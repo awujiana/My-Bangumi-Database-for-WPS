@@ -185,8 +185,7 @@ export function initIncrementalSyncFromRibbon(): void {
 > 5.1 已完成：enrichAlias 别名列外提、findHeaderRow、getColumnMap、
 > locked-sheet buildCandidate、clean-engine scanXinFanHeaderRow、
 > preview getRowData、ribbon detectConflicts、sync-result-dialog 日期统计。
-> 仍未做：ui/handlers/sync.ts 收藏填充（改批量写需先读旧值做基底，且会丢掉
-> setCellValue 的 Formula/Value 回退，收益风险比不划算，暂搁置）。
+> ✅ 收藏填充已改批量矩形写（`b80f8a99`，§5.6 A3）——§5.1 全部完成。
 > 本批另两项已落地：enrichIntoRow 整行批量读写（源表半程见 `efd1336f`、目标表写穿透缓存见下方「2026-10-18 批次」注）、github-sync 删除 undo 快照（见「删除阶段」行标注）。
 >
 > 5.2 已完成：四个 `fetchXxxText` → `createRawTextFetcher`（含 abort 监听器泄漏修复）。
@@ -226,7 +225,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | ~~`locked-sheet.ts:306-330`~~ **已修（2026-10-17 标注）**                              | 每张表 660 次，多工作簿再乘表数                                | 一次矩形读 10×60                                                                                                                                                                                                                               | 660 次 → 11 次/表           |
 | ~~`ribbon-service.ts:443` `detectConflicts`~~ **已修（2026-10-17 标注）**              | 每行 2-3 次逐格读，1000 行 ≈ 3000 次                           | 照抄同文件 `getSyncPreview:215` 的批量范式                                                                                                                                                                                                     | 3000 次 → 1 次              |
 | ~~`ui/preview.ts:120-130` `getRowData`~~ **已修（2026-10-17 标注）**                   | 每行约 17 次 IPC，500 行 ≈ 8500 次（「预览同步」卡数秒的主因） | 循环外对列包围盒一次矩形读                                                                                                                                                                                                                     | N×17 → 1 次                 |
-| ~~`ui/handlers/sync.ts:199-205` `_fillSheetWithCollections`~~ **主动搁置**             | 每条收藏逐格写 ~8 列                                           | ❌ 不改：批量写要先读旧值做基底（否则 `null`/空串会清掉区间中段的列），且会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链。收益/风险比不划算（重启前置条件见 §5.6 A3）                                                                                                  | —                           |
+| ~~`ui/handlers/sync.ts:199-205` `_fillSheetWithCollections`~~ **已修（`b80f8a99`）**             | 每条收藏逐格写 ~8 列                                           | ❌ 不改：批量写要先读旧值做基底（否则 `null`/空串会清掉区间中段的列），且会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链。收益/风险比不划算（重启前置条件见 §5.6 A3）                                                                                                  | —                           |
 | ~~`sync-result-dialog.ts:128-149`~~ **已修（2026-10-17 标注）**                        | 每次同步完成弹窗全表走一遍，5000 行 ≈ 2 万次                   | 循环外一次读两列矩形                                                                                                                                                                                                                           | 2N → 1 次                   |
 | ~~`clean-engine.ts:197-220` `scanXinFanHeaderRow`~~ **已修（2026-10-17 标注）**        | 30 行 × 50 列逐格扫，且被每张表放大                            | 逐行 `readRangeValues`                                                                                                                                                                                                                         | ~2100 次 → ~30 次/表        |
 
@@ -247,7 +246,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | ~~`ribbon-service.ts` vs `tools/util/index.ts` 的剪贴板部分~~ **已收敛**                                            | `copyTokenForRibbon`/`copyTokenToClipboard` 各写一份逐字相同的「建 textarea → select → execCommand → 移除」                                                                                                                  | ✅ 抽 `copyTextWithResult(text): ClipboardCopyResult`（判别联合 `ok / unsupported / error`，保留 Ribbon 弹窗「不支持」与「带原因」两种文案）；`copyTokenToClipboard` 变一行委托                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ~~`ribbon-service.ts` vs `tools/util/index.ts` 的取用户资料~~ **已收敛**                                            | `testTokenForRibbon` 与 `_fetchBgmUserInfo` 是两份独立的 XHR 取用户资料（~80 / ~120 行），前者 async + 弹窗、后者回调式                                                                                                      | ✅ 抽 `fetchBgmMe(signal): Promise<BgmMeResult>`（**纯请求 + 解析，无副作用**），返回**带 HTTP 状态码的判别联合** `ok / http(status) / network / timeout / parse / aborted / no-token`。判别联合**刻意不压平** —— `testTokenForRibbon` 要按 401 与其它状态码给不同文案、且超时与网络错误文案不同， 而 `_fetchBgmUserInfo` 只需粗分类（timeout 并入 network）。副作用按需留在各自调用方：前者落库 userId/username + 通知 Token 更新，后者落库 + 头像缓存 + PluginStorage 持久化。 `ribbon-service.ts` 的独立 XHR 实现已删净（该文件内 0 处 `new XMLHttpRequest()`）。注意 `_fetchBgmUserInfo` 的回调因此变成**微任务**，其 11 条 XHR 用例已补 flush                                                                                                                                                                                                                                                                                                                                                                |
 | ~~`sync-record.ts` 两处表头写入~~ **已收敛（6dab3478，2026-10-15）**                                                                                       | 新建表时**逐格**写表头（12 次 COM）、迁移时矩形一次写并顺带设底色 —— 同一件事两种写法                                                                                                                                        | ✅ 抽 `writeSyncRecordHeader(sheet, { gray? })`：两处共用一次 `Range.Value2 = [SYNC_RECORD_COLUMNS]` 矩形写，新建表路径顺带从 12 次 IPC 降到 1 次。 ⚠️ 已有表路径（`getOrCreateSyncRecordSheet` 的 else 分支）**不走本函数** —— 那里是「逐格读回比对 + 只修复不一致的列」并记修复日志，语义不同                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ~~`preview.ts` / `sync.ts`~~ **主动搁置**                                                                           | `{onPause,onResume,onStop}` handlers 对象重复（实测 5 处逐字相同 + `preview.ts` 1 处空实现变体）                                                                                                                             | ❌ 不改：① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 这类精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError。收益仅 ~35 行，**无性能收益**（详见 §5.6 C）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ~~`preview.ts` / `sync.ts`~~ **已收敛（`f11b037b`）**                                                                           | `{onPause,onResume,onStop}` handlers 对象重复（实测 5 处逐字相同 + `preview.ts` 1 处空实现变体）                                                                                                                             | ❌ 不改：① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 这类精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError。收益仅 ~35 行，**无性能收益**（详见 §5.6 C）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### 5.3 CPU 热点（非 IPC）
 
@@ -266,7 +265,7 @@ export function initIncrementalSyncFromRibbon(): void {
 > 三处**结论与清单建议不同**的取舍（均有理由，详见各提交信息）：
 > ① `verifyToken` **未**委托 `fetchBgmMe` —— 后者内部读「已存 token」，而前者要验证「调用方显式传入的 token」（可能是未保存的测试 Token），委托会改变签名语义；
 > ② `tools/utility.js` 与 `tools/util/index.js` 的双轨 **只做局部合一**（删死守卫 + sync-result-dialog 同文件两 specifier 合一）—— 全局统一要改 19 个测试文件的 mock 路径，超过阈值；
-> ③ 布局探测**未加跨调用缓存** —— 布局在 SheetActivate/编辑后会变，无失效机制的 memo 有写错数据风险（重启前置条件见 §5.6 A2）。
+> ③ 布局探测**已加跨调用缓存**（`ef46ba87`，§5.6 A2）——布局在 SheetActivate/编辑后会变，缓存复用 `clearSheetCache` 失效入口，与 findHeaderRow 同等暴露。
 
 四个并行审查（本轮 4 个提交的回归核对 / `ts/sync`+`ts/services` / `ts/ui`+`ts/panel`+`ts/tools` / 对照本清单比对）。
 
@@ -341,7 +340,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | 2 | `scanTarget` 原先 `collectExcludedRows` 1 次全量读 + `estimateRowBytes` 至多 30 次逐行采样读 + `planNoiseRules` 又 1 次全量读 | 数据区整块**只读一次**，排除行判定 / 行字节估算 / 噪声行扫描三者共用（`block` 可选参数；未提供时各函数按原行为自读，导出函数仍可独立使用） | 每目标至多 32 次 COM → 1 次 |
 | 3 | `scanCleanRules` 全同步：大表扫描期间任务窗格**完全冻结**（按钮无反馈、无法滚动）           | 改异步，**逐目标之间让出宏任务**（`setTimeout(0)`）。⚠️ 必须是宏任务 —— 微任务（`await Promise.resolve()`）不足以让浏览器重绘，与首屏 COM 扫描同一原则；页面侧 `handleScan` 改 async + 扫描防重入（`isScanning`，防双击交错写 `scanResult`） | 扫描期间 UI 保持响应            |
 
-**评估后不做**（风险 > 收益，记录备查）：多规则重复解析表结构（`planDuplicateRows` 等各自调 `readSheetLayout`）。共享 `buildTarget` 已解析的 layout 对新番表会**改变语义**——新番表无「名称」表头，`readSheetLayout` 的标准路径必然失败并返回空计划，而 `buildTarget` 走专属签名路径构造了推导 colMap；传入会让新番表突然能跑重复行规则。要做得先给 `CleanTargetInfo` 记 `isXinFan` 再分流，收益仅 (规则数−1)×3 次 COM/目标。（完整分类见 **§5.6 A1**）
+**原评估后不做，✅ 已落地（`a10774a9`，§5.6 A1）**：多规则重复解析表结构（`planDuplicateRows` 等各自调 `readSheetLayout`）。共享 `buildTarget` 已解析的 layout 对新番表会**改变语义**——新番表无「名称」表头，`readSheetLayout` 的标准路径必然失败并返回空计划，而 `buildTarget` 走专属签名路径构造了推导 colMap；传入会让新番表突然能跑重复行规则。要做得先给 `CleanTargetInfo` 记 `isXinFan` 再分流，收益仅 (规则数−1)×3 次 COM/目标。（完整分类见 **§5.6 A1**）
 
 #### 5.5.4 UI 风格统一：统计条收敛六套手写变体
 
@@ -365,37 +364,54 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ---
 
-### 5.6 评估后不做 / 新发现重构点汇总（2026-10-18 盘点）
+### 5.6 评估后不做 / 新发现重构点汇总（2026-10-18 盘点 · **2026-10-19 全部落地**）
 
 > 本章汇总 §5 全清单里**未做**的重构点（已完成的见 §5.1–§5.5 各行标注，不重复列）。
 > 分三桶：**A = 评估后不做、但有性能收益**——不论当初因风险还是收益比搁置，一律列出收益量化与**重启前置条件**，条件满足时应重新评估；**B = 本轮新发现、有性能收益但尚未评估**（只读盘点，未改动代码）；**C = 评估后不做且无性能收益**（纯去重 / 语义取舍，备查）。
+>
+> **落地记录（2026-10-19）**：A / B / C 共 10 项已全部完成，逐项提交与差异如下——
+>
+> | 项 | 内容 | 提交 | 与本文档原计划的差异 |
+> | --- | --- | --- | --- |
+> | A1 | 清理多规则共享表结构解析 | `a10774a9` | **不需要 `isXinFan` 前置条件**：共享的是 `readSheetLayout` 的同一结果（新番表标准路径本就解析失败返回 null），而非 `buildTarget` 的推导 colMap——语义天然不变 |
+> | A2 | 布局探测跨调用缓存 | `ef46ba87` | 只缓存 `detectAnimeSourceLayout`（同族键 + `clearSheetCache` 失效）；`findIntroSheetInWorkbook` **不做**工作簿级缓存（增删表无失效事件；B1 后其重扫已降到每表至多 1 次矩形读），理由写在 JSDoc |
+> | A3 | 收藏填充批量写 | `b80f8a99` | 按「连续行合并 + 每批 ≤200 行」实现（500 条 ≈ 十余次），非单次整表写——限制单批失败波及面；批写失败回退逐格 `setCellValue` |
+> | B1 | `countIntroHeaderHits` 矩形读 | `413ddabf` | — |
+> | B2 | `findAliasColumn` 矩形读 | `413ddabf` | — |
+> | C1 | handlers 工厂 | `f11b037b` | 落为 `core/sync-progress-handlers.ts` 叶子模块（依赖注入 `BGM.sync`），同时收敛两处内联类型；action-handlers 的「不支持暂停」变体保留 |
+> | C2 | `verifyToken` 委托 | `b973fedc` | 管道核心 `requestBgmMeRaw` 显式 token 参数化；`fetchBgmMe` 的 username 取值顺序（nickname 优先）与 `verifyToken`（username 优先）**各自保留**，不强行统一 |
+> | C3 | 双轨 barrel 合一 | `958c5b00` | 统一到 `tools/util/index.js`（删 `tools/utility.ts` 壳）；`config-service.test.ts` 改 importOriginal 局部 mock；sync 记录表相关 typeof 守卫**保留**（刻意降级路径） |
+> | C4 | `toggleSheetLock` 统一 | `2903dafa` | 收敛状态核心（`applyLockedSheet` / `isLockedAt`）与渲染（`renderSheetLockUi`），页面校验文案 / toast / 后处理**原样保留** |
+> | C5 | 删 `getSequentialRowsBySeqCol` | `c94775ff` | 连 12 条测试一起删（用例总数 4540 → 4528） |
+>
+> 验证口径：每项独立提交，均过 eslint 0 / 生产 tsc 0 / gate 八关全绿。
 
-#### A. 评估后不做 · 有性能收益（前置条件满足后应重启评估）
+#### A. 评估后不做 · 有性能收益（前置条件满足后应重启评估）—— ✅ 已全部落地（2026-10-19）
 
 | # | 重构点（现状） | 做了的性能收益 | 暂不做的原因（风险） | 重启前置条件 |
 | --- | --- | --- | --- | --- |
-| A1 | 清理多规则重复解析表结构：`planDuplicateRows` / `planDuplicateUrlRows` / `planEmptyNameRows` 各自调 `readSheetLayout`（`sheet-cleaning.ts:265 / 368 / 446`，原记录见 §5.5.3 末尾） | 每目标省 (规则数−1) 次表结构解析（`getColumnMap` 矩形读 + `getLastRow`）；执行前 diff 预览一次算 3 个计划 → 3 次解析可降到 1 次。**原记录收益估计：(规则数−1)×3 次 COM/目标** | 共享 `buildTarget` 已解析的 layout 对新番表会**改变语义**——新番表无「名称」表头，`readSheetLayout` 的标准路径必然失败并返回空计划，而 `buildTarget` 走专属签名路径构造了推导 colMap；传入会让新番表**突然能跑重复行规则** | 先给 `CleanTargetInfo` 记 `isXinFan` 再分流：isXinFan 用推导 colMap，其余目标走共享 layout |
-| A2 | 富化布局探测无跨调用缓存：`detectAnimeSourceLayout` / `findIntroSheetInWorkbook` 每次进富化页 / SheetActivate 后全簿重跑（矩形读半程已由 `efd1336f` 修复——每表 ~1 次矩形读，但结果不记忆） | 免掉每次激活的全簿重扫：`N 表 × 激活次数` 次矩形读 → 命中缓存 0 次；反复切换工作表 / 反复开关富化页时收益线性累积 | 布局在 SheetActivate / 用户编辑表头后会变，**无失效机制的 memo 有写错数据风险**（§5.4 取舍③） | 失效机制：SheetActivate 与表头编辑后按「表名 + 版本」失效——`clearSheetCache(ws)` 已有先例（`panel-lifecycle.ts:833` 激活即清），可复用同一失效入口再加「布局版本号」 |
-| A3 | 收藏填充逐格写：`_fillSheetWithCollections`（`ui/handlers/sync.ts:142`）每条收藏逐格写 ~8 列（500 条 ≈ 4000 次 COM） | ~8N 次 COM → 批量矩形写（500 条收藏 ≈ 4000 次 → 十余次）；顺带消除「写一半失败留下半行脏数据」的中间态 | ① 批量写要先读旧值做基底，否则 `null`/空串会清掉区间中段的列（§2.2）；② 会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链（个别宿主写公式列的兼容路径） | 读旧值做基底（`readRangeCellValues` 保留原始类型）+ 批量失败时对失败行动逐格 `setCellValue` 兜底，回退链不丢 |
+| A1 ✅ `a10774a9` | 清理多规则重复解析表结构：`planDuplicateRows` / `planDuplicateUrlRows` / `planEmptyNameRows` 各自调 `readSheetLayout`（`sheet-cleaning.ts:265 / 368 / 446`，原记录见 §5.5.3 末尾） | 每目标省 (规则数−1) 次表结构解析（`getColumnMap` 矩形读 + `getLastRow`）；执行前 diff 预览一次算 3 个计划 → 3 次解析可降到 1 次。**原记录收益估计：(规则数−1)×3 次 COM/目标** | 共享 `buildTarget` 已解析的 layout 对新番表会**改变语义**——新番表无「名称」表头，`readSheetLayout` 的标准路径必然失败并返回空计划，而 `buildTarget` 走专属签名路径构造了推导 colMap；传入会让新番表**突然能跑重复行规则** | 先给 `CleanTargetInfo` 记 `isXinFan` 再分流：isXinFan 用推导 colMap，其余目标走共享 layout |
+| A2 ✅ `ef46ba87` | 富化布局探测无跨调用缓存：`detectAnimeSourceLayout` / `findIntroSheetInWorkbook` 每次进富化页 / SheetActivate 后全簿重跑（矩形读半程已由 `efd1336f` 修复——每表 ~1 次矩形读，但结果不记忆） | 免掉每次激活的全簿重扫：`N 表 × 激活次数` 次矩形读 → 命中缓存 0 次；反复切换工作表 / 反复开关富化页时收益线性累积 | 布局在 SheetActivate / 用户编辑表头后会变，**无失效机制的 memo 有写错数据风险**（§5.4 取舍③） | 失效机制：SheetActivate 与表头编辑后按「表名 + 版本」失效——`clearSheetCache(ws)` 已有先例（`panel-lifecycle.ts:833` 激活即清），可复用同一失效入口再加「布局版本号」 |
+| A3 ✅ `b80f8a99` | 收藏填充逐格写：`_fillSheetWithCollections`（`ui/handlers/sync.ts:142`）每条收藏逐格写 ~8 列（500 条 ≈ 4000 次 COM） | ~8N 次 COM → 批量矩形写（500 条收藏 ≈ 4000 次 → 十余次）；顺带消除「写一半失败留下半行脏数据」的中间态 | ① 批量写要先读旧值做基底，否则 `null`/空串会清掉区间中段的列（§2.2）；② 会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链（个别宿主写公式列的兼容路径） | 读旧值做基底（`readRangeCellValues` 保留原始类型）+ 批量失败时对失败行动逐格 `setCellValue` 兜底，回退链不丢 |
 
-#### B. 新发现 · 有性能收益（2026-10-18 只读盘点，未评估未改动）
+#### B. 新发现 · 有性能收益（2026-10-18 只读盘点，未评估未改动）—— ✅ 已全部落地（2026-10-19）
 
 | # | 重构点（现状） | 量化收益 | 风险备注 |
 | --- | --- | --- | --- |
-| B1 | `countIntroHeaderHits`（`enrich-engine.ts:1860`）逐行 50 次 `getCellValue`；被 `findIntroSheetInWorkbook`（每张候选表，`:1889`）与 `buildIntroSheetContext`（`:1921`）调用 | 每候选表最坏 10 行 × 50 列 = **500 次逐格读** → 1 次矩形读（与 `detectAnimeSourceLayout` 同范式：矩形读 + 形状守卫失败回退逐格，行为逐字一致）；N 表工作簿每次进富化页最坏 N×500 次 | 低：纯读、有回退；但 `MAX_SCAN_ROWS=10` 内「命中 ≥2 即停」的早停语义要保持 |
-| B2 | `findAliasColumn`（`enrich-engine.ts:457`）逐列 50 次 `getCellValue` 扫别名列表头 | 每次调用 ~50 次 → 1 次矩形读（只读表头行，`findHeaderRow` 已有缓存） | 低：同上；调用点 3 处（`:531` / `:1059` / `:2010` 回退路径），改动一次三处受益 |
+| B1 ✅ `413ddabf` | `countIntroHeaderHits`（`enrich-engine.ts:1860`）逐行 50 次 `getCellValue`；被 `findIntroSheetInWorkbook`（每张候选表，`:1889`）与 `buildIntroSheetContext`（`:1921`）调用 | 每候选表最坏 10 行 × 50 列 = **500 次逐格读** → 1 次矩形读（与 `detectAnimeSourceLayout` 同范式：矩形读 + 形状守卫失败回退逐格，行为逐字一致）；N 表工作簿每次进富化页最坏 N×500 次 | 低：纯读、有回退；但 `MAX_SCAN_ROWS=10` 内「命中 ≥2 即停」的早停语义要保持 |
+| B2 ✅ `413ddabf` | `findAliasColumn`（`enrich-engine.ts:457`）逐列 50 次 `getCellValue` 扫别名列表头 | 每次调用 ~50 次 → 1 次矩形读（只读表头行，`findHeaderRow` 已有缓存） | 低：同上；调用点 3 处（`:531` / `:1059` / `:2010` 回退路径），改动一次三处受益 |
 
-#### C. 评估后不做 · 无性能收益（纯去重 / 语义取舍，备查）
+#### C. 评估后不做 · 无性能收益（纯去重 / 语义取舍，备查）—— ✅ 已全部落地（2026-10-19）
 
 | 重构点 | 收益性质 | 不做原因 |
 | --- | --- | --- |
-| `preview.ts` / `sync.ts` 的 `{onPause,onResume,onStop}` handlers 工厂（5 处逐字重复 + 1 处空实现变体） | 仅 ~35 行去重 | ① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError |
-| `verifyToken` 委托 `fetchBgmMe`（`GET /v0/me` 的第三份实现） | 去重 | 委托会改变签名语义：`fetchBgmMe` 内部读「已存 token」，`verifyToken` 要验证「调用方显式传入的 token」（可能是未保存的测试 Token） |
-| `tools/utility.js` 与 `tools/util/index.js` 双轨 barrel 全局合一 | 统一入口 | 要改 19 个测试文件的 mock 路径，超过改动面阈值（已做局部合一：删死守卫 + 同文件两 specifier 合一） |
-| `toggleSheetLock` 两套实现统一 | 去重 | 确认为不同页面的有意实现（面板自管状态 / 富化页委托锁引擎 + 后处理），核心锁定逻辑只有一份，强行统一反而会破坏各自的页面状态流 |
-| `getSequentialRowsBySeqCol` 删除（`exceltobangumi/index.ts:226`） | 删死代码 | 全库无生产调用方，但从 `ts/index.ts` barrel 导出且有 ~15 条用例覆盖；删除会掉覆盖又破坏公开 API。若确认不再对外，可连测试一起删 |
+| ✅ `f11b037b` `preview.ts` / `sync.ts` handlers 工厂（5 处逐字重复 + 1 处空实现变体） | 仅 ~35 行去重 | ① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError |
+| ✅ `b973fedc` `verifyToken` 委托 `fetchBgmMe`（`GET /v0/me` 的第三份实现） | 去重 | 委托会改变签名语义：`fetchBgmMe` 内部读「已存 token」，`verifyToken` 要验证「调用方显式传入的 token」（可能是未保存的测试 Token） |
+| ✅ `958c5b00` `tools/utility.js` 与 `tools/util/index.js` 双轨 barrel 合一 | 统一入口 | 要改 19 个测试文件的 mock 路径，超过改动面阈值（已做局部合一：删死守卫 + 同文件两 specifier 合一） |
+| ✅ `2903dafa` `toggleSheetLock` 两套实现统一 | 去重 | 确认为不同页面的有意实现（面板自管状态 / 富化页委托锁引擎 + 后处理），核心锁定逻辑只有一份，强行统一反而会破坏各自的页面状态流 |
+| ✅ `c94775ff` `getSequentialRowsBySeqCol` 删除（`exceltobangumi/index.ts:226`） | 删死代码 | 全库无生产调用方，但从 `ts/index.ts` barrel 导出且有 ~15 条用例覆盖；删除会掉覆盖又破坏公开 API。若确认不再对外，可连测试一起删 |
 
-> **后续动作口径**：A / B 任一项开工时，按本文档「统一改法」（§5 引言：矩形读 + 逐格读回退、形状守卫不一致绝不猜）实施，跑 `check:com-in-loop` 门禁并补回归；A 三项须先落实「重启前置条件」再动代码。
+> **后续动作口径（已全部落地，留存备查）**：A / B 任一项开工时，按本文档「统一改法」（§5 引言：矩形读 + 逐格读回退、形状守卫不一致绝不猜）实施，跑 `check:com-in-loop` 门禁并补回归；A 三项须先落实「重启前置条件」再动代码。
 
 ---
 
@@ -499,4 +515,4 @@ const existing = existingRows[0]
 
 ### 性能重构备查（评估后不做 / 新发现）
 
-见 **§5.6**：**3 项「评估后不做但有性能收益」**（A1 清理多规则重复解析表结构 / A2 富化布局探测无跨调用缓存 / A3 收藏填充逐格写，各附收益量化与重启前置条件）；**2 项「新发现待评估」**（B1 `countIntroHeaderHits` 每候选表最坏 500 次逐格读、B2 `findAliasColumn` 每次 50 次逐格读，均可按「矩形读 + 回退」收敛）；**5 项无性能收益的搁置项**（备查）。
+见 **§5.6**：A / B / C 共 10 项已于 **2026-10-19 全部落地**（3 项性能收益：A1 多规则共享表结构 / A2 布局探测缓存 / A3 收藏填充批量写；2 项新发现：B1 `countIntroHeaderHits` 500 次逐格读、B2 `findAliasColumn` 50 次逐格读，均改矩形读；5 项去重 / 语义取舍：C1–C5）。逐项提交与「与原计划的差异」见该节「落地记录」表。

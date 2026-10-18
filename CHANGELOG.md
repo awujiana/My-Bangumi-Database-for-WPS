@@ -8,6 +8,22 @@
 
 ## [未发布]
 
+### 重构 / 性能（§5.6 全部 10 项落地：3 项性能收益 + 2 项新发现 + 5 项去重）
+
+按 §5.6「评估后不做 / 新发现重构点」逐项落地（从难到易），每项独立提交：
+
+- **A1 清理多规则共享表结构**（`a10774a9`）：`planDuplicateRows` / `planDuplicateUrlRows` / `planEmptyNameRows` 原先各自 `readSheetLayout`（每目标 3 次解析）→ `scanTarget` 每目标惰性解析一次、三规则共用。**无需 `isXinFan` 前置条件**——共享的是 `readSheetLayout` 的同一结果（新番表标准路径本就返回 null），语义天然不变。
+- **A2 布局探测跨调用缓存**（`ef46ba87`）：`detectAnimeSourceLayout` 加同族键缓存 + 复用 `clearSheetCache` 失效入口；`findIntroSheetInWorkbook` 刻意不缓存（增删表无失效事件），理由写入 JSDoc。
+- **A3 收藏填充批量写**（`b80f8a99`）：`_fillSheetWithCollections` 从逐格 ~8 次/条 → 连续行合并的 `Range.Value2` 矩形写（每批 ≤200 行），旧值基底 + 批失败逐格 `setCellValue` 回退。
+- **B1/B2 简介识别与别名列改矩形读**（`413ddabf`）：`countIntroHeaderHits` 每候选表最坏 500 次逐格读 → 1 次；`findAliasColumn` 每次 50 次 → 1 次；均含形状守卫回退。
+- **C1 handlers 工厂**（`f11b037b`）：5 处逐字重复 + 1 处空实现 → `core/sync-progress-handlers.ts` 叶子模块（依赖注入，避开 mock 口径坑）。
+- **C2 verifyToken 委托**（`b973fedc`）：`GET /v0/me` 管道核心 `requestBgmMeRaw` 显式 token 参数化，两处语义差异（username 取值顺序 / 超时）逐字保留。
+- **C3 双轨 barrel 合一**（`958c5b00`）：40 个文件统一到 `tools/util/index.js`，删兼容壳与数据路径 typeof 死守卫。
+- **C4 toggleSheetLock 统一**（`2903dafa`）：共享状态核心（`applyLockedSheet` / `isLockedAt`）与渲染（`renderSheetLockUi`），页面流程原样保留。
+- **C5 删死 API**（`c94775ff`）：`getSequentialRowsBySeqCol` 连 12 条测试一起删。
+
+验证：每项独立过 gate 八关；最终 vitest **137 文件 / 4528 用例全绿**（4540 → 4528，差额即 C5 删除的 12 条）。
+
 ### 文档（COM 优化清单盘点：评估后不做 / 新发现重构点汇总，TECH_KNOWLEDGE §5.6）
 
 - **背景**：`文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md` §5.1–§5.5 的重构点大多已标注「已修」，但「**未做**」的项散落四节（§5.1 主动搁置 / §5.2 主动搁置 / §5.4 取舍③ / §5.5.3 末尾），且从未按「有无性能收益」归类——想捡起某一项时要在全文档里人肉找前置条件。
