@@ -1275,6 +1275,33 @@ select.input option,
   }
 }
 
+/* ---- 通栏区块的操作区限宽（仅横屏多列模式） ---- */
+/* .section-wide 在宽窗格下横跨全部列，内部「按钮行 / 页签 / 统计条」若跟着
+   拉满，会出现 1500px 的单个按钮或各占一半的 750px 巨型页签——横屏下极不
+   美观。数据表格与 diff 明细仍用全宽（信息密度需要）。
+   ⚠️ 必须与栅格同断点（min-width: 960px）：.section-wide 类本身不区分宽度，
+   不加断点会让窄屏单列也命中（按钮/页签不再填满，改变窄屏行为）。 */
+@media (min-width: 960px) {
+  .section-wide .bgm-btn-row {
+    max-width: 720px;
+  }
+
+  /* 页签改内容宽度（原 flex:1 均分，通栏下变成巨型 tab） */
+  .section-wide .preview-tab {
+    flex: 0 0 auto;
+  }
+
+  /* 统计条收敛到与操作区协调的宽度，避免一条短胶囊 + 大片空白 */
+  .section-wide .stat-grid {
+    max-width: 880px;
+  }
+
+  /* clean 页扫描按钮：通栏时改内容宽度（基础 flex:1 见 clean.css） */
+  .section-wide #cleanScanBtn {
+    flex: 0 0 auto;
+  }
+}
+
 /* ============================ 16. 模块排序编辑器 ======================== */
 /* 设置页「模块排序」：每个页面一组，条目支持 ↑↓ 按钮与鼠标拖拽两种排序方式 */
 .module-order-groups {

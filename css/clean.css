@@ -406,6 +406,11 @@
   background: transparent;
 }
 
+/* ---- 扫描按钮：列内 / 窄屏填满按钮行（原为 HTML 行内样式，下沉以便横屏覆盖） ---- */
+#cleanScanBtn {
+  flex: 1;
+}
+
 /* ---- 危险按钮 ---- */
 .bgm-btn.danger {
   color: var(--danger);
