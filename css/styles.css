@@ -36,7 +36,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -65,8 +65,8 @@
 }
 
 .modal-close-btn:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+    background: var(--fill-6);
+    color: var(--text-1);
 }
 
 .modal-body {
@@ -80,12 +80,12 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 20px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid var(--border);
     flex-shrink: 0;
 }
 
 #dialogMessage {
-    color: #b0b0b0;
+    color: var(--text-2);
 }
 
 .dialog-buttons {
@@ -109,11 +109,12 @@
 }
 
 .confirm-no {
-    background: #3a3a3a;
+    background: var(--bg-surface-2);
 }
 
 .confirm-yes {
     background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
+    color: #fff;
 }
 
 /* ========== 同步预览弹窗 ========== */
@@ -125,7 +126,7 @@
 
 .sync-preview-modal-toolbar {
     padding: 10px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid var(--border);
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
@@ -175,8 +176,8 @@
 }
 
 .detail-close-btn:hover {
-    background: rgba(255,255,255,0.1);
-    color: #fff;
+    background: var(--fill-6);
+    color: var(--text-1);
 }
 
 /* ========== 基础重置 ========== */
@@ -224,7 +225,7 @@ body {
 }
 
 .header-text h2 {
-    color: #ffffff;
+    color: var(--text-1);
     margin-bottom: 5px;
     font-size: 22px;
 }
@@ -343,18 +344,18 @@ body {
 .bgm-btn.primary {
     background: var(--bg-surface);
     color: var(--text-1);
-    border: 1px solid rgba(255,255,255,0.16);
+    border: 1px solid var(--border-strong);
 }
 
 .bgm-btn.primary:hover {
     background: var(--bg-btn-hover);
-    border-color: rgba(255,255,255,0.28);
+    border-color: var(--border-emphasis);
 }
 
 .bgm-btn.warning {
     background: var(--bg-surface);
     color: var(--warning);
-    border: 1px solid rgba(255,255,255,0.16);
+    border: 1px solid var(--border-strong);
 }
 
 .bgm-btn.warning:hover {
@@ -365,7 +366,7 @@ body {
 .bgm-btn.success {
     background: var(--bg-surface);
     color: var(--success);
-    border: 1px solid rgba(255,255,255,0.16);
+    border: 1px solid var(--border-strong);
 }
 
 .bgm-btn.success:hover {
@@ -407,7 +408,7 @@ body {
     font-weight: 500;
     padding: 2px 6px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--fill-3);
     transition: color 0.3s, background 0.3s;
 }
 
@@ -810,12 +811,12 @@ select.input {
 
 .format-table th {
     background: var(--bg-surface-2);
-    color: #fff;
+    color: var(--text-1);
     font-weight: 600;
 }
 
 .format-table td {
-    color: #ccc;
+    color: var(--text-2);
 }
 
 .format-table .required {
@@ -904,7 +905,7 @@ select.input {
 }
 
 #filterStatus {
-    color: #ccc;
+    color: var(--text-2);
     white-space: pre-line;
     line-height: 1.5;
 }
@@ -921,7 +922,7 @@ select.input {
     z-index: 9999;
     animation: toastIn 0.3s ease;
     background: var(--bg-surface-2);
-    color: #fff;
+    color: var(--text-1);
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
@@ -1059,13 +1060,13 @@ select.input {
 
 .detail-table th {
     background: var(--bg-surface-2);
-    color: #fff;
+    color: var(--text-1);
     font-weight: 600;
     width: 120px;
 }
 
 .detail-table td {
-    color: #ccc;
+    color: var(--text-2);
 }
 
 .detail-table .label {
@@ -1215,8 +1216,8 @@ select.input {
 }
 
 .bgm-dialog-close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--fill-6);
+    color: var(--text-1);
 }
 
 .bgm-dialog-icon {
@@ -1452,7 +1453,7 @@ select.input {
     font-weight: 500;
     z-index: 10002;
     background: var(--bg-surface-2);
-    color: #fff;
+    color: var(--text-1);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     opacity: 0;
     transition: opacity 0.3s, transform 0.3s;
@@ -1493,11 +1494,11 @@ select.input {
 }
 
 .preview-table tr {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .preview-table tr:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fill-1);
 }
 
 .preview-header-row {
@@ -1514,7 +1515,7 @@ select.input {
     text-align: center;
     font-size: 11px;
     white-space: nowrap;
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid var(--border-subtle);
     min-width: 28px;
 }
 
@@ -1525,7 +1526,7 @@ select.input {
 
 .preview-name {
     font-weight: 500;
-    color: #ddd;
+    color: var(--text-1);
 }
 
 .preview-header {
@@ -1711,7 +1712,7 @@ select.input {
 /* ========== 富预览 - 详情条目 ========== */
 .detail-item {
     background: linear-gradient(180deg, #252530 0%, #1f1f28 100%);
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     margin-bottom: 6px;
     overflow: hidden;
@@ -1736,8 +1737,8 @@ select.input {
     align-items: center;
     justify-content: space-between;
     padding: 6px 10px;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: var(--fill-7);
+    border-bottom: 1px solid var(--border-faint);
     gap: 6px;
 }
 
@@ -1825,7 +1826,7 @@ select.input {
     display: flex;
     align-items: center;
     padding: 2px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border-faint);
     gap: 8px;
     min-height: 20px;
 }
@@ -1845,7 +1846,7 @@ select.input {
 
 .detail-value {
     font-size: 12px;
-    color: #ccc;
+    color: var(--text-2);
     word-break: break-all;
     line-height: 1.4;
 }
@@ -1949,6 +1950,43 @@ select.input {
     --radius-md: 8px;
 }
 
+/* ========== Catppuccin Latte（浅色主题下的对应调色板） ==========
+   2026-10-19：上方 Mocha 调色板是**深色专用**的第二套 token 体系，被进度卡、
+   详情表、统计芯片等大量 `var(--text)/var(--surface0)` 使用。原先没有浅色映射，
+   导致浅色主题下这些组件仍是深色孤岛、文字与背景撞色。此处按 Catppuccin
+   官方 Latte 主题补齐映射（与 Mocha 一一对应），浅色下整体成立。
+*/
+[data-theme="light"] {
+    --crust:     #dce0e8;
+    --mantle:    #e6e9ef;
+    --base:      #eff1f5;
+    --surface0:  #ccd0da;
+    --surface1:  #bcc0cc;
+    --surface2:  #acb0be;
+
+    --text:      #4c4f69;
+    --subtext1:  #5c5f77;
+    --subtext0:  #6c6f85;
+    --overlay2:  #7c7f93;
+    --overlay1:  #8c8fa1;
+    --overlay0:  #9ca0b0;
+
+    --rosewater: #dc8a78;
+    --flamingo:  #dd7878;
+    --pink:      #ea76cb;
+    --mauve:     #8839ef;
+    --red:       #d20f39;
+    --maroon:    #e64553;
+    --peach:     #fe640b;
+    --yellow:    #df8e1d;
+    --green:     #40a02b;
+    --teal:      #179299;
+    --sky:       #04a5e5;
+    --sapphire:  #209fb5;
+    --blue:      #1e66f5;
+    --lavender:  #7287fd;
+}
+
 /* ========== 通用进度组件（modal / inline / detach） ========== */
 .bgm-progress__content {
     max-width: 640px;
@@ -1968,7 +2006,7 @@ select.input {
     justify-content: space-between;
     gap: 8px;
     padding: 10px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .bgm-progress__head-left {
@@ -2004,7 +2042,7 @@ select.input {
 }
 
 .bgm-progress__close:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--fill-5);
     color: var(--text, #cdd6f4);
 }
 
@@ -2021,7 +2059,7 @@ select.input {
 /* ---- 底部按钮 ---- */
 .bgm-progress__footer {
     padding: 10px 14px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--border-subtle);
 }
 
 .bgm-progress__btns {
@@ -2055,7 +2093,7 @@ select.input {
 }
 
 .bgm-progress--detach {
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-medium);
     border-radius: 10px;
     background: var(--base, #1e1e2e);
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
@@ -2078,7 +2116,7 @@ select.input {
     white-space: pre-line;
     padding: 8px 10px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--fill-2);
     font-size: 12px;
     line-height: 1.6;
 }
@@ -2187,9 +2225,9 @@ select.input {
 .bgm-progress__chart {
     margin-top: 12px;
     padding: 14px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fill-1);
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
 }
 
 /* 结果区域 - 确保可滚动 */
@@ -2206,9 +2244,9 @@ select.input {
     white-space: pre-line;
     color: var(--text, #cdd6f4);
     padding: 10px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--fill-2);
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
     margin: 0;
 }
 
@@ -2239,7 +2277,7 @@ select.input {
     font-size: 11px;
     padding: 3px 8px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--fill-4);
     color: #94a3b8;
     white-space: nowrap;
 }
@@ -2279,7 +2317,7 @@ select.input {
 .bgm-detail-table-wrap {
     overflow-x: auto;
     border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
 }
 
 .bgm-detail-table {
@@ -2293,7 +2331,7 @@ select.input {
 .bgm-detail-table td {
     padding: 6px 8px;
     text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--border-subtle);
     white-space: nowrap;
 }
 
@@ -2307,7 +2345,7 @@ select.input {
 }
 
 .bgm-detail-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--fill-2);
 }
 
 .bgm-detail-table td:nth-child(3) {
@@ -2357,8 +2395,8 @@ select.input {
     text-align: right;
     font-size: 11px;
     color: var(--subtext0, #a6adc8);
-    background: rgba(255, 255, 255, 0.03);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--fill-1);
+    border-top: 1px solid var(--border-subtle);
 }
 
 /* ========== 系统日志面板 ========== */
@@ -2441,17 +2479,17 @@ select.input {
 .conflict-table th,
 .conflict-table td {
     padding: 8px 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     text-align: left;
     font-size: 13px;
-    color: #e0e0e0;
+    color: var(--text-2);
     vertical-align: middle;
 }
 
 .conflict-table th {
-    background: #3a3a3a;
+    background: var(--bg-surface-2);
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-1);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -2540,10 +2578,10 @@ select.input {
 .time-filter-select {
     padding: 12px 16px !important;
     font-size: 15px !important;
-    border: 2px solid #4a4a4a !important;
+    border: 2px solid var(--border-strong) !important;
     border-radius: 8px !important;
     background: var(--bg-surface-2) !important;
-    color: #ffffff !important;
+    color: var(--text-1) !important;
     min-height: 44px;
     cursor: pointer;
     transition: all 0.25s ease;
@@ -2918,7 +2956,7 @@ select.input {
     margin-bottom: 16px;
     padding: 12px 16px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--fill-1);
 }
 
 .connection-status strong {
@@ -3639,7 +3677,7 @@ body {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--border-strong);
     background: rgba(49, 50, 68, 0.9);
     color: #cdd6f4;
     font-size: 18px;
@@ -3699,4 +3737,26 @@ body {
     #statusFilterSelect {
         margin-left: 4px;
     }
+}
+
+/* ========== 浅色主题修正（2026-10-19）==========
+   背景：面板样式里有两套 token（tokens.css 的 --bg-* 与上方 Catppuccin Mocha），
+   其中若干组件用硬编码深色面 + 白字。浅色下这些面若仍是深色孤岛，
+   与全局浅色不协调；改为 token 面后，文字色必须同步 token 化（本块负责）。
+*/
+[data-theme="light"] .modal-content,
+[data-theme="light"] .detail-modal-content {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+}
+
+[data-theme="light"] .modal-content h3,
+[data-theme="light"] .modal-header h3,
+[data-theme="light"] .detail-modal-header h3,
+[data-theme="light"] .conflict-modal-header h3 {
+  color: var(--text-1);
+}
+
+[data-theme="light"] .conflict-modal-content {
+  border-color: var(--border-strong);
 }

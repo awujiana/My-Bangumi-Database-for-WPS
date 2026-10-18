@@ -249,7 +249,7 @@
 
 .preview-tab:hover {
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fill-3);
 }
 
 .preview-tab.active {
@@ -309,11 +309,11 @@
 }
 
 .preview-table tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--fill-7);
 }
 
 .preview-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill-4);
 }
 
 .preview-table tbody tr:last-child td {
@@ -729,13 +729,13 @@
   font-weight: 600;
   background: var(--bg-surface-2, var(--bg-surface-2));
   color: var(--text-1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--border-strong);
   box-shadow: none;
 }
 
 #startEnrichBtn:hover {
   background: var(--bg-surface-2);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--border-emphasis);
   box-shadow: none;
   transform: translateY(-1px);
 }

@@ -277,8 +277,8 @@ body {
   left: 0;
   top: 0;
   border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--fill-6);
+  border: 1px solid var(--border-strong);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   pointer-events: none;
   opacity: 0;
@@ -609,7 +609,7 @@ select.input,
 select.input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 .input::placeholder,
 .form-row input::placeholder {
@@ -671,7 +671,7 @@ select.input option,
 }
 .radio-label:has(input:checked) {
   border-color: var(--primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fill-5);
 }
 .radio-label input {
   accent-color: var(--primary);
@@ -780,7 +780,7 @@ select.input option,
   font-weight: 500;
   padding: 2px 7px;
   border-radius: var(--r-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill-4);
   color: var(--text-2);
 }
 #tokenStatus,
@@ -907,7 +907,7 @@ select.input option,
   white-space: nowrap;
 }
 .preview-box tr:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill-4);
 }
 .preview-box tr:last-child td {
   border-bottom: none;
