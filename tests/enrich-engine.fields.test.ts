@@ -21,6 +21,7 @@
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { clearSheetCache } from '../ts/tools/util/sheet.js'
 
 // ========== Mock 基础设施（内存工作表） ==========
 
@@ -267,6 +268,10 @@ function createStyledSheet(isSourceFontBroken: boolean, isHeaderFontBroken: bool
 
 beforeEach(() => {
   store.clear()
+  // detectAnimeSourceLayout 带跨调用缓存（§5.6 A2，与 findHeaderRow 同族）：
+  // 本文件多个用例复用同一表名 'anime' 且数据不同，不清会把上一个用例的
+  // 布局泄漏到下一个用例
+  clearSheetCache(animeSheet)
   throwOnCol = null
   isThrowOnGetColumnMap = false
   mocks.readBackOverride = null
@@ -981,6 +986,26 @@ describe('detectAnimeSourceLayout 新番来源表布局', () => {
     setCell(ANIME, 2, 2, '播放平台')
     setCell(ANIME, 2, 3, '独播')
 
+    expect(detectAnimeSourceLayout(animeSheet)).toBeNull()
+  })
+
+  it('跨调用缓存：二次探测命中不再读表，clearSheetCache 后重新探测（§5.6 A2）', () => {
+    setCell(ANIME, 1, 1, '2026年4月新番一览')
+    setCell(ANIME, 2, 3, '周更时间')
+    setCell(ANIME, 2, 4, '播放平台')
+    setCell(ANIME, 2, 5, '独播')
+    setCell(ANIME, 4, 2, '芙莉莲')
+
+    expect(detectAnimeSourceLayout(animeSheet)?.headerRow).toBe(2)
+
+    // 把字段行清空：若二次探测真的读了表，结果应变为 null
+    setCell(ANIME, 2, 3, '')
+    setCell(ANIME, 2, 4, '')
+    setCell(ANIME, 2, 5, '')
+    expect(detectAnimeSourceLayout(animeSheet)?.headerRow).toBe(2)
+
+    // 失效入口与 findHeaderRow 同一把（clearSheetCache）：清完后重新探测拿到新表
+    clearSheetCache(animeSheet)
     expect(detectAnimeSourceLayout(animeSheet)).toBeNull()
   })
 })

@@ -1136,6 +1136,18 @@ describe('findIntroSheetInWorkbook 工作簿内查找', () => {
 
     expect(findIntroSheetInWorkbook(wb)).toBe(introSheet)
   })
+
+  it('不做跨调用缓存：简介表内容变化后再次查找即刻反映（§5.6 A2 取舍记录）', () => {
+    seedIntroSheetInBook()
+    const wb = createWorkbook([{ Name: BANGUMI }, introSheet])
+
+    expect(findIntroSheetInWorkbook(wb)).toBe(introSheet)
+
+    // 把简介表头改坏（命中数 <2）：若工作簿级查找被跨调用缓存，这里仍会返回 introSheet
+    setCell(INTRO, 1, 2, '随便')
+    setCell(INTRO, 1, 3, '什么')
+    expect(findIntroSheetInWorkbook(wb)).toBeNull()
+  })
 })
 
 // ========== enrichIntroFromContext 测试 ==========

@@ -23,7 +23,9 @@ import {
   readRangeValues,
   BGM,
 } from '../tools/util/index.js'
-import { createSheetCellCache, readRowsCache } from '../tools/util/sheet.js'
+// cacheGet 直连子模块（先例：本 import 的 readRowsCache 等）：它与 clearSheetCache
+// 共用 sheet.ts 内的同一份 sheetCache，经 barrel 导入在整体 mock 的测试里会拿到 undefined。
+import { cacheGet, createSheetCellCache, readRowsCache } from '../tools/util/sheet.js'
 import type { SheetCellCache } from '../tools/util/sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
@@ -386,10 +388,37 @@ export interface AnimeSourceLayout {
 }
 
 /**
- * 识别 Hazx 新番表这类「标题/分组行 + 横向字段行 + 数据」布局。
- * 通用 findHeaderRow 只认识 Bangumi 追踪表字段，无法识别该文件第 2 行的周更时间/播放平台等字段。
+ * 识别 Hazx 新番表这类「标题/分组行 + 横向字段行 + 数据」布局（**带跨调用缓存**）。
+ *
+ * 缓存（§5.6 A2）：布局探测是单表最重的扫描（矩形读 10 行 × 50 列 + `detectColumns`），
+ * 而反复切换源工作表 / 重扫工作簿列表时会重复探测同一张表。缓存键与
+ * `findHeaderRow` / `getLastRow` 同族（表名前缀），**失效复用同一入口**
+ * `clearSheetCache(ws)`（`refreshData` 等刷新点即清，见 `panel-lifecycle.ts`）——
+ * 与既有缓存同等的失效窗口，不引入新的失效协议。负结果（null）同样缓存，
+ * 与 `findHeaderRow` 缓存 0 一致。
+ *
+ * ⚠️ 与 `findHeaderRow` 同等暴露：表头在「不清缓存的事件」里被改时会读到旧布局
+ * （§5.4 取舍③ 明确的既有约定）。表名读取异常（坏代理）时退化为不缓存，
+ * 绝不让缓存逻辑把异常吞掉。
  */
 export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout | null {
+  let sheetName: string
+  try {
+    sheetName = sheet.Name || ''
+  } catch {
+    return detectAnimeSourceLayoutUncached(sheet)
+  }
+  if (!sheetName) return detectAnimeSourceLayoutUncached(sheet)
+  return cacheGet(`${sheetName}:animeSourceLayout`, () =>
+    detectAnimeSourceLayoutUncached(sheet),
+  )
+}
+
+/**
+ * 布局探测实现（无缓存）。对外一律走 {@link detectAnimeSourceLayout}；
+ * 本函数仅服务于缓存工厂内部。
+ */
+function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout | null {
   let headerRow = 0
   let firstFieldCol = 0
 
@@ -1885,6 +1914,13 @@ export interface IntroSheetContext {
  * 在工作簿中查找「新番简介」工作表：
  * 某行命中 ≥2 个简介表头关键字、且不是主新番表布局（无周更时间/播放平台等横向字段）。
  * @param excludeSheetName 排除的工作表名（当前主源表）
+ *
+ * **不做跨调用缓存**（§5.6 A2 的取舍记录）：其结果取决于整个工作簿的表集合，
+ * 而「增删工作表」没有可挂失效的事件——工作簿级键一旦写入，用户新增一张简介表后
+ * 缓存不会失效，静默漏富化字段。单表级 `detectAnimeSourceLayout` 已有缓存
+ * （同族键 + `clearSheetCache` 失效），简介行的逐格读也按 §5.6 B1 收敛为矩形读，
+ * 全簿重扫的剩余成本已降至「每张候选表至多 1 次矩形读」，不值得为之引入
+ * 无失效协议的缓存。
  */
 export function findIntroSheetInWorkbook(
   wb: WpsWorkbook,
