@@ -1485,32 +1485,50 @@ select.input {
     color: white;
 }
 
-/* \u9884\u89C8\u8868\u683C */
-.preview-table {
+/* 预览表格（面板；enrich 页的 .preview-table 是外层容器，规则不共用） */
+.preview-box .preview-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     margin-bottom: 8px;
 }
 
-.preview-table tr {
+.preview-box .preview-table tr {
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.preview-table tr:hover {
-    background: var(--fill-1);
+/* 斑马纹：预览一次铺十几行，只有分隔线时很容易串行 */
+.preview-box .preview-table tbody tr:not(.preview-header-row):nth-child(even) {
+    background: var(--fill-7);
 }
 
-.preview-header-row {
-    background: rgba(74, 158, 255, 0.1);
+.preview-box .preview-table tr:hover {
+    background: var(--fill-4);
 }
 
-.preview-header-row:hover {
-    background: rgba(74, 158, 255, 0.15);
+.preview-box .preview-header-row {
+    /* color-mix 而非写死 rgba(74,158,255,…)：蓝色描边/底色要随深浅主题走，
+       且混出来的结果是**不透明**的——粘性表头必须有实底，否则滚动时数据行
+       会从半透明底透出来。 */
+    background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-surface));
 }
 
-.preview-row-num {
-    color: #666;
+/* 表头行粘性：预览容器有 max-height，滚动时列名始终可见。
+   sticky 打在 td 上——打在 tr 上时 border-collapse: collapse 会丢描边。 */
+.preview-box .preview-header-row td {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: inherit;
+}
+
+.preview-box .preview-header-row:hover,
+.preview-box .preview-header-row:hover td {
+    background: color-mix(in srgb, var(--accent-blue) 16%, var(--bg-surface));
+}
+
+.preview-box .preview-row-num {
+    color: var(--text-3);
     padding: 3px 6px;
     text-align: center;
     font-size: 11px;
@@ -1519,34 +1537,42 @@ select.input {
     min-width: 28px;
 }
 
-.preview-header-row .preview-row-num {
+.preview-box .preview-header-row .preview-row-num {
     color: var(--accent-blue);
     font-weight: bold;
 }
 
-.preview-name {
+.preview-box .preview-name {
     font-weight: 500;
     color: var(--text-1);
 }
 
-.preview-header {
+/* 预览空状态：无数据行时给一块居中说明，避免看起来像「加载失败」 */
+.preview-box .preview-empty {
+    padding: 18px 12px;
+    text-align: center;
+    color: var(--text-3);
+    font-size: var(--fs-sm);
+    line-height: 1.7;
+}
+
+.preview-box .preview-empty-hint {
+    color: var(--text-3);
+    opacity: 0.8;
+}
+
+.preview-box .preview-header {
     color: var(--accent-blue);
     font-weight: 600;
     font-size: 11px;
 }
 
-.preview-important-header {
-    color: #ff9f43;
+.preview-box .preview-important-header {
+    color: var(--accent-amber);
     font-weight: 700;
 }
 
-.preview-important {
-    color: #f0e6d3;
-    font-weight: 500;
-    background: rgba(255, 159, 67, 0.06);
-}
-
-.preview-table td {
+.preview-box .preview-table td {
     padding: 3px 8px;
     overflow: hidden;
     text-overflow: ellipsis;
