@@ -10,6 +10,8 @@
 
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js'
 import { bgmLog } from '../tools/util/index.js'
+import { requestBgmMeRaw } from '../tools/util/bgm-me.js'
+import type { BgmMeRawResult } from '../tools/util/bgm-me.js'
 
 /**
  * Token验证结果接口
@@ -154,6 +156,13 @@ function xhrGet(
   return requestPromise(xhr, signal)
 }
 
+/** 管道失败分类 → 旧 `requestPromise` 的 `Error.message`（`verifyToken` catch 文案逐字保留） */
+const RAW_FAILURE_MESSAGES = {
+  aborted: '请求被取消',
+  network: '网络错误',
+  timeout: '请求超时',
+} as const
+
 /**
  * 验证Bangumi API Token的有效性
  *
@@ -166,6 +175,12 @@ function xhrGet(
  * @description
  * 通过调用 /v0/me 接口验证Token是否有效。
  * 如果Token有效，会自动更新缓存中的用户信息。
+ *
+ * **§5.6 C2**：`GET /v0/me` 的 XHR 管道委托 `requestBgmMeRaw`（与 `fetchBgmMe`
+ * 共用唯一实现），但**必须显式传入待验证的 token**——`fetchBgmMe` 读的是
+ * 「已存 token」，而本函数验证的可能是尚未保存的测试 Token；这正是两处长期没能
+ * 合并的语义差异，靠参数化保留。超时 30s 沿用原 `requestPromise` 的默认值，
+ * 失败文案与其 `Error.message` 逐字一致。
  */
 export async function verifyToken(token: string, signal?: AbortSignal): Promise<TokenVerifyResult> {
   const result: TokenVerifyResult = { valid: false, message: '' }
@@ -175,19 +190,26 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
     return result
   }
 
+  const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
+  bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 验证 Token: ${apiUrl}`)
+
+  let raw: BgmMeRawResult
   try {
-    const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
-    bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 验证 Token: ${apiUrl}`)
+    raw = await requestBgmMeRaw(token, { timeout: 30_000, signal })
+  } catch (error: unknown) {
+    // 宿主在请求建立阶段同步抛错（如 setRequestHeader 抛非 Error）：沿用旧 catch 口径
+    const errorMessage = error instanceof Error ? error.message : ''
+    result.message = errorMessage || '验证过程出错'
+    bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
+    return result
+  }
 
-    const xhr = new XMLHttpRequest()
-    xhr.open('GET', apiUrl, true)
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.setRequestHeader('Content-Type', 'application/json')
-
-    const response = await requestPromise(xhr, signal)
-    const userData = response.data as BangumiUserData | null
-
-    if (response.status === 200) {
+  if (raw.kind === 'ok') {
+    try {
+      // 200 但响应体为空 → null（与旧 requestPromise 的 `responseText ? JSON.parse : null` 一致）
+      const userData = raw.responseText
+        ? (JSON.parse(raw.responseText) as BangumiUserData | null)
+        : null
       result.valid = true
       result.message = 'Token 有效'
       bgmLog(
@@ -198,19 +220,27 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
         result.userId = String(userData.id || '')
         result.username = (userData.username || userData.nickname) ?? ''
       }
-    } else if (response.status === 401) {
+    } catch {
+      // 200 但响应体不是合法 JSON：与旧 requestPromise 的 reject('解析响应失败') 一致
+      result.message = '解析响应失败'
+      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
+    }
+    return result
+  }
+
+  if (raw.kind === 'http') {
+    if (raw.status === 401) {
       result.message = 'Token 无效或已过期'
       bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] Token 无效或已过期`)
     } else {
-      result.message = `验证失败 (HTTP ${String(response.status)})`
-      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${String(response.status)}`)
+      result.message = `验证失败 (HTTP ${String(raw.status)})`
+      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${String(raw.status)}`)
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : ''
-    result.message = errorMessage || '验证过程出错'
-    bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
+    return result
   }
 
+  result.message = RAW_FAILURE_MESSAGES[raw.kind]
+  bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
   return result
 }
 

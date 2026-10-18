@@ -62,6 +62,7 @@ import {
   storeTokenExpires,
   getTokenRemainingTime,
 } from '../ts/tools/util/index.js'
+import { fetchBgmMeWithToken } from '../ts/tools/util/bgm-me.js'
 
 // ========== 假 WPS 宿主 ==========
 
@@ -1155,6 +1156,54 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', async () => {
       expect.objectContaining({ id: '9', username: 'noPersist' }),
       'none',
     )
+  })
+})
+
+describe('util · fetchBgmMeWithToken（§5.6 C2：显式 token 参数化）', () => {
+  beforeEach(() => {
+    FakeXhr.instances.length = 0
+    vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('用显式传入的 token 发请求，不读已存 token', async () => {
+    // 刻意不 storeBgToken：若实现内部读「已存 token」，会走 no-token 分支且不发请求
+    const pending = fetchBgmMeWithToken('explicit-token')
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+
+    expect(xhr.method).toBe('GET')
+    expect(xhr.url).toMatch(/\/v0\/me$/)
+    expect(xhr.headers.Authorization).toBe('Bearer explicit-token')
+    // fetchBgmMe 的 15s 超时不变
+    expect(xhr.timeout).toBe(15_000)
+
+    xhr.emit('load')
+    const result = await pending
+    expect(result.kind).toBe('ok')
+  })
+
+  it('401 → http 判别并保留状态码', async () => {
+    const pending = fetchBgmMeWithToken('t')
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.status = 401
+    xhr.emit('load')
+
+    expect(await pending).toEqual({ kind: 'http', status: 401 })
+  })
+
+  it('signal 已 aborted → 不发请求直接 aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    const result = await fetchBgmMeWithToken('t', controller.signal)
+
+    expect(result).toEqual({ kind: 'aborted' })
+    expect(FakeXhr.instances).toHaveLength(0)
   })
 })
 
