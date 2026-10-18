@@ -98,6 +98,20 @@ export interface RowPlan {
 export interface RowPlanOptions {
   /** 不参与清理的行号集合（汇总行 / 说明行等，由排除规则得出） */
   excludedRows?: ReadonlySet<number>
+  /**
+   * 调用方已解析的表结构（每目标解析一次、多规则共用，见 `clean-engine` 的 `scanTarget`）。
+   *
+   * 传入时跳过内部 `readSheetLayout`——每规则省 ~3 次 COM
+   * （`findHeaderRow` + `getLastRow` + `getColumnMap`）。传 `null` 表示
+   * 「已解析且失败」，直接返回空计划，不再重复解析。
+   *
+   * ⚠️ 语义契约：调用方须传 `readSheetLayout(ws)` 的**同一结果**。新番表无标准
+   * 「名称」表头时解析结果为 `null`——与不传时各计划自行解析的结果一致，
+   * 因此新番表不会因共享而突然获得行级清理能力（推导 colMap 只在
+   * `buildTarget` 的新番表专属签名路径内使用，不进本选项）。
+   * 不传（`undefined`）时按原行为自行解析，保持 `plan*` 可独立调用。
+   */
+  layout?: SheetLayout | null
 }
 
 /** 表结构信息（扫描阶段统一解析，避免重复 COM 调用） */
@@ -262,7 +276,9 @@ function hasDistinctValues(
  * 并把被删行的「标签/分级」合并进保留行（去重）。
  */
 export function planDuplicateRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
-  const layout = readSheetLayout(ws)
+  // 表结构优先用调用方解析好的（scanTarget 每目标一次、多规则共用）；
+  // 未提供时才自行解析（plan* 可独立调用）。null = 已解析且失败，直接空计划。
+  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
 
   const nameCol = layout.colMap.get('名称')
@@ -365,7 +381,7 @@ function resolveUrlGroup(
  * 保留行号最大的一行，合并其余行的「标签/分级」后删除其余行。
  */
 export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
-  const layout = readSheetLayout(ws)
+  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
   const urlCol = layout.colMap.get('Bangumi_URL')
   if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
@@ -443,7 +459,7 @@ export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions)
  * 只清理数据区内部（表头行 +1 ~ 最后数据行）的空洞，不动表尾。
  */
 export function planEmptyNameRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
-  const layout = readSheetLayout(ws)
+  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
   const nameCol = layout.colMap.get('名称')
   if (!nameCol) return emptyPlan('未找到「名称」列')

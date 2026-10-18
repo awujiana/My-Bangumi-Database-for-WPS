@@ -191,6 +191,104 @@ describe('readSheetLayout', () => {
   })
 })
 
+// ========== 共享表结构选项（§5.6 A1：每目标解析一次，多规则共用） ==========
+
+describe('plan* · 调用方传入 layout 时不重复解析', () => {
+  it('传入 layout：不触发内部 readSheetLayout（findHeaderRow/getLastRow/getColumnMap 零调用）', () => {
+    const ws = installModel(
+      makeSheetModel(1, STANDARD_HEADERS, [
+        row('作品A', 'u1', 't1', 'd1', 'e1'),
+        row('作品A', '', 't2', 'd2', 'e2'),
+      ]),
+    )
+    const layout = readSheetLayout(ws)
+    expect(layout).not.toBeNull()
+    // 清掉 readSheetLayout 自身的解析计数，只度量计划阶段的解析次数
+    m.findHeaderRow.mockClear()
+    m.getLastRow.mockClear()
+    m.getColumnMap.mockClear()
+
+    const plan = planDuplicateRows(ws, { layout })
+
+    expect(plan.deleteRows).toEqual([3])
+    expect(m.findHeaderRow).not.toHaveBeenCalled()
+    expect(m.getLastRow).not.toHaveBeenCalled()
+    expect(m.getColumnMap).not.toHaveBeenCalled()
+  })
+
+  it('不传 layout：按原行为自行解析（解析各一次），结果不变', () => {
+    const ws = installModel(
+      makeSheetModel(1, STANDARD_HEADERS, [
+        row('作品A', 'u1', 't1', 'd1', 'e1'),
+        row('作品A', '', 't2', 'd2', 'e2'),
+      ]),
+    )
+    m.findHeaderRow.mockClear()
+    m.getLastRow.mockClear()
+    m.getColumnMap.mockClear()
+
+    const plan = planDuplicateRows(ws)
+
+    expect(plan.deleteRows).toEqual([3])
+    expect(m.findHeaderRow).toHaveBeenCalledTimes(1)
+    expect(m.getLastRow).toHaveBeenCalledTimes(1)
+    expect(m.getColumnMap).toHaveBeenCalledTimes(1)
+  })
+
+  it('传入 null（已解析且失败）：直接空计划，不再重复解析', () => {
+    const ws = installModel(
+      makeSheetModel(0, STANDARD_HEADERS, [row('A', 'u', 't', 'd', 'e')]),
+    )
+    m.findHeaderRow.mockClear()
+    m.getLastRow.mockClear()
+    m.getColumnMap.mockClear()
+
+    const plan = planDuplicateRows(ws, { layout: null })
+
+    expect(plan.deleteRows).toEqual([])
+    expect(plan.skippedReason).toBe('未找到表头行或无数据行')
+    expect(m.findHeaderRow).not.toHaveBeenCalled()
+    expect(m.getLastRow).not.toHaveBeenCalled()
+    expect(m.getColumnMap).not.toHaveBeenCalled()
+  })
+
+  it('三个行规则可共享同一 layout 实例，且与各自解析的结果逐字一致（scanTarget 的用法）', () => {
+    const ws = installModel(
+      makeSheetModel(1, STANDARD_HEADERS, [
+        row('作品A', 'u1', 't1', 'd1', 'e1'),
+        row('作品A', 'u1', 't2', 'd2', 'e2'),
+        row('', '', '', '', ''),
+      ]),
+    )
+    const layout = readSheetLayout(ws)
+    expect(layout).not.toBeNull()
+    m.findHeaderRow.mockClear()
+    m.getLastRow.mockClear()
+    m.getColumnMap.mockClear()
+
+    // 共享调用方解析的 layout
+    const byNameShared = planDuplicateRows(ws, { layout })
+    const byUrlShared = planDuplicateUrlRows(ws, { layout })
+    const emptyShared = planEmptyNameRows(ws, { layout })
+    // 三个规则一次解析都没做（全部吃传入的 layout）
+    expect(m.findHeaderRow).not.toHaveBeenCalled()
+    expect(m.getLastRow).not.toHaveBeenCalled()
+    expect(m.getColumnMap).not.toHaveBeenCalled()
+
+    // 不传 layout 自行解析，结果必须与共享版逐字一致（语义不变）
+    const byNameOwn = planDuplicateRows(ws)
+    const byUrlOwn = planDuplicateUrlRows(ws)
+    const emptyOwn = planEmptyNameRows(ws)
+    expect(m.findHeaderRow).toHaveBeenCalledTimes(3)
+    expect(m.getLastRow).toHaveBeenCalledTimes(3)
+    expect(m.getColumnMap).toHaveBeenCalledTimes(3)
+
+    expect(byNameShared).toEqual(byNameOwn)
+    expect(byUrlShared).toEqual(byUrlOwn)
+    expect(emptyShared).toEqual(emptyOwn)
+  })
+})
+
 // ========== mergeTagValues ==========
 
 describe('mergeTagValues', () => {

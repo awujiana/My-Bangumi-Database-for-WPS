@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+/** 行规则 mock 的调用参数形状（scanRowRule 传入 excludedRows + 共享 layout） */
+interface PlanCallOptions {
+  excludedRows?: ReadonlySet<number>
+  layout?: unknown
+}
+
 const mocks = vi.hoisted(() => ({
   getOpenWorkbooks: vi.fn(),
   findHeaderRow: vi.fn(),
@@ -9,10 +15,11 @@ const mocks = vi.hoisted(() => ({
   readRangeValues: vi.fn(),
   setCellValue: vi.fn(),
   bgmLog: vi.fn(),
-  planDuplicateRows: vi.fn(),
-  planDuplicateUrlRows: vi.fn(),
-  planEmptyNameRows: vi.fn(),
+  planDuplicateRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
+  planDuplicateUrlRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
+  planEmptyNameRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
   applyRowPlan: vi.fn(),
+  readSheetLayout: vi.fn(),
 }))
 
 vi.mock('../ts/core/constants.js', () => ({
@@ -38,6 +45,7 @@ vi.mock('../ts/sync/sheet-cleaning.js', () => ({
   planDuplicateUrlRows: mocks.planDuplicateUrlRows,
   planEmptyNameRows: mocks.planEmptyNameRows,
   applyRowPlan: mocks.applyRowPlan,
+  readSheetLayout: mocks.readSheetLayout,
 }))
 
 import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS, ROW_BYTES_FALLBACK } from '../ts/panel/clean-rules.js'
@@ -459,6 +467,68 @@ describe('scanCleanRules', () => {
     expect(plan?.changes[0]?.nextValue).toBe('合并标签')
     expect(plan?.estimatedBytes).toBeGreaterThan(0)
     expect(mocks.planDuplicateRows).toHaveBeenCalledTimes(1)
+  })
+
+  it('表结构每目标只解析一次，三个行规则共享同一 layout（§5.6 A1）', async () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
+    const shared = {
+      headerRow: 1,
+      lastRow: 4,
+      colMap: new Map(DEFAULT_COL_MAP),
+      dataStartRow: 2,
+    }
+    mocks.readSheetLayout.mockReturnValue(shared)
+    mocks.planDuplicateRows.mockReturnValue({
+      deleteRows: [3],
+      changes: [],
+      groups: 1,
+      mergedGroups: 0,
+    })
+    mocks.planDuplicateUrlRows.mockReturnValue({
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未发现同 URL 重复行',
+    })
+    mocks.planEmptyNameRows.mockReturnValue({
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未发现空白数据行',
+    })
+
+    const result = await scanCleanRules(['dup-name', 'dup-url', 'empty-name'])
+
+    // 每目标一次解析（三个行规则共用），而非每规则各解析一次（~3 次 COM × 规则数）
+    expect(mocks.readSheetLayout).toHaveBeenCalledTimes(1)
+    expect(mocks.planDuplicateRows.mock.calls[0]?.[1]?.layout).toBe(shared)
+    expect(mocks.planDuplicateUrlRows.mock.calls[0]?.[1]?.layout).toBe(shared)
+    expect(mocks.planEmptyNameRows.mock.calls[0]?.[1]?.layout).toBe(shared)
+    expect(result.plans).toHaveLength(1)
+  })
+
+  it('新番表目标（readSheetLayout 为 null）行规则收到 null：语义与自行解析失败一致', async () => {
+    mockWorkbookSheet('2026年4月新番表')
+    makeGrid({ 3: { 3: '新番表 by Hazx.' }, 5: { 3: '淫狱团地' } })
+    // 新番表无标准「名称」表头 → readSheetLayout 标准路径解析失败返回 null。
+    // 共享该结果不会让新番表突然获得行级清理能力（推导 colMap 不进 layout 选项）。
+    mocks.readSheetLayout.mockReturnValue(null)
+    mocks.planDuplicateRows.mockReturnValue({
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未找到表头行或无数据行',
+    })
+
+    const result = await scanCleanRules(['dup-name'])
+
+    expect(mocks.planDuplicateRows.mock.calls[0]?.[1]?.layout).toBeNull()
+    expect(result.plans).toHaveLength(0)
+    expect(result.notes.join('\n')).toContain('未找到表头行或无数据行')
   })
 
   it('未知规则 ID 记入 notes', async () => {

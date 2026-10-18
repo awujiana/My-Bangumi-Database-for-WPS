@@ -37,12 +37,14 @@ import {
   planDuplicateRows,
   planDuplicateUrlRows,
   planEmptyNameRows,
+  readSheetLayout,
 } from '../sync/sheet-cleaning.js'
 import type {
   DeletedRowPreview,
   DuplicateGroupPreview,
   RowChange,
   RowPlan,
+  SheetLayout,
 } from '../sync/sheet-cleaning.js'
 
 // ========== 类型 ==========
@@ -743,6 +745,7 @@ function scanRowRule(
   target: CleanTargetInfo,
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
+  getLayout: () => SheetLayout | null,
   block?: readonly string[][],
 ): RulePlan {
   const base: RulePlanBase = {
@@ -756,15 +759,15 @@ function scanRowRule(
   try {
     switch (rule.kind) {
       case 'duplicateNameRows': {
-        plan = planDuplicateRows(target.ws, { excludedRows })
+        plan = planDuplicateRows(target.ws, { excludedRows, layout: getLayout() })
         break
       }
       case 'duplicateUrlRows': {
-        plan = planDuplicateUrlRows(target.ws, { excludedRows })
+        plan = planDuplicateUrlRows(target.ws, { excludedRows, layout: getLayout() })
         break
       }
       case 'emptyNameRows': {
-        plan = planEmptyNameRows(target.ws, { excludedRows })
+        plan = planEmptyNameRows(target.ws, { excludedRows, layout: getLayout() })
         break
       }
       case 'noiseRows': {
@@ -811,6 +814,7 @@ function scanOneRule(
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
   notes: string[],
+  getLayout: () => SheetLayout | null,
   block?: readonly string[][],
 ): RulePlan | null {
   const rule = findCleanRule(id)
@@ -821,7 +825,7 @@ function scanOneRule(
   const plan =
     rule.kind === 'cellTransform'
       ? scanCellTransform(rule, target, excludedRows)
-      : scanRowRule(rule, target, excludedRows, rowBytes, block)
+      : scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block)
   if (plan.skipped) {
     notes.push(`${target.label} · ${rule.name}：${plan.skipped}`)
     return null
@@ -848,9 +852,22 @@ function scanTarget(
   }
   const rowBytes = estimateRowBytes(target, block)
 
+  // 表结构每目标只解析一次，三个行规则共用（原为每规则各自 readSheetLayout，~3 次 COM × 规则数）。
+  // 惰性：勾选的规则里没有行级规则时完全不解析。传的是 readSheetLayout 的同一结果——
+  // 新番表无标准「名称」表头时解析结果为 null，与各计划自行解析的结果一致，语义不变。
+  let isLayoutResolved = false
+  let sharedLayout: SheetLayout | null = null
+  const getLayout = (): SheetLayout | null => {
+    if (!isLayoutResolved) {
+      sharedLayout = readSheetLayout(target.ws)
+      isLayoutResolved = true
+    }
+    return sharedLayout
+  }
+
   const plans: RulePlan[] = []
   for (const id of ruleIds) {
-    const plan = scanOneRule(id, target, excludedRows, rowBytes, notes, block)
+    const plan = scanOneRule(id, target, excludedRows, rowBytes, notes, getLayout, block)
     if (plan) plans.push(plan)
   }
   return plans
