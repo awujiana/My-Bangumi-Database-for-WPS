@@ -193,9 +193,33 @@ function makeSyncSheet(): { Name: string; Activate: ReturnType<typeof vi.fn> } {
   return { Name: '同步记录', Activate: vi.fn() }
 }
 
+/**
+ * Range(...).Value2 批量写记录（§5.6 A3：收藏填充从逐格写改为矩形写）。
+ * getter 恒返回 null：空表填充场景没有旧值基底（readRect 据此返回「读失败」→ 空基底）。
+ */
+const value2Writes: { address: string; value: unknown }[] = []
+/** 置 true 时矩形写抛错，用于验证「批量失败 → 回退逐格 setCellValue」路径 */
+let shouldValue2Throw = false
+
 /** 数据工作表假对象 */
-function makeDataSheet(): { Name: string; Activate: ReturnType<typeof vi.fn> } {
-  return { Name: '数据表', Activate: vi.fn() }
+function makeDataSheet(): {
+  Name: string
+  Activate: ReturnType<typeof vi.fn>
+  Range: (address: string) => { Value2: unknown }
+} {
+  return {
+    Name: '数据表',
+    Activate: vi.fn(),
+    Range: (address: string) => ({
+      get Value2(): unknown {
+        return null
+      },
+      set Value2(value: unknown) {
+        if (shouldValue2Throw) throw new Error('COM 批量写入失败')
+        value2Writes.push({ address, value })
+      },
+    }),
+  }
 }
 
 /** 用户原工作表假对象 */
@@ -299,6 +323,8 @@ beforeEach(() => {
   vi.resetAllMocks()
   document.body.replaceChildren()
   cells.clear()
+  value2Writes.length = 0
+  shouldValue2Throw = false
   answers.queue = []
   answers.cursor = 0
   answers.fallback = true
@@ -819,6 +845,8 @@ describe('sync · _doAPISync > 空表自动填充', () => {
   it('一条都没写进去 → 提示检查工作表是否可编辑', async () => {
     setEmptySheet()
     m.fetchAllUserCollections.mockResolvedValue([collection()])
+    // 矩形写抛错 → 回退逐格 setCellValue；逐格也全失败 → written=0
+    shouldValue2Throw = true
     m.setCellValue.mockReturnValue(false)
 
     await runApiSync()
@@ -835,7 +863,7 @@ describe('sync · _doAPISync > 空表自动填充', () => {
     expect(m.showAlert).toHaveBeenCalledWith('没有需要处理的数据行！')
   })
 
-  it('填充成功 → 写入单元格并进入同步流程', async () => {
+  it('填充成功 → 批量矩形写入单元格并进入同步流程', async () => {
     setEmptySheet()
     m.fetchAllUserCollections.mockResolvedValue([
       collection({ subject_id: 100, subject: { name_cn: '动画A', name: 'AnimeA' } }),
@@ -845,9 +873,68 @@ describe('sync · _doAPISync > 空表自动填充', () => {
 
     expect(m.ensureSheetHeaders).toHaveBeenCalled()
     expect(m.clearSheetCache).toHaveBeenCalled()
-    expect(m.setCellValue).toHaveBeenCalled()
+    // §5.6 A3：一条收藏 = 一次矩形写（旧实现是 ~5 次逐格 setCellValue）
+    expect(value2Writes).toHaveLength(1)
+    expect(value2Writes[0]?.address).toBe('A2:I2')
+    expect(value2Writes[0]?.value).toEqual([
+      ['https://bgm.tv/subject/100', '动画A', '是', null, null, null, null, null, 1],
+    ])
     expect(m.showSyncProgressDialog).toHaveBeenCalledWith('正在收藏下载', expect.any(Object), '配置摘要')
     expect(m.completeSyncProgressDialog).toHaveBeenCalled()
+  })
+
+  it('批量写：连续行合并为一次矩形写，空值列写回旧值基底（§5.6 A3）', async () => {
+    setEmptySheet()
+    m.fetchAllUserCollections.mockResolvedValue([
+      collection({ subject_id: 100, subject: { name_cn: '动画A', name: 'AnimeA' } }),
+      collection({ subject_id: 200, subject: { name_cn: '动画B', name: 'AnimeB' } }),
+    ])
+
+    await runApiSync()
+
+    // 2 条收藏 → 1 次矩形写（列跨度 1..序列号列 9）
+    expect(value2Writes).toHaveLength(1)
+    expect(value2Writes[0]?.address).toBe('A2:I3')
+    expect(value2Writes[0]?.value).toEqual([
+      ['https://bgm.tv/subject/100', '动画A', '是', null, null, null, null, null, 1],
+      ['https://bgm.tv/subject/200', '动画B', '是', null, null, null, null, null, 2],
+    ])
+    // 批量路径不再逐格写
+    expect(m.setCellValue).not.toHaveBeenCalled()
+  })
+
+  it('矩形写抛错 → 回退逐格 setCellValue（保留逐格失败口径）', async () => {
+    setEmptySheet()
+    m.fetchAllUserCollections.mockResolvedValue([
+      collection({ subject_id: 100, subject: { name_cn: '动画A', name: 'AnimeA' } }),
+      collection({ subject_id: 200, subject: { name_cn: '动画B', name: 'AnimeB' } }),
+    ])
+    shouldValue2Throw = true
+
+    await runApiSync()
+
+    // 每行 4 个待写列（Bangumi_URL / 名称 / 是否看完 / 序列号）
+    expect(m.setCellValue).toHaveBeenCalledTimes(8)
+    expect(m.setCellValue).toHaveBeenCalledWith(expect.anything(), 2, 1, 'https://bgm.tv/subject/100')
+    expect(m.setCellValue).toHaveBeenCalledWith(expect.anything(), 3, 9, 2)
+    expect(m.setStatus).toHaveBeenCalledWith('收藏数据填充完成：2/2', 'info')
+  })
+
+  it('无 subject_id 的条目不写，且断开矩形区间', async () => {
+    setEmptySheet()
+    m.fetchAllUserCollections.mockResolvedValue([
+      collection({ subject_id: 100 }),
+      collection({ subject_id: 0 }),
+      collection({ subject_id: 300 }),
+    ])
+
+    await runApiSync()
+
+    // 第 2 条无 subject_id：行 3 不写 → 行 2 与行 4 各自一次矩形写
+    expect(value2Writes.map((write) => write.address)).toEqual(['A2:I2', 'A4:I4'])
+    // 序列号仍按条目下标（第 3 条 → 3）
+    expect((value2Writes[1]?.value as unknown[][] | undefined)?.[0]?.[8]).toBe(3)
+    expect(m.setStatus).toHaveBeenCalledWith('收藏数据填充完成：2/3', 'info')
   })
 
   it('每 50 条让出一次事件循环并刷新状态', async () => {
@@ -1088,14 +1175,17 @@ describe('sync · 补充分支', () => {
 
     await runApiSync()
 
-    // setCellValue(ws, row, col, value) → 取 [col, value]
-    const writes = m.setCellValue.mock.calls.map((call) => [call[2], call[3]])
-    expect(writes).toContainEqual([10, 'AnimeA'])
-    expect(writes).toContainEqual([11, BGM_SUBJECT_TYPES[4]])
-    expect(writes).toContainEqual([4, 8])
-    expect(writes).toContainEqual([5, 'TV, 原创'])
-    expect(writes).toContainEqual([12, '很好看'])
-    expect(writes).toContainEqual([3, '是'])
+    // §5.6 A3：改为矩形写——从批量矩阵按列下标（col-1）断言五个可选列
+    expect(value2Writes).toHaveLength(1)
+    expect(value2Writes[0]?.address).toBe('A2:L2')
+    const matrix = value2Writes[0]?.value as unknown[][] | undefined
+    const line = matrix?.[0]
+    expect(line?.[9]).toBe('AnimeA')
+    expect(line?.[10]).toBe(BGM_SUBJECT_TYPES[4])
+    expect(line?.[3]).toBe(8)
+    expect(line?.[4]).toBe('TV, 原创')
+    expect(line?.[11]).toBe('很好看')
+    expect(line?.[2]).toBe('是')
   })
 
   it('syncFromPanel 进度框的暂停/恢复/停止回调接到 BGM.sync', async () => {

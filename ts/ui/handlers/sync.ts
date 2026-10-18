@@ -49,8 +49,9 @@ import type {
   UpdateRecordParameters,
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.js'
-import { ensureSheetHeaders } from '../../tools/util/index.js'
-import type { WpsApp, WpsWorksheet } from '../../tools/wps.js'
+import { ensureSheetHeaders, readRangeCellValues } from '../../tools/util/index.js'
+import { colNumberToLetter } from '../../tools/string-utilities.js'
+import type { WpsApp, WpsCellValue, WpsWorksheet } from '../../tools/wps.js'
 
 import { _T } from './_constants.js'
 import { showTokenDialog } from './token.js'
@@ -134,10 +135,36 @@ interface SyncPreparedData {
   startTime: number
 }
 
+/** 收藏填充的单行待写单元格（列号 + 值；口径与旧逐格写逐字一致） */
+interface FillWrites {
+  col: number
+  value: unknown
+}
+
+/** 收藏填充的单行待写计划 */
+interface FillPendingRow {
+  row: number
+  writes: FillWrites[]
+}
+
+/** 批量矩形写的单批行数上限（限制单次写失败的波及面） */
+const FILL_BATCH_ROWS = 200
+
 /**
  * 将 Bangumi 收藏列表填充到空工作表。
  * 仅写入 colMap 中存在的列，避免向不存在的列写入。
- * @returns 实际写入的数据行数
+ *
+ * **批量写（§5.6 A3）**：旧实现每条收藏逐格写 ~8 列（500 条 ≈ 4000 次 COM）。
+ * 现改为「连续行合并成一次 `Range.Value2` 矩形写」（500 条 ≈ 十余次）：
+ *  1. **旧值基底**：写入区间一次 `readRangeCellValues` 矩形读（`preserveCellValue`
+ *     保留原始类型）——矩形写会覆盖 1..maxWriteCol 整段，未提供的列必须写回旧值，
+ *     否则 `null`/空串会清掉区间中段的列（§2.2）；读不到旧值（空表 / 读失败）时
+ *     基底为 `null`，与空表填充场景一致。
+ *  2. **批量写**：连续行每至多 {@link FILL_BATCH_ROWS} 行一次矩形写；写抛错时
+ *     该批回退逐格 `setCellValue`（保留其 `Formula`/`Value` 回退链与逐格失败语义）。
+ *  3. 无 `subject_id` 的条目行不写、也不并入矩形区间（与旧行为一致）；
+ *     每行的待写列集合与旧逐格写逐字一致（空值列照样不写）。
+ * @returns 实际写入的数据行数（无单元格写失败的行数，与旧口径一致）
  */
 async function _fillSheetWithCollections(
   ws: WpsWorksheet,
@@ -145,9 +172,11 @@ async function _fillSheetWithCollections(
   headerRow: number,
   colMap: Map<string, number>,
 ): Promise<number> {
-  let written = 0
   const total = collections.length
 
+  // 1. 逐条计算待写单元格（口径与旧逐格写一致；每 50 行让出事件循环）
+  const pending: FillPendingRow[] = []
+  let maxWriteCol = 0
   for (let index = 0; index < total; index += 1) {
     const item = collections[index]
     if (item?.subject_id) {
@@ -157,7 +186,7 @@ async function _fillSheetWithCollections(
       const alias = subject?.name_cn && subject.name ? subject.name : ''
       const url = `https://bgm.tv/subject/${String(item.subject_id)}`
 
-      const writes: { col: number; value: unknown }[] = []
+      const writes: FillWrites[] = []
 
       const seqCol = colMap.get('序列号')
       if (seqCol !== undefined) writes.push({ col: seqCol, value: index + 1 })
@@ -196,22 +225,91 @@ async function _fillSheetWithCollections(
         writes.push({ col: commentCol, value: item.comment })
       }
 
-      let isRowOk = true
-      for (const { col, value } of writes) {
-        if (!setCellValue(ws, row, col, value)) {
-          isRowOk = false
-        }
-      }
-      if (isRowOk) written += 1
-
-      // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
-      if ((index + 1) % 50 === 0) {
-        setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
-        await new Promise((resolve) => {
-          setTimeout(resolve, 0)
-        })
+      pending.push({ row, writes })
+      for (const { col } of writes) {
+        if (col > maxWriteCol) maxWriteCol = col
       }
     }
+
+    // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
+    if ((index + 1) % 50 === 0) {
+      setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0)
+      })
+    }
+  }
+
+  let written = 0
+  if (pending.length === 0) return written
+
+  // 2. 旧值基底：整个写入区间一次矩形读（保留原始类型，数字/日期列不被 String() 化）
+  const firstRow = pending[0]?.row ?? 0
+  const lastRow = pending.at(-1)?.row ?? 0
+  const oldRows =
+    maxWriteCol > 0 ? readRangeCellValues(ws, firstRow, lastRow, 1, maxWriteCol) : []
+  const oldValueAt = (row: number, col: number): WpsCellValue =>
+    oldRows[row - firstRow]?.[col - 1] ?? null
+
+  // 3. 连续行分批矩形写；批写失败回退该批逐格 setCellValue
+  let batchStart = 0
+  while (batchStart < pending.length) {
+    let batchEnd = batchStart
+    while (
+      batchEnd + 1 < pending.length &&
+      (pending[batchEnd + 1]?.row ?? 0) === (pending[batchEnd]?.row ?? 0) + 1 &&
+      batchEnd - batchStart + 1 < FILL_BATCH_ROWS
+    ) {
+      batchEnd += 1
+    }
+    const batch = pending.slice(batchStart, batchEnd + 1)
+    const batchFirstRow = batch[0]?.row ?? 0
+    const batchLastRow = batch.at(-1)?.row ?? 0
+
+    const values: WpsCellValue[][] = batch.map(({ row, writes }) => {
+      const line: WpsCellValue[] = []
+      for (let col = 1; col <= maxWriteCol; col += 1) {
+        const override = writes.find((write) => write.col === col)
+        line.push(override ? (override.value as WpsCellValue) : oldValueAt(row, col))
+      }
+      return line
+    })
+
+    let isBatchOk = false
+    if (maxWriteCol > 0) {
+      try {
+        const range = ws.Range(
+          `${colNumberToLetter(1)}${String(batchFirstRow)}:${colNumberToLetter(maxWriteCol)}${String(batchLastRow)}`,
+        )
+        range.Value2 = values
+        isBatchOk = true
+      } catch (error: unknown) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[_fillSheetWithCollections] 批量写入第 ${String(batchFirstRow)}-${String(batchLastRow)} 行失败，回退逐格写入: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    } else {
+      // 无可写列：旧行为同样一行都不写且全部计 written
+      isBatchOk = true
+    }
+
+    if (isBatchOk) {
+      written += batch.length
+    } else {
+      // 回退路径与旧实现逐字一致：逐格 setCellValue，统计失败行
+      for (const { row, writes } of batch) {
+        let isRowOk = true
+        for (const { col, value } of writes) {
+          if (!setCellValue(ws, row, col, value)) {
+            isRowOk = false
+          }
+        }
+        if (isRowOk) written += 1
+      }
+    }
+
+    batchStart = batchEnd + 1
   }
 
   setStatus(`收藏数据填充完成：${String(written)}/${String(total)}`, 'info')
