@@ -194,6 +194,11 @@ export function initIncrementalSyncFromRibbon(): void {
 >
 > 5.3 已完成：别名匹配 O(n²) → 反向索引。
 >
+> **进度（2026-10-18 批次）**：新增 §5.5 —— 清理页「执行前预览」重构：
+> diff 视图模块（diff2html 范式 / 零依赖）、预览数据零额外 COM 采集、
+> 三处卡顿源修复（PluginStorage 缓存 / 数据块共用 / 异步扫描）、
+> 统计条六套手写变体收敛、横屏排版。
+>
 > **统一改法**：全部走「矩形读 + 逐格读回退」——只有读回的行数（单行时还要求宽度）
 > 与请求一致才信任批量结果，否则回退原逐格路径。这样即便宿主/桩不支持区域读，
 > 行为也与改造前**逐字一致**，优化只会在真实宿主上生效。
@@ -294,6 +299,55 @@ export function initIncrementalSyncFromRibbon(): void {
 - `ribbon-service.ts` 的 `getField`（236-248）与 `exceltobangumi/index.ts` 的 `createFieldGetter`（162-175）同构；指纹数组三处逐字重复。
 - `panel/panel-page.ts:40` 的 4 行 Escape 处理 vs `ui/components/modal-a11y.ts:52` 的完整 focus trap —— 详情模态疑似未复用 a11y 组件。
 - `toggleSheetLock` 两套实现：`panel/enrich-page.ts:970`（委托锁引擎）vs `panel/panel-lifecycle.ts:74`（自管 `BGM.sheet`）。
+
+---
+
+### 5.5 清理页「执行前预览」重构（2026-10-18：diff 视图 + 横屏 + 性能）
+
+> 用户诉求原话：执行前预览要能「看到将删哪些行、在哪里、做什么操作，有 diff 数据表示」；
+> 「所有可对比的都要有 diff 页面可看」；「统一所有 UI 风格，统计页面统一为外部导航栏风格」；
+> 「支持横屏排版」；「找到能减少卡顿的地方」。
+
+#### 5.5.1 diff 视图模块（`ts/ui/diff-view.ts` + `css/diff.css`，四页共用）
+
+参考 diff2html 的交互范式，**零依赖**（任务窗格 CSP 禁外链 + 包体敏感，不引本体）：
+
+- 行类型四态：`keep`（重复组保留行，标记 `=`）/ `delete`（待删行或旧值，`-`，红）/ `insert`（新值，`+`，绿）/ `context`（分组说明行，跨列单格）；
+- **行内高亮**：`splitInlineDiff(old, next)` 按公共前后缀裁剪出四段，差异中段包 `<span class="diff-del|diff-ins">`。纯函数、零依赖，不追求最小编辑脚本（LCS）—— 单元格值通常是小改动（去空格 / 改分隔符 / 补别名），前后缀裁剪已足够直观；
+- **分页**：默认每页 50 行，「显示更多」按批 `insertAdjacentHTML` 追加 —— 千行级预览一次性 innerHTML 会把任务窗格卡死；
+- **安全双路径**（本项目铁律）：所有用户数据先 `escapeHtml` 再整体 `sanitizeHtml`；**批量行追加必须走 `sanitizeTableRows`** —— DOMPurify 主路径用 DOMParser 按完整文档上下文解析，顶层裸 `<tr>` 会被剥成文本（`sanitizeTableRows` 的 JSDoc 已记此坑）；
+- ⚠️ **`colspan` 不在 `sanitize.ts` 的 ALLOWED_ATTR 白名单里**：diff 视图的 context 行是运行时拼装表格首次使用跨列，严格白名单会静默剥掉 `colspan` → 跨列失效（**真机 bug，由真实 DOMPurify 路径的单测抓到**）。已补白名单 + 回归断言。教训：**运行时拼装表格用到任何新属性前，先查白名单**。
+
+#### 5.5.2 预览数据采集：零额外 COM
+
+引擎原产出只有 `deleteRows: number[]`（行号）与 `changes`（含新旧值），页面无法回答「删的到底是哪条数据」。本轮把预览数据**顺带采集**（数据本就已读入内存，零额外 COM 读取）：
+
+- `RowPlan.rowPreviews: DeletedRowPreview[]`（行号 + 名称 + URL）与 `groupPreviews: DuplicateGroupPreview[]`（保留行 vs 待删行，重复类规则产出）—— 后者让用户能逐组核对「引擎留对了行吗」；
+- `RowChange.oldValue`：行级变更（标签合并）的旧值取自已在内存的 tags 列 —— 没有它，diff 只能显示 `- （空）→ + 新标签`，用户看不到改了什么；
+- `planDuplicateUrlRows` 为取受害行名称**新增 1 次名称列矩形读**（同 URL 组内各行名称不同，没有名称用户无法核对）；
+- `planEmptyNameRows` 的逐列读改**单次矩形读**（原列数 = COM 往返次数，30 列就是 30 次；语义不变——仍只检查 colMap 已识别列）。
+
+#### 5.5.3 性能：三处卡顿源
+
+| # | 卡顿源                                                                                       | 修法                                                                                                                                                                        | 收益                            |
+ | - | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| 1 | `clean-page.ts` 勾选状态每次渲染 / 勾选 / 扫描都按候选表数量反复过 `PluginStorage.getItem`（跨 WebView 桥：IPC + JSON.parse）；50 张表时**一次勾选 = 上百次 IPC** | write-through 内存缓存（`sheetSelectionCache` + `sheetSelectionPersisted`）：读命中内存，写同时落缓存与持久化。一致性依据：勾选状态只由本页写入，无跨写者 | 一次勾选 ~N 次 IPC → 1 次       |
+| 2 | `scanTarget` 原先 `collectExcludedRows` 1 次全量读 + `estimateRowBytes` 至多 30 次逐行采样读 + `planNoiseRules` 又 1 次全量读 | 数据区整块**只读一次**，排除行判定 / 行字节估算 / 噪声行扫描三者共用（`block` 可选参数；未提供时各函数按原行为自读，导出函数仍可独立使用） | 每目标至多 32 次 COM → 1 次 |
+| 3 | `scanCleanRules` 全同步：大表扫描期间任务窗格**完全冻结**（按钮无反馈、无法滚动）           | 改异步，**逐目标之间让出宏任务**（`setTimeout(0)`）。⚠️ 必须是宏任务 —— 微任务（`await Promise.resolve()`）不足以让浏览器重绘，与首屏 COM 扫描同一原则；页面侧 `handleScan` 改 async + 扫描防重入（`isScanning`，防双击交错写 `scanResult`） | 扫描期间 UI 保持响应            |
+
+**评估后不做**（风险 > 收益，记录备查）：多规则重复解析表结构（`planDuplicateRows` 等各自调 `readSheetLayout`）。共享 `buildTarget` 已解析的 layout 对新番表会**改变语义**——新番表无「名称」表头，`readSheetLayout` 的标准路径必然失败并返回空计划，而 `buildTarget` 走专属签名路径构造了推导 colMap；传入会让新番表突然能跑重复行规则。要做得先给 `CleanTargetInfo` 记 `isXinFan` 再分流，收益仅 (规则数−1)×3 次 COM/目标。
+
+#### 5.5.4 UI 风格统一：统计条收敛六套手写变体
+
+用户要求「所有页面统一风格、统计区统一为外部导航栏风格」。改前是**六套并存**：统一组件 `stat-cards.ts`（三页在用）+ `preview.ts` 手写卡（还带硬编码 hex `#f59e0b`/`#22c55e`，违反令牌化铁律）+ enrich 三处静态卡（`match-stat-*` / `enrich-stat-*` / `record-stat-*`）+ 两处死 CSS（`clean-stat-*` / `bgm-stat-card*`）。
+
+收敛结果：**一套 `.stat-grid` / `.stat-card` 标记 + 导航栏视觉语言**（横排胶囊、`r-md` 圆角、1px 描边悬停加深、语义色只作用于数值，flex-wrap 自然折行无需窄档媒体查询）。静态统计块只换类名、**保留 JS 依赖的 `id`**（`textContent` 更新逻辑零改动）；死 CSS 全删。同步结果弹窗的统计**未**强改——它早已共用 `sync-stats-chart.ts` 仪表盘组件（环形图 / 图标卡是另一种信息密度场景，且已令牌化），强行套胶囊条会破坏仪表盘。
+
+#### 5.5.5 横屏排版
+
+任务窗格停靠成横排（宽而矮，典型如顶部停靠）时，单列主区留大片空白、上下滚动距离翻倍。改法：`panel-theme.css` 新增 960px / 1440px 两档，非 panel 页（panel 早已 `.main.main-grid`）主区切 2/3 列栅格；`.section-wide` 标记天然全宽区块（clean / enrich 的 `#sec-preview`，跨全部列）。
+
+⚠️ **不用 `repeat(auto-fit, minmax(280px, 400px))`**（panel 的口径）：Chrome 探针实测 1500px 窗格下它给 2×400px，**右侧空出约 1/4 宽度**——正是要消除的问题。改用确定性列数 + `1fr` 铺满（超宽也不碎片化）。验证用一次性宽视口探针（量计算样式 + 截图），`audit:layout` 窄档 5 页面 × 2 档复测无异常。
 
 ---
 
