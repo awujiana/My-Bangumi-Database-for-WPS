@@ -19,7 +19,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { getNotifyApi } from '../core/ui-bridge.js'
+import { getNotifyApi, getSyncProgressApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
   ensureSheetHeaders,
@@ -43,6 +43,14 @@ import { collectNeededFieldsFromSheet } from './shard-fetch.js'
 import { applyColumnOverrides, excludedColumnClosure, excludedJsonlFields } from './sync-mapping.js'
 import type { SyncMappingConfig } from './sync-mapping.js'
 import type { SyncSource } from './sync-source.js'
+
+/**
+ * 远程同步的阶段名（供进度弹窗的阶段时间线）。
+ *
+ * 导出给调用方：弹窗由 `showSyncProgressDialog` 打开（UI 层），阶段推进由本模块
+ * 做（编排层），两边必须用同一份下标，否则时间线会跳错。
+ */
+export const REMOTE_SYNC_PHASES: readonly string[] = ['下载', '比对', '写入'] as const
 
 /** {@link runRemoteSync} 入参：两个薄入口的历史差异全部在此参数化 */
 export interface RunRemoteSyncParameters {
@@ -151,6 +159,8 @@ export async function runRemoteSync(
     3,
     `下载完成：${String(remoteEntries.length)} 条（耗时 ${String(downloadElapsed)}ms）`,
   )
+  // 下载阶段结束 → 推进时间线到「比对」
+  getSyncProgressApi().setPhase(1)
 
   // 3. 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
   const app = getApp()
@@ -225,6 +235,8 @@ export async function runRemoteSync(
     }
 
     onProgress?.(2, 3, '比对差异中...')
+    // 比对阶段结束 → 推进时间线到「写入」（真正的耗时大头通常在这里）
+    getSyncProgressApi().setPhase(2)
     const diffStartTs = Date.now()
     const diffs = computeDiff(effectiveRemoteEntries, local.entries, effectiveStrategy, timeFilter)
     const diffElapsed = Date.now() - diffStartTs

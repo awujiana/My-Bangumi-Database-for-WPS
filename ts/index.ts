@@ -250,6 +250,8 @@ export {
   getSyncSource,
   getRegisteredSourceTypes,
   isSyncSourceRegistered,
+  // 远程同步的阶段名（进度弹窗时间线；下标须与 remote-sync-core 的推进一致）
+  REMOTE_SYNC_PHASES,
 } from './sync/sync-source-registry.js'
 
 export {

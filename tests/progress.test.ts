@@ -576,7 +576,115 @@ describe('真实 DOMPurify 环境（加载项运行时路径）', () => {
     })
     expect(controller).not.toBeNull()
     expect(document.querySelector('[data-el="bar"]')).not.toBeNull()
+    // 阶段时间线的 <ol> 是新加进模板的标签：白名单一旦收紧会把它剥掉，
+    // collectElements 随即抛「缺少必需元素」。这里显式钉住，避免运行时才发现。
+    expect(document.querySelector('[data-el="phases"]')).not.toBeNull()
     controller?.update(3, 6, 'ok')
     expect(document.querySelector('[data-el="bar"]')?.getAttribute('aria-valuenow')).toBe('50')
+  })
+})
+
+
+/** 起一个带阶段时间线的 inline 进度组件 */
+function createWithPhases(phases?: readonly string[]) {
+  return createProgress({
+    mode: 'inline',
+    title: '正在同步',
+    showHeader: false,
+    hostId: makeHost().id,
+    // 条件展开：与 ui/dialog.ts 的 \`...(config && { configHtml })\` 同一写法
+    ...(phases && { phases }),
+  })
+}
+
+/** 取第 index 个阶段项 */
+function phaseItem(index: number): HTMLElement {
+  const item = document.querySelectorAll<HTMLElement>('.bgm-progress__phase')[index]
+  if (item === undefined) throw new Error(`缺少阶段项: ${String(index)}`)
+  return item
+}
+
+describe('阶段时间线（phases）', () => {
+  it('未传 phases → 不渲染时间线（既有调用方行为不变）', () => {
+    const controller = createWithPhases()
+
+    expect(document.querySelectorAll('.bgm-progress__phase')).toHaveLength(0)
+    expect(pickElement('[data-el=phases]').style.display).toBe('none')
+    // 未启用时推进阶段也不该抛错，调用方不必分支判断
+    expect(() => {
+      controller?.setPhase(1)
+    }).not.toThrow()
+  })
+
+  it('传入 phases → 渲染各阶段，并直接从第 0 阶段开始', () => {
+    createWithPhases(['下载', '比对', '写入'])
+
+    const items = document.querySelectorAll('.bgm-progress__phase')
+    expect(items).toHaveLength(3)
+    expect(phaseItem(0).className).toContain('bgm-progress__phase--active')
+    expect(phaseItem(0).getAttribute('aria-current')).toBe('step')
+    expect(phaseItem(1).className).toContain('bgm-progress__phase--pending')
+    expect(phaseItem(1).getAttribute('aria-current')).toBe('false')
+    expect(phaseItem(0).textContent).toContain('下载')
+  })
+
+  it('setPhase 推进：之前的阶段转为 done 并带上耗时', () => {
+    vi.useFakeTimers()
+    try {
+      const controller = createWithPhases(['下载', '比对', '写入'])
+      vi.advanceTimersByTime(1500)
+
+      controller?.setPhase(1)
+
+      expect(phaseItem(0).className).toContain('bgm-progress__phase--done')
+      expect(phaseItem(1).className).toContain('bgm-progress__phase--active')
+      expect(phaseItem(2).className).toContain('bgm-progress__phase--pending')
+      // 已完成阶段显示耗时文本
+      expect(phaseItem(0).textContent).toContain(formatDuration(1500))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('setPhase 越界或重复 → 静默忽略，不推进也不报错', () => {
+    const controller = createWithPhases(['下载', '比对'])
+
+    controller?.setPhase(-1)
+    controller?.setPhase(2)
+    controller?.setPhase(1.5)
+
+    expect(phaseItem(0).className).toContain('bgm-progress__phase--active')
+    controller?.setPhase(0)
+    expect(phaseItem(0).className).toContain('bgm-progress__phase--active')
+  })
+
+  it('complete（正常完成）→ 全部阶段标为 done 并显示最后一个阶段耗时', () => {
+    vi.useFakeTimers()
+    try {
+      const controller = createWithPhases(['下载', '比对', '写入'])
+      vi.advanceTimersByTime(1000)
+      controller?.setPhase(2)
+      vi.advanceTimersByTime(2000)
+
+      controller?.complete({ summary: '完成' })
+
+      expect(phaseItem(0).className).toContain('bgm-progress__phase--done')
+      expect(phaseItem(1).className).toContain('bgm-progress__phase--done')
+      expect(phaseItem(2).className).toContain('bgm-progress__phase--done')
+      expect(phaseItem(2).textContent).toContain(formatDuration(2000))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('complete（被停止）→ 保留未完成阶段为 pending，用户能看出卡在哪一步', () => {
+    const controller = createWithPhases(['下载', '比对', '写入'])
+
+    controller?.setPhase(1)
+    controller?.complete({ summary: '已停止', ok: false })
+
+    expect(phaseItem(0).className).toContain('bgm-progress__phase--done')
+    expect(phaseItem(1).className).toContain('bgm-progress__phase--active')
+    expect(phaseItem(2).className).toContain('bgm-progress__phase--pending')
   })
 })

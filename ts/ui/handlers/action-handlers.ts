@@ -64,6 +64,7 @@ import {
   showToast,
   storeBgToken,
   syncFromRemote,
+  REMOTE_SYNC_PHASES,
   syncSelectedRows,
   toggleSheetLock,
   updateSyncProgressDialog,
@@ -682,6 +683,8 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
             },
           },
           configSummary,
+          // 阶段时间线：下载 → 比对 → 写入，由 remote-sync-core 推进
+          REMOTE_SYNC_PHASES,
         )
 
         // 状态栏同步更新（与 syncFromPanel 行为一致）

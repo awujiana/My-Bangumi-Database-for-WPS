@@ -57,6 +57,7 @@ describe('core/ui-bridge', () => {
       expect(() => {
         progress.show('同步中', { onPause: vi.fn(), onResume: vi.fn(), onStop: vi.fn() })
         progress.update(1, 10, '消息')
+        progress.setPhase(1)
         progress.complete('完成', [])
         progress.hide()
       }).not.toThrow()
@@ -83,12 +84,16 @@ describe('core/ui-bridge', () => {
       const bridge = await import('../ts/core/ui-bridge.js')
       const show = vi.fn()
       const update = vi.fn()
+      const setPhase = vi.fn()
       const complete = vi.fn()
       const hide = vi.fn()
-      bridge.registerSyncProgressApi({ show, update, complete, hide })
+      bridge.registerSyncProgressApi({ show, update, setPhase, complete, hide })
 
       bridge.getSyncProgressApi().update(3, 10, '消息')
       expect(update).toHaveBeenCalledWith(3, 10, '消息')
+
+      bridge.getSyncProgressApi().setPhase(2)
+      expect(setPhase).toHaveBeenCalledWith(2)
     })
 
     it('registerSyncRunner 后 getSyncRunner 返回注册的执行体', async () => {

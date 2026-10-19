@@ -69,6 +69,8 @@ const mockGetSyncSourceType = vi.hoisted(() => vi.fn().mockReturnValue('github')
 // 缺列主动通知（toast）：core 经通知桥的 getNotifyApi 发出（依赖反转，不直连 UI 层），
 // 桥被 mock 成只记 toast 调用，避免真实降级实现写日志噪声
 const mockToast = vi.hoisted(() => vi.fn<(message: string, toastType?: string) => void>())
+/** 阶段时间线推进（下载 → 比对 → 写入） */
+const mockSetPhase = vi.hoisted(() => vi.fn<(index: number) => void>())
 
 // 创建可变的 mock source 引用
 // 注意：vi.hoisted 的代码先于 import 求值，此处不能引用 Result（会触发 TDZ
@@ -107,6 +109,7 @@ vi.mock('../ts/core/constants.js', () => ({
 }))
 
 // 通知桥：core 的缺列 toast 走 getNotifyApi().toast（依赖反转，不直连 UI 层）
+// 进度桥：编排层推进阶段时间线走 getSyncProgressApi().setPhase
 vi.mock('../ts/core/ui-bridge.js', () => ({
   getNotifyApi: () => ({
     toast: mockToast,
@@ -115,6 +118,13 @@ vi.mock('../ts/core/ui-bridge.js', () => ({
     error: vi.fn(),
     success: vi.fn(),
     input: vi.fn(),
+  }),
+  getSyncProgressApi: () => ({
+    show: vi.fn(),
+    update: vi.fn(),
+    setPhase: mockSetPhase,
+    complete: vi.fn(),
+    hide: vi.fn(),
   }),
 }))
 
@@ -212,6 +222,7 @@ import {
   getRegisteredSourceTypes,
   isSyncSourceRegistered,
   syncFromRemote,
+  REMOTE_SYNC_PHASES,
 } from '../ts/sync/sync-source-registry.js'
 import type { SyncTimeFilter } from '../ts/sync/github-sync-diff.js'
 
@@ -344,6 +355,19 @@ describe('syncFromRemote', () => {
     expect(result).toBeDefined()
     expect(mockGithubSourceReference.fetchRemoteEntries).toHaveBeenCalled()
     expect(mockApplyDiffToSheet).toHaveBeenCalled()
+  })
+
+  it('阶段时间线按「下载 → 比对 → 写入」依次推进', async () => {
+    // 本文件的 beforeEach 不做统一 clearAllMocks，先自己清一遍再断言调用序列
+    mockSetPhase.mockClear()
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockComputeDiff.mockReturnValue([])
+
+    await syncFromRemote()
+
+    // 下标必须与 REMOTE_SYNC_PHASES 一致：0=下载 1=比对 2=写入
+    expect(REMOTE_SYNC_PHASES).toEqual(['下载', '比对', '写入'])
+    expect(mockSetPhase.mock.calls.map((call) => call[0])).toEqual([1, 2])
   })
 
   it('缺合法 sid 计数透传到 result.skippedInvalidLines 并记 WARN', async () => {

@@ -24,6 +24,9 @@ import type { GithubSyncResult } from './remote-sync-apply.js'
 import type { SyncMappingConfig } from './sync-mapping.js'
 import type { SyncSource } from './sync-source.js'
 
+/** 阶段名随编排层一起对外，保证弹窗与推进用同一份下标 */
+export { REMOTE_SYNC_PHASES } from './remote-sync-core.js'
+
 /** 同步源工厂函数：每次调用返回新实例，避免实例间状态共享 */
 type SyncSourceFactory = () => SyncSource
 

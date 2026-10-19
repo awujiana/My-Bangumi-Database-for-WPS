@@ -2155,6 +2155,71 @@ select.input {
     margin-bottom: 8px;
 }
 
+/* ---- 阶段时间线（可选：showProgress 传 phases 时才渲染）----
+ * 三态：pending（灰）/ active（蓝 + 呼吸）/ done（绿 + 耗时）。
+ * 刻意放在 .bgm-progress__section **之外**——完成态会隐藏 section（进度条与日志），
+ * 但各阶段耗时是要留给用户看的，跟着一起藏掉就白做了。
+ * 不做连接线：flex-wrap 换行时连接线会指向下一行开头，反而不像时间线。 */
+.bgm-progress__phases {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+}
+
+.bgm-progress__phase {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-3);
+}
+
+.bgm-progress__phase-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    flex: 0 0 auto;
+}
+
+.bgm-progress__phase--active {
+    color: var(--text-1);
+    font-weight: 600;
+}
+
+.bgm-progress__phase--active .bgm-progress__phase-dot {
+    background: var(--accent-blue);
+    animation: bgm-phase-pulse 1.4s var(--ease) infinite;
+}
+
+.bgm-progress__phase--done {
+    color: var(--text-2);
+}
+
+.bgm-progress__phase--done .bgm-progress__phase-dot {
+    background: var(--success);
+}
+
+/* 等宽数字：耗时逐秒跳动时不会左右抖 */
+.bgm-progress__phase-time {
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes bgm-phase-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
 .bgm-progress__config .cfg-summary {
     display: flex;
     flex-wrap: wrap;

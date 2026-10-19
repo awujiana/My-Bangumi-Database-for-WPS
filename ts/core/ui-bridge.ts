@@ -61,14 +61,20 @@ export interface NotifyApi {
 
 /** 同步进度弹窗能力（由 ui/dialog.ts 实现，现为通用进度组件的 modal 包装） */
 export interface SyncProgressApi {
-  /** 打开进度弹窗并接管暂停/继续/停止回调 */
+  /** 打开进度弹窗并接管暂停/继续/停止回调（phaseNames 提供时渲染阶段时间线） */
   show(
     title: string,
     handlers: SyncProgressHandlers,
     config?: SyncConfigSummary,
+    phaseNames?: readonly string[],
   ): void
   /** 更新进度 */
   update(current: number, total: number, message?: string, logLine?: string, eta?: string): void
+  /**
+   * 推进阶段时间线（未启用时静默忽略，调用方不必分支判断）。
+   * 阶段名由 `show()` 的 `phaseNames` 给出，这里只按下标推进。
+   */
+  setPhase(index: number): void
   /** 置为完成态 */
   complete(
     summary: string,
@@ -138,6 +144,9 @@ const FALLBACK_SYNC_PROGRESS: SyncProgressApi = {
   },
   update: () => {
     warnNotRegistered('syncProgress', 'update')
+  },
+  setPhase: () => {
+    warnNotRegistered('syncProgress', 'setPhase')
   },
   complete: () => {
     warnNotRegistered('syncProgress', 'complete')

@@ -433,6 +433,7 @@ export function showSyncProgressDialog(
   title: string,
   handlers: SyncProgressHandlers,
   config?: SyncConfigSummary,
+  phaseNames?: readonly string[],
 ): void {
   _syncProgress?.hide()
   _resetSyncTimer()
@@ -445,6 +446,7 @@ export function showSyncProgressDialog(
     enablePause: true,
     enableStop: true,
     ...(config && { configHtml: renderConfigSummary(config) }),
+    ...(phaseNames && phaseNames.length > 0 && { phases: phaseNames }),
     onPause: (): void => {
       _syncPauseStart = Date.now()
       handlers.onPause()
@@ -713,6 +715,9 @@ registerNotifyApi({
 registerSyncProgressApi({
   show: showSyncProgressDialog,
   update: updateSyncProgressDialog,
+  setPhase: (index: number): void => {
+    _syncProgress?.setPhase(index)
+  },
   complete: completeSyncProgressDialog,
   hide: hideSyncProgressDialog,
 })

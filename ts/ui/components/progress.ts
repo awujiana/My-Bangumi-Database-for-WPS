@@ -55,6 +55,16 @@ export interface ProgressShowOptions extends ProgressHandlers {
   enableStop?: boolean
   /** 是否显示标题栏（含图标与右上角关闭），`modal` 默认 true，`inline` 默认 false */
   showHeader?: boolean
+  /**
+   * 阶段名列表（如 `['下载', '比对', '写入']`）。
+   *
+   * 提供时进度条上方渲染一条阶段时间线，调用方用 `controller.setPhase(i)` 推进。
+   * 不提供则不渲染——既有调用方行为完全不变。
+   *
+   * 动机：同步一次要跑好几个阶段，进度条只给总数，卡在「下载」还是「写入」
+   * 只能翻日志；时间线把当前阶段与已完成阶段的耗时直接摆出来。
+   */
+  phases?: readonly string[]
   /** 完成态标题（不传则用图标区分成功/停止） */
   doneTitle?: string
 }
@@ -91,6 +101,13 @@ export interface ProgressController {
   setPaused(isPaused: boolean): void
   /** 切换为完成态 */
   complete(options: ProgressCompleteOptions): void
+  /**
+   * 切到指定阶段（配合 `phases` 使用）。
+   *
+   * 把之前的阶段标为「已完成」（并记录耗时），指定的标为「进行中」。
+   * 未启用阶段时间线时静默忽略——调用方不必分支判断。
+   */
+  setPhase(index: number): void
   /** 隐藏并销毁 */
   hide(): void
   /** 是否处于可见（运行或完成）状态 */
@@ -106,6 +123,7 @@ interface ProgressElements {
   closeTop: HTMLButtonElement
   body: HTMLElement
   config: HTMLElement
+  phases: HTMLElement
   section: HTMLElement
   label: HTMLElement
   percent: HTMLElement
@@ -144,6 +162,7 @@ const PROGRESS_TEMPLATE = `
   </div>
   <div data-el="body" class="bgm-progress__body">
     <div data-el="config" class="bgm-progress__config" style="display:none;"></div>
+    <ol data-el="phases" class="bgm-progress__phases" style="display:none;"></ol>
     <div data-el="section" class="bgm-progress__section">
       <div class="bgm-progress__meta" aria-live="polite" aria-atomic="true">
         <span data-el="label" class="bgm-progress__label">进度: 准备中...</span>
@@ -203,6 +222,7 @@ function collectElements(content: HTMLElement): ProgressElements {
     closeTop: requireButton(content, '[data-el="closeTop"]'),
     body: requireElement(content, '[data-el="body"]'),
     config: requireElement(content, '[data-el="config"]'),
+    phases: requireElement(content, '[data-el="phases"]'),
     section: requireElement(content, '[data-el="section"]'),
     label: requireElement(content, '[data-el="label"]'),
     percent: requireElement(content, '[data-el="percent"]'),
@@ -373,6 +393,86 @@ export function createProgress(options: ProgressShowOptions): ProgressController
     els.config.style.display = 'none'
   }
 
+  // ---- 阶段时间线（可选）----
+  const phases = options.phases ?? []
+  /** 各阶段的开始时刻；-1 表示该阶段还没进入过 */
+  const phaseStartedAt: number[] = phases.map(() => -1)
+  /** 各阶段耗时（毫秒）；-1 表示还没结束 */
+  const phaseElapsed: number[] = phases.map(() => -1)
+  /** 当前阶段下标；-1 表示尚未开始 */
+  let currentPhase = -1
+
+  /** 渲染阶段时间线（只在启用时调用一次） */
+  const renderPhases = (): void => {
+    els.phases.replaceChildren()
+    for (const [index, name] of phases.entries()) {
+      const item = document.createElement('li')
+      item.className = 'bgm-progress__phase bgm-progress__phase--pending'
+      item.dataset.phase = String(index)
+
+      const dot = document.createElement('span')
+      dot.className = 'bgm-progress__phase-dot'
+      const text = document.createElement('span')
+      text.className = 'bgm-progress__phase-name'
+      text.textContent = name
+      const time = document.createElement('span')
+      time.className = 'bgm-progress__phase-time'
+      time.dataset.el = 'phaseTime'
+
+      item.append(dot, text, time)
+      els.phases.appendChild(item)
+    }
+    els.phases.style.display = ''
+  }
+
+  /** 单个阶段的状态：pending（未开始）/ active（进行中）/ done（已完成） */
+  const phaseStateOf = (index: number): 'pending' | 'active' | 'done' => {
+    if (index < currentPhase) return 'done'
+    if (index === currentPhase) return 'active'
+    return 'pending'
+  }
+
+  /**
+   * 按当前状态刷新各个阶段项的类名与耗时文本。
+   * 用 className 整体赋值而非 classList 增删：状态是三选一，
+   * 整体赋值不会出现「上一个状态的类没被摘掉」的残留。
+   */
+  const paintPhases = (): void => {
+    if (currentPhase < 0) return
+    // 直接迭代 NodeList（已带 HTMLElement 类型，省掉 instanceof 判断与 if 包裹）
+    for (const item of els.phases.querySelectorAll<HTMLElement>(':scope > li')) {
+      const index = Number(item.dataset.phase ?? '-1')
+      const state = phaseStateOf(index)
+      item.className = `bgm-progress__phase bgm-progress__phase--${state}`
+      // aria-current="false" 是合法取值（明确表示非当前项），比 removeAttribute 更省分支
+      item.setAttribute('aria-current', state === 'active' ? 'step' : 'false')
+      const elapsed = phaseElapsed[index] ?? -1
+      const timeElement = item.querySelector<HTMLElement>(':scope > [data-el="phaseTime"]')
+      if (timeElement) timeElement.textContent = elapsed >= 0 ? formatDuration(elapsed) : ''
+    }
+  }
+
+  if (phases.length > 0) renderPhases()
+
+  /** 切到指定阶段：结掉上一个阶段的计时，开启下一个 */
+  const setPhase = (index: number): void => {
+    if (phases.length === 0) return
+    if (!Number.isSafeInteger(index) || index < 0 || index >= phases.length) return
+    if (index === currentPhase) return
+    const now = Date.now()
+    // 结束上一个阶段
+    if (currentPhase >= 0 && phaseStartedAt[currentPhase] !== undefined) {
+      const started = phaseStartedAt[currentPhase] ?? now
+      phaseElapsed[currentPhase] = now - started
+    }
+    currentPhase = index
+    phaseStartedAt[index] = now
+    paintPhases()
+  }
+
+  // 启用时间线时直接从第 0 阶段开始，调用方不必显式 setPhase(0)
+  if (phases.length > 0) setPhase(0)
+
   // ---- 重置进度区 ----
   els.bar.style.width = '0%'
   els.bar.textContent = ''
@@ -501,6 +601,16 @@ export function createProgress(options: ProgressShowOptions): ProgressController
     },
     complete(completeOptions: ProgressCompleteOptions): void {
       if (!isVisible) return
+      // 收尾：结掉最后一个阶段的计时，并把所有阶段标为已完成
+      // （时间线在 section 里，section 会被隐藏，所以这里只更新数据态；
+      //  被「停止」时保留未完成阶段的 pending 外观，用户能看出卡在哪一步）
+      if (phases.length > 0 && currentPhase >= 0) {
+        const now = Date.now()
+        const started = phaseStartedAt[currentPhase] ?? now
+        phaseElapsed[currentPhase] = now - started
+        currentPhase = (completeOptions.ok ?? true) ? phases.length : currentPhase
+        paintPhases()
+      }
       const isOk = completeOptions.ok ?? true
       els.icon.textContent = completeOptions.icon ?? (isOk ? '✅' : '⏹️')
       els.title.textContent = completeOptions.doneTitle ?? (isOk ? '执行完成' : '已停止')
@@ -545,6 +655,7 @@ export function createProgress(options: ProgressShowOptions): ProgressController
       document.addEventListener('keydown', escHandler)
       els.closeBtn.focus()
     },
+    setPhase,
     hide,
     isActive: (): boolean => isVisible,
   }

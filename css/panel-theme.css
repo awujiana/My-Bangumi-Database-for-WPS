@@ -51,8 +51,25 @@ body {
 }
 
 /* ============================ 3. 应用外壳 ================================ */
+/* 面板入场：整块淡入上移。
+   只动 .global 一层——逐块（section 级）动画会在模块重排时反复重播：nav-order
+   轮询到别的页改了顺序后会重渲染 main 的子元素，每次重渲染都会把入场动画再放
+   一遍，看起来像闪烁。整块播一次则完全不受重排影响。
+   prefers-reduced-motion 由本文件第 14 节的全局规则统一关掉。 */
+@keyframes bgm-app-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* 覆盖原 styles.css .global{max-width:480px}，改为桌面应用栅格 */
 .global {
+  animation: bgm-app-enter 260ms var(--ease) both;
   max-width: none;
   margin: 0;
   display: grid;
@@ -65,6 +82,19 @@ body {
 }
 
 /* ---- 顶栏 ---- */
+/* 主题切换（深色 / 浅色 / 跟随系统）：token 换档时颜色 120ms 平滑过渡。
+   只挑**没有自带 transition** 的表面写整条；.section 自带 transition，已在其
+   自身列表里追加 background-color / color——在这里整条覆盖会把 hover 的
+   transform / box-shadow 一起盖掉。 */
+.topbar,
+.sidebar,
+.side-card {
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease),
+    border-color 120ms var(--ease);
+}
+
 .topbar {
   grid-area: topbar;
   position: sticky;
@@ -445,7 +475,12 @@ body.nav-icons-only .nav a:hover::after {
   transition:
     border-color var(--dur),
     transform var(--dur) var(--ease),
-    box-shadow var(--dur);
+    box-shadow var(--dur),
+    /* 主题切换时底色平滑过渡（120ms），而不是硬切。
+       注意是**追加**进既有列表，不能整条覆盖——会盖掉 hover 的
+       transform / box-shadow，让悬停反馈失效。 */
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
   overflow: hidden;
 }
 .section:hover {
