@@ -29,7 +29,7 @@ import {
   getDataSheet,
 } from '../tools/util/index.js'
 
-import { collectMissingColumns, computeDiff, filterByTime } from './github-sync-diff.js'
+import { collectMissingColumns, collectRemoteEmptyFields, computeDiff, filterByTime } from './github-sync-diff.js'
 import type { ConflictResolution, SyncStrategy, SyncTimeFilter } from './github-sync-diff.js'
 import { formatTimeFilterLabel } from './github-time-format.js'
 import {
@@ -336,6 +336,26 @@ export async function runRemoteSync(
           'warning',
         )
       }
+    }
+
+    // 远程空值体检：本地该列为空、远程对应字段也为空 → 同步后仍是空的，
+    // 但界面上完全无声。用户无从区分「远程没数据」和「同步没生效」，
+    // 这里统计出来交给完成弹窗说明（不弹 toast——这类字段本就普遍缺失，会太吵）。
+    // 口径与缺列体检互斥：本地**没有**这一列归缺列，本地有列但为空才归这里。
+    const emptyStats = collectRemoteEmptyFields(effectiveRemoteEntries, local.entries)
+    // 用户主动取消同步的列不进提示——那是选择，不是缺数据
+    result.remoteEmptyFields =
+      excludedSet === undefined
+        ? emptyStats
+        : emptyStats.filter((item) => !excludedSet.has(item.name))
+    if (result.remoteEmptyFields.length > 0) {
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[${logTag}] ${String(result.remoteEmptyFields.length)} 个字段本地为空且远程也无数据：${result.remoteEmptyFields
+          .slice(0, 5)
+          .map((item) => `${item.name}(${String(item.count)})`)
+          .join('、')}`,
+      )
     }
 
     // 脏数据体检：分片拼接时缺合法 sid 的记录被静默跳过（与 parseJsonl 的

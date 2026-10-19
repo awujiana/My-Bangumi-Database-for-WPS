@@ -45,6 +45,7 @@ import type {
   GithubSyncDiff,
   GithubSyncDetailItem,
   LocalRowEntry,
+  RemoteEmptyFieldStat,
   SyncStrategy,
 } from './github-sync-diff.js'
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
@@ -99,6 +100,16 @@ export interface GithubSyncResult {
    * 由结果弹窗提示，数字大于 0 即说明数据源本身有脏数据。
    */
   skippedInvalidLines?: number
+  /**
+   * 「本地该列为空、远程对应字段也为空」的统计（按本地列名聚合，降序）
+   *
+   * 与 `missingColumns` 同口径的第三种体检：`computeDiff` 对扩展字段讲究
+   * 「远程没值就不视为差异」（不能用远程空值抹掉本地数据），这是对的，
+   * 但完全静默——用户看到「同步成功」却无从区分「远程本来就没数据」和
+   * 「同步没生效」。数据仓库里这类字段很常见（如 `播放结束` 仅约 25% 非空），
+   * 因此只进完成弹窗、不弹 toast。
+   */
+  remoteEmptyFields?: RemoteEmptyFieldStat[]
 }
 
 /**

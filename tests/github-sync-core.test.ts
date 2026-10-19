@@ -229,6 +229,8 @@ vi.mock('../ts/sync/github-sync-diff.js', () => ({
   filterByTime: mockFilterByTime,
   // 缺列体检：本文件用例关注同步主流程，不关心缺列提示，返回空清单
   collectMissingColumns: vi.fn((): string[] => []),
+  // 远程空值体检：同上，本文件不关心该提示，返回空统计
+  collectRemoteEmptyFields: vi.fn((): unknown[] => []),
   EXTENDED_FIELD_MAP: [
     ['date', '开播日期'],
     ['meta_tags', '标签/分级'],

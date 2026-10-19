@@ -9,6 +9,7 @@ import {
   EXTENDED_FIELD_MAP,
   SYNC_STRATEGY_LABELS,
   collectMissingColumns,
+  collectRemoteEmptyFields,
 } from '../ts/sync/github-sync-diff.js'
 import type {
   GithubRemoteEntry,
@@ -1333,5 +1334,103 @@ describe('collectMissingColumns', () => {
     expect(missing).toContain('评分')
     expect(missing.indexOf('Bangumi_URL')).toBeLessThan(missing.indexOf('名称'))
     expect(new Set(missing).size).toBe(missing.length)
+  })
+})
+
+// ========== collectRemoteEmptyFields 测试 ==========
+/**
+ * 背景（2026-10-19）：computeDiff 对扩展字段「远程没值就不视为差异」是刻意的——不能用远程空值抹掉本地数据。
+ * 但这条规则完全静默，用户会误判成「同步没生效」。本体检把「本地该列为空 + 远程该字段也为空」统计出来交给完成弹窗说明。
+ */
+
+/** 构造本地条目：只给显式列出的字段（未列出的列视为不存在） */
+function makeEmptyFieldsLocal(fields: Record<string, string>): Map<string, LocalRowEntry> {
+  return new Map([['1', { row: 2, sid: '1', fields }]])
+}
+
+describe('collectRemoteEmptyFields', () => {
+  it('本地该列为空 + 远程字段为空 → 计入（本次完结日期/制作公司场景）', () => {
+    const remotes: GithubRemoteEntry[] = [
+      { sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
+    ]
+    const local = makeEmptyFieldsLocal({ 完播日: '', 制作公司: '' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([
+      { name: '完播日', count: 1 },
+      { name: '制作公司', count: 1 },
+    ])
+  })
+
+  it('本地该列为空但远程有值 → 不计入（那属于同步没写进去，不是远程无数据）', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '2026-09-24' }]
+    const local = makeEmptyFieldsLocal({ 完播日: '' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
+  })
+
+  it('本地该列已有值 → 不计入（用户不会为已填好的列困惑）', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    const local = makeEmptyFieldsLocal({ 完播日: '2026-09-24' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
+  })
+
+  it('本地没有该列 → 不计入（归缺列体检，避免两处重复提示）', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    // 完全没有「完播日」这一列
+    const local = makeEmptyFieldsLocal({ 名称: 'A' })
+
+    const stats = collectRemoteEmptyFields(remotes, local)
+
+    expect(stats.some((item) => item.name === '完播日')).toBe(false)
+  })
+
+  it('远程缺该字段（undefined）→ 同样计入', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A' }]
+    const local = makeEmptyFieldsLocal({ 完播日: '' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([{ name: '完播日', count: 1 }])
+  })
+
+  it('新增行（本地无该 SID）不参与统计', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '999', name: 'A', 播放结束: '' }]
+    const local = makeEmptyFieldsLocal({ 完播日: '' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
+  })
+
+  it('多条目按命中条数降序聚合', () => {
+    const remotes: GithubRemoteEntry[] = [
+      { sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
+      { sid: '99', name: 'B', 播放结束: '', 动画制作公司: '' },
+    ]
+    const local = new Map<string, LocalRowEntry>([
+      ['1', { row: 2, sid: '1', fields: { 完播日: '', 制作公司: '' } }],
+      ['99', { row: 3, sid: '99', fields: { 完播日: '' } }],
+    ])
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([
+      { name: '完播日', count: 2 },
+      { name: '制作公司', count: 1 },
+    ])
+  })
+
+  it('别名列两个名字都存在且都为空 → 两个名字各计一次', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 动画制作公司: '' }]
+    const local = makeEmptyFieldsLocal({ 制作公司: '', 动画制作公司: '' })
+
+    const stats = collectRemoteEmptyFields(remotes, local)
+
+    expect(stats).toHaveLength(2)
+    expect(stats.map((item) => item.name).sort((a, b) => a.localeCompare(b))).toEqual(
+      ['制作公司', '动画制作公司'].sort((a, b) => a.localeCompare(b)),
+    )
+  })
+
+  it('远程无数据但本地也无任何相关列 → 空结果', () => {
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    const local = makeEmptyFieldsLocal({ 名称: 'A' })
+
+    expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
   })
 })

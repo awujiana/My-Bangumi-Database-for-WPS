@@ -423,6 +423,32 @@ describe('showSyncResultDialog 结果弹窗', () => {
     expect(resultDialogHtml()).not.toContain('开播日期统计')
   })
 
+  it('存在「远程也无数据」字段时渲染对应区块（说明不是同步失败）', () => {
+    showSyncResultDialog(
+      makeOptions({
+        result: makeResult({
+          remoteEmptyFields: [
+            { name: '完播日', count: 101 },
+            { name: '制作公司', count: 64 },
+          ],
+        }),
+      }),
+    )
+
+    const html = resultDialogHtml()
+    expect(html).toContain('远程也无数据的字段')
+    expect(html).toContain('完播日 · 101 条')
+    expect(html).toContain('制作公司 · 64 条')
+    // 关键是要点明「不是同步失败」，否则用户仍会误判成加载项有 bug
+    expect(html).toContain('这不是同步失败')
+  })
+
+  it('没有「远程也无数据」字段时不渲染该区块（避免每次同步都啰嗦）', () => {
+    showSyncResultDialog(makeOptions())
+
+    expect(resultDialogHtml()).not.toContain('远程也无数据的字段')
+  })
+
   it('点击确定关闭弹窗', () => {
     showSyncResultDialog(makeOptions())
 

@@ -276,6 +276,28 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
       </div>`
       : ''
 
+  // 远程空值提示：本地该列为空、远程对应字段也是空的 → 同步后仍然为空。
+  // computeDiff 不能用远程空值抹掉本地数据（正确），但完全静默，用户会以为
+  // 同步没生效。这里点明「远程也没数据」，避免误判成加载项有 bug。
+  // 只进弹窗不弹 toast：数据仓库里这类字段本就普遍缺失（如完播日约 75% 无数据）。
+  const remoteEmptyFields = (result.remoteEmptyFields ?? []).slice(0, 8)
+  const remoteEmptyHtml =
+    remoteEmptyFields.length > 0
+      ? `
+      <div class="bgm-result-section">
+        <div class="bgm-result-section-title">ℹ️ 远程也无数据的字段</div>
+        <div class="bgm-result-date-label">以下列你的表里是空的，远程数据里也没有值，所以本次没有写入（刻意不覆盖你的本地数据）。这不是同步失败——若需要补全，请到 Bangumi 条目页补充信息，等数据仓库下次更新。</div>
+        <div class="bgm-meta-bar">
+          ${remoteEmptyFields
+            .map(
+              (item) =>
+                `<span class="bgm-meta-tag">${escapeHtml(item.name)} · ${String(item.count)} 条</span>`,
+            )
+            .join('')}
+        </div>
+      </div>`
+      : ''
+
   // 脏数据提示：分片拼接时缺合法 sid 的记录被跳过（与 parseJsonl 的「非法行
   // 不中断整体解析」同口径）。不提示的话用户只会看到「下载了 N 条、只同步了
   // 一部分」却说不出原因——这里显式给出跳过条数，指向数据源本身有脏数据。
@@ -302,6 +324,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
         </div>
         ${dateHtml}
         ${missingHtml}
+        ${remoteEmptyHtml}
         ${skippedHtml}
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📋 操作</div>

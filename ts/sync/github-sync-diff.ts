@@ -219,6 +219,66 @@ function hasRemoteValue(value: unknown): boolean {
   return typeof value === 'boolean'
 }
 
+/** 单个「远程也无数据」字段的统计（按本地列名聚合） */
+export interface RemoteEmptyFieldStat {
+  /** 本地列名（如「完播日」「制作公司」） */
+  name: string
+  /** 命中的条目数：本地该列为空 **且** 远程对应字段也为空 */
+  count: number
+}
+
+/**
+ * 体检：找出「本地该列是空的、远程对应字段也是空的」字段
+ *
+ * 背景（2026-10-19）：`computeDiff` 对扩展字段的判定是
+ * `remoteString && …` —— 远程没有值时**刻意不视为差异**，否则会用远程的空值
+ * 把本地已有的数据抹掉。这条规则是对的，但副作用是**完全静默**：用户看到
+ * 「同步成功」，却无从区分「远程本来就没数据」和「同步没生效」。
+ *
+ * 实测数据仓库里这类字段很常见（`播放结束` 仅 25.3% 非空、`动画制作公司`
+ * 26.2%），所以不弹 toast（会太吵），只把统计交给完成弹窗——用户点开就能
+ * 知道「不是同步的问题，是 Bangumi 上没登记」。
+ *
+ * 判据（两条同时成立才计入）：
+ * 1. 本地**存在**该列，且该行该列的值为空（列不存在属于「缺列体检」的范畴，
+ *    那边已有提示，这里不重复计数）；
+ * 2. 远程对应字段为空（undefined / 空串 / 0）。
+ *
+ * @param remotes 本次参与同步的远程条目
+ * @param localEntries 本地条目（SID → 行数据）
+ * @returns 按命中条数降序的统计（命中的条目数 > 0）
+ */
+export function collectRemoteEmptyFields(
+  remotes: readonly GithubRemoteEntry[],
+  localEntries: ReadonlyMap<string, LocalRowEntry>,
+): RemoteEmptyFieldStat[] {
+  const counts = new Map<string, number>()
+
+  for (const remote of remotes) {
+    // 新增行不算：那是「本地还没这条」，不是「远程没数据」
+    const local = remote.sid ? localEntries.get(remote.sid) : undefined
+    // 用嵌套 if 而非 continue：本文件的 lint 规则禁 continue（含嵌套循环场景）
+    if (local) {
+      for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+        const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
+        // 远程有值 → 不关本体检的事（没写进去请去看缺列体检）
+        if (!hasRemoteValue(remoteValue)) {
+          for (const excelField of getExcelAliases(jsonlField)) {
+            // 本地没这一列 → 归缺列体检；本地有值 → 该列不空，不是用户会困惑的场景
+            if (local.fields[excelField]?.trim() === '') {
+              counts.set(excelField, (counts.get(excelField) ?? 0) + 1)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const stats: RemoteEmptyFieldStat[] = []
+  for (const [name, count] of counts) stats.push({ name, count })
+  return stats.sort((a, b) => b.count - a.count)
+}
+
 /**
  * 体检：找出「远程有数据、本地却没有对应表头」的字段
  *
