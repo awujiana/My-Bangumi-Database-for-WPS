@@ -168,12 +168,25 @@ const JSONL_FIELD_EXCEL_ALIASES: Readonly<Record<string, readonly string[]>> = {
 }
 
 /**
+ * 别名查询结果缓存
+ *
+ * `getExcelAliases` 是 `jsonlField` 的纯函数（依赖的两个表都是模块级常量），
+ * 但调用点在「每行 × 每字段」的热路径里：computeDiff 对 3 万行 × 19 个扩展
+ * 字段 ≈ 59 万次调用，每次都要线性 `find` + 新建数组/Set。按字段名缓存后
+ * 重复调用直接返回同一份只读数组（调用方均只读遍历，不会改）。
+ */
+const _excelAliasesCache = new Map<string, readonly string[]>()
+
+/**
  * 获取指定 JSONL 字段对应的所有 Excel 列名（含主映射和别名）
  *
  * @param jsonlField JSONL 字段名
- * @returns Excel 列名数组（至少包含 1 个元素）
+ * @returns Excel 列名数组（至少包含 1 个元素；同一字段多次返回同一引用）
  */
 export function getExcelAliases(jsonlField: string): readonly string[] {
+  const cached = _excelAliasesCache.get(jsonlField)
+  if (cached !== undefined) return cached
+
   const mapped = EXTENDED_FIELD_MAP.find(([jf]) => jf === jsonlField)
   const primary = mapped ? [mapped[1]] : []
   const aliases = JSONL_FIELD_EXCEL_ALIASES[jsonlField] ?? []
@@ -187,6 +200,7 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
       result.push(name)
     }
   }
+  _excelAliasesCache.set(jsonlField, result)
   return result
 }
 

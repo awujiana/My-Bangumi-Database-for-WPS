@@ -64,7 +64,6 @@ export interface DetailItem {
   finishedDate: string
   typeNum: number
   isUploaded: boolean
-  urlCell: WpsRange | null
 }
 
 export interface PreviewItem {
@@ -180,7 +179,6 @@ function getRowData(
     finishedDate: '',
     typeNum: 0,
     isUploaded: false,
-    urlCell: null,
   }
 
   const readCol = (mapKey: string): string => {
@@ -188,11 +186,7 @@ function getRowData(
     if (col !== undefined) {
       // 命中批量读缓存就用缓存，否则逐格读（兼容未走批量路径的调用点）
       const raw = rowCells?.get(col) ?? getCellValue(ws, rowNumber, col)
-      const value = trim(raw)
-      if (mapKey === 'Bangumi_URL') {
-        data.urlCell = getCell(ws, rowNumber, col)
-      }
-      return value
+      return trim(raw)
     }
     return ''
   }
@@ -415,11 +409,7 @@ export async function previewSyncContent(): Promise<void> {
     direction: 'Excel → Bangumi',
     extra: [{ label: '总行数', value: String(dataRows.length) }],
   })
-  showSyncProgressDialog(
-    '正在同步 - 预览同步',
-    createSyncControlHandlers(BGM.sync),
-    previewConfig,
-  )
+  showSyncProgressDialog('正在同步 - 预览同步', createSyncControlHandlers(BGM.sync), previewConfig)
 
   // 进入运行状态（防重入，统一入口）
   if (!BGM.sync.enterRunningState()) return
@@ -1014,11 +1004,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
       ],
     })
     // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
-    showSyncProgressDialog(
-      '正在上传同步',
-      createSyncControlHandlers(BGM.sync),
-      uploadConfig,
-    )
+    showSyncProgressDialog('正在上传同步', createSyncControlHandlers(BGM.sync), uploadConfig)
 
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
       // 从 Ribbon 设置读取

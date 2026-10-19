@@ -6,6 +6,7 @@ import {
   computeDiff,
   tagsToString,
   isGithubRemoteEntry,
+  getExcelAliases,
   EXTENDED_FIELD_MAP,
   SYNC_STRATEGY_LABELS,
   collectMissingColumns,
@@ -1222,11 +1223,14 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
   it('本地 Bangumi_URL 与 sid 派生值不一致时应记入 changedFields', () => {
     const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
     const local = new Map<string, LocalRowEntry>([
-      ['123', {
-        row: 2,
-        sid: '123',
-        fields: { Bangumi_URL: 'https://bgm.tv/subject/999', 名称: '条目' },
-      }],
+      [
+        '123',
+        {
+          row: 2,
+          sid: '123',
+          fields: { Bangumi_URL: 'https://bgm.tv/subject/999', 名称: '条目' },
+        },
+      ],
     ])
 
     const diffs = computeDiff(remote, local)
@@ -1239,11 +1243,14 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
   it('本地 Bangumi_URL 与派生值一致且其余字段无差异时不产生 diff', () => {
     const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
     const local = new Map<string, LocalRowEntry>([
-      ['123', {
-        row: 2,
-        sid: '123',
-        fields: { Bangumi_URL: 'https://bgm.tv/subject/123', 名称: '条目' },
-      }],
+      [
+        '123',
+        {
+          row: 2,
+          sid: '123',
+          fields: { Bangumi_URL: 'https://bgm.tv/subject/123', 名称: '条目' },
+        },
+      ],
     ])
 
     expect(computeDiff(remote, local)).toEqual([])
@@ -1300,9 +1307,7 @@ describe('collectMissingColumns', () => {
   })
 
   it('远程字段为空值或 0 时不应催促用户加列（score/rank 的 0 表示无数据）', () => {
-    const remotes: GithubRemoteEntry[] = [
-      { sid: '1', score: 0, rank: 0, 别名: '', meta_tags: [] },
-    ]
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 0, rank: 0, 别名: '', meta_tags: [] }]
     const colMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
@@ -1350,9 +1355,7 @@ function makeEmptyFieldsLocal(fields: Record<string, string>): Map<string, Local
 
 describe('collectRemoteEmptyFields', () => {
   it('本地该列为空 + 远程字段为空 → 计入（本次完结日期/制作公司场景）', () => {
-    const remotes: GithubRemoteEntry[] = [
-      { sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
-    ]
+    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' }]
     const local = makeEmptyFieldsLocal({ 完播日: '', 制作公司: '' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([
@@ -1432,5 +1435,21 @@ describe('collectRemoteEmptyFields', () => {
     const local = makeEmptyFieldsLocal({ 名称: 'A' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
+  })
+})
+
+describe('getExcelAliases 缓存', () => {
+  it('同一字段重复查询返回同一引用（热路径 59 万次调用不重复计算）', () => {
+    const first = getExcelAliases('动画制作公司')
+    const second = getExcelAliases('动画制作公司')
+
+    expect(second).toBe(first)
+  })
+
+  it('缓存不改变取值：主映射在前、别名在后、去重', () => {
+    expect(getExcelAliases('动画制作公司')).toEqual(['制作公司', '动画制作公司'])
+    expect(getExcelAliases('播放结束')).toEqual(['完播日'])
+    // 无映射、无别名的字段返回空数组
+    expect(getExcelAliases('不存在的字段')).toEqual([])
   })
 })
