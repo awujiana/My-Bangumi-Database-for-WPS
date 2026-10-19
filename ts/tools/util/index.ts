@@ -56,11 +56,7 @@ export {
 } from './sheet.js'
 export { fetchBgmMe } from './bgm-me.js'
 // 批量字段访问器（矩形读 + 逐格回退）与同步行指纹：exceltobangumi / ribbon-service 共用
-export {
-  createBatchFieldGetter,
-  calcSyncRowFingerprint,
-  type FieldGetter,
-} from './field-getter.js'
+export { createBatchFieldGetter, calcSyncRowFingerprint, type FieldGetter } from './field-getter.js'
 export { sleep, delay } from './sleep.js'
 
 // ========== BGM 全局窗口扩展接口 ==========

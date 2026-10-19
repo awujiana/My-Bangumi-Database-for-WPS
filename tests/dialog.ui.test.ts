@@ -77,9 +77,7 @@ function makeStats(overrides: Partial<SyncProgressStats> = {}): SyncProgressStat
 }
 
 /** 构造一条同步明细 */
-function makeDetail(
-  overrides: Partial<GithubSyncDetailItem> = {},
-): GithubSyncDetailItem {
+function makeDetail(overrides: Partial<GithubSyncDetailItem> = {}): GithubSyncDetailItem {
   return { kind: 'add', sid: '123', name: '葬送的芙莉莲', ...overrides }
 }
 
@@ -334,9 +332,9 @@ describe('ui/dialog UI 层', () => {
       const { showAlert } = await loadDialogReady()
 
       showAlert('内容')
-      getModal('bgmAlertDialog').querySelector('.bgm-dialog-body')?.dispatchEvent(
-        new MouseEvent('click', { bubbles: true }),
-      )
+      getModal('bgmAlertDialog')
+        .querySelector('.bgm-dialog-body')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
       expect(getModal('bgmAlertDialog').style.display).toBe('flex')
     })
@@ -633,9 +631,7 @@ describe('ui/dialog UI 层', () => {
       const { showSyncProgressDialog, completeSyncProgressDialog } = await loadDialogReady()
 
       showSyncProgressDialog('标题', { onPause: vi.fn(), onResume: vi.fn(), onStop: vi.fn() })
-      completeSyncProgressDialog('完成', ['文本详情'], false, undefined, undefined, [
-        makeDetail(),
-      ])
+      completeSyncProgressDialog('完成', ['文本详情'], false, undefined, undefined, [makeDetail()])
 
       const call = progressMock.complete.mock.calls.at(-1)?.[0]
       expect(call?.detailsHtml).toContain('bgm-detail-table')
@@ -654,11 +650,8 @@ describe('ui/dialog UI 层', () => {
     })
 
     it('隐藏后清空实例，后续更新不再生效', async () => {
-      const {
-        showSyncProgressDialog,
-        updateSyncProgressDialog,
-        hideSyncProgressDialog,
-      } = await loadDialogReady()
+      const { showSyncProgressDialog, updateSyncProgressDialog, hideSyncProgressDialog } =
+        await loadDialogReady()
 
       showSyncProgressDialog('标题', { onPause: vi.fn(), onResume: vi.fn(), onStop: vi.fn() })
       hideSyncProgressDialog()
@@ -731,9 +724,7 @@ describe('ui/dialog UI 层', () => {
     it('对名称做 HTML 转义，阻断注入', async () => {
       const { renderSyncDetailTable } = await loadDialogReady()
 
-      const html = renderSyncDetailTable([
-        makeDetail({ name: '<img src=x onerror=alert(1)>' }),
-      ])
+      const html = renderSyncDetailTable([makeDetail({ name: '<img src=x onerror=alert(1)>' })])
 
       expect(html).not.toContain('onerror')
       expect(html).not.toContain('alert(1)')
@@ -745,7 +736,13 @@ describe('ui/dialog UI 层', () => {
       const { showSyncProgressDialog, completeSyncProgressDialog } = await loadDialogReady()
 
       showSyncProgressDialog('标题', { onPause: vi.fn(), onResume: vi.fn(), onStop: vi.fn() })
-      completeSyncProgressDialog('完成', [], false, undefined, makeStats({ unchanged: 0, failed: 0 }))
+      completeSyncProgressDialog(
+        '完成',
+        [],
+        false,
+        undefined,
+        makeStats({ unchanged: 0, failed: 0 }),
+      )
 
       expect(progressMock.complete.mock.calls.at(-1)?.[0]?.resultHtml).toContain('var(--green')
     })
@@ -783,13 +780,7 @@ describe('ui/dialog UI 层', () => {
       const { showSyncProgressDialog, completeSyncProgressDialog } = await loadDialogReady()
 
       showSyncProgressDialog('标题', { onPause: vi.fn(), onResume: vi.fn(), onStop: vi.fn() })
-      completeSyncProgressDialog(
-        '完成',
-        [],
-        false,
-        undefined,
-        makeStats({ skipped: 0, failed: 0 }),
-      )
+      completeSyncProgressDialog('完成', [], false, undefined, makeStats({ skipped: 0, failed: 0 }))
 
       const call = progressMock.complete.mock.calls.at(-1)?.[0]
       expect(call?.resultHtml).not.toContain('跳过 0')

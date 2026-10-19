@@ -644,9 +644,13 @@ export function showConfirm(
  */
 export function confirmAsync(message: string, title?: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    showConfirm(message, (isConfirmed) => {
-      resolve(isConfirmed)
-    }, title)
+    showConfirm(
+      message,
+      (isConfirmed) => {
+        resolve(isConfirmed)
+      },
+      title,
+    )
   })
 }
 

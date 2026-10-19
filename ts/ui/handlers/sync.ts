@@ -249,8 +249,7 @@ async function _fillSheetWithCollections(
   // 2. 旧值基底：整个写入区间一次矩形读（保留原始类型，数字/日期列不被 String() 化）
   const firstRow = pending[0]?.row ?? 0
   const lastRow = pending.at(-1)?.row ?? 0
-  const oldRows =
-    maxWriteCol > 0 ? readRangeCellValues(ws, firstRow, lastRow, 1, maxWriteCol) : []
+  const oldRows = maxWriteCol > 0 ? readRangeCellValues(ws, firstRow, lastRow, 1, maxWriteCol) : []
   const oldValueAt = (row: number, col: number): WpsCellValue =>
     oldRows[row - firstRow]?.[col - 1] ?? null
 

@@ -19,19 +19,19 @@ const mocks = vi.hoisted(() => ({
   getSyncRunner: vi.fn<() => (() => Promise<void>) | null>(() => null),
   notify: {
     alert: vi.fn<(message: string, title: string) => void>(),
-    confirm: vi.fn<
-      (message: string, callback: (isConfirmed: boolean) => void, title?: string) => void
-    >(),
+    confirm:
+      vi.fn<(message: string, callback: (isConfirmed: boolean) => void, title?: string) => void>(),
     error: vi.fn<(message: string, title: string) => void>(),
-    input: vi.fn<
-      (
-        title: string,
-        prompt: string,
-        defaultValue?: string,
-        onOk?: (value: string) => void,
-        onCancel?: () => void,
-      ) => void
-    >(),
+    input:
+      vi.fn<
+        (
+          title: string,
+          prompt: string,
+          defaultValue?: string,
+          onOk?: (value: string) => void,
+          onCancel?: () => void,
+        ) => void
+      >(),
     show: vi.fn(),
     toast: vi.fn<(message: string, kind?: string) => void>(),
   },
@@ -55,16 +55,19 @@ function createFakeDialog() {
   return {
     alert: vi.fn<(title: string, message: string) => void>(),
     error: vi.fn<(title: string, message: string) => void>(),
-    input: vi.fn<
-      (
-        title: string,
-        prompt: string,
-        defaultValue: string,
-        onOk?: (value: string) => void,
-        onCancel?: () => void,
-      ) => void
+    input:
+      vi.fn<
+        (
+          title: string,
+          prompt: string,
+          defaultValue: string,
+          onOk?: (value: string) => void,
+          onCancel?: () => void,
+        ) => void
+      >(),
+    show: vi.fn<
+      (type: string, title: string, message: string, options?: { onOk?: () => void }) => void
     >(),
-    show: vi.fn<(type: string, title: string, message: string, options?: { onOk?: () => void }) => void>(),
   }
 }
 
@@ -211,8 +214,7 @@ describe('BGM.Dialog · input / confirm', () => {
 
     // 通知口的 onOk 参数在类型上不收 undefined；这里刻意越界传入以覆盖防御分支
     const forwarded = mocks.notify.input.mock.calls[0]?.[3] as unknown as
-      | ((value?: string) => void)
-      | undefined
+      ((value?: string) => void) | undefined
     expect(typeof forwarded).toBe('function')
     forwarded?.('用户输入')
     expect(onOk).toHaveBeenCalledWith('用户输入')
@@ -257,7 +259,13 @@ describe('BGM.Dialog · show 的类型分发', () => {
 
   it('type=input 走 input 分支', () => {
     BGM.Dialog.show('input', '标题', '提示', { defaultValue: 'd' })
-    expect(mocks.notify.input).toHaveBeenCalledWith('标题', '提示', 'd', expect.any(Function), undefined)
+    expect(mocks.notify.input).toHaveBeenCalledWith(
+      '标题',
+      '提示',
+      'd',
+      expect.any(Function),
+      undefined,
+    )
   })
 
   it('type=error 走 error 分支', () => {
@@ -423,7 +431,11 @@ describe('BGM · 状态便捷方法', () => {
     })
 
     BGM.setSyncComplete({ success: 1, fail: 0, skip: 2 })
-    expect(emitSpy).toHaveBeenCalledWith(BGM_EVENTS.SYNC_COMPLETED, { success: 1, fail: 0, skip: 2 })
+    expect(emitSpy).toHaveBeenCalledWith(BGM_EVENTS.SYNC_COMPLETED, {
+      success: 1,
+      fail: 0,
+      skip: 2,
+    })
 
     BGM.setSyncComplete()
     expect(emitSpy).toHaveBeenCalledWith(BGM_EVENTS.SYNC_COMPLETED, undefined)

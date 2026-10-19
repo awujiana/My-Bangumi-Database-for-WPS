@@ -182,11 +182,7 @@ import {
   LOG_LEVELS,
 } from '../ts/core/constants.js'
 import { _T } from '../ts/ui/handlers/_constants.js'
-import {
-  syncCollectionFromBgm,
-  syncFromBgmByAPI,
-  syncFromPanel,
-} from '../ts/ui/handlers/sync.js'
+import { syncCollectionFromBgm, syncFromBgmByAPI, syncFromPanel } from '../ts/ui/handlers/sync.js'
 
 // ========== 场景构件 ==========
 
@@ -386,9 +382,13 @@ beforeEach(() => {
   m.confirmAsync.mockImplementation(
     (message: string, title?: string) =>
       new Promise<boolean>((resolve) => {
-        m.showConfirm(message, (isConfirmed: boolean) => {
-          resolve(isConfirmed)
-        }, title)
+        m.showConfirm(
+          message,
+          (isConfirmed: boolean) => {
+            resolve(isConfirmed)
+          },
+          title,
+        )
       }),
   )
 })
@@ -635,8 +635,14 @@ describe('sync · syncFromPanel > 确认与执行', () => {
     await syncFromPanel()
 
     expect(m.SyncToBangumiAsync).toHaveBeenCalled()
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('获取当前工作表失败'))
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('激活数据工作表失败'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('获取当前工作表失败'),
+    )
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('激活数据工作表失败'),
+    )
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining('激活同步记录工作表失败'),
@@ -660,7 +666,10 @@ describe('sync · syncFromPanel > 确认与执行', () => {
 
     await syncFromPanel()
 
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('恢复工作表失败'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('恢复工作表失败'),
+    )
   })
 })
 
@@ -816,7 +825,9 @@ describe('sync · _doAPISync > 空表自动填充', () => {
 
     await runApiSync()
 
-    expect(m.showAlert).toHaveBeenCalledWith('当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。')
+    expect(m.showAlert).toHaveBeenCalledWith(
+      '当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。',
+    )
   })
 
   it('空表且用户取消填充 → 不写表头', async () => {
@@ -891,7 +902,11 @@ describe('sync · _doAPISync > 空表自动填充', () => {
     expect(value2Writes[0]?.value).toEqual([
       ['https://bgm.tv/subject/100', '动画A', '是', null, null, null, null, null, 1],
     ])
-    expect(m.showSyncProgressDialog).toHaveBeenCalledWith('正在收藏下载', expect.any(Object), '配置摘要')
+    expect(m.showSyncProgressDialog).toHaveBeenCalledWith(
+      '正在收藏下载',
+      expect.any(Object),
+      '配置摘要',
+    )
     expect(m.completeSyncProgressDialog).toHaveBeenCalled()
   })
 
@@ -927,7 +942,12 @@ describe('sync · _doAPISync > 空表自动填充', () => {
 
     // 每行 4 个待写列（Bangumi_URL / 名称 / 是否看完 / 序列号）
     expect(m.setCellValue).toHaveBeenCalledTimes(8)
-    expect(m.setCellValue).toHaveBeenCalledWith(expect.anything(), 2, 1, 'https://bgm.tv/subject/100')
+    expect(m.setCellValue).toHaveBeenCalledWith(
+      expect.anything(),
+      2,
+      1,
+      'https://bgm.tv/subject/100',
+    )
     expect(m.setCellValue).toHaveBeenCalledWith(expect.anything(), 3, 9, 2)
     expect(m.setStatus).toHaveBeenCalledWith('收藏数据填充完成：2/2', 'info')
   })
@@ -958,7 +978,10 @@ describe('sync · _doAPISync > 空表自动填充', () => {
     await runApiSync()
 
     expect(m.setStatus).toHaveBeenCalledWith('正在填充收藏数据：50/50', 'info')
-    expect(m.setStatus).toHaveBeenCalledWith(expect.stringContaining('收藏数据填充完成：50/50'), 'info')
+    expect(m.setStatus).toHaveBeenCalledWith(
+      expect.stringContaining('收藏数据填充完成：50/50'),
+      'info',
+    )
   })
 })
 
@@ -1123,7 +1146,10 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
       expect.anything(),
       expect.stringContaining('激活同步记录工作表失败'),
     )
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('切回数据工作表失败'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('切回数据工作表失败'),
+    )
   })
 
   it('流程内抛错 → 关进度框、交 handleError、弹错误并置状态栏为失败', async () => {
@@ -1153,7 +1179,10 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
 
     await runApiSync()
 
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('恢复原始工作表失败'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('恢复原始工作表失败'),
+    )
   })
 
   it('成功结束 → 日志给出同步统计四行', async () => {
@@ -1161,8 +1190,14 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
 
     await runApiSync()
 
-    expect(m.bgmLog).toHaveBeenCalledWith(LOG_LEVELS.INFO, '[_doAPISync] ========== 同步统计 ==========')
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('BGM 收藏总数: 1'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      LOG_LEVELS.INFO,
+      '[_doAPISync] ========== 同步统计 ==========',
+    )
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('BGM 收藏总数: 1'),
+    )
   })
 })
 
@@ -1249,7 +1284,10 @@ describe('sync · 补充分支', () => {
 
     await runApiSync()
 
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('获取原始工作表失败'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('获取原始工作表失败'),
+    )
     expect(m.completeSyncProgressDialog).toHaveBeenCalled()
   })
 

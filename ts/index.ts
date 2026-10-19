@@ -665,10 +665,7 @@ export {
   ensureBangumiColumns,
   searchSheet,
 } from './sync/enrich-engine.js'
-export type {
-  EnrichColumnMapping,
-  AnimeSourceLayout,
-} from './sync/enrich-layout.js'
+export type { EnrichColumnMapping, AnimeSourceLayout } from './sync/enrich-layout.js'
 export type {
   EnrichConfig,
   MatchResult,
