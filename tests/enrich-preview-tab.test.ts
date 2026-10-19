@@ -11,11 +11,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // 只隔离富化引擎：preview-tab 只用到 isBangumiSheetEmpty 一个函数，
 // 真实模块会连带加载整条 WPS 依赖链。
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-matching.js', () => ({
   isBangumiSheetEmpty: vi.fn(() => false),
 }))
 
-import { isBangumiSheetEmpty } from '../ts/sync/enrich-engine.js'
+import { isBangumiSheetEmpty } from '../ts/sync/enrich-matching.js'
 import { state } from '../ts/panel/enrich-page-context.js'
 import {
   setPreviewTab,
@@ -24,7 +24,7 @@ import {
   refreshMatchHintText,
   resetMatchResults,
 } from '../ts/panel/enrich-preview-tab.js'
-import type { MatchResult } from '../ts/sync/enrich-engine.js'
+import type { MatchResult } from '../ts/sync/enrich-types.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 
 const IDS = [

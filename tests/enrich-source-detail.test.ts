@@ -24,7 +24,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { EnrichColumnMapping } from '../ts/sync/enrich-engine.js'
+import type { EnrichColumnMapping } from '../ts/sync/enrich-layout.js'
 
 // ========== 依赖替身 ==========
 

@@ -21,7 +21,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { EnrichColumnMapping, IntroSheetContext, MatchResult } from '../ts/sync/enrich-engine.js'
+import type { MatchResult } from '../ts/sync/enrich-types.js'
+import type { EnrichColumnMapping } from '../ts/sync/enrich-layout.js'
+import type { IntroSheetContext } from '../ts/sync/enrich-intro.js'
 import type { WpsWorkbook, WpsWorksheet } from '../ts/tools/wps.js'
 
 // ========== 依赖替身 ==========
@@ -73,14 +75,20 @@ const m = vi.hoisted(() => ({
   ensureSourceSheet: vi.fn<() => unknown>(),
 }))
 
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-layout.js', () => ({
   detectColumns: m.detectColumns,
   detectAnimeSourceLayout: m.detectAnimeSourceLayout,
-  matchEntries: m.matchEntries,
   readPlatformValues: m.readPlatformValues,
+}))
+vi.mock('../ts/sync/enrich-normalize.js', () => ({
+  normalizeName: m.normalizeName,
+}))
+vi.mock('../ts/sync/enrich-matching.js', () => ({
+  matchEntries: m.matchEntries,
+}))
+vi.mock('../ts/sync/enrich-intro.js', () => ({
   findIntroSheetInWorkbook: m.findIntroSheetInWorkbook,
   buildIntroSheetContext: m.buildIntroSheetContext,
-  normalizeName: m.normalizeName,
 }))
 
 vi.mock('../ts/sync/workbook-auto-detect.js', () => ({

@@ -5,15 +5,18 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
+import { enrichEntries } from '../sync/enrich-engine.js'
 import {
-  detectColumns,
-  detectAnimeSourceLayout,
-  matchEntries,
-  enrichEntries,
-  findIntroSheetInWorkbook,
   buildIntroSheetContext,
-} from '../sync/enrich-engine.js'
-import type { EnrichConfig, EnrichResultItem, EnrichProgress } from '../sync/enrich-engine.js'
+  findIntroSheetInWorkbook,
+} from '../sync/enrich-intro.js'
+import { detectAnimeSourceLayout, detectColumns } from '../sync/enrich-layout.js'
+import { matchEntries } from '../sync/enrich-matching.js'
+import type {
+  EnrichConfig,
+  EnrichProgress,
+  EnrichResultItem,
+} from '../sync/enrich-types.js'
 import {
   refreshEnrichWorkbooks,
   refreshEnrichSheets,

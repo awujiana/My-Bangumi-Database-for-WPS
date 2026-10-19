@@ -14,12 +14,12 @@
 import { describe, it, expect } from 'vitest'
 
 import {
+  appendFeatures,
+  mergeTags,
   normalizeName,
   splitAliases,
   splitTags,
-  mergeTags,
-  appendFeatures,
-} from '../ts/sync/enrich-engine.js'
+} from '../ts/sync/enrich-normalize.js'
 
 // ========== normalizeName ==========
 describe('normalizeName 边界情况', () => {

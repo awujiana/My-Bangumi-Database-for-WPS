@@ -608,55 +608,79 @@ export {
 } from './sync/sheet-cleaning.js'
 
 // ============================================================================
-// 22. 新番表富化引擎（来自 sync/enrich-engine.js + sync/enrich-record.js）
+// 22. 新番表富化引擎（enrich-engine 已按职责拆分，此处**直连**各模块）
 // ============================================================================
+// 2026-10-19：原 enrich-engine.js（2194 行）按职责拆为
+//   enrich-types / enrich-layout / enrich-cells / enrich-normalize /
+//   enrich-matching / enrich-fields / enrich-intro，enrich-engine 只留编排。
+// 对外一律直连新模块，不再经 enrich-engine 转出——少一层 indirection，
+// 也免得 enrich-engine 为兼容而长期背着一堆 re-export。
 export {
-  // 富化引擎核心函数
+  // 列名与布局识别
   detectColumns,
+  detectAnimeSourceLayout,
+  findAliasColumn,
+  getBangumiColumnMap,
+  readPlatformValues,
+} from './sync/enrich-layout.js'
+export {
+  // 新番表读取与条目匹配
+  readNewAnimeRow,
   matchEntries,
-  enrichEntries,
+  isBangumiSheetEmpty,
+} from './sync/enrich-matching.js'
+export {
+  // 逐字段写入
+  enrichTags,
+  enrichPlatform,
+  enrichDate,
+  enrichEpisodes,
+  enrichFeatures,
+} from './sync/enrich-fields.js'
+export {
+  // 简介工作表富化
+  enrichIntroData,
+  enrichOpEdPv,
+  readIntroSheetRow,
+  isIntroSheet,
+  findIntroSheetInWorkbook,
+  buildIntroSheetContext,
+  enrichIntroFromContext,
+} from './sync/enrich-intro.js'
+export {
+  // 纯文本工具簇
   normalizeName,
   mergeTags,
   splitTags,
   splitAliases,
   appendFeatures,
-  findAliasColumn,
-  getBangumiColumnMap,
-  readNewAnimeRow,
-  enrichTags,
-  enrichDate,
-  enrichEpisodes,
-  enrichFeatures,
-  // 简介工作表富化函数（第二阶段）
-  enrichIntroData,
-  enrichOpEdPv,
-  readIntroSheetRow,
-  isIntroSheet,
-  // 别名富化函数
-  enrichAlias,
-  // 冲突解决函数
-  resolveConflictField,
-  // 列管理函数
-  ensureBangumiColumns,
-  // 噪声关键词过滤（预览单元格渲染与富化写入共用）
   shouldFilterNoise,
-  // 噪声关键词缓存失效（设置页保存自定义关键词后调用）
   resetNoiseKeywordCache,
-  // 判断 Bangumi 目标表是否为空表（预览空态判定）
-  isBangumiSheetEmpty,
-  // 搜索与查询函数
+} from './sync/enrich-normalize.js'
+export {
+  // 富化编排（仍在 enrich-engine）
+  enrichEntries,
+  enrichAlias,
+  resolveConflictField,
+  ensureBangumiColumns,
   searchSheet,
-  // 富化引擎类型
-  type EnrichColumnMapping,
-  type EnrichConfig,
-  type MatchResult,
-  type EnrichResultItem,
-  type EnrichedField,
-  type ConflictInfo,
-  type SearchResult,
-  type EnrichProgress,
-  type ProgressCallback,
 } from './sync/enrich-engine.js'
+export type {
+  EnrichColumnMapping,
+  AnimeSourceLayout,
+} from './sync/enrich-layout.js'
+export type {
+  EnrichConfig,
+  MatchResult,
+  EnrichResultItem,
+  EnrichedField,
+  ConflictInfo,
+  EnrichStats,
+  EnrichProgress,
+  ProgressCallback,
+} from './sync/enrich-types.js'
+export type { IntroSheetContext } from './sync/enrich-intro.js'
+export type { SearchResult } from './sync/enrich-engine.js'
 
 export {
   // 富化记录表函数

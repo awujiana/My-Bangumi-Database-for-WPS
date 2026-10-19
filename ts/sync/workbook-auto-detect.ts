@@ -17,7 +17,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { detectAnimeSourceLayout } from './enrich-engine.js'
+import { detectAnimeSourceLayout } from './enrich-layout.js'
 import { bgmLog, getApp } from '../tools/util/index.js'
 import {
   countDataRowsAfter,

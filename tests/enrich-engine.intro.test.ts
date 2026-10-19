@@ -169,24 +169,20 @@ vi.mock('../ts/sync/enrich-record.js', () => ({
 // ========== 导入被测真实实现 ==========
 
 import { createSheetCellCache } from '../ts/tools/util/sheet.js'
+import { findAliasColumn } from '../ts/sync/enrich-layout.js'
 import {
-  isIntroSheet,
-  enrichIntroData,
-  enrichOpEdPv,
-  enrichAlias,
-  resolveConflictField,
-  readIntroSheetRow,
-  findAliasColumn,
   buildIntroSheetContext,
-  findIntroSheetInWorkbook,
+  enrichIntroData,
   enrichIntroFromContext,
-} from '../ts/sync/enrich-engine.js'
-import type {
-  EnrichColumnMapping,
-  EnrichedField,
-  ConflictInfo,
-  IntroSheetContext,
-} from '../ts/sync/enrich-engine.js'
+  enrichOpEdPv,
+  findIntroSheetInWorkbook,
+  isIntroSheet,
+  readIntroSheetRow,
+} from '../ts/sync/enrich-intro.js'
+import { enrichAlias, resolveConflictField } from '../ts/sync/enrich-engine.js'
+import type { ConflictInfo, EnrichedField } from '../ts/sync/enrich-types.js'
+import type { EnrichColumnMapping } from '../ts/sync/enrich-layout.js'
+import type { IntroSheetContext } from '../ts/sync/enrich-intro.js'
 
 // ========== 测试替身 ==========
 

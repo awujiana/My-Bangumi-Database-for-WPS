@@ -11,12 +11,9 @@
  *   （会成环）。
  */
 
-import type {
-  EnrichColumnMapping,
-  MatchResult,
-  ConflictInfo,
-  IntroSheetContext,
-} from '../sync/enrich-engine.js'
+import type { IntroSheetContext } from '../sync/enrich-intro.js'
+import type { EnrichColumnMapping } from '../sync/enrich-layout.js'
+import type { ConflictInfo, MatchResult } from '../sync/enrich-types.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import type { EnrichDetailGroup } from './enrich-detail-render.js'
 

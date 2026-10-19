@@ -8,15 +8,18 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import {
-  detectColumns,
-  detectAnimeSourceLayout,
-  matchEntries,
-  readPlatformValues,
-  findIntroSheetInWorkbook,
   buildIntroSheetContext,
-  normalizeName,
-} from '../sync/enrich-engine.js'
-import type { EnrichColumnMapping, EnrichConfig, MatchResult } from '../sync/enrich-engine.js'
+  findIntroSheetInWorkbook,
+} from '../sync/enrich-intro.js'
+import {
+  detectAnimeSourceLayout,
+  detectColumns,
+  readPlatformValues,
+} from '../sync/enrich-layout.js'
+import { matchEntries } from '../sync/enrich-matching.js'
+import { normalizeName } from '../sync/enrich-normalize.js'
+import type { EnrichColumnMapping } from '../sync/enrich-layout.js'
+import type { EnrichConfig, MatchResult } from '../sync/enrich-types.js'
 import {
   ANIME_SOURCE_DETECTOR,
   findAnimeSourceSheetInWorkbook,

@@ -6,7 +6,7 @@ vi.mock('../ts/panel/enrich-page-state.js', () => ({
   getEnrichPreviewConfig: vi.fn(),
 }))
 
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-normalize.js', () => ({
   shouldFilterNoise: vi.fn((part: string) => part === '噪声'),
 }))
 

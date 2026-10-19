@@ -32,9 +32,7 @@ import {
 import type { EnrichColumnMapping } from './enrich-layout.js'
 import { getAnnotatedValue, readTargetCell, writeTargetCell } from './enrich-cells.js'
 import { appendFeatures, FEATURE_SEPARATOR, normalizeName } from './enrich-normalize.js'
-// 类型-only 反向引用：enrich-engine 会 re-export 本模块，这里再 type-import 它
-// 不构成运行时边（check:cycles 区分类型边），避免为两个接口新开一个模块。
-import type { ConflictInfo, EnrichedField } from './enrich-engine.js'
+import type { ConflictInfo, EnrichedField } from './enrich-types.js'
 
 // ========== 常量定义 ==========
 

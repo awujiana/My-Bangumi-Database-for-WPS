@@ -64,7 +64,7 @@ vi.mock('../ts/tools/locked-sheet.js', () => ({
   },
 }))
 
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-layout.js', () => ({
   detectAnimeSourceLayout: m.detectAnimeSourceLayout,
 }))
 

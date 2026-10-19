@@ -8,7 +8,11 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { resolveConflictField } from '../sync/enrich-engine.js'
-import type { EnrichResultItem, ConflictInfo, EnrichedField } from '../sync/enrich-engine.js'
+import type {
+  ConflictInfo,
+  EnrichedField,
+  EnrichResultItem,
+} from '../sync/enrich-types.js'
 import { bgmLog, BGM } from '../tools/util/index.js'
 import { state, safeGetElement } from './enrich-page-context.js'
 import { createInlineProgress, progressHosts } from './enrich-progress-hosts.js'

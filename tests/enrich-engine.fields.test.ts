@@ -166,30 +166,28 @@ vi.mock('../ts/sync/enrich-record.js', () => ({
 // ========== 导入被测真实实现 ==========
 
 import {
+  detectAnimeSourceLayout,
   detectColumns,
-  readPlatformValues,
-  readNewAnimeRow,
   getBangumiColumnMap,
-  isBangumiSheetEmpty,
-  matchEntries,
-  enrichTags,
-  enrichPlatform,
+  readPlatformValues,
+} from '../ts/sync/enrich-layout.js'
+import { isBangumiSheetEmpty, matchEntries, readNewAnimeRow } from '../ts/sync/enrich-matching.js'
+import {
   enrichDate,
   enrichEpisodes,
   enrichFeatures,
-  enrichEntries,
-  ensureBangumiColumns,
-  detectAnimeSourceLayout,
-  buildIntroSheetContext,
-  searchSheet,
-} from '../ts/sync/enrich-engine.js'
+  enrichPlatform,
+  enrichTags,
+} from '../ts/sync/enrich-fields.js'
+import { buildIntroSheetContext } from '../ts/sync/enrich-intro.js'
+import { enrichEntries, ensureBangumiColumns, searchSheet } from '../ts/sync/enrich-engine.js'
 import type {
-  EnrichColumnMapping,
   EnrichConfig,
   EnrichedField,
   MatchResult,
   ProgressCallback,
-} from '../ts/sync/enrich-engine.js'
+} from '../ts/sync/enrich-types.js'
+import type { EnrichColumnMapping } from '../ts/sync/enrich-layout.js'
 import { registerNotifyApi } from '../ts/core/ui-bridge.js'
 
 // ========== 测试替身 ==========

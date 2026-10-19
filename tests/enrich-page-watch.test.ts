@@ -101,13 +101,19 @@ vi.mock('../ts/tools/util/index.js', async () => {
 vi.mock('../ts/tools/sanitize.js', () => ({ sanitizeHtml: (html: string) => html }))
 vi.mock('../ts/ui/dialog.js', () => ({ showToast: m.showToast }))
 vi.mock('../ts/tools/locked-sheet.js', () => ({ findWorkbookByName: m.findWorkbookByName }))
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-layout.js', () => ({
   detectColumns: m.detectColumns,
   detectAnimeSourceLayout: m.detectAnimeSourceLayout,
+}))
+vi.mock('../ts/sync/enrich-matching.js', () => ({
   matchEntries: m.matchEntries,
-  enrichEntries: m.enrichEntries,
+}))
+vi.mock('../ts/sync/enrich-intro.js', () => ({
   findIntroSheetInWorkbook: m.findIntroSheetInWorkbook,
   buildIntroSheetContext: m.buildIntroSheetContext,
+}))
+vi.mock('../ts/sync/enrich-engine.js', () => ({
+  enrichEntries: m.enrichEntries,
 }))
 vi.mock('../ts/sync/enrich-lock.js', () => ({
   refreshEnrichWorkbooks: m.refreshEnrichWorkbooks,

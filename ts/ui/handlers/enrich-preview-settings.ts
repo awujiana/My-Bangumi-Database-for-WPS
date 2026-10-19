@@ -18,7 +18,7 @@
 
 import { CONFIG_KEYS, getConfig, setConfig } from '../../tools/config.js'
 import { BGM } from '../../tools/util/index.js'
-import { resetNoiseKeywordCache } from '../../sync/enrich-engine.js'
+import { resetNoiseKeywordCache } from '../../sync/enrich-normalize.js'
 
 /** 与 enrich-page 的 DEFAULT_ENRICH_PREVIEW_CONFIG 保持一致 */
 const DEFAULT_EP_SINGLE = 1

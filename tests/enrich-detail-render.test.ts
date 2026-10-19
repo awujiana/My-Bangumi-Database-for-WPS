@@ -7,7 +7,7 @@ vi.mock('../ts/tools/sanitize.js', () => ({
   sanitizeHtml: (dirty: string) => dirty,
 }))
 
-import type { EnrichResultItem, EnrichedField } from '../ts/sync/enrich-engine.js'
+import type { EnrichedField, EnrichResultItem } from '../ts/sync/enrich-types.js'
 import {
   fieldActionLabel,
   matchTypeLabel,

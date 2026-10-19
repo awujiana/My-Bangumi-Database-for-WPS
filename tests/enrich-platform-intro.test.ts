@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { monthLabelFromWorkbookName } from '../ts/sync/workbook-auto-detect.js'
-import { resetNoiseKeywordCache, shouldFilterNoise } from '../ts/sync/enrich-engine.js'
+import { resetNoiseKeywordCache, shouldFilterNoise } from '../ts/sync/enrich-normalize.js'
 
 describe('monthLabelFromWorkbookName', () => {
   it('4 位年份 + 去扩展名 → yy年m月', () => {

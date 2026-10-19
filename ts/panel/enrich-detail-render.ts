@@ -5,7 +5,11 @@
  * 以及「分组 → 条目 → 字段」三级 HTML 渲染。全部无 DOM 副作用，便于单测。
  */
 
-import type { EnrichResultItem, EnrichedField, MatchResult } from '../sync/enrich-engine.js'
+import type {
+  EnrichedField,
+  EnrichResultItem,
+  MatchResult,
+} from '../sync/enrich-types.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 

@@ -140,8 +140,9 @@ vi.mock('../ts/sync/enrich-record.js', () => ({
 
 // ========== 导入被测模块 ============
 
-import { isBangumiSheetEmpty, matchEntries, enrichEntries } from '../ts/sync/enrich-engine.js'
-import type { EnrichConfig, MatchResult } from '../ts/sync/enrich-engine.js'
+import { isBangumiSheetEmpty, matchEntries } from '../ts/sync/enrich-matching.js'
+import { enrichEntries } from '../ts/sync/enrich-engine.js'
+import type { EnrichConfig, MatchResult } from '../ts/sync/enrich-types.js'
 
 // ========== 测试数据 ==========
 

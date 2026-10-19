@@ -10,7 +10,7 @@
  *   - `getConfig` / `CONFIG_KEYS`（来自 tools/config）
  */
 
-import type { EnrichColumnMapping } from '../sync/enrich-engine.js'
+import type { EnrichColumnMapping } from '../sync/enrich-layout.js'
 
 import { getConfig, CONFIG_KEYS } from '../tools/config.js'
 

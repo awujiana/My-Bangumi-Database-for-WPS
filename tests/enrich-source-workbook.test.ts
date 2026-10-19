@@ -22,7 +22,7 @@ vi.mock('../ts/core/constants.js', () => ({
   LOG_LEVELS: { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 },
 }))
 // preview-tab 只被 closeOpenedSourceWorkbook 用来清空匹配结果，真实模块会带整条引擎依赖
-vi.mock('../ts/sync/enrich-engine.js', () => ({
+vi.mock('../ts/sync/enrich-matching.js', () => ({
   isBangumiSheetEmpty: vi.fn(() => false),
 }))
 

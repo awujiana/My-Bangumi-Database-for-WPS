@@ -17,7 +17,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ConflictInfo, EnrichResultItem } from '../ts/sync/enrich-engine.js'
+import type { ConflictInfo, EnrichResultItem } from '../ts/sync/enrich-types.js'
 
 // ========== 依赖替身 ==========
 

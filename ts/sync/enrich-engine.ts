@@ -17,10 +17,8 @@ import {
   getCellValue,
   setCellValue,
   getLastRow,
-  isEmptyValue,
   findHeaderRow,
   readRangeValues,
-  BGM,
 } from '../tools/util/index.js'
 // cacheGet 直连子模块（先例：本 import 的 readRowsCache 等）：它与 clearSheetCache
 // 共用 sheet.ts 内的同一份 sheetCache，经 barrel 导入在整体 mock 的测试里会拿到 undefined。
@@ -33,11 +31,8 @@ import type { AddEnrichRecordParameters } from './enrich-record.js'
 
 import {
   TAG_SEPARATOR,
-  FEATURE_SEPARATOR,
   normalizeName,
   splitAliases,
-  mergeTags,
-  appendFeatures,
 } from './enrich-normalize.js'
 
 /**
@@ -46,18 +41,27 @@ import {
  * enrich-layout.js（叶子） ← enrich-intro.js ← enrich-engine.js
  * enrich-cells.js （叶子） ↙                   ↙
  *
- * 本文件**导入**它们供内部使用，再 **re-export** 保持既有对外 API 完全不变
- * （ts/index.ts 与 panel/* 仍从 enrich-engine.js 取这些符号）。
+ * 调用方（ts/index.ts 与 panel/*）已**直连**各新模块，本文件不再为兼容保留
+ * re-export——只在下面 import 供自身编排使用。
  */
 
 import {
   findAliasColumn,
   getBangumiColumnMap,
   mappingMaxCol,
-  readPlatformValues,
 } from './enrich-layout.js'
-import type { EnrichColumnMapping } from './enrich-layout.js'
 import { readTargetCell, writeTargetCell } from './enrich-cells.js'
+
+import { enrichPlatform, enrichTags, enrichDate, enrichEpisodes, enrichFeatures } from './enrich-fields.js'
+import { readNewAnimeRow } from './enrich-matching.js'
+import type {
+  ConflictInfo,
+  EnrichConfig,
+  EnrichedField,
+  EnrichResultItem,
+  MatchResult,
+  ProgressCallback,
+} from './enrich-types.js'
 import {
   INTRO_FIELD_TO_BANGUMI,
   enrichIntroData,
@@ -68,25 +72,6 @@ import {
 } from './enrich-intro.js'
 import type { IntroSheetContext } from './enrich-intro.js'
 
-export {
-  detectColumns,
-  detectAnimeSourceLayout,
-  findAliasColumn,
-  getBangumiColumnMap,
-  readPlatformValues,
-} from './enrich-layout.js'
-export type { AnimeSourceLayout, EnrichColumnMapping } from './enrich-layout.js'
-export {
-  INTRO_FIELD_TO_BANGUMI,
-  buildIntroSheetContext,
-  enrichIntroData,
-  enrichIntroFromContext,
-  enrichOpEdPv,
-  findIntroSheetInWorkbook,
-  isIntroSheet,
-  readIntroSheetRow,
-} from './enrich-intro.js'
-export type { IntroSheetContext } from './enrich-intro.js'
 // 纯文本工具簇已迁至 `enrich-normalize.js`，此处再导出以保持既有导入路径不变。
 export {
   normalizeName,
@@ -98,581 +83,14 @@ export {
   shouldFilterNoise,
 } from './enrich-normalize.js'
 
-// ========== 常量定义 ==========
-
-/**
-
 // ========== 类型定义 ==========
-
-/**
- * 富化配置
- */
-export interface EnrichConfig {
-  filePath: string
-  sheetName: string
-  headerRow: number
-  dataStartRow: number
-  columnMapping: EnrichColumnMapping
-  targetSheetName?: string
-}
-
-/**
- * 匹配结果
- */
-export interface MatchResult {
-  animeRow: number
-  matchedAnimeName: string
-  matchType: 'exact' | 'alias' | 'unmatched' | 'error'
-  bangumiRow?: number
-  bangumiName?: string
-  aliases?: string[]
-  errorMessage?: string
-}
-
-/**
- * 富化字段变更记录
- */
-export interface EnrichedField {
-  fieldName: string
-  bangumiColumn: number
-  oldValue: string | null
-  updatedValue: string
-  action: 'fill' | 'append' | 'skip'
-  /** 附注：仅当来源字段名与目标列名不同时存在，形如「字段名差异: 编剧 → 脚本」 */
-  note?: string
-}
-
-/**
- * 字段冲突信息（需用户确认）
- */
-export interface ConflictInfo {
-  fieldName: string
-  bangumiColumn: number
-  bangumiRow: number
-  oldValue: string
-  updatedValue: string
-  animeRow: number
-  matchedAnimeName: string
-  resolution: 'append' | 'keep' | 'overwrite'
-  note?: string
-}
-
-/**
- * 富化结果条目
- */
-export interface EnrichResultItem {
-  kind: 'matched' | 'unmatched' | 'error'
-  animeRow: number
-  name: string
-  matchType?: 'exact' | 'alias' | 'unmatched' | 'error'
-  enrichedFields: EnrichedField[]
-  conflicts?: ConflictInfo[] | undefined
-  errorMessage?: string
-}
-
-/**
- * 富化统计
- */
-export interface EnrichStats {
-  matched: number
-  enriched: number
-  skipped: number
-  failed: number
-}
 
 /**
  * 单行富化结果（供 enrichEntries 累计统计）
  */
 type EnrichRowOutcome = 'enriched' | 'skipped' | 'error'
 
-/**
- * 富化进度
- */
-export interface EnrichProgress {
-  current: number
-  total: number
-  currentName: string
-  stats: EnrichStats
-  etaMs: number
-}
-
-/**
- * 进度回调函数类型
- */
-export type ProgressCallback = (progress: EnrichProgress) => void
-
 // ========== 核心函数 ==========
-
-/**
- * 读取新番表一行数据
- */
-export function readNewAnimeRow(
-  sheet: WpsWorksheet,
-  row: number,
-  mapping: EnrichColumnMapping,
-  rowCells?: readonly string[],
-): Record<string, string> {
-  const cell = (col: number): string => rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
-  const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
-  if (mapping.tagsCol) data.TAGS = cell(mapping.tagsCol) || ''
-  if (mapping.premiereCol) data['首播'] = cell(mapping.premiereCol) || ''
-  if (mapping.episodesCol) data['集数'] = cell(mapping.episodesCol) || ''
-  if (mapping.weekdayCol) data['周更时间'] = cell(mapping.weekdayCol) || ''
-  // 播放平台聚合：platformCol + platformExtraCols + exclusiveCol 去空去重（富化与预览共用口径）
-  data['播放平台'] = readPlatformValues(sheet, row, mapping, rowCells).join(TAG_SEPARATOR)
-  if (mapping.exclusiveCol) data['独播'] = cell(mapping.exclusiveCol) || ''
-  if (mapping.specialCol) data['特殊'] = cell(mapping.specialCol) || ''
-  return data
-}
-
-/**
- * 构建 Bangumi 追踪表的索引
- * 返回 [名称索引, 别名索引]
- */
-function buildBangumiIndexes(
-  bangumiSheet: WpsWorksheet,
-  columnMap: Map<string, number>,
-): [Map<string, number>, Map<string, number[]>, Map<number, string>, Map<number, string[]>] {
-  const nameIndex = new Map<string, number>()
-  const aliasIndex = new Map<string, number[]>()
-  const rowNames = new Map<number, string>()
-  // 反向索引：行号 → 该行的全部别名。有它「按行取别名」才是 O(1)；
-  // 否则 matchEntriesInner 每命中一条都要遍历整个 aliasIndex 做 rows.includes(row) —— O(n²)。
-  const aliasByRow = new Map<number, string[]>()
-
-  const nameCol = columnMap.get('名称') ?? 0
-  if (nameCol === 0) {
-    bgmLog(LOG_LEVELS.WARN, '[buildBangumiIndexes] Bangumi表中未找到名称列')
-    return [nameIndex, aliasIndex, rowNames, aliasByRow]
-  }
-
-  const aliasCol = findAliasColumn(bangumiSheet)
-  const lastRow = getLastRow(bangumiSheet)
-
-  // 性能（P1-C）：一次矩形读取覆盖名称列与别名列，替代逐行 1~2 次 getCellValue
-  const allData =
-    lastRow >= 2 ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameCol, aliasCol)) : []
-
-  for (const [index, rowData] of allData.entries()) {
-    const row = index + 2
-    const name = (rowData[nameCol - 1] ?? '').trim()
-    if (name) {
-      const normalizedName = normalizeName(name)
-      nameIndex.set(normalizedName, row)
-      rowNames.set(row, name)
-
-      if (aliasCol > 0) {
-        const aliasString = (rowData[aliasCol - 1] ?? '').trim()
-        if (aliasString) {
-          const aliases = splitAliases(aliasString)
-          for (const alias of aliases) {
-            const normalizedAlias = normalizeName(alias)
-            if (!aliasIndex.has(normalizedAlias)) {
-              aliasIndex.set(normalizedAlias, [])
-            }
-            const rows = aliasIndex.get(normalizedAlias)
-            if (rows && !rows.includes(row)) {
-              rows.push(row)
-              const rowAliases = aliasByRow.get(row)
-              if (rowAliases) {
-                rowAliases.push(alias)
-              } else {
-                aliasByRow.set(row, [alias])
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[buildBangumiIndexes] 名称索引: ${String(nameIndex.size)} 条, 别名索引: ${String(aliasIndex.size)} 条`,
-  )
-
-  return [nameIndex, aliasIndex, rowNames, aliasByRow]
-}
-
-/**
- * 判断 Bangumi 目标表是否为空（有表头但无数据行）
- * 空表时富化流程会将新番表条目作为新行追加写入
- * @returns true 表示目标表只有表头、没有任何数据行
- */
-export function isBangumiSheetEmpty(bangumiSheet: WpsWorksheet): boolean {
-  const headerRow = findHeaderRow(bangumiSheet)
-  if (headerRow <= 0) return false
-  const lastRow = getLastRow(bangumiSheet, true, headerRow)
-  return lastRow <= headerRow
-}
-
-/**
- * 匹配新番表与 Bangumi 追踪表条目
- */
-export function matchEntries(
-  animeSheet: WpsWorksheet,
-  bangumiSheet: WpsWorksheet,
-  config: EnrichConfig,
-): MatchResult[] {
-  const results: MatchResult[] = []
-
-  try {
-    matchEntriesInner(animeSheet, bangumiSheet, config, results)
-  } catch (error: unknown) {
-    BGM.handleError(error, { context: 'matchEntries', showAlert: false })
-  }
-
-  return results
-}
-
-/**
- * matchEntries 主体（自 try 块抽离，降低 unicorn/try-complexity 计数）
- */
-function matchEntriesInner(
-  animeSheet: WpsWorksheet,
-  bangumiSheet: WpsWorksheet,
-  config: EnrichConfig,
-  results: MatchResult[],
-): void {
-  const bangumiColMap = getBangumiColumnMap(bangumiSheet)
-  const [nameIndex, aliasIndex, rowNames, aliasByRow] = buildBangumiIndexes(
-    bangumiSheet,
-    bangumiColMap,
-  )
-
-  const lastRow = getLastRow(animeSheet)
-  const { dataStartRow } = config
-
-  const { nameCol } = config.columnMapping
-  if (nameCol === 0) {
-    bgmLog(LOG_LEVELS.ERROR, '[matchEntries] 新番表未找到名称列，无法匹配')
-    return
-  }
-
-  for (let row = dataStartRow; row <= lastRow; row += 1) {
-    const rawName = getCellValue(animeSheet, row, nameCol).trim()
-    if (rawName) {
-      const normalizedName = normalizeName(rawName)
-      let matchResult: MatchResult = {
-        animeRow: row,
-        matchedAnimeName: rawName,
-        matchType: 'unmatched',
-      }
-
-      try {
-        // 精确匹配
-        if (nameIndex.has(normalizedName)) {
-          const bangumiRow = nameIndex.get(normalizedName)
-          if (bangumiRow !== undefined) {
-            const matchedName = rowNames.get(bangumiRow)
-            matchResult = {
-              animeRow: row,
-              matchedAnimeName: rawName,
-              matchType: 'exact',
-              bangumiRow,
-              ...(matchedName !== undefined && { bangumiName: matchedName }),
-            }
-          }
-        }
-
-        // 别名匹配
-        if (matchResult.matchType === 'unmatched') {
-          const aliasRows = aliasIndex.get(normalizedName)
-          if (aliasRows && aliasRows.length > 0) {
-            const bangumiRow = aliasRows[0]
-            if (bangumiRow !== undefined) {
-              // 反向索引 O(1) 取该行别名（原先遍历整个 aliasIndex 做 includes，是 O(n²)）
-              const aliases = aliasByRow.get(bangumiRow) ?? []
-              const matchedName = rowNames.get(bangumiRow)
-              matchResult = {
-                animeRow: row,
-                matchedAnimeName: rawName,
-                matchType: 'alias',
-                bangumiRow,
-                ...(matchedName !== undefined && { bangumiName: matchedName }),
-                aliases,
-              }
-            }
-          }
-        }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        matchResult = {
-          animeRow: row,
-          matchedAnimeName: rawName,
-          matchType: 'error',
-          errorMessage,
-        }
-        bgmLog(LOG_LEVELS.ERROR, `[matchEntries] 匹配 "${rawName}" 时出错: ${errorMessage}`)
-      }
-
-      results.push(matchResult)
-    }
-  }
-
-  const unmatchedCount = results.filter((r) => r.matchType === 'unmatched').length
-  const errorCount = results.filter((r) => r.matchType === 'error').length
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[matchEntries] 匹配完成：精确 ${String(results.filter((r) => r.matchType === 'exact').length)} 条, ` +
-      `别名 ${String(results.filter((r) => r.matchType === 'alias').length)} 条, ` +
-      `未匹配 ${String(unmatchedCount)} 条, 错误 ${String(errorCount)} 条, 共 ${String(results.length)} 条`,
-  )
-}
-
-/**
- * 富化标签
- * 追加模式（现有 + TAG_SEPARATOR + 新标签，去重），空值时填充
- */
-export function enrichTags(
-  sheet: WpsWorksheet,
-  row: number,
-  incomingData: Record<string, string>,
-  colMap: Map<string, number>,
-  enriched: EnrichedField[],
-  cache?: SheetCellCache,
-): void {
-  const bangumiTagsCol = colMap.get('标签/分级') ?? colMap.get('标签')
-  if (!bangumiTagsCol) return
-
-  const incomingTags = incomingData.TAGS ?? ''
-  if (isEmptyValue(incomingTags)) return
-
-  const oldTags = readTargetCell(sheet, cache, row, bangumiTagsCol)
-  if (isEmptyValue(oldTags)) {
-    writeTargetCell(sheet, cache, row, bangumiTagsCol, incomingTags)
-    enriched.push({
-      fieldName: '标签/分级',
-      bangumiColumn: bangumiTagsCol,
-      oldValue: null,
-      updatedValue: incomingTags,
-      action: 'fill',
-    })
-  } else {
-    const merged = mergeTags(oldTags, incomingTags)
-    if (merged === oldTags) {
-      enriched.push({
-        fieldName: '标签/分级',
-        bangumiColumn: bangumiTagsCol,
-        oldValue: oldTags,
-        updatedValue: merged,
-        action: 'skip',
-      })
-    } else {
-      writeTargetCell(sheet, cache, row, bangumiTagsCol, merged)
-      enriched.push({
-        fieldName: '标签/分级',
-        bangumiColumn: bangumiTagsCol,
-        oldValue: oldTags,
-        updatedValue: merged,
-        action: 'append',
-      })
-    }
-  }
-}
-
-/**
- * 富化播放平台
- * 写入 Bangumi 表「在线播放平台」列；目标单元格已有值时合并去重，不重复写入已有平台
- */
-export function enrichPlatform(
-  sheet: WpsWorksheet,
-  row: number,
-  incomingData: Record<string, string>,
-  colMap: Map<string, number>,
-  enriched: EnrichedField[],
-  cache?: SheetCellCache,
-): void {
-  const targetCol = colMap.get('在线播放平台') ?? colMap.get('播放平台')
-  if (!targetCol) return
-
-  const incomingPlatforms = incomingData['播放平台'] ?? ''
-  if (isEmptyValue(incomingPlatforms)) return
-
-  const oldPlatforms = readTargetCell(sheet, cache, row, targetCol)
-  if (isEmptyValue(oldPlatforms)) {
-    writeTargetCell(sheet, cache, row, targetCol, incomingPlatforms)
-    enriched.push({
-      fieldName: '在线播放平台',
-      bangumiColumn: targetCol,
-      oldValue: null,
-      updatedValue: incomingPlatforms,
-      action: 'fill',
-    })
-  } else {
-    const merged = mergeTags(oldPlatforms, incomingPlatforms)
-    if (merged === oldPlatforms) {
-      enriched.push({
-        fieldName: '在线播放平台',
-        bangumiColumn: targetCol,
-        oldValue: oldPlatforms,
-        updatedValue: merged,
-        action: 'skip',
-      })
-    } else {
-      writeTargetCell(sheet, cache, row, targetCol, merged)
-      enriched.push({
-        fieldName: '在线播放平台',
-        bangumiColumn: targetCol,
-        oldValue: oldPlatforms,
-        updatedValue: merged,
-        action: 'append',
-      })
-    }
-  }
-}
-
-/**
- * 富化首播日期
- * 仅在 Bangumi 列为空时填充
- */
-export function enrichDate(
-  sheet: WpsWorksheet,
-  row: number,
-  incomingData: Record<string, string>,
-  colMap: Map<string, number>,
-  enriched: EnrichedField[],
-  cache?: SheetCellCache,
-): void {
-  const bangumiDateCol = colMap.get('开播日期')
-  if (!bangumiDateCol) return
-
-  const date = incomingData['首播'] ?? ''
-  if (isEmptyValue(date)) return
-
-  const oldDate = readTargetCell(sheet, cache, row, bangumiDateCol)
-  if (isEmptyValue(oldDate)) {
-    writeTargetCell(sheet, cache, row, bangumiDateCol, date)
-    enriched.push({
-      fieldName: '开播日期',
-      bangumiColumn: bangumiDateCol,
-      oldValue: null,
-      updatedValue: date,
-      action: 'fill',
-    })
-  } else {
-    enriched.push({
-      fieldName: '开播日期',
-      bangumiColumn: bangumiDateCol,
-      oldValue: oldDate,
-      updatedValue: date,
-      action: 'skip',
-    })
-  }
-}
-
-/**
- * 富化集数
- * 仅在 Bangumi 列为空时填充
- */
-export function enrichEpisodes(
-  sheet: WpsWorksheet,
-  row: number,
-  incomingData: Record<string, string>,
-  colMap: Map<string, number>,
-  enriched: EnrichedField[],
-  cache?: SheetCellCache,
-): void {
-  const bangumiEpisodesCol = colMap.get('集数')
-  if (!bangumiEpisodesCol) return
-
-  const incomingEpisodes = incomingData['集数'] ?? ''
-  if (isEmptyValue(incomingEpisodes)) return
-
-  const oldEpisodes = readTargetCell(sheet, cache, row, bangumiEpisodesCol)
-  if (isEmptyValue(oldEpisodes)) {
-    writeTargetCell(sheet, cache, row, bangumiEpisodesCol, incomingEpisodes)
-    enriched.push({
-      fieldName: '集数',
-      bangumiColumn: bangumiEpisodesCol,
-      oldValue: null,
-      updatedValue: incomingEpisodes,
-      action: 'fill',
-    })
-  } else {
-    enriched.push({
-      fieldName: '集数',
-      bangumiColumn: bangumiEpisodesCol,
-      oldValue: oldEpisodes,
-      updatedValue: incomingEpisodes,
-      action: 'skip',
-    })
-  }
-}
-
-/**
- * 富化特点/印象
- * 追加模式（收集周更/平台/独播/特殊信息，以 FEATURE_SEPARATOR 分隔）
- */
-export function enrichFeatures(
-  sheet: WpsWorksheet,
-  row: number,
-  incomingData: Record<string, string>,
-  colMap: Map<string, number>,
-  enriched: EnrichedField[],
-  cache?: SheetCellCache,
-): void {
-  const bangumiFeatureCol = colMap.get('特点/印象')
-  if (!bangumiFeatureCol) return
-
-  const featureParts: string[] = []
-
-  const weekday = incomingData['周更时间'] ?? ''
-  if (!isEmptyValue(weekday)) {
-    featureParts.push(`周更:${weekday}`)
-  }
-
-  const platform = incomingData['播放平台'] ?? ''
-  if (!isEmptyValue(platform)) {
-    featureParts.push(`平台:${platform}`)
-  }
-
-  const exclusive = incomingData['独播'] ?? ''
-  if (!isEmptyValue(exclusive)) {
-    featureParts.push(`独播:${exclusive}`)
-  }
-
-  const special = incomingData['特殊'] ?? ''
-  if (!isEmptyValue(special)) {
-    featureParts.push(`特殊:${special}`)
-  }
-
-  if (featureParts.length === 0) return
-
-  const features = featureParts.join(FEATURE_SEPARATOR)
-  const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureCol)
-
-  if (isEmptyValue(oldFeature)) {
-    writeTargetCell(sheet, cache, row, bangumiFeatureCol, features)
-    enriched.push({
-      fieldName: '特点/印象',
-      bangumiColumn: bangumiFeatureCol,
-      oldValue: null,
-      updatedValue: features,
-      action: 'fill',
-    })
-  } else {
-    const merged = appendFeatures(oldFeature, features)
-    if (merged === oldFeature) {
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        updatedValue: merged,
-        action: 'skip',
-      })
-    } else {
-      writeTargetCell(sheet, cache, row, bangumiFeatureCol, merged)
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        updatedValue: merged,
-        action: 'append',
-      })
-    }
-  }
-}
 
 /**
  * 执行富化操作
