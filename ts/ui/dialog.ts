@@ -628,6 +628,26 @@ export function showConfirm(
   })
 }
 
+/**
+ * 确认对话框的 Promise 版（异步流程里需要 `await` 用户决策时用）
+ *
+ * 同步流程用 {@link showConfirm} 的回调式即可；但 `syncFromPanel` / `_doAPISync`
+ * 这类本身就是 `async` 的链路，用回调式要把后续逻辑整段塞进回调里（或手写
+ * `new Promise` 包装）。此前两处**逐字重复**了同一段 `new Promise` 样板，
+ * 收敛到这里。
+ *
+ * @param message 提示内容
+ * @param title   可选标题
+ * @returns 用户点了「确定」为 true，取消为 false
+ */
+export function confirmAsync(message: string, title?: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    showConfirm(message, (isConfirmed) => {
+      resolve(isConfirmed)
+    }, title)
+  })
+}
+
 export function showError(message: string, title?: string, onOk?: () => void): void {
   _showDialog('error', { message, title: title ?? '错误', ...(onOk && { onOk }) })
 }

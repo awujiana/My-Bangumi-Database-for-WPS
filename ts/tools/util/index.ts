@@ -135,12 +135,6 @@ export const BGM: {
   }
 
   showAlert: (title: string, message: string) => void
-  showConfirm: (
-    title: string,
-    message: string,
-    onConfirm?: () => void,
-    onCancel?: () => void,
-  ) => void
   handleError: (error: unknown, options?: ErrorOptions) => BgmError
   safeExecute: <T>(function_: () => T, context?: string, options?: ErrorOptions) => T | BgmError
 
@@ -441,20 +435,6 @@ export const BGM: {
 
   showAlert(title: string, message: string): void {
     BGM.Dialog.alert(title, message)
-  },
-
-  showConfirm(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
-    BGM.Dialog.confirm(
-      message,
-      (isConfirmed: boolean) => {
-        if (isConfirmed) {
-          onConfirm?.()
-        } else {
-          onCancel?.()
-        }
-      },
-      title,
-    )
   },
 
   // 统一错误处理

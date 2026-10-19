@@ -60,6 +60,8 @@ const m = vi.hoisted(() => ({
   // ---- barrel: 对话框 ----
   showAlert: vi.fn(),
   showConfirm: vi.fn(),
+  // Promise 版：走同一个 showConfirm 替身，从而共用 answers 队列
+  confirmAsync: vi.fn<(message: string, title?: string) => Promise<boolean>>(),
   showToast: vi.fn(),
   setStatus: vi.fn(),
   showSyncProgressDialog: vi.fn(),
@@ -379,6 +381,16 @@ beforeEach(() => {
     answers.cursor += 1
     callback(shouldConfirm)
   })
+  // confirmAsync 必须与 showConfirm 共用同一份「用户回答」：真实实现就是它的包装，
+  // 分开维护会让「用户点否」的用例在异步链路上跑出相反结果。
+  m.confirmAsync.mockImplementation(
+    (message: string, title?: string) =>
+      new Promise<boolean>((resolve) => {
+        m.showConfirm(message, (isConfirmed: boolean) => {
+          resolve(isConfirmed)
+        }, title)
+      }),
+  )
 })
 
 afterEach(() => {

@@ -106,6 +106,8 @@ export {
   showAlert,
   // 确认
   showConfirm,
+  // 确认（Promise 版，异步链路里 await 用户决策）
+  confirmAsync,
   // 错误
   showError,
   // 成功

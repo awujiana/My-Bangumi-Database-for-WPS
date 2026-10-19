@@ -15,6 +15,7 @@ import {
   trim,
   showAlert,
   showConfirm,
+  confirmAsync,
   showToast,
   setStatus,
   verifyToken,
@@ -553,11 +554,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
             空状态：${String(preview.emptyStatus)}
             ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMessage}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`
 
-  const isConfirmed = await new Promise<boolean>((resolve) => {
-    showConfirm(message, (confirmed) => {
-      resolve(confirmed)
-    })
-  })
+  const isConfirmed = await confirmAsync(message)
   if (!isConfirmed) {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步')
     bgmLog(
@@ -813,14 +810,9 @@ async function _doAPISync(
       return
     }
 
-    const isConfirmed = await new Promise<boolean>((resolve) => {
-      showConfirm(
-        `当前工作表为空，是否从 Bangumi 收藏列表自动填充 ${String(userCollections.length)} 条条目？`,
-        (confirmed) => {
-          resolve(confirmed)
-        },
-      )
-    })
+    const isConfirmed = await confirmAsync(
+      `当前工作表为空，是否从 Bangumi 收藏列表自动填充 ${String(userCollections.length)} 条条目？`,
+    )
     if (!isConfirmed) {
       bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 用户取消空表填充')
       return

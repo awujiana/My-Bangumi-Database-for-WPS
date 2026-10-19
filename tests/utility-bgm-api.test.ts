@@ -271,32 +271,10 @@ describe('BGM.Dialog · show 的类型分发', () => {
   })
 })
 
-describe('BGM · showAlert / showConfirm', () => {
+describe('BGM · showAlert', () => {
   it('showAlert 委托给 Dialog.alert', () => {
     BGM.showAlert('标题', '内容')
     expect(mocks.notify.alert).toHaveBeenCalledWith('内容', '标题')
-  })
-
-  it('showConfirm：确认时调 onConfirm，取消时调 onCancel', () => {
-    const onConfirm = vi.fn()
-    const onCancel = vi.fn()
-
-    BGM.showConfirm('标题', '内容', onConfirm, onCancel)
-
-    const forwarded = mocks.notify.confirm.mock.calls[0]?.[1]
-    forwarded?.(true)
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-
-    forwarded?.(false)
-    expect(onCancel).toHaveBeenCalledTimes(1)
-  })
-
-  it('showConfirm：两个回调都可省略', () => {
-    BGM.showConfirm('标题', '内容')
-    expect(() => {
-      mocks.notify.confirm.mock.calls[0]?.[1]?.(true)
-      mocks.notify.confirm.mock.calls[0]?.[1]?.(false)
-    }).not.toThrow()
   })
 })
 

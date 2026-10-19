@@ -252,6 +252,36 @@ describe('ui/dialog UI 层', () => {
     })
   })
 
+  describe('confirmAsync', () => {
+    it('点击确定 → resolve(true)', async () => {
+      const { confirmAsync } = await loadDialogReady()
+
+      const pending = confirmAsync('确认删除？')
+      document.getElementById('bgmConfirmOk')?.click()
+
+      await expect(pending).resolves.toBe(true)
+    })
+
+    it('点击取消 → resolve(false)', async () => {
+      const { confirmAsync } = await loadDialogReady()
+
+      const pending = confirmAsync('确认删除？')
+      document.getElementById('bgmConfirmCancel')?.click()
+
+      await expect(pending).resolves.toBe(false)
+    })
+
+    it('沿用 showConfirm 的默认标题与自定义标题', async () => {
+      const { confirmAsync } = await loadDialogReady()
+
+      const pending = confirmAsync('内容', '自定义确认')
+      expect(document.getElementById('bgmConfirmTitle')?.textContent).toBe('自定义确认')
+
+      document.getElementById('bgmConfirmOk')?.click()
+      await expect(pending).resolves.toBe(true)
+    })
+  })
+
   describe('showInput', () => {
     it('回填默认值并在确定时回传输入内容', async () => {
       const { showInput } = await loadDialogReady()
