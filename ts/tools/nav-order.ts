@@ -62,6 +62,12 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
     { id: 'sec-run', label: '执行清理', icon: '🧹' },
     { id: 'sec-log', label: '结果日志', icon: '📜' },
   ],
+  highlight: [
+    { id: 'sec-condition', label: '匹配条件', icon: '🎯' },
+    { id: 'sec-columns', label: '高亮列', icon: '☑️' },
+    { id: 'sec-preview', label: '实时预览', icon: '👁️' },
+    { id: 'sec-run', label: '应用与清除', icon: '🖌️' },
+  ],
   settings: [
     { id: 'sec-appearance', label: '外观与导航', icon: '🎨' },
     { id: 'sec-modules', label: '模块排序', icon: '🧩' },
@@ -80,11 +86,18 @@ export const PAGE_LABELS: Readonly<Record<string, string>> = {
   panel: '主面板',
   enrich: '富化面板',
   clean: '清理面板',
+  highlight: '高亮面板',
   settings: '设置页',
 }
 
 /** 设置页中可配置排序的页面键（顺序即展示顺序） */
-export const ORDERABLE_PAGES: readonly string[] = ['panel', 'enrich', 'clean', 'settings']
+export const ORDERABLE_PAGES: readonly string[] = [
+  'panel',
+  'enrich',
+  'clean',
+  'highlight',
+  'settings',
+]
 
 /** 排序持久化的轮询间隔（ms）：空闲态（无变化）时的读取频率 */
 const SYNC_IDLE_INTERVAL_MS = 2000

@@ -1076,6 +1076,70 @@ export function showCleanPanel(): void {
 }
 
 /**
+ * 标记「番剧高亮」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
+ */
+export function markHighlightPaneLoaded(): void {
+  if (typeof window === 'undefined') return
+  const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
+  app?.PluginStorage?.setItem('highlight_pane_url', window.location.href)
+}
+
+/**
+ * 显示 / 切换「番剧高亮」面板（独立面板，与设置 / 富化 / 清理面板并列）
+ *
+ * 面板 ID 缓存于 `highlight_pane_id`；配合 `highlight_pane_url` 标记做自愈：
+ * 缓存 ID 存在但页面从未成功加载时，隐藏旧面板并重建。与清理面板同款机制。
+ */
+export function showHighlightPanel(): void {
+  const app = getApp() as {
+    PluginStorage?: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+    }
+    CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    GetTaskPane?: (id: string) => { Visible: boolean }
+  } | null
+  if (!app) {
+    bgmLog(LOG_LEVELS.ERROR, '[showHighlightPanel] 无法获取 WPS Application 对象')
+    return
+  }
+
+  let highlightId = app.PluginStorage?.getItem('highlight_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('highlight_pane_url')
+
+  // 自愈：缓存 ID 存在但页面从未成功加载 → 隐藏并重建
+  if (highlightId && !storedPaneUrl?.includes('highlight.html')) {
+    const stalePane = app.GetTaskPane?.(highlightId)
+    if (stalePane) stalePane.Visible = false
+    app.PluginStorage?.setItem('highlight_pane_id', '')
+    app.PluginStorage?.setItem('highlight_pane_url', '')
+    highlightId = null
+    bgmLog(LOG_LEVELS.WARN, '[showHighlightPanel] 检测到加载失败的旧高亮面板，已重建')
+  }
+
+  if (highlightId) {
+    const pane = app.GetTaskPane?.(highlightId)
+    if (pane) {
+      pane.Visible = !pane.Visible
+      bgmLog(LOG_LEVELS.INFO, `[showHighlightPanel] 高亮面板可见性切换: ${String(pane.Visible)}`)
+      return
+    }
+    app.PluginStorage?.setItem('highlight_pane_id', '')
+    app.PluginStorage?.setItem('highlight_pane_url', '')
+    bgmLog(LOG_LEVELS.WARN, '[showHighlightPanel] 高亮面板ID失效，已清除存储')
+  }
+
+  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('highlight.html'))
+  if (pane) {
+    pane.Visible = true
+    app.PluginStorage?.setItem('highlight_pane_id', pane.ID)
+    bgmLog(LOG_LEVELS.INFO, `[showHighlightPanel] 高亮面板已创建(ID:${pane.ID})`)
+  } else {
+    bgmLog(LOG_LEVELS.ERROR, '[showHighlightPanel] 创建高亮面板失败')
+  }
+}
+
+/**
  * 构造任务窗格页面 URL
  *
  * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录

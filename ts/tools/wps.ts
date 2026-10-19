@@ -234,6 +234,8 @@ export interface WpsFont {
   Bold: boolean
   Size: number
   Color: number
+  /** 颜色索引（-4105=xlAutomatic 等；清除填充/字色时用） */
+  ColorIndex?: number
 }
 
 export interface WpsBorders {

@@ -24,6 +24,9 @@
 				<group id="cleanGroup" label="数据清理">
                     <button id="btnOpenCleanPanel" label="数据清理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
+				<group id="highlightGroup" label="番剧高亮">
+                    <button id="btnOpenHighlightPanel" label="番剧高亮" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                </group>
             </tab>
         </tabs>
     </ribbon>

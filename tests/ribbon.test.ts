@@ -34,6 +34,7 @@ vi.mock('../ts/index.js', () => ({
   showEnrichPanel: vi.fn(),
   showSettingsPanel: vi.fn(),
   showCleanPanel: vi.fn(),
+  showHighlightPanel: vi.fn(),
   getApp: vi.fn(() => null),
   isIncrementalSyncEnabled: vi.fn(() => false),
   isSkipConflictsEnabled: vi.fn(() => false),
