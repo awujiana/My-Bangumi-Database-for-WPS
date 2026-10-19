@@ -19,6 +19,38 @@
   不能整条覆盖（会盖掉 hover 的 transform / box-shadow）。已有 `prefers-reduced-motion`
   全局规则自动降级。
 
+### 修复 / 体验（完播日闭环：数据仓库侧章节推导补全，2026-10-19）
+
+- **上期排查结论（infobox 源缺失）成立，本期补上第二个数据源**：infobox 的
+  「播放结束」Bangumi 页面普遍没登记（约 25% 非空），但**章节数据本来就在每周
+  官方 dump 里**。本期在数据仓库 dump 侧做完播日推导，插件侧**零改动**：
+  - 修了一个一直存在的拆分 bug：`step01` 此前按 episode 自身的 `type`
+    （章节类型：0=本篇/1=SP/2=OP…）拆分，170 万条章节里 99.6% 落进
+    `type0_episode.jsonlines`，`type2_episode.jsonlines` 只剩 291 条 OP——
+    与文档声明的「按 subject_id 归属 type」相反。修正后 34.8 万条动画章节就位。
+  - `step09` 新增推导：infobox 未登记「播放结束」时，取该条目全部章节的
+    最大 airdate 兜底（格式与 infobox 一致「2008年9月28日」）；infobox 有登记
+    值时优先，冲突不覆盖。实测（dump 2026-10-13，31,174 条）：播放结束非空
+    7,891 → 13,913（25.3% → 44.6%），新增 6,022 条全来自推导，0 个旧值被改动。
+  - 为什么不在加载项侧做：「从远端仓库更新」的设计初衷就是不调 Bangumi API
+    （免 token、免限流）；逐条拉 `/v0/episodes` 对 3 万条既慢又必然撞限流。
+    章节标记（chapter-marker）按单条调该接口的既有行为不变。
+  - 用户可感知的变化：点「从远端仓库更新」后，此前因 infobox 缺登记而空着的
+    「完播日」列会被补上；动画完结的那周起该列随周更自动推进。
+
+### 性能 / 重构（confirmAsync + 别名缓存 + 预览死字段）
+
+- **重构**：`showConfirm` 的 Promise 版 `confirmAsync` 收敛到 `dialog.ts`——
+  `syncFromPanel` / `_doAPISync` 两条 async 链路此前各逐字重复一段
+  `new Promise` 包装；回调式 `BGM.showConfirm` 随之删除，barrel 改导
+  `confirmAsync`。测试替身与 `showConfirm` 共用同一份「用户回答」队列，
+  避免异步链路上「用户点否」跑出相反结果。
+- **性能**：`getExcelAliases` 按字段名缓存——它是纯函数，但调用点在
+  「每行 × 每字段」热路径（computeDiff 对 3 万行 ≈ 72 万次调用），每次都要
+  线性 `find` + 新建数组/Set。实测 717k 次调用 124ms → 20ms（-84%）。
+- **性能**：删除 `DetailItem.urlCell` 死字段——全仓无消费方，却每条预览行
+  都要付一次 `getCell` COM 调用（500 行预览 ≈ 500 次 IPC）。
+
 ### 修复 / 体验（「从远端仓库更新」未更新完结日期排查）
 
 - **排查结论：加载项的更新逻辑正确，是上游数据缺失**。用户报「7 月新番完结后，
