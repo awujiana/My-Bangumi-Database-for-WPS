@@ -142,6 +142,13 @@
           <div class="command-actions">
             <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
             <button class="bgm-btn" data-action="testSelected">👆 选中行同步</button>
+            <button
+              class="bgm-btn"
+              data-action="selectFailedRows"
+              title="选中上次同步失败的行，再点「👆 选中行同步」只重发这几行（仅记住本次会话）"
+            >
+              🎯 重试失败行
+            </button>
             <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏下载</button>
             <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
           </div>
