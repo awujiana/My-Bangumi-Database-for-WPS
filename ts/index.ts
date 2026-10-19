@@ -68,6 +68,17 @@ export {
 } from './core/result.js'
 
 // ============================================================================
+// 2b. 上次同步的失败行号（内存态，供「重试失败行」入口；来自 core/failed-rows.js）
+// ============================================================================
+export {
+  buildFailedRowsAddress,
+  clearLastFailedRows,
+  getLastFailedRows,
+  setLastFailedRows,
+  type FailedRowsRecord,
+} from './core/failed-rows.js'
+
+// ============================================================================
 // 3. Token Payload 打包与完整性校验（来自 core/token-payload.js，**非加密**）
 // ============================================================================
 export {

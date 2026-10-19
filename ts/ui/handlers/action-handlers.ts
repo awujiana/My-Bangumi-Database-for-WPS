@@ -99,7 +99,7 @@ import {
 } from './github-settings.js'
 import { renderLogEntries } from './log-panel.js'
 import { selectDefaultFolder, updatePathDisplay } from './path-controls.js'
-import { cleanLockedDataSheet } from './sheet.js'
+import { cleanLockedDataSheet, selectFailedRowsFromLastSync } from './sheet.js'
 import { syncCollectionFromBgm, syncFromPanel } from './sync.js'
 import {
   openUserCollection,
@@ -166,6 +166,12 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] syncSelectedRows 函数未定义')
     }
+  },
+
+  // 重试失败行：只选中上次失败的那几行，同步仍走「👆 选中行同步」
+  selectFailedRows: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选中上次同步失败的行')
+    selectFailedRowsFromLastSync()
   },
 
   clear: (context) => {

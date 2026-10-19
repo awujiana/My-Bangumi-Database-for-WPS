@@ -53,6 +53,8 @@ import {
   addTagsFromString,
 } from '../pure-utilities.js'
 import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../sync-record.js'
+// 失败行号留档：同步只把失败压成计数就丢了，用户无从只重试那几行
+import { setLastFailedRows } from '../../core/failed-rows.js'
 
 // 子模块内部依赖（不通过 re-export 暴露给外部）
 import { bgmRequestSync as _bgmRequestSync } from './api.js'
@@ -699,6 +701,12 @@ export async function SyncToBangumiAsync(
     seqCol,
   )
 
+  // 失败行留档（含所属表名）：供「重试失败行」只重发这几行，而不是整表重跑
+  setLastFailedRows(
+    failTasks.map((task) => task.rowNum),
+    ws.Name || '',
+  )
+
   // 步骤 6: 批量更新 UI 和记录
   const reportProgress = (current: number, message: string) => {
     if (options?.onProgress) options.onProgress(current, syncTasks.length, message)
@@ -892,6 +900,8 @@ async function executeSelectedSync(
     // 计数器与明细（声明移到 early return 之后；用对象包裹计数器，
     // 供循环内异步闭包通过属性更新，避免 no-loop-func 捕获循环外可变 let 变量）
     const counters = { success: 0, fail: 0, skip: 0, episodeMark: 0 }
+    // 失败行号：与 counters.fail 同步累积，供「重试失败行」只重发这几行
+    const failedRows: number[] = []
     const details: string[] = []
     const selectedRowsConfig: SyncConfigSummary = buildSyncConfig({
       source: '当前工作表',
@@ -1048,6 +1058,7 @@ async function executeSelectedSync(
                   }
                 } else {
                   counters.fail += 1
+                  failedRows.push(rowNumber)
                   details.push(
                     `✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`,
                   )
@@ -1109,6 +1120,7 @@ async function executeSelectedSync(
         await syncSingleRowTask()
       } catch (error: unknown) {
         counters.fail += 1
+        failedRows.push(rowNumber)
         const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.ERROR,
@@ -1125,6 +1137,8 @@ async function executeSelectedSync(
 
     // 输出最终汇总日志
     const elapsed = Date.now() - startTime
+    // 失败行留档（含所属表名）：下一次「重试失败行」就只重发这几行
+    setLastFailedRows(failedRows, ws.Name || '')
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 汇总 ==========`)
     bgmLog(
       LOG_LEVELS.INFO,

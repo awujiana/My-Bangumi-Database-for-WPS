@@ -11,9 +11,64 @@ import {
   BGM,
   getApp,
   showToast,
+  buildFailedRowsAddress,
+  getLastFailedRows,
 } from '../../index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
 import { cleanSheetDuplicates } from '../../sync/sheet-cleaning.js'
+
+/**
+ * 选中「上次同步失败的行」，供用户接着点「👆 选中行同步」只重发这几行。
+ *
+ * 只做选中、不直接发请求——用户能在发请求前先看清要重试哪些行；同步路径完全
+ * 复用现有的 `app.Selection` 读取逻辑，不新增一条同步实现。
+ *
+ * 三条拒绝条件（都比「静默选中错行」好）：
+ *  1. 没有失败记录；
+ *  2. 失败行属于另一张表（行号换表就错位了）；
+ *  3. 地址串超长（Excel Range 地址有长度上限）。
+ */
+export function selectFailedRowsFromLastSync(): void {
+  const record = getLastFailedRows()
+  if (!record || record.rows.length === 0) {
+    showToast('上次同步没有失败行', 'info')
+    return
+  }
+
+  const app = getApp()
+  const ws: WpsWorksheet | null = app?.ActiveWorkbook?.ActiveSheet ?? null
+  if (!ws) {
+    showToast('无法获取当前工作表', 'error')
+    return
+  }
+  if (record.sheetName && ws.Name !== record.sheetName) {
+    showToast(`失败行属于「${record.sheetName}」表，请先切回该表`, 'warn')
+    return
+  }
+
+  const address = buildFailedRowsAddress(record.rows)
+  if (!address) {
+    showToast(`失败行过多（${String(record.rows.length)} 行），请分批手动选择重试`, 'warn')
+    return
+  }
+
+  try {
+    ws.Range(address).Select()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    BGM.handleError(error, { context: 'selectFailedRows', showAlert: false })
+    showToast(`选中失败行失败：${message}`, 'error')
+    return
+  }
+
+  const preview = record.rows.slice(0, 8).join(', ')
+  const more = record.rows.length > 8 ? '…' : ''
+  bgmLog(LOG_LEVELS.INFO, `[selectFailedRows] 已选中 ${String(record.rows.length)} 行: ${address}`)
+  showToast(
+    `已选中 ${String(record.rows.length)} 个失败行（${preview}${more}），点「👆 选中行同步」重试`,
+    'success',
+  )
+}
 
 /**
  * 清洗锁定的数据工作表：
