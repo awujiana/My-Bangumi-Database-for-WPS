@@ -95,9 +95,13 @@ function safeAlert(message: string, title?: string): void {
 }
 
 function isUploadedByColor(seqCell: WpsRange | null): boolean {
-  if (!seqCell?.Interior) return false
-  const c = seqCell.Interior.Color
-  return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(c)
+  // Interior 只读一次：WPS 的 Range 是跨进程 COM 代理，每次属性读取都是一次
+  // 进程间往返。旧写法 `seqCell?.Interior` 判空后 `seqCell.Interior.Color` 又把
+  // Interior 读了一遍 —— 预览对每条数据行都要走这个函数，3000 行的表每行多付
+  // 1 次往返。提成局部量后每行固定 2 次属性读（Interior + Color）。
+  const interior = seqCell?.Interior
+  if (!interior) return false
+  return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(interior.Color)
 }
 
 /** 预览取数涉及的映射键（批量矩形读时据此确定列包围盒） */

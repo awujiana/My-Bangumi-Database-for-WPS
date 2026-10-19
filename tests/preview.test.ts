@@ -27,6 +27,13 @@ const registered = vi.hoisted(() => ({ count: 0 }))
 /** 状态机的可变部分单独持有：用于驱动「读取 isRunning 时抛错」这类场景 */
 const syncState = vi.hoisted(() => ({ running: false, throwOnIsRunningRead: false }))
 
+/**
+ * `Interior` 属性读取次数：WPS 的 Range 是跨进程 COM 代理，每次属性读都是一次
+ * 进程间往返。预览对每条数据行都要读一次序列号格的 Interior.Color 判「已上传」，
+ * 这个计数器守住「每行只读一次 Interior」——旧写法判空后又把 Interior 读了一遍。
+ */
+const interiorReads = vi.hoisted(() => ({ value: 0 }))
+
 const mocks = vi.hoisted(() => ({
   bgmLog: vi.fn<(level: number, message: string) => void>(),
   /** 形状与真实 handleError 一致：返回对象且调用方可改写 message */
@@ -75,8 +82,7 @@ const mocks = vi.hoisted(() => ({
   detectConflicts: vi.fn(async () => ({ conflictCount: 0 })),
   extractSubjectId: vi.fn((url: string) => /subject\/(\d+)/.exec(url)?.[1] ?? null),
   mapWatchStatus: vi.fn(
-    (status: string) =>
-      ({ 想看: 1, 看过: 2, 在看: 3, 搁置: 4, 抛弃: 5 })[status.trim()] ?? 0,
+    (status: string) => ({ 想看: 1, 看过: 2, 在看: 3, 搁置: 4, 抛弃: 5 })[status.trim()] ?? 0,
   ),
   buildJsonPayload: vi.fn((_getField: (key: string) => string): string => '{"type":2}'),
   bgmRequestSync: vi.fn(async () => ({ code: 200, message: '' })),
@@ -100,19 +106,18 @@ const mocks = vi.hoisted(() => ({
       },
     ) => ({ success: 1, fail: 0, skip: 0, stopped: false }),
   ),
-  showSyncProgressDialog: vi.fn<
-    (
-      title: string,
-      handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
-      config?: unknown,
-    ) => void
-  >(),
-  updateSyncProgressDialog: vi.fn<
-    (current: number, total: number, message?: string, logLine?: string) => void
-  >(),
-  completeSyncProgressDialog: vi.fn<
-    (summary: string, details: string[], isStopped?: boolean) => void
-  >(),
+  showSyncProgressDialog:
+    vi.fn<
+      (
+        title: string,
+        handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
+        config?: unknown,
+      ) => void
+    >(),
+  updateSyncProgressDialog:
+    vi.fn<(current: number, total: number, message?: string, logLine?: string) => void>(),
+  completeSyncProgressDialog:
+    vi.fn<(summary: string, details: string[], isStopped?: boolean) => void>(),
   hideSyncProgressDialog: vi.fn<() => void>(),
   buildSyncConfig: vi.fn((input: unknown) => input),
   getUserApiPath: vi.fn(() => 'me'),
@@ -320,8 +325,12 @@ beforeEach(() => {
   mocks.getCellValue.mockImplementation(
     (_ws: unknown, row: number, col: number) => cells[`${String(row)}:${String(col)}`] ?? '',
   )
+  interiorReads.value = 0
   mocks.getCell.mockImplementation((_ws: unknown, row: number) => ({
-    Interior: { Color: uploadedRows.has(row) ? BGM_COLOR.SUCCESS : BGM_COLOR.WHITE },
+    get Interior() {
+      interiorReads.value += 1
+      return { Color: uploadedRows.has(row) ? BGM_COLOR.SUCCESS : BGM_COLOR.WHITE }
+    },
   }))
   mocks.detectConflicts.mockResolvedValue({ conflictCount: 0 })
   mocks.bgmRequestSync.mockResolvedValue({ code: 200, message: '' })
@@ -382,6 +391,28 @@ describe('preview · previewSyncContent', () => {
     await previewSyncContent()
 
     expect(mocks.showToast).toHaveBeenCalledWith('无法读取列映射', 'error')
+  })
+
+  it('COM 往返不放大：每条数据行只读一次 Interior（判空后不再重读）', async () => {
+    setDataPreview()
+    // 第 2 行标记为已上传（绿色）
+    uploadedRows = new Set([2])
+    mountPreviewModal()
+
+    await previewSyncContent()
+
+    // 夹具的数据行是 [2, 3]（visibleRows [1,2,3] 去掉表头行 1）。
+    // 旧写法 `seqCell?.Interior` 判空 + `seqCell.Interior.Color` 取色会把
+    // Interior 读两遍 → 2 行应是 4 次；提成局部量后每行固定 1 次。
+    // 先证明循环真的跑够了轮数，再证明属性读取没有放大（REF-com-io 范式）。
+    expect(mocks.getCell).toHaveBeenCalledTimes(2)
+    expect(interiorReads.value).toBe(2)
+
+    // 颜色判定语义不变：第 2 行的卡片仍带 uploaded 类，第 3 行不带
+    const row2Card = document.querySelector('.detail-item[data-row="2"]')
+    const row3Card = document.querySelector('.detail-item[data-row="3"]')
+    expect(row2Card?.classList.contains('uploaded')).toBe(true)
+    expect(row3Card?.classList.contains('uploaded')).toBe(false)
   })
 
   it('拿不到运行状态（enterRunningState 返回 false）→ 不渲染卡片', async () => {
@@ -819,7 +850,9 @@ describe('preview · uploadSingleRow', () => {
     item.append(header)
     item.append(button)
     document.body.append(item)
-    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } } })
+    mocks.getApp.mockReturnValue({
+      ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } },
+    })
     const seenFields: Record<string, string> = {}
     mocks.buildJsonPayload.mockImplementation((getField: (key: string) => string) => {
       seenFields.Bangumi_URL = getField('Bangumi_URL')
@@ -853,7 +886,9 @@ describe('preview · uploadSingleRow', () => {
   })
 
   it('记录写盘失败 → 明确提示用户本条未登记', async () => {
-    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } } })
+    mocks.getApp.mockReturnValue({
+      ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } },
+    })
     mocks.addSyncRecord.mockReturnValue(false)
 
     await uploadSingleRow(2)
@@ -866,7 +901,9 @@ describe('preview · uploadSingleRow', () => {
 
   it('上传失败（非 2xx）→ 标红、按钮转「失败」并提示', async () => {
     const button = mountUploadButton()
-    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } } })
+    mocks.getApp.mockReturnValue({
+      ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } },
+    })
     mocks.bgmRequestSync.mockResolvedValue({ code: 500, message: '服务器错误' })
 
     await uploadSingleRow(2, button)
@@ -881,14 +918,14 @@ describe('preview · uploadSingleRow', () => {
   })
 
   it('上传失败且无 message → 用 HTTP 状态码兜底', async () => {
-    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } } })
+    mocks.getApp.mockReturnValue({
+      ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } },
+    })
     mocks.bgmRequestSync.mockResolvedValue({ code: 0, message: '' })
 
     await uploadSingleRow(2)
 
-    expect(mocks.addSyncRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'HTTP 0' }),
-    )
+    expect(mocks.addSyncRecord).toHaveBeenCalledWith(expect.objectContaining({ message: 'HTTP 0' }))
     expect(mocks.showToast).toHaveBeenCalledWith('上传失败: 未知错误', 'error')
   })
 
@@ -935,7 +972,9 @@ describe('preview · uploadSingleRow', () => {
   })
 
   it('没有按钮元素时静默完成（不触碰 DOM）', async () => {
-    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } } })
+    mocks.getApp.mockReturnValue({
+      ActiveWorkbook: { Worksheets: { Item: () => ({ Name: '动画' }) } },
+    })
 
     await expect(uploadSingleRow(2)).resolves.toBeUndefined()
 
@@ -1056,7 +1095,11 @@ describe('preview · viewSyncRecordDetail', () => {
 
       expect(mocks.showAlert).toHaveBeenCalledWith('同步记录功能不可用！', undefined)
     } finally {
-      Reflect.set(mocks, 'getAllSyncRecords', vi.fn((): unknown[] => []))
+      Reflect.set(
+        mocks,
+        'getAllSyncRecords',
+        vi.fn((): unknown[] => []),
+      )
     }
   })
 })
@@ -1233,10 +1276,7 @@ describe('preview · syncAllRows', () => {
 
     await syncAllRows()
 
-    expect(mocks.bgmLog).toHaveBeenCalledWith(
-      2,
-      expect.stringContaining('读取增量同步设置失败'),
-    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith(2, expect.stringContaining('读取增量同步设置失败'))
     expect(mocks.syncToBangumi).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
