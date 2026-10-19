@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/highlight.css" />
+  </head>
+  <body data-page="highlight">
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/highlight-bootstrap.js"></script>
+    <script src="../wpsjsrpcsdk.js"></script>
+
+    <div class="global">
+      <!-- ===================== 顶栏 ===================== -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title">🎯 番剧高亮</span>
+            <span class="brand-sub">按季度起点高亮最新番剧 · 列自选 · 预览不动表</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===================== 侧栏（功能导航） ===================== -->
+      <aside class="sidebar">
+        <nav class="nav" aria-label="功能导航">
+          <div class="nav-label">功能导航</div>
+          <a href="#sec-condition" title="匹配条件"
+            ><span class="nav-ico">🎯</span><span class="nav-text">匹配条件</span></a
+          >
+          <a href="#sec-columns" title="高亮列"
+            ><span class="nav-ico">☑️</span><span class="nav-text">高亮列</span></a
+          >
+          <a href="#sec-preview" title="实时预览"
+            ><span class="nav-ico">👁️</span><span class="nav-text">实时预览</span></a
+          >
+          <a href="#sec-run" title="应用与清除"
+            ><span class="nav-ico">🖌️</span><span class="nav-text">应用与清除</span></a
+          >
+        </nav>
+      </aside>
+
+      <!-- ===================== 主区 ===================== -->
+      <main class="main">
+        <!-- 匹配条件 -->
+        <section class="section" id="sec-condition">
+          <h3>
+            🎯 匹配条件<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-condition"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「匹配条件」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            当前工作表：<strong id="hlSheetName">—</strong>。日期列三种格式都认（<code>25年4月</code> 文本 /
+            <code>2026-10-01</code> / 真实日期单元格）。
+          </p>
+
+          <label class="hl-field-label" for="hlSource">日期列（匹配依据）</label>
+          <select id="hlSource" class="hl-select"></select>
+          <p class="hint">
+            自动模式优先用「开播季度」列（数据页公式已归一并排除电影/剧场版）；没有时回退
+            「开播日期」「完播日」。
+          </p>
+
+          <label class="hl-field-label">匹配模式</label>
+          <div class="hl-mode-row">
+            <button type="button" class="hl-mode-btn active" id="hlModeAuto">自动：当前季</button>
+            <button type="button" class="hl-mode-btn" id="hlModeManual">手动指定年月</button>
+          </div>
+          <div id="hlManualBox" class="hl-manual-box" style="display: none">
+            <select id="hlManualYear" class="hl-select"></select>
+            <select id="hlManualMonth" class="hl-select"></select>
+          </div>
+          <p class="hint">
+            自动模式按今天定位当前季：1/2 月→1 月季，3/4/5 月→4 月季，6/7/8 月→7 月季，9/10/11
+            月→10 月季，12 月→次年 1 月季（12 月播的番剧归冬季档）。
+          </p>
+
+          <label class="hl-watch-row">
+            <input type="checkbox" id="hlAutoWatch" />
+            <span>自动跟随表格变化（编辑后自动重算高亮）</span>
+          </label>
+          <p class="hint">默认关闭。开启后本面板保持打开才会生效，不会常驻监听。</p>
+        </section>
+
+        <!-- 高亮列 -->
+        <section class="section" id="sec-columns">
+          <h3>
+            ☑️ 高亮列<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-columns"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「高亮列」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            勾选命中行要涂绿的列，选择会被记住（下次自动带上）。序列号列不在列表里——它的绿色是
+            「已上传」标记，混用会分不清。
+          </p>
+          <div id="hlColList" class="hl-col-list"></div>
+        </section>
+
+        <!-- 实时预览 -->
+        <section class="section section-wide" id="sec-preview">
+          <h3>
+            👁️ 实时预览<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-preview"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「实时预览」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">预览只读表格、不动数据；改动上面的选项会实时重算。</p>
+          <div class="hl-preview-box">
+            <div class="hl-preview-count" id="hlPreviewCount">命中 0 行</div>
+            <div class="hl-preview-target" id="hlPreviewTarget"></div>
+            <div class="hl-preview-chips" id="hlPreviewChips"></div>
+            <div class="hl-preview-names" id="hlPreviewNames"></div>
+            <div class="hl-preview-skip" id="hlPreviewSkip"></div>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small" id="hlRefreshBtn">🔄 刷新预览</button>
+          </div>
+        </section>
+
+        <!-- 应用与清除 -->
+        <section class="section" id="sec-run">
+          <h3>
+            🖌️ 应用与清除<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-run"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「应用与清除」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            应用后把预览命中的行按勾选列涂绿（与旧宏同款 RGB(0,176,80)）；清除只抹本插件加的绿，
+            不碰你自己填的色。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="hlApplyBtn">🖌️ 应用高亮</button>
+            <button class="bgm-btn small" id="hlClearBtn">🧽 清除高亮</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

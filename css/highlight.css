@@ -1,0 +1,151 @@
+/* ============================================================================
+ * BGM 加载项 · 番剧高亮页面样式（css/highlight.css）
+ * ----------------------------------------------------------------------------
+ * 仅负责「高亮页」的展示层：匹配条件控件、高亮列勾选列表、实时预览盒。
+ * 配色 / 间距 / 圆角一律复用 css/tokens.css，不引入任何新依赖。
+ * ==========================================================================*/
+
+/* ---- 匹配条件 ---- */
+.hl-field-label {
+  display: block;
+  margin-top: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.hl-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+.hl-mode-row {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.hl-mode-btn {
+  flex: 1;
+  padding: 7px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.hl-mode-btn.active {
+  border-color: var(--accent);
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+  font-weight: 500;
+}
+
+.hl-manual-box {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.hl-watch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+/* ---- 高亮列 ---- */
+.hl-col-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.hl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-faint);
+  cursor: pointer;
+}
+
+.hl-row:last-child {
+  border-bottom: none;
+}
+
+.hl-col-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hl-col-letter {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+}
+
+/* ---- 实时预览 ---- */
+.hl-preview-box {
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--bg-surface-2);
+}
+
+.hl-preview-count {
+  color: var(--text-1);
+  font-size: var(--fs-display);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.hl-preview-target {
+  margin-top: var(--sp-1);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.hl-preview-chips {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: var(--sp-3);
+}
+
+.hl-chip {
+  padding: 1px 10px;
+  margin: 0 6px 6px 0;
+  border-radius: var(--r-pill);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.hl-chip-empty {
+  color: var(--text-3);
+}
+
+.hl-preview-names {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.hl-preview-skip {
+  margin-top: var(--sp-2);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
