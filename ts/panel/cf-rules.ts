@@ -49,6 +49,8 @@ export interface ForeignRuleSnapshot {
   formula: string
   /** 规则类型能否被插件重建保留 */
   kind: 'expression' | 'other'
+  /** 宿主的原始类型号（WPS XlFormatConditionType）；读不到留空 */
+  type?: number
   /** 读到的填充色（尽力而为，读不到留空） */
   interior?: string
   /** 读到的字体色 */

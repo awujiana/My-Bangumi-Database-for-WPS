@@ -70,6 +70,7 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
   ],
   cf: [
     { id: 'sec-target', label: '目标工作表', icon: '🎯' },
+    { id: 'sec-existing', label: '既有规则', icon: '👀' },
     { id: 'sec-rules', label: '规则管理', icon: '☑️' },
     { id: 'sec-defaults', label: '默认规则集', icon: '📦' },
     { id: 'sec-apply', label: '应用与修复', icon: '🖌️' },

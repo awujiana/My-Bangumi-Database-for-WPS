@@ -83,6 +83,14 @@
   font-weight: 400;
 }
 
+.cf-existing-index {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 .cf-rule {
   display: flex;
   align-items: center;

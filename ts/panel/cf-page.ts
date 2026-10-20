@@ -35,7 +35,12 @@ import {
   shiftFormulaRows,
 } from './cf-rules.js'
 import type { ApplyStrategy, CfRule, ForeignRuleSnapshot } from './cf-rules.js'
-import { applyCfPlan, isFormatConditionsSupported, readForeignRules } from './cf-apply.js'
+import {
+  applyCfPlan,
+  checkFormatConditionsReadable,
+  isFormatConditionsSupported,
+  readForeignRules,
+} from './cf-apply.js'
 import { initShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
@@ -72,6 +77,10 @@ interface PageState {
   searchQuery: string
   /** 模态框里待定的策略选择（打开模态框时置位） */
   pendingStrategy: ApplyStrategy
+  /** 目标工作表既有规则快照（只读展示，不参与规则库） */
+  existing: ForeignRuleSnapshot[]
+  /** 读取既有规则的失败原因；null = 正常读到（可能为空表） */
+  existingError: string | null
 }
 
 const state: PageState = {
@@ -83,6 +92,8 @@ const state: PageState = {
   editingIsNew: false,
   searchQuery: '',
   pendingStrategy: CF_STRATEGY_FALLBACK,
+  existing: [],
+  existingError: null,
 }
 
 // ===== DOM 辅助 =====
@@ -176,6 +187,90 @@ function reloadSheets(): void {
     state.selectedKey = first ? first.key : ''
   }
   renderSheetSelect()
+  // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
+  // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
+  loadExistingRules()
+}
+
+// ===== 工作表既有规则（只读）=====
+
+/** WPS/Excel XlFormatConditionType 中文标签；未知类型显示原始编号 */
+const FC_TYPE_LABELS: Record<number, string> = {
+  1: '单元格值',
+  2: '公式',
+  3: '色阶',
+  4: '数据条',
+  5: 'Top10 / 平均值',
+  6: '图标集',
+}
+
+function fcTypeLabel(type: number | undefined, kind: 'expression' | 'other'): string {
+  if (type === undefined) return kind === 'expression' ? '公式' : '其它类型'
+  return FC_TYPE_LABELS[type] ?? `类型 ${String(type)}`
+}
+
+/** 读目标工作表既有规则并渲染（只读；导入走 importForeign） */
+function loadExistingRules(): void {
+  const entry = selectedSheet()
+  if (!entry) {
+    state.existing = []
+    state.existingError = '尚未选择目标工作表'
+    renderExistingRules()
+    return
+  }
+  const unreadable = checkFormatConditionsReadable(entry.ws)
+  if (unreadable !== null) {
+    state.existing = []
+    state.existingError = `${unreadable}（既有规则读不到）`
+    renderExistingRules()
+    return
+  }
+  try {
+    state.existing = readForeignRules(entry.ws)
+    state.existingError = null
+  } catch (error: unknown) {
+    state.existing = []
+    state.existingError = `读取失败：${(error as Error).message}`
+  }
+  renderExistingRules()
+}
+
+/** 渲染既有规则列表（只读，按优先级排列） */
+function renderExistingRules(): void {
+  const container = byId('cfExistingList')
+  if (!container) return
+  if (state.existingError !== null) {
+    container.innerHTML = `<p class="cf-empty">${escapeHtml(state.existingError)}</p>`
+    setText('cfExistingCount', '—')
+    return
+  }
+  if (state.existing.length === 0) {
+    container.innerHTML = '<p class="cf-empty">这张表当前没有条件格式规则。</p>'
+    setText('cfExistingCount', '0 条')
+    return
+  }
+
+  setText('cfExistingCount', `${String(state.existing.length)} 条`)
+  container.innerHTML = state.existing
+    .map(
+      (rule, index) => `
+      <div class="cf-rule">
+        <span class="cf-existing-index" title="优先级（靠前先生效）">${String(index + 1)}</span>
+        <div class="cf-rule-main">
+          <div class="cf-rule-name">${escapeHtml(fcTypeLabel(rule.type, rule.kind))}${
+            rule.kind === 'other' ? ' · 插件无法重建' : ''
+          }</div>
+          <div class="cf-rule-meta">${escapeHtml(rule.range || '（未读到范围）')}${
+            rule.formula
+              ? ` · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
+                  rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula,
+                )}</code>`
+              : ''
+          }</div>
+        </div>
+      </div>`,
+    )
+    .join('')
 }
 
 // ===== Store 读写 =====
@@ -602,7 +697,13 @@ function importForeign(): void {
   const foreign = readForeignRules(entry.ws)
   const expressible = foreign.filter((rule) => rule.kind === 'expression' && rule.formula)
   if (expressible.length === 0) {
-    showToast('没有可导入的公式类规则', 'info')
+    showToast(
+      foreign.length === 0
+        ? '这张表没有条件格式规则（可在「既有规则」卡片确认）'
+        : `读取到 ${String(foreign.length)} 条规则，但没有可导入的公式类规则`,
+      'info',
+    )
+    loadExistingRules()
     return
   }
   const imported: CfRule[] = expressible.map((rule) => ({
@@ -646,9 +747,13 @@ export function initCfPage(): void {
   selectById('cfSheet')?.addEventListener('change', (event) => {
     state.selectedKey = (event.target as HTMLSelectElement).value
     setConfig(KEY_SHEET, state.selectedKey)
+    loadExistingRules()
   })
   byId('cfReloadSheetsBtn')?.addEventListener('click', () => {
     reloadSheets()
+  })
+  byId('cfRefreshExistingBtn')?.addEventListener('click', () => {
+    loadExistingRules()
   })
 
   // 规则操作

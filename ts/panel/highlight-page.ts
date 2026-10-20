@@ -80,6 +80,8 @@ interface HighlightColumn {
   col: number
   /** 列字母 */
   letter: string
+  /** 是否勾选；日期源列恒为 true 且不可取消 */
+  selected: boolean
 }
 
 interface LastApplied {
@@ -94,7 +96,7 @@ interface PageState {
   /** 日期源规范列名 */
   sourceKey: string
   sourceCol: number
-  /** 高亮列（含源列，源列恒选） */
+  /** 可选高亮列（含源列，源列恒选且不可取消） */
   columns: HighlightColumn[]
   mode: 'auto' | 'manual'
   manual: YearMonth
@@ -172,7 +174,12 @@ function isFormulaSource(): boolean {
   return state.sourceKey === FORMULA_SOURCE
 }
 
-/** 重建高亮列列表：源列恒选置顶 + 缓存勾选；序列号列刻意排除 */
+/**
+ * 重建高亮列列表：**列出全部可选列**（源列恒选置顶，序列号列刻意排除）
+ *
+ * 曾经只列缓存里已有的列，导致首次使用只有「源列 + 名称」，且**没有任何 UI 能把
+ * 别的列加进来**——勾选框只能取消、不能新增（真机反馈：高亮列不能选择更多的）。
+ */
 function rebuildColumns(): void {
   const cached = new Set<string>()
   try {
@@ -190,28 +197,24 @@ function rebuildColumns(): void {
   }
 
   const columns: HighlightColumn[] = []
-  // 源列恒选且置顶（列映射变化等边缘情况下也要在）
-  if (state.sourceKey) {
-    columns.push({
-      name: state.sourceKey,
-      col: state.sourceCol,
-      letter: colLetter(state.sourceCol),
-    })
-  }
   for (const [name, col] of state.colMap) {
-    const isSkipped = name === '序列号' || name === state.sourceKey
-    if (!isSkipped && cached.has(name)) {
-      columns.push({ name, col, letter: colLetter(col) })
+    // 序列号列的绿色是「已上传」判定色，高亮它会混淆两种语义，故不进列表
+    const isSequenceColumn = name === '序列号'
+    const isSource = name === state.sourceKey
+    // 首次使用（无缓存）默认带「名称」作视觉锚点
+    const isFirstRunDefault = cached.size === 0 && name === '名称'
+    if (!isSequenceColumn) {
+      columns.push({
+        name,
+        col,
+        letter: colLetter(col),
+        selected: isSource || isFirstRunDefault || cached.has(name),
+      })
     }
   }
 
-  // 首次使用（无缓存）：默认追加「名称」列作视觉锚点
-  if (cached.size === 0) {
-    const nameCol = state.colMap.get('名称')
-    if (nameCol !== undefined) {
-      columns.push({ name: '名称', col: nameCol, letter: colLetter(nameCol) })
-    }
-  }
+  // 源列恒选置顶：列映射变化等边缘情况下也要在，且不让用户取消
+  columns.sort((a, b) => Number(b.name === state.sourceKey) - Number(a.name === state.sourceKey))
 
   state.columns = columns
 }
@@ -237,17 +240,23 @@ function renderColumnList(): void {
   const container = byId('hlColList')
   if (!container) return
   container.innerHTML = state.columns
-    .map(
-      (c) => `
+    .map((c) => {
+      const isLocked = c.name === state.sourceKey
+      return `
       <label class="hl-row">
-        <input type="checkbox" checked data-col="${escapeHtml(c.name)}" />
-        <span class="hl-col-name">${escapeHtml(c.name)}</span>
+        <input type="checkbox" data-col="${escapeHtml(c.name)}"${c.selected ? ' checked' : ''}${
+          isLocked ? ' disabled' : ''
+        } />
+        <span class="hl-col-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
         <span class="hl-col-letter">${escapeHtml(c.letter)} 列</span>
-      </label>`,
-    )
+      </label>`
+    })
     .join('')
   container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((box) => {
     box.addEventListener('change', () => {
+      const name = box.dataset.col ?? ''
+      const column = state.columns.find((c) => c.name === name)
+      if (column) column.selected = box.checked
       persistColumns()
       refreshPreview()
     })
@@ -269,13 +278,8 @@ function renderColumnListIfChanged(): void {
 }
 
 function persistColumns(): void {
-  const container = byId('hlColList')
-  if (!container) return
-  const checked: string[] = []
-  container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((box) => {
-    const name = box.dataset.col
-    if (name && box.checked) checked.push(name)
-  })
+  const checked = state.columns.filter((c) => c.selected).map((c) => c.name)
+  // 源列必须留在缓存里：换表后源列可能变（公式列 → 原始日期列），届时它仍要默认勾上
   const withSource =
     state.sourceKey && !checked.includes(state.sourceKey) ? [state.sourceKey, ...checked] : checked
   setConfig(KEY_COLUMNS, JSON.stringify(withSource))
@@ -480,11 +484,13 @@ function applyHighlight(isSilent = false): void {
     return
   }
 
-  // 连续行合并 + 按 8000 字符装车：块失败自动对半拆（见 paintRangeGroups）
+  // 连续行合并 + 按 8000 字符装车：块失败自动对半拆（见 paintSheet）
   const addresses: string[] = []
-  for (const column of state.columns) {
+  const selected = state.columns.filter((c) => c.selected)
+  for (const column of selected) {
     addresses.push(...rowsToRangeAddresses(rows, column.letter))
   }
+  const selectedColumns = state.columns.filter((c) => c.selected).length
   const painted = paintSheet(ws, addresses, { fillColor: HIGHLIGHT_COLOR, fontColor: 0 })
   if (painted === 0) {
     if (!isSilent) showToast('高亮写入失败，请查看日志', 'error')
@@ -495,10 +501,10 @@ function applyHighlight(isSilent = false): void {
   setConfig(KEY_LAST_APPLIED, JSON.stringify(record))
   bgmLog(
     LOG_LEVELS.INFO,
-    `[highlight] 已高亮 ${String(rows.length)} 行 × ${String(state.columns.length)} 列（${String(painted)} 个区域块）`,
+    `[highlight] 已高亮 ${String(rows.length)} 行 × ${String(selectedColumns)} 列（${String(painted)} 个区域块）`,
   )
   if (!isSilent) {
-    showToast(`已高亮 ${String(rows.length)} 行 × ${String(state.columns.length)} 列`, 'success')
+    showToast(`已高亮 ${String(rows.length)} 行 × ${String(selectedColumns)} 列`, 'success')
   }
 }
 

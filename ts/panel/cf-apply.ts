@@ -35,6 +35,21 @@ export function isFormatConditionsSupported(ws: WpsWorksheet | null | undefined)
   return typeof ws.UsedRange.FormatConditions?.Add === 'function'
 }
 
+/**
+ * 检查能否枚举既有规则
+ *
+ * @returns 能枚举返回 null；否则返回**原因**（页面据此区分「这张表没有规则」和
+ *   「根本读不到规则」——后者曾被静默当成前者，用户看到的是误导性的空列表）
+ */
+export function checkFormatConditionsReadable(ws: WpsWorksheet | null | undefined): string | null {
+  if (!isFormatConditionsSupported(ws)) return '当前 WPS 版本不支持条件格式 API'
+  const formatConditions = ws?.UsedRange?.FormatConditions
+  if (typeof formatConditions?.Item !== 'function') {
+    return '宿主未提供 FormatConditions.Item，无法枚举既有规则'
+  }
+  return null
+}
+
 /** 读一条规则的填充色（尽力而为；宿主拒绝时留空） */
 function readInteriorColor(fc: WpsFormatCondition): string | undefined {
   try {
@@ -81,6 +96,7 @@ export function readForeignRules(ws: WpsWorksheet | null | undefined): ForeignRu
         range: fc.AppliesTo?.Address ?? '',
         formula: typeof fc.Formula1 === 'string' ? fc.Formula1 : '',
         kind: fc.Type === XL_EXPRESSION ? 'expression' : 'other',
+        ...(typeof fc.Type === 'number' && { type: fc.Type }),
         ...(interior !== undefined && { interior }),
         ...(fontColor !== undefined && { fontColor }),
       })
