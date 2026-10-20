@@ -136,10 +136,10 @@ export function shiftFormulaRows(formula: string, rowDelta: number): string {
   if (rowDelta === 0) return formula
   return formula.replace(
     /(\$?)([A-Z]{1,3})(\d+)/g,
-    (match, dollar: string, col: string, row: string) => {
+    (match, dollar: string, column: string, row: string) => {
       const shifted = Number(row) + rowDelta
       if (shifted < 1) return match
-      return `${dollar}${col}${String(shifted)}`
+      return `${dollar}${column}${String(shifted)}`
     },
   )
 }

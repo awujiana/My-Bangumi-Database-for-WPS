@@ -30,9 +30,9 @@ export function readTargetCell(
   sheet: WpsWorksheet,
   cache: SheetCellCache | undefined,
   row: number,
-  col: number,
+  column: number,
 ): string {
-  return cache ? cache.read(row, col) : getCellValue(sheet, row, col)
+  return cache ? cache.read(row, column) : getCellValue(sheet, row, column)
 }
 
 /** 目标表单元格写：有缓存走 cache.write（先写 COM 再穿透更新缓存），否则直接写 */
@@ -40,14 +40,14 @@ export function writeTargetCell(
   sheet: WpsWorksheet,
   cache: SheetCellCache | undefined,
   row: number,
-  col: number,
+  column: number,
   value: string,
 ): void {
   if (cache) {
-    cache.write(row, col, value)
+    cache.write(row, column, value)
     return
   }
-  setCellValue(sheet, row, col, value)
+  setCellValue(sheet, row, column, value)
 }
 
 /**

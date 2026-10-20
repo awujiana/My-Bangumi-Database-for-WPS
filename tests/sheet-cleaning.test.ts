@@ -19,7 +19,7 @@ const m = vi.hoisted(() => ({
   getLastRow: vi.fn<(worksheet: unknown) => number>(),
   readRangeValues:
     vi.fn<(worksheet: unknown, r1: number, r2: number, c1: number, c2: number) => string[][]>(),
-  setCellValue: vi.fn<(worksheet: unknown, row: number, col: number, value: string) => void>(),
+  setCellValue: vi.fn<(worksheet: unknown, row: number, column: number, value: string) => void>(),
 }))
 
 vi.mock('../ts/tools/util/index.js', () => ({
@@ -51,7 +51,7 @@ interface SheetModel {
   columns: Record<string, number>
   cells: Record<number, Record<number, string>>
   deletedRanges: string[]
-  writes: { row: number; col: number; value: string }[]
+  writes: { row: number; column: number; value: string }[]
   /** 列号 → 只返回前 N 行（模拟 COM 少返回数据，取值为缺失的 undefined） */
   truncatedColumns: Record<number, number>
   /** 列号 → 这些数据行返回空数组（模拟 COM 返回形状异常） */
@@ -76,8 +76,8 @@ function makeSheetModel(
   cells[headerRow] = headerLine
   for (const [rowIndex, line] of dataRows.entries()) {
     const record: Record<number, string> = {}
-    for (const [colIndex, text] of line.entries()) {
-      record[colIndex + 1] = text
+    for (const [columnIndex, text] of line.entries()) {
+      record[columnIndex + 1] = text
     }
     cells[headerRow + 1 + rowIndex] = record
   }
@@ -122,8 +122,8 @@ function installModel(next: SheetModel): WpsWorksheet {
             out.push([])
           } else {
             const line: string[] = []
-            for (let col = c1; col <= c2; col += 1) {
-              line.push(model.cells[rowNumber]?.[col] ?? '')
+            for (let column = c1; column <= c2; column += 1) {
+              line.push(model.cells[rowNumber]?.[column] ?? '')
             }
             out.push(line)
           }
@@ -133,8 +133,8 @@ function installModel(next: SheetModel): WpsWorksheet {
     },
   )
   m.setCellValue.mockImplementation(
-    (_ws: unknown, rowNumber: number, col: number, value: string) => {
-      model.writes.push({ row: rowNumber, col, value })
+    (_ws: unknown, rowNumber: number, column: number, value: string) => {
+      model.writes.push({ row: rowNumber, column, value })
     },
   )
   return makeWorksheet()
@@ -180,8 +180,8 @@ describe('readSheetLayout', () => {
     expect(layout?.headerRow).toBe(1)
     expect(layout?.lastRow).toBe(2)
     expect(layout?.dataStartRow).toBe(2)
-    expect(layout?.colMap.get('名称')).toBe(1)
-    expect(layout?.colMap.get('标签/分级')).toBe(3)
+    expect(layout?.columnMap.get('名称')).toBe(1)
+    expect(layout?.columnMap.get('标签/分级')).toBe(3)
   })
 
   it('表头不在首行时数据起始行随之偏移', () => {
@@ -350,7 +350,7 @@ describe('planDuplicateRows · 组解析', () => {
     const plan = planDuplicateRows(worksheet)
 
     expect(plan.deleteRows).toEqual([3])
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Y', oldValue: '标签X' }])
+    expect(plan.changes).toEqual([{ row: 2, column: 3, value: '标签X | 标签Y', oldValue: '标签X' }])
     expect(plan.groups).toBe(1)
     expect(plan.mergedGroups).toBe(1)
     expect(plan.skippedReason).toBeUndefined()
@@ -444,7 +444,7 @@ describe('planDuplicateRows · 组解析', () => {
     // 两个 URL 行都保留（不是 victim），只有无 URL 行进入待删
     expect(plan.deleteRows).toEqual([4])
     expect(plan.mergedGroups).toBe(1)
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Z', oldValue: '标签X' }])
+    expect(plan.changes).toEqual([{ row: 2, column: 3, value: '标签X | 标签Z', oldValue: '标签X' }])
   })
 
   it('两个含 URL 行数据一致且存在空 URL 行 → 删除空 URL 行', () => {
@@ -460,7 +460,7 @@ describe('planDuplicateRows · 组解析', () => {
 
     expect(plan.deleteRows).toEqual([4])
     // 受害行只有第 4 行：第 3 行含 URL 会被保留，其标签不并入保留行
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Z', oldValue: '标签X' }])
+    expect(plan.changes).toEqual([{ row: 2, column: 3, value: '标签X | 标签Z', oldValue: '标签X' }])
   })
 
   it('缺「标签/分级」列 → 仍删行但不产生变更', () => {
@@ -559,7 +559,7 @@ describe('planDuplicateUrlRows', () => {
     const plan = planDuplicateUrlRows(worksheet)
 
     expect(plan.deleteRows).toEqual([2])
-    expect(plan.changes).toEqual([{ row: 3, col: 3, value: '标签Y | 标签X', oldValue: '标签Y' }])
+    expect(plan.changes).toEqual([{ row: 3, column: 3, value: '标签Y | 标签X', oldValue: '标签Y' }])
     expect(plan.groups).toBe(1)
     expect(plan.mergedGroups).toBe(1)
     expect(model.deletedRanges).toEqual([])
@@ -721,14 +721,14 @@ describe('applyRowPlan', () => {
     const removed = applyRowPlan(worksheet, {
       deleteRows: [5, 6],
       changes: [
-        { row: 5, col: 3, value: '不该写' },
-        { row: 9, col: 3, value: '应该写' },
+        { row: 5, column: 3, value: '不该写' },
+        { row: 9, column: 3, value: '应该写' },
       ],
       groups: 1,
       mergedGroups: 1,
     })
 
-    expect(model.writes).toEqual([{ row: 9, col: 3, value: '应该写' }])
+    expect(model.writes).toEqual([{ row: 9, column: 3, value: '应该写' }])
     expect(model.deletedRanges).toEqual(['5:6'])
     expect(removed).toBe(2)
   })
@@ -738,13 +738,13 @@ describe('applyRowPlan', () => {
 
     const removed = applyRowPlan(worksheet, {
       deleteRows: [],
-      changes: [{ row: 3, col: 3, value: 'X' }],
+      changes: [{ row: 3, column: 3, value: 'X' }],
       groups: 0,
       mergedGroups: 1,
     })
 
     expect(removed).toBe(0)
-    expect(model.writes).toEqual([{ row: 3, col: 3, value: 'X' }])
+    expect(model.writes).toEqual([{ row: 3, column: 3, value: 'X' }])
     expect(model.deletedRanges).toEqual([])
   })
 })
@@ -786,7 +786,7 @@ describe('cleanSheetDuplicates', () => {
       mergedTagGroups: 1,
       duplicateNameGroups: 1,
     })
-    expect(model.writes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Y' }])
+    expect(model.writes).toEqual([{ row: 2, column: 3, value: '标签X | 标签Y' }])
     expect(model.deletedRanges).toEqual(['3:3'])
     const messages = m.bgmLog.mock.calls.map((call) => call[1] ?? '')
     expect(messages.some((message) => message.includes('开始清洗重复行'))).toBe(true)

@@ -35,8 +35,9 @@ const mockReadRangeValues = vi.hoisted(() =>
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
+          for (let column = startCol; column <= endCol; column += 1) {
+            const value = mockGetCellValue(worksheet, row, column) as
+              string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)
@@ -65,8 +66,9 @@ const mockReadRangeCellValues = vi.hoisted(() =>
         const rows: (string | number | boolean | Date | null)[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
-          for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
+          for (let column = startCol; column <= endCol; column += 1) {
+            const value = mockGetCellValue(worksheet, row, column) as
+              string | number | boolean | null
             line.push(value ?? null)
           }
           rows.push(line)
@@ -401,7 +403,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
-  colNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColNumberToLetter,
   trim: mockTrim,
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -1012,9 +1014,9 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/111'
-      if (row === 3 && col === 1) return 'https://bgm.tv/subject/222'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
+      if (row === 3 && column === 1) return 'https://bgm.tv/subject/222'
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string) => {
@@ -1196,8 +1198,8 @@ describe('readLocalEntries 批量读取路径', () => {
         ['名称', 2],
       ]),
     )
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/1'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/1'
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string) => {
@@ -1227,9 +1229,9 @@ describe('readLocalEntries 批量读取路径', () => {
         ['名称', 2],
       ]),
     )
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/1'
-      if (row === 2 && col === 2) return 'Test'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/1'
+      if (row === 2 && column === 2) return 'Test'
       return ''
     })
     mockExtractSubjectId.mockReturnValue('1')
@@ -1247,8 +1249,8 @@ describe('readLocalEntries 批量读取路径', () => {
     mockGetColumnMap.mockReturnValue(new Map())
 
     // 验证列映射为空
-    const colMap: Map<string, number> = mockGetColumnMap()
-    expect(colMap.has('Bangumi_URL')).toBe(false)
+    const columnMap: Map<string, number> = mockGetColumnMap()
+    expect(columnMap.has('Bangumi_URL')).toBe(false)
   })
 
   it('无数据行时应返回空结果', () => {
@@ -1506,9 +1508,9 @@ describe('applyDiffToSheet', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     mockSetCellValue.mockImplementation(() => {})
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 3 && col === 1) return 'https://bgm.tv/subject/1'
-      if (row === 3 && col === 2) return '旧名称'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 3 && column === 1) return 'https://bgm.tv/subject/1'
+      if (row === 3 && column === 2) return '旧名称'
       return ''
     })
 
@@ -1688,9 +1690,9 @@ describe('syncFromGithub selectedRowsOnly', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/111'
-      if (row === 3 && col === 1) return 'https://bgm.tv/subject/222'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
+      if (row === 3 && column === 1) return 'https://bgm.tv/subject/222'
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string) => {
@@ -2112,8 +2114,8 @@ describe('getSelectedRowSids 分支覆盖', () => {
     mockGetLastRow.mockReturnValue(5)
     // 有列但没有 Bangumi_URL
     mockGetColumnMap.mockReturnValue(new Map([['名称', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/111'
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
       return ''
     })
 
@@ -2474,9 +2476,9 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(12)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (col === 1 && row >= 2 && row <= 12) return `https://bgm.tv/subject/${String(row - 1)}`
-      if (col === 2 && row >= 2 && row <= 12) return `条目${String(row - 1)}`
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (column === 1 && row >= 2 && row <= 12) return `https://bgm.tv/subject/${String(row - 1)}`
+      if (column === 2 && row >= 2 && row <= 12) return `条目${String(row - 1)}`
       return ''
     })
 
@@ -2582,9 +2584,9 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
       ]),
     )
     mockSetCellValue.mockImplementation(() => {})
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (col === 1) return `https://bgm.tv/subject/${String(row)}`
-      if (col === 2) return `旧名称${String(row)}`
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+      if (column === 1) return `https://bgm.tv/subject/${String(row)}`
+      if (column === 2) return `旧名称${String(row)}`
       return ''
     })
   })
@@ -3385,7 +3387,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
 describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
   it('更新扩展字段时正确匹配 EXTENDED_FIELD_MAP', async () => {
     const mockWs = createMockWorksheet()
-    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致），
+    // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致），
     // 使批量写入路径（而非逐字段回退）被真正走到
     mockWs.Range = asRangeMock((address: string) =>
       address.includes(':')
@@ -3495,7 +3497,7 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
 describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
   it('日期列值经过 formatDateToLocal 处理', async () => {
     const mockWs = createMockWorksheet()
-    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致）
+    // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致）
     mockWs.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '']], Interior: { Color: 0 } }
@@ -3550,7 +3552,7 @@ describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
 describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
   it('扩展字段为字符串且非日期列时直接赋值 (line 797)', async () => {
     const mockWs = createMockWorksheet()
-    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致）
+    // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致）
     mockWs.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '']], Interior: { Color: 0 } }
@@ -3752,9 +3754,9 @@ describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'no-col-1',
+        sid: 'no-column-1',
         remote: {
-          sid: 'no-col-1',
+          sid: 'no-column-1',
           name: '无匹配列',
           date: '2024-06-15',
         },
@@ -3931,9 +3933,9 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'empty-col-1',
+        sid: 'empty-column-1',
         remote: {
-          sid: 'empty-col-1',
+          sid: 'empty-column-1',
           name: '空列测试',
           date: '2024-06-15',
         },
@@ -3943,7 +3945,7 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
 
     const result = await applyDiffToSheet(diffs, 'add-update')
     // 空列时 batchWriteNewRows 返回 0，回退到逐行写入
-    // writeRemoteEntryToRow 在列映射为空时所有 safeSet 走 !col return 分支，不抛异常
+    // writeRemoteEntryToRow 在列映射为空时所有 safeSet 走 !column return 分支，不抛异常
     // 因此 added 仍为 1（逐行写入被视为成功，只是没有实际写入任何列）
     expect(result.added).toBe(1)
     // 验证空列警告日志被记录（line 596 被触发）
@@ -5045,9 +5047,9 @@ describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
         ['名称', 2],
       ]),
     )
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: number, col: number) => {
-      if (row === 2 && col === 1) return 'https://bgm.tv/subject/999'
-      if (row === 2 && col === 2) return '测试条目'
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: number, column: number) => {
+      if (row === 2 && column === 1) return 'https://bgm.tv/subject/999'
+      if (row === 2 && column === 2) return '测试条目'
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string) => {
@@ -5066,7 +5068,7 @@ describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
 
 // ========== 补充测试：readLocalEntries 无可读列/无 Bangumi_URL 列 (lines 293-294) ==========
 describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
-  it('colMap 无 Bangumi_URL 时 readLocalEntriesForSync 返回空 (line 396 外层守卫)', () => {
+  it('columnMap 无 Bangumi_URL 时 readLocalEntriesForSync 返回空 (line 396 外层守卫)', () => {
     const mockWs = createMockWorksheet({ name: 'DataSheet' })
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
@@ -5079,16 +5081,16 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
     expect(result!.lastRow).toBe(1)
   })
 
-  it('colMap 有 Bangumi_URL 但 get 返回 undefined 时进入 readCols 为空分支 (lines 293-294)', () => {
+  it('columnMap 有 Bangumi_URL 但 get 返回 undefined 时进入 readCols 为空分支 (lines 293-294)', () => {
     const mockWs = createMockWorksheet({ name: 'DataSheet' })
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
-    // colMap.has('Bangumi_URL') 为 true，但 get('Bangumi_URL') 返回 undefined
+    // columnMap.has('Bangumi_URL') 为 true，但 get('Bangumi_URL') 返回 undefined
     // 这使得外层守卫通过，但 readCols 为空，触发 lines 293-294
-    const colMapWithUndefined = new Map<string, number | undefined>([['Bangumi_URL', undefined]])
-    // 刻意构造「has 为 true 但 get 为 undefined」的非法状态，覆盖守卫通过后的空 colMap 分支
-    mockGetColumnMap.mockReturnValue(colMapWithUndefined as unknown as Map<string, number>)
+    const columnMapWithUndefined = new Map<string, number | undefined>([['Bangumi_URL', undefined]])
+    // 刻意构造「has 为 true 但 get 为 undefined」的非法状态，覆盖守卫通过后的空 columnMap 分支
+    mockGetColumnMap.mockReturnValue(columnMapWithUndefined as unknown as Map<string, number>)
 
     const result = readLocalEntriesForSync()
     expect(result).not.toBeNull()
@@ -5557,7 +5559,7 @@ function asThrowingRowRangeMock(throwMessage: string): MockRange {
     }
     return {
       get Value2(): string[][] {
-        // 忠实桩：读回的列数必须与区间一致（本 describe 的 colMap 为 名称=2/别名=3，
+        // 忠实桩：读回的列数必须与区间一致（本 describe 的 columnMap 为 名称=2/别名=3，
         // 区间 B..C 共 2 列）。返回 `[['']]`（仅 1 列）会被完整性守卫判为「读不全」
         // 而走逐字段回退，从而测不到「整行写入抛错 → 回退」这条路径。
         return [['', '']]
@@ -5575,7 +5577,7 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     vi.clearAllMocks()
     mockIsGithubConfigComplete.mockReturnValue(true)
     // 必须同时给出「别名」列：非 writeAll 的更新把名称追加到「别名」列（safeAppend），
-    // 只有「名称」列时 safeAppend 会在 `if (!col) return` 处直接返回，
+    // 只有「名称」列时 safeAppend 会在 `if (!column) return` 处直接返回，
     // 于是 attempted=false → 走「没有写入需要尝试 → 视为成功」，测不到回退分支
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -5759,7 +5761,7 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
 
     expect(result.updated).toBe(1)
     expect(result.failed).toBe(0)
-    // 非 writeAll 的更新把名称追加到「别名」列（colMap 里 别名=3）
+    // 非 writeAll 的更新把名称追加到「别名」列（columnMap 里 别名=3）
     expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 3, '新名字')
   })
 

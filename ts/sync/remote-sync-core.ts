@@ -256,7 +256,7 @@ export async function runRemoteSync(
     }
 
     // 列映射确认（写入侧）：取消同步的列从 diff 显式字段里剔除。
-    // add 的 '*' 不在此滤——写入层经 colMap 摘列天然跳过（见 applyDiffToSheet）。
+    // add 的 '*' 不在此滤——写入层经 columnMap 摘列天然跳过（见 applyDiffToSheet）。
     // 滤完后 changedFields 为空的 update diff 没有可写内容，移出 diff 列表，
     // 否则计数与明细会显示「更新了 N 条」但实际什么都没写。
     // 过滤必须早于下面的计数：counts 与 apply 用同一份 writableDiffs。
@@ -286,7 +286,7 @@ export async function runRemoteSync(
       `[${logTag}] diff 完成（${effectiveStrategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${String(diffElapsed)}ms`,
     )
 
-    // 列映射确认（写入侧）：改映射的列号改写表。默认列名 → 目标列在 colMap 里的列号。
+    // 列映射确认（写入侧）：改映射的列号改写表。默认列名 → 目标列在 columnMap 里的列号。
     // 目标列不存在（用户选了不存在的列）时跳过该条 —— applyColumnOverrides 已把
     // 本地值复制到默认键，缺失列在写入层静默跳过，不会写错位置。
     let columnRemap: Map<string, number> | undefined

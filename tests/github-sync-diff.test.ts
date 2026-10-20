@@ -1272,24 +1272,24 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
 describe('collectMissingColumns', () => {
   it('本地缺少 Bangumi_URL 列时应报出该列（无法按 SID 定位行）', () => {
     const remotes: GithubRemoteEntry[] = [{ sid: '1', name: '条目' }]
-    const colMap = new Map<string, number>([['名称', 2]])
+    const columnMap = new Map<string, number>([['名称', 2]])
 
-    expect(collectMissingColumns(remotes, colMap)).toContain('Bangumi_URL')
+    expect(collectMissingColumns(remotes, columnMap)).toContain('Bangumi_URL')
   })
 
   it('没有远程条目时不报 URL 列缺失', () => {
-    const colMap = new Map<string, number>([['名称', 2]])
+    const columnMap = new Map<string, number>([['名称', 2]])
 
-    expect(collectMissingColumns([], colMap)).toEqual([])
+    expect(collectMissingColumns([], columnMap)).toEqual([])
   })
 
   it('远程有数据但本地无对应列时应报出应添加的表头名', () => {
     const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 8.5, rank: 120 }]
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
     ])
-    const missing = collectMissingColumns(remotes, colMap)
+    const missing = collectMissingColumns(remotes, columnMap)
 
     expect(missing).toContain('评分')
     expect(missing).toContain('排名')
@@ -1297,34 +1297,34 @@ describe('collectMissingColumns', () => {
 
   it('本地已存在对应列时不应报出', () => {
     const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 8.5 }]
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
       ['评分', 3],
     ])
 
-    expect(collectMissingColumns(remotes, colMap)).toEqual([])
+    expect(collectMissingColumns(remotes, columnMap)).toEqual([])
   })
 
   it('远程字段为空值或 0 时不应催促用户加列（score/rank 的 0 表示无数据）', () => {
     const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 0, rank: 0, 别名: '', meta_tags: [] }]
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
     ])
 
-    expect(collectMissingColumns(remotes, colMap)).toEqual([])
+    expect(collectMissingColumns(remotes, columnMap)).toEqual([])
   })
 
   it('别名命中其一即不报缺失（动画制作公司 → 制作公司 / 动画制作公司 任一存在）', () => {
     const remotes: GithubRemoteEntry[] = [{ sid: '1', 动画制作公司: 'Studio' }]
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
       ['动画制作公司', 3],
     ])
 
-    expect(collectMissingColumns(remotes, colMap)).toEqual([])
+    expect(collectMissingColumns(remotes, columnMap)).toEqual([])
   })
 
   it('多条目同一字段缺失时结果应去重，且核心字段排在前面', () => {

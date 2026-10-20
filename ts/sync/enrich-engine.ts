@@ -29,11 +29,7 @@ import type { WpsWorksheet } from '../tools/wps.js'
 import { addEnrichRecords } from './enrich-record.js'
 import type { AddEnrichRecordParameters } from './enrich-record.js'
 
-import {
-  TAG_SEPARATOR,
-  normalizeName,
-  splitAliases,
-} from './enrich-normalize.js'
+import { TAG_SEPARATOR, normalizeName, splitAliases } from './enrich-normalize.js'
 
 /**
  * 拆分出去的子模块（原文件 2194 行，按职责切成三个模块，依赖单向）：
@@ -45,14 +41,16 @@ import {
  * re-export——只在下面 import 供自身编排使用。
  */
 
-import {
-  findAliasColumn,
-  getBangumiColumnMap,
-  mappingMaxCol,
-} from './enrich-layout.js'
+import { findAliasColumn, getBangumiColumnMap, mappingMaxCol } from './enrich-layout.js'
 import { readTargetCell, writeTargetCell } from './enrich-cells.js'
 
-import { enrichPlatform, enrichTags, enrichDate, enrichEpisodes, enrichFeatures } from './enrich-fields.js'
+import {
+  enrichPlatform,
+  enrichTags,
+  enrichDate,
+  enrichEpisodes,
+  enrichFeatures,
+} from './enrich-fields.js'
 import { readNewAnimeRow } from './enrich-matching.js'
 import type {
   ConflictInfo,
@@ -537,15 +535,15 @@ export function resolveConflictField(
  */
 export function ensureBangumiColumns(
   sheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   requiredFields: Record<string, string>,
   headerRow: number,
 ): Map<string, number> {
-  const updatedMap = new Map(colMap)
+  const updatedMap = new Map(columnMap)
   let maxCol = 0
 
-  for (const col of updatedMap.values()) {
-    if (col > maxCol) maxCol = col
+  for (const column of updatedMap.values()) {
+    if (column > maxCol) maxCol = column
   }
 
   const missing: { field: string; sourceKey: string }[] = []
@@ -627,7 +625,7 @@ export function ensureBangumiColumns(
       additions.push([missingField.field, firstNewCol + index])
     }
   } catch (error) {
-    // 不做部分提交：写入失败的列一律不写进 colMap，下游会按既有回退列处理。
+    // 不做部分提交：写入失败的列一律不写进 columnMap，下游会按既有回退列处理。
     // 也**不清理**已写下的表头：读回可能因 COM 异常拿到空值，据不可靠信号去清空
     // 会擦掉正确表头（数据丢失代价远高于残留一个空列）。
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -636,11 +634,11 @@ export function ensureBangumiColumns(
     return updatedMap
   }
 
-  for (const [field, col] of additions) {
-    updatedMap.set(field, col)
+  for (const [field, column] of additions) {
+    updatedMap.set(field, column)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(col)} 列 (样式已跟随现有列)`,
+      `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(column)} 列 (样式已跟随现有列)`,
     )
   }
 
@@ -650,15 +648,15 @@ export function ensureBangumiColumns(
 /**
  * WpsCellRef 辅助函数：生成单元格引用
  */
-function WpsCellReference(row: number, col: number): string {
-  let colString = ''
-  let c = col
+function WpsCellReference(row: number, column: number): string {
+  let columnString = ''
+  let c = column
   while (c > 0) {
     c -= 1
-    colString = String.fromCodePoint(65 + (c % 26)) + colString
+    columnString = String.fromCodePoint(65 + (c % 26)) + columnString
     c = Math.floor(c / 26)
   }
-  return `${colString}${String(row)}`
+  return `${columnString}${String(row)}`
 }
 
 // ========== 新番简介工作表识别与关联富化 ==========
@@ -673,12 +671,12 @@ export function enrichAlias(
   row: number,
   animeName: string,
   bangumiName: string | undefined,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   aliasCol?: number,
   cache?: SheetCellCache,
 ): void {
-  const nameCol = colMap.get('名称')
+  const nameCol = columnMap.get('名称')
   if (!nameCol) return
 
   if (animeName === bangumiName) {
@@ -744,14 +742,14 @@ export interface SearchResult {
 export function searchSheet(
   sheet: WpsWorksheet,
   keyword: string,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   dataStartRow: number,
 ): SearchResult[] {
   if (!keyword.trim()) return []
 
   const results: SearchResult[] = []
   const normalizedKeyword = normalizeName(keyword)
-  const nameCol = colMap.get('名称') ?? colMap.get('动漫名称') ?? colMap.get('番组名') ?? 0
+  const nameCol = columnMap.get('名称') ?? columnMap.get('动漫名称') ?? columnMap.get('番组名') ?? 0
 
   if (nameCol === 0) return results
 
@@ -765,7 +763,7 @@ export function searchSheet(
       if (normalizedName.includes(normalizedKeyword)) {
         const fieldMatches: SearchResult['fieldMatches'] = [{ column: '名称', value: nameValue }]
 
-        const aliasCol = colMap.get('别名')
+        const aliasCol = columnMap.get('别名')
         if (aliasCol) {
           const aliasValue = getCellValue(sheet, row, aliasCol)
           if (aliasValue) {

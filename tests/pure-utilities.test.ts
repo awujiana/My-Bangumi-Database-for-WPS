@@ -7,32 +7,32 @@ import { getSeqColIndex, addTagsFromString, buildTagsArray } from '../ts/sync/pu
 describe('pure-utilities', () => {
   // ========== getSeqColIndex 测试 ==========
   describe('getSeqColIndex', () => {
-    it('无 colMap 时返回默认值 4', () => {
+    it('无 columnMap 时返回默认值 4', () => {
       expect(getSeqColIndex(undefined)).toBe(4)
     })
 
-    it('colMap 中有"序列号"键时返回对应索引', () => {
-      const colMap = new Map<string, number>([['序列号', 5]])
-      expect(getSeqColIndex(colMap)).toBe(5)
+    it('columnMap 中有"序列号"键时返回对应索引', () => {
+      const columnMap = new Map<string, number>([['序列号', 5]])
+      expect(getSeqColIndex(columnMap)).toBe(5)
     })
 
-    it('colMap 中无"序列号"键时返回默认值 4', () => {
-      const colMap = new Map<string, number>([
+    it('columnMap 中无"序列号"键时返回默认值 4', () => {
+      const columnMap = new Map<string, number>([
         ['名称', 2],
         ['集数', 3],
       ])
-      expect(getSeqColIndex(colMap)).toBe(4)
+      expect(getSeqColIndex(columnMap)).toBe(4)
     })
 
-    it('空 colMap 时返回默认值 4', () => {
-      const colMap = new Map<string, number>()
-      expect(getSeqColIndex(colMap)).toBe(4)
+    it('空 columnMap 时返回默认值 4', () => {
+      const columnMap = new Map<string, number>()
+      expect(getSeqColIndex(columnMap)).toBe(4)
     })
 
-    it('colMap 中"序列号"值为 0 时返回默认值（|| 运算符特性）', () => {
+    it('columnMap 中"序列号"值为 0 时返回默认值（|| 运算符特性）', () => {
       // 注意：JavaScript 的 || 运算符对 0 返回右侧值
-      const colMap = new Map<string, number>([['序列号', 0]])
-      expect(getSeqColIndex(colMap)).toBe(4)
+      const columnMap = new Map<string, number>([['序列号', 0]])
+      expect(getSeqColIndex(columnMap)).toBe(4)
     })
   })
 

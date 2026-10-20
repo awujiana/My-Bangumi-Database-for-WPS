@@ -24,7 +24,7 @@ export type FieldGetter = (row: number, key: string) => string
  * 批量读取数据并创建字段快速访问器（矩形读 + 逐格回退）。
  *
  * @param worksheet 工作表
- * @param colMap 列名 → 列号
+ * @param columnMap 列名 → 列号
  * @param startRow 数据起始行
  * @param lastRow 数据末行
  * @param columns 参与批量读取的列名（只决定矩形读宽度；访问器对表外列走逐格回退）
@@ -32,7 +32,7 @@ export type FieldGetter = (row: number, key: string) => string
  */
 export function createBatchFieldGetter(
   worksheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   startRow: number,
   lastRow: number,
   columns: readonly string[],
@@ -40,23 +40,23 @@ export function createBatchFieldGetter(
   // 批量读取所有需要的数据列
   let maxCol = 1
   for (const key of columns) {
-    const col = colMap.get(key)
-    if (col !== undefined) maxCol = Math.max(maxCol, col)
+    const column = columnMap.get(key)
+    if (column !== undefined) maxCol = Math.max(maxCol, column)
   }
   const allData = readRangeValues(worksheet, startRow, lastRow, 1, maxCol)
 
   return (row: number, key: string): string => {
-    const col = colMap.get(key)
-    if (!col) return ''
+    const column = columnMap.get(key)
+    if (!column) return ''
     const rowIndex = row - startRow
     if (rowIndex >= 0 && rowIndex < allData.length) {
       const rowData = allData[rowIndex]
-      if (Array.isArray(rowData) && col - 1 < rowData.length) {
-        return trim(rowData[col - 1])
+      if (Array.isArray(rowData) && column - 1 < rowData.length) {
+        return trim(rowData[column - 1])
       }
     }
     // 回退到逐单元格读取
-    const fallbackCol = colMap.get(key)
+    const fallbackCol = columnMap.get(key)
     return fallbackCol === undefined ? '' : trim(getCellValue(worksheet, row, fallbackCol))
   }
 }

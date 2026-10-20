@@ -15,7 +15,7 @@ import {
   escapeHtml,
   getCellValue,
   readRangeValues,
-  colNumberToLetter,
+  columnNumberToLetter,
   HEADER_KEYWORDS,
   IMPORTANT_COLS,
   showToast,
@@ -39,7 +39,7 @@ import type { LockedSheetInfo } from '../tools/locked-sheet.js'
 interface CandidateHeader {
   row: number
   matchCount: number
-  colCount: number
+  columnCount: number
 }
 
 interface HeaderMeta {
@@ -60,7 +60,7 @@ interface HeaderMeta {
 
 interface PreviewRow {
   row: number
-  cols: string[] | { text: string; important: boolean }[]
+  columns: string[] | { text: string; important: boolean }[]
   isHeader: boolean
   aligned: boolean
   isImportant?: boolean[]
@@ -300,8 +300,8 @@ export function detectHeaderAndColumns(
   const scanEndRow = PANEL_CONFIG.MAX_SCAN_ROWS + SCAN_ROWS_EXTRA
   const block = readRangeValues(worksheet, 1, scanEndRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
   const canBatch = block.length === scanEndRow
-  const cellAt = (row: number, col: number): string =>
-    canBatch ? (block[row - 1]?.[col - 1] ?? '') : getCellValue(worksheet, row, col)
+  const cellAt = (row: number, column: number): string =>
+    canBatch ? (block[row - 1]?.[column - 1] ?? '') : getCellValue(worksheet, row, column)
 
   // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
   const candidates: CandidateHeader[] = []
@@ -309,12 +309,12 @@ export function detectHeaderAndColumns(
     const shouldScanRow = !isFiltered || !visibleRowSet || visibleRowSet.has(r)
     if (shouldScanRow) {
       let matchCount = 0
-      let colCount = 0
+      let columnCount = 0
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
         try {
           const v = cellAt(r, c).trim()
           if (v) {
-            colCount += 1
+            columnCount += 1
             const cv = v.toLowerCase()
             if (HEADER_KEYWORDS.some((kw) => cv === kw || cv.includes(kw))) {
               matchCount += 1
@@ -332,7 +332,7 @@ export function detectHeaderAndColumns(
         }
       }
       if (matchCount >= 3) {
-        candidates.push({ row: r, matchCount, colCount })
+        candidates.push({ row: r, matchCount, columnCount })
       }
     }
   }
@@ -353,9 +353,9 @@ export function detectHeaderAndColumns(
   }
 
   // 选列数最多、行号最小的行作为锚点
-  candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row)
+  candidates.sort((a, b) => b.columnCount - a.columnCount || a.row - b.row)
   const candidateRows = new Set(candidates.map((candidate) => candidate.row))
-  // 锚点未必是表头首行：多行表头里「补齐行」可能比主表头行更宽（colCount 更大），
+  // 锚点未必是表头首行：多行表头里「补齐行」可能比主表头行更宽（columnCount 更大），
   // 直接把它当表头会整行丢掉主表头的列名。向上回溯到紧邻的连续候选块首行。
   let headerRow = candidates[0]?.row ?? 0
   while (candidateRows.has(headerRow - 1)) {
@@ -475,7 +475,7 @@ export function autoDetectSheet(): {
   sheetName: string
   headerRow: number
   matchCount: number
-  colCount: number
+  columnCount: number
 } | null {
   // 跨所有已打开工作簿扫描（表头 + 数据行数 + 名称关键词，优先活动工作簿/工作表）
   const candidates = findBangumiTargetSheets()
@@ -499,7 +499,7 @@ export function autoDetectSheet(): {
     sheetName: best.sheetName,
     headerRow: best.headerRow,
     matchCount: best.headerMatchCount,
-    colCount: best.headerMatchCount,
+    columnCount: best.headerMatchCount,
   }
 }
 // ========== 筛选状态 ==========
@@ -516,10 +516,10 @@ function collectActiveFilterCols(worksheet: WpsWorksheet, filters: WpsFilters): 
     try {
       const f = filters.Item(index)
       if (f.On) {
-        let colName = ''
+        let columnName = ''
         try {
-          const headerCell = worksheet.Range(`${colNumberToLetter(index)}1`)
-          colName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
+          const headerCell = worksheet.Range(`${columnNumberToLetter(index)}1`)
+          columnName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
         } catch (error: unknown) {
           BGM.handleError(error, {
             showAlert: false,
@@ -538,7 +538,7 @@ function collectActiveFilterCols(worksheet: WpsWorksheet, filters: WpsFilters): 
             criteria += ` / ${f.Criteria2}`
           }
         }
-        activeCols.push(colName ? `${colName}(${criteria})` : `列${String(index)}`)
+        activeCols.push(columnName ? `${columnName}(${criteria})` : `列${String(index)}`)
       }
     } catch (error: unknown) {
       BGM.handleError(error, {
@@ -639,8 +639,8 @@ function isReadPreviewSegmentBatch(
   previewRows: PreviewRow[],
 ): boolean {
   // 一次性读取整个矩形区域
-  const startColLetter = colNumberToLetter(meta.previewColStartAbsolute)
-  const endColLetter = colNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
+  const startColLetter = columnNumberToLetter(meta.previewColStartAbsolute)
+  const endColLetter = columnNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
   const rangeAddr = worksheet.Range(
     `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLength - 1)}`,
   )
@@ -667,7 +667,7 @@ function isReadPreviewSegmentBatch(
         rowCols.push(v)
       }
       if (hasAny) {
-        previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
+        previewRows.push({ row: dr, columns: rowCols, isHeader: false, aligned: true })
         hasData = true
       }
     }
@@ -725,17 +725,17 @@ function renderPreviewTable(
   let html = '<table class="preview-table"><tbody>'
   // 以表头行列数作为统一列数，避免不同行列数不同导致错位
   const headerItem = rows.find((r) => r.isHeader)
-  const fixedColCount = headerItem?.aligned ? (headerItem.cols as string[]).length : 0
+  const fixedColCount = headerItem?.aligned ? (headerItem.columns as string[]).length : 0
   for (const item of rows) {
     const rowClass = item.isHeader ? 'preview-header-row' : ''
     html += `<tr class="${rowClass}">`
     html += `<td class="preview-row-num">${String(item.isHeader ? 'H' : item.row)}</td>`
     if (item.aligned) {
-      const cols = item.cols as string[]
+      const columns = item.columns as string[]
       // 使用统一列数，确保所有行列对齐
-      const colLimit = fixedColCount > 0 ? fixedColCount : cols.length
-      for (let index = 0; index < colLimit; index += 1) {
-        const text = cols[index] ?? ''
+      const columnLimit = fixedColCount > 0 ? fixedColCount : columns.length
+      for (let index = 0; index < columnLimit; index += 1) {
+        const text = columns[index] ?? ''
         let cls = ''
         if (item.isHeader) {
           cls = 'preview-header'
@@ -862,7 +862,7 @@ export function refreshData(): void {
     if (meta.headerRow > 0) {
       previewRows.push({
         row: -1,
-        cols: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
+        columns: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
         isHeader: true,
         aligned: true,
         isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd),
@@ -916,13 +916,13 @@ export function refreshData(): void {
               const rowCols: string[] = []
               let hasAny = false
               for (let ci = 0; ci < displayColCount; ci += 1) {
-                const col = meta.previewColStartAbsolute + ci
-                const v = getCellValue(worksheet, dr, col).trim()
+                const column = meta.previewColStartAbsolute + ci
+                const v = getCellValue(worksheet, dr, column).trim()
                 if (v) hasAny = true
                 rowCols.push(v)
               }
               if (hasAny) {
-                previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
+                previewRows.push({ row: dr, columns: rowCols, isHeader: false, aligned: true })
                 hasData = true
               }
             }
@@ -936,19 +936,19 @@ export function refreshData(): void {
       for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r += 1) {
         const isRowIncluded = !isFiltered || !visibleRowSet || visibleRowSet.has(r)
         if (isRowIncluded) {
-          // 与表头分支一致：cols 必须是字符串数组（aligned 路径的 renderPreviewTable
+          // 与表头分支一致：columns 必须是字符串数组（aligned 路径的 renderPreviewTable
           // 按 string[] 渲染；此前 push {text,important} 对象会显示成 [object Object]）
-          const cols: string[] = []
+          const columns: string[] = []
           let hasAny = false
           for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
             const v = getCellValue(worksheet, r, c).trim()
             if (v) {
-              cols.push(v)
+              columns.push(v)
               hasAny = true
             }
           }
           if (hasAny) {
-            previewRows.push({ row: r, cols, isHeader: false, aligned: true })
+            previewRows.push({ row: r, columns, isHeader: false, aligned: true })
             hasData = true
             count += 1
           }

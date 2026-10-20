@@ -73,8 +73,8 @@ const mocks = vi.hoisted(() => ({
     String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
   ),
   /** 1 → A；测试列数远小于 26，故只需覆盖单字母区间 */
-  colNumberToLetter: vi.fn((index: number) => String.fromCodePoint(64 + index)),
-  getCellValue: vi.fn<(worksheet: FakeWorksheet, row: number, col: number) => string>(),
+  columnNumberToLetter: vi.fn((index: number) => String.fromCodePoint(64 + index)),
+  getCellValue: vi.fn<(worksheet: FakeWorksheet, row: number, column: number) => string>(),
   // 矩形读必须与逐格读来自同一份数据源（都是 `__cells`）：矩形读只是逐格读的
   // 批量形态，两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
   readRangeValues: vi.fn(
@@ -83,8 +83,8 @@ const mocks = vi.hoisted(() => ({
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
-        for (let col = c1; col <= c2; col += 1) {
-          line.push(cells[`${String(row)}:${String(col)}`] ?? '')
+        for (let column = c1; column <= c2; column += 1) {
+          line.push(cells[`${String(row)}:${String(column)}`] ?? '')
         }
         out.push(line)
       }
@@ -132,7 +132,7 @@ vi.mock('../ts/index.js', async () => {
     escapeHtml: mocks.escapeHtml,
     getCellValue: mocks.getCellValue,
     readRangeValues: mocks.readRangeValues,
-    colNumberToLetter: mocks.colNumberToLetter,
+    columnNumberToLetter: mocks.columnNumberToLetter,
     showToast: mocks.showToast,
     getFilterStatus: mocks.getFilterStatus,
     getLastRow: mocks.getLastRow,
@@ -287,8 +287,8 @@ beforeEach(() => {
   mocks.getLastRow.mockReturnValue(0)
   mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [] })
   mocks.getCellValue.mockImplementation(
-    (worksheet: FakeWorksheet, row: number, col: number) =>
-      worksheet.__cells?.[`${String(row)}:${String(col)}`] ?? '',
+    (worksheet: FakeWorksheet, row: number, column: number) =>
+      worksheet.__cells?.[`${String(row)}:${String(column)}`] ?? '',
   )
   mocks.findWorkbookByName.mockReturnValue(null)
   mocks.findBangumiTargetSheets.mockReturnValue([])
@@ -712,15 +712,17 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('单个单元格读取失败 → 记录后继续扫描其余列', () => {
     let hasThrown = false
-    mocks.getCellValue.mockImplementation((worksheet: FakeWorksheet, row: number, col: number) => {
-      // 每个坐标只抛一次：表头扫描阶段有 try/catch 能兜住并继续；
-      // 表头名回读阶段（第二遍逐列读，无 try/catch）必须正常返回，否则错误会冒泡。
-      if (row === 1 && col === 2 && !hasThrown) {
-        hasThrown = true
-        throw new Error('该单元格不可读')
-      }
-      return worksheet.__cells?.[`${String(row)}:${String(col)}`] ?? ''
-    })
+    mocks.getCellValue.mockImplementation(
+      (worksheet: FakeWorksheet, row: number, column: number) => {
+        // 每个坐标只抛一次：表头扫描阶段有 try/catch 能兜住并继续；
+        // 表头名回读阶段（第二遍逐列读，无 try/catch）必须正常返回，否则错误会冒泡。
+        if (row === 1 && column === 2 && !hasThrown) {
+          hasThrown = true
+          throw new Error('该单元格不可读')
+        }
+        return worksheet.__cells?.[`${String(row)}:${String(column)}`] ?? ''
+      },
+    )
 
     // 本用例覆盖的是「单格读取失败 → 记 handleError 后继续」：矩形读可用时整块读
     // 成功，单格不会失败（真实宿主同样如此），故显式让矩形读不可用，走逐格回退路径。
@@ -818,7 +820,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '1:1': '序列号',
       '1:2': '名称',
       '1:3': '打分',
-      // 第 2 行补 5 列 —— 列数比第 1 行多，只按 colCount 排序会把第 2 行误当表头
+      // 第 2 行补 5 列 —— 列数比第 1 行多，只按 columnCount 排序会把第 2 行误当表头
       '2:4': '开播日期',
       '2:5': '集数',
       '2:6': '标签',
@@ -951,7 +953,7 @@ describe('panel-lifecycle · autoDetectSheet', () => {
       sheetName: '动画',
       headerRow: 1,
       matchCount: 5,
-      colCount: 5,
+      columnCount: 5,
     })
   })
 })
@@ -1101,7 +1103,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     updateFilterStatus(asWs(sheet))
 
     expect(mocks.handleError).toHaveBeenCalled()
-    // 生产行为：列名读取失败时退回「列N」且不带条件括号（colName 为空即丢弃整个括号段）
+    // 生产行为：列名读取失败时退回「列N」且不带条件括号（columnName 为空即丢弃整个括号段）
     expect(element.textContent).toContain('列1')
   })
 

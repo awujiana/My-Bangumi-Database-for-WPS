@@ -44,7 +44,7 @@ export interface RowChange {
   /** 行号（1-based，Excel 行号） */
   row: number
   /** 列号（1-based） */
-  col: number
+  column: number
   /** 目标值 */
   value: string
   /** 原值（行级规则的标签合并等；采集自已读入的列，零额外 COM 读取） */
@@ -107,7 +107,7 @@ export interface RowPlanOptions {
    *
    * ⚠️ 语义契约：调用方须传 `readSheetLayout(worksheet)` 的**同一结果**。新番表无标准
    * 「名称」表头时解析结果为 `null`——与不传时各计划自行解析的结果一致，
-   * 因此新番表不会因共享而突然获得行级清理能力（推导 colMap 只在
+   * 因此新番表不会因共享而突然获得行级清理能力（推导 columnMap 只在
    * `buildTarget` 的新番表专属签名路径内使用，不进本选项）。
    * 不传（`undefined`）时按原行为自行解析，保持 `plan*` 可独立调用。
    */
@@ -121,7 +121,7 @@ export interface SheetLayout {
   /** 最后数据行号 */
   lastRow: number
   /** 列名 → 列号 */
-  colMap: Map<string, number>
+  columnMap: Map<string, number>
   /** 数据起始行 */
   dataStartRow: number
 }
@@ -163,14 +163,14 @@ export function readSheetLayout(worksheet: WpsWorksheet): SheetLayout | null {
   return {
     headerRow,
     lastRow,
-    colMap: getColumnMap(worksheet, headerRow),
+    columnMap: getColumnMap(worksheet, headerRow),
     dataStartRow: headerRow + 1,
   }
 }
 
 /** 读取单列数据（返回按数据行顺序排列的一维数组） */
-function readColumn(worksheet: WpsWorksheet, layout: SheetLayout, col: number): string[] {
-  return readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, col, col).map(
+function readColumn(worksheet: WpsWorksheet, layout: SheetLayout, column: number): string[] {
+  return readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, column, column).map(
     (row) => row[0] ?? '',
   )
 }
@@ -283,13 +283,13 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
 
-  const nameCol = layout.colMap.get('名称')
+  const nameCol = layout.columnMap.get('名称')
   if (!nameCol) return emptyPlan('未找到「名称」列')
-  const urlCol = layout.colMap.get('Bangumi_URL')
+  const urlCol = layout.columnMap.get('Bangumi_URL')
   if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
-  const tagsCol = layout.colMap.get('标签/分级')
-  const dateCol = layout.colMap.get('开播日期')
-  const episodesCol = layout.colMap.get('集数')
+  const tagsCol = layout.columnMap.get('标签/分级')
+  const dateCol = layout.columnMap.get('开播日期')
+  const episodesCol = layout.columnMap.get('集数')
 
   const excluded = options?.excludedRows
   const names = readColumn(worksheet, layout, nameCol)
@@ -328,7 +328,7 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
       if (tagsCol && outcome.mergedTags !== null) {
         changes.push({
           row: outcome.keepRow,
-          col: tagsCol,
+          column: tagsCol,
           value: outcome.mergedTags,
           oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
         })
@@ -385,15 +385,15 @@ function resolveUrlGroup(
 export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
-  const urlCol = layout.colMap.get('Bangumi_URL')
+  const urlCol = layout.columnMap.get('Bangumi_URL')
   if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
-  const tagsCol = layout.colMap.get('标签/分级')
+  const tagsCol = layout.columnMap.get('标签/分级')
 
   const excluded = options?.excludedRows
   const urls = readColumn(worksheet, layout, urlCol)
   const tags = tagsCol ? readColumn(worksheet, layout, tagsCol) : null
   // 同 URL 组内各行名称不同，diff 对比视图需要名称列（一次矩形读）
-  const nameCol = layout.colMap.get('名称')
+  const nameCol = layout.columnMap.get('名称')
   const names = nameCol ? readColumn(worksheet, layout, nameCol) : null
 
   const groups = new Map<string, number[]>()
@@ -424,7 +424,7 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
       if (tagsCol && outcome.mergedTags !== null) {
         changes.push({
           row: outcome.keepRow,
-          col: tagsCol,
+          column: tagsCol,
           value: outcome.mergedTags,
           oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
         })
@@ -463,22 +463,22 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
 export function planEmptyNameRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
-  const nameCol = layout.colMap.get('名称')
+  const nameCol = layout.columnMap.get('名称')
   if (!nameCol) return emptyPlan('未找到「名称」列')
 
   const excluded = options?.excludedRows
   // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
-  // 语义不变——仍只检查 colMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
-  const maxCol = Math.max(...layout.colMap.values())
+  // 语义不变——仍只检查 columnMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
+  const maxCol = Math.max(...layout.columnMap.values())
   const block = readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, 1, maxCol)
-  const otherCols = [...layout.colMap.values()].filter((col) => col !== nameCol)
+  const otherCols = [...layout.columnMap.values()].filter((column) => column !== nameCol)
 
   const rowsToDelete: number[] = []
   for (const [index, cells] of block.entries()) {
     const row = toRow(layout, index)
     const isBlank =
       (cells[nameCol - 1] ?? '').trim() === '' &&
-      otherCols.every((col) => (cells[col - 1] ?? '').trim() === '')
+      otherCols.every((column) => (cells[column - 1] ?? '').trim() === '')
     if (isBlank && !excluded?.has(row)) rowsToDelete.push(row)
   }
 
@@ -528,7 +528,7 @@ export function applyRowPlan(worksheet: WpsWorksheet, plan: RowPlan): number {
   const removedRows = new Set(plan.deleteRows)
   for (const change of plan.changes) {
     if (!removedRows.has(change.row)) {
-      setCellValue(worksheet, change.row, change.col, change.value)
+      setCellValue(worksheet, change.row, change.column, change.value)
     }
   }
   if (plan.deleteRows.length === 0) return 0

@@ -19,9 +19,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockState = vi.hoisted(() => ({
   addSyncRecords: vi.fn<(records: unknown[]) => boolean>(() => true),
-  getCell: vi.fn<(worksheet: unknown, row: number, col: number) => { Interior: { Color: number } } | null>(
-    () => ({ Interior: { Color: 0 } }),
-  ),
+  getCell: vi.fn<
+    (worksheet: unknown, row: number, column: number) => { Interior: { Color: number } } | null
+  >(() => ({ Interior: { Color: 0 } })),
   handleError: vi.fn(),
   setSyncComplete: vi.fn(),
   toast: vi.fn(),
@@ -54,10 +54,7 @@ import {
   markSyncResultColor,
   TYPE_NAMES,
 } from '../ts/sync/exceltobangumi/progress-reporter.js'
-import type {
-  SyncResultStats,
-  SyncTask,
-} from '../ts/sync/exceltobangumi/progress-reporter.js'
+import type { SyncResultStats, SyncTask } from '../ts/sync/exceltobangumi/progress-reporter.js'
 import { BGM_COLOR, SYNC_STATUS } from '../ts/core/constants.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 
@@ -94,9 +91,9 @@ describe('markSyncResultColor', () => {
   it('成功时写入成功色', () => {
     markSyncResultColor(createStubWorksheet(), 5, true, 9)
     expect(mockState.getCell).toHaveBeenCalledWith(expect.anything(), 5, 9)
-    expect((mockState.getCell.mock.results[0]?.value as { Interior: { Color: number } }).Interior.Color).toBe(
-      BGM_COLOR.SUCCESS,
-    )
+    expect(
+      (mockState.getCell.mock.results[0]?.value as { Interior: { Color: number } }).Interior.Color,
+    ).toBe(BGM_COLOR.SUCCESS)
   })
 
   it('失败时写入失败色', () => {
@@ -292,7 +289,17 @@ describe('finalizeSyncResults', () => {
     const all = [executed, createTask({ sid: '2' }), createTask({ sid: '3' })]
     const reportProgress = vi.fn()
 
-    finalizeSyncResults(createStubWorksheet(), 9, [executed], [], all, true, result, 0, reportProgress)
+    finalizeSyncResults(
+      createStubWorksheet(),
+      9,
+      [executed],
+      [],
+      all,
+      true,
+      result,
+      0,
+      reportProgress,
+    )
 
     expect(result.skip).toBe(2)
     expect(result.stopped).toBe(true)

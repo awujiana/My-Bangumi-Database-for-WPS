@@ -201,8 +201,8 @@ export function collectNeededFieldsFromSheet(): Set<string> | undefined {
   if (!worksheet) return undefined
 
   const headerRow = findHeaderRow(worksheet) || 1
-  const colMap = getColumnMap(worksheet, headerRow)
-  const columns = [...colMap.keys()]
+  const columnMap = getColumnMap(worksheet, headerRow)
+  const columns = [...columnMap.keys()]
   if (columns.length === 0) return undefined
 
   return neededFieldsForColumns(columns)

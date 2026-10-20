@@ -77,7 +77,7 @@ interface HighlightColumn {
   /** 规范列名 */
   name: string
   /** 列号（1-based） */
-  col: number
+  column: number
   /** 列字母 */
   letter: string
   /** 是否勾选；日期源列恒为 true 且不可取消 */
@@ -92,7 +92,7 @@ interface LastApplied {
 interface PageState {
   worksheet: WpsWorksheet | null | undefined
   headerRow: number
-  colMap: Map<string, number>
+  columnMap: Map<string, number>
   /** 日期源规范列名 */
   sourceKey: string
   sourceCol: number
@@ -107,7 +107,7 @@ interface PageState {
 const state: PageState = {
   worksheet: null,
   headerRow: 1,
-  colMap: new Map(),
+  columnMap: new Map(),
   sourceKey: '',
   sourceCol: 0,
   columns: [],
@@ -141,9 +141,9 @@ function setText(id: string, text: string): void {
 
 // ===== 数据源与列 =====
 
-function colLetter(col: number): string {
+function columnLetter(column: number): string {
   let letter = ''
-  let n = col
+  let n = column
   while (n > 0) {
     const rem = (n - 1) % 26
     letter = String.fromCodePoint(65 + rem) + letter
@@ -156,15 +156,15 @@ function colLetter(col: number): string {
  * 解析日期源：配置指定 > 自动（开播季度 > 开播日期 > 完播日）
  * @returns 规范列名与列号；都识别不到返回 null
  */
-function resolveSource(): { key: string; col: number } | null {
+function resolveSource(): { key: string; column: number } | null {
   const configured = getConfig(KEY_SOURCE, '', true)
   if (configured) {
-    const col = state.colMap.get(configured)
-    if (col !== undefined) return { key: configured, col }
+    const column = state.columnMap.get(configured)
+    if (column !== undefined) return { key: configured, column }
   }
   for (const candidate of SOURCE_CANDIDATES) {
-    const col = state.colMap.get(candidate)
-    if (col !== undefined) return { key: candidate, col }
+    const column = state.columnMap.get(candidate)
+    if (column !== undefined) return { key: candidate, column }
   }
   return null
 }
@@ -197,7 +197,7 @@ function rebuildColumns(): void {
   }
 
   const columns: HighlightColumn[] = []
-  for (const [name, col] of state.colMap) {
+  for (const [name, column] of state.columnMap) {
     // 序列号列的绿色是「已上传」判定色，高亮它会混淆两种语义，故不进列表
     const isSequenceColumn = name === '序列号'
     const isSource = name === state.sourceKey
@@ -206,8 +206,8 @@ function rebuildColumns(): void {
     if (!isSequenceColumn) {
       columns.push({
         name,
-        col,
-        letter: colLetter(col),
+        column,
+        letter: columnLetter(column),
         selected: isSource || isFirstRunDefault || cached.has(name),
       })
     }
@@ -225,7 +225,7 @@ function renderSourceSelect(): void {
   const configured = getConfig(KEY_SOURCE, '', true)
   const options: string[] = ['__auto__']
   for (const candidate of SOURCE_CANDIDATES) {
-    if (state.colMap.has(candidate)) options.push(candidate)
+    if (state.columnMap.has(candidate)) options.push(candidate)
   }
   select.innerHTML = options
     .map((value) => {
@@ -244,17 +244,17 @@ function renderColumnList(): void {
       const isLocked = c.name === state.sourceKey
       return `
       <label class="highlight-row">
-        <input type="checkbox" data-col="${escapeHtml(c.name)}"${c.selected ? ' checked' : ''}${
+        <input type="checkbox" data-column="${escapeHtml(c.name)}"${c.selected ? ' checked' : ''}${
           isLocked ? ' disabled' : ''
         } />
-        <span class="highlight-col-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
-        <span class="highlight-col-letter">${escapeHtml(c.letter)} 列</span>
+        <span class="highlight-column-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
+        <span class="highlight-column-letter">${escapeHtml(c.letter)} 列</span>
       </label>`
     })
     .join('')
   container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((box) => {
     box.addEventListener('change', () => {
-      const name = box.dataset.col ?? ''
+      const name = box.dataset.column ?? ''
       const column = state.columns.find((c) => c.name === name)
       if (column) column.selected = box.checked
       persistColumns()
@@ -269,7 +269,7 @@ function renderColumnListIfChanged(): void {
   if (!container) return
   const rendered = new Set(
     [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map(
-      (box) => box.dataset.col ?? '',
+      (box) => box.dataset.column ?? '',
     ),
   )
   const current = new Set(state.columns.map((c) => c.name))
@@ -304,7 +304,7 @@ function refreshPreview(): void {
     return
   }
   state.sourceKey = source.key
-  state.sourceCol = source.col
+  state.sourceCol = source.column
   rebuildColumns()
   renderColumnListIfChanged()
 
@@ -319,14 +319,14 @@ function refreshPreview(): void {
   }
 
   // 一次矩形读：日期源列 + 名称列（名称仅用于预览展示）
-  const nameCol = state.colMap.get('名称')
-  const readCols = new Set<number>([source.col])
+  const nameCol = state.columnMap.get('名称')
+  const readCols = new Set<number>([source.column])
   if (nameCol !== undefined) readCols.add(nameCol)
   let minCol = Infinity
   let maxCol = 0
-  for (const col of readCols) {
-    if (col < minCol) minCol = col
-    if (col > maxCol) maxCol = col
+  for (const column of readCols) {
+    if (column < minCol) minCol = column
+    if (column > maxCol) maxCol = column
   }
 
   const block = readRangeValues(worksheet, firstRow, lastRow, minCol, maxCol)
@@ -341,7 +341,7 @@ function refreshPreview(): void {
   for (const [index, line] of block.entries()) {
     const rowNo = firstRow + index
     const cells = line
-    const value = cells[source.col - minCol] ?? ''
+    const value = cells[source.column - minCol] ?? ''
     rows.push({ row: rowNo, value })
     if (nameCol !== undefined) names.set(rowNo, cells[nameCol - minCol] ?? '')
   }
@@ -625,7 +625,7 @@ function reloadSheet(): void {
     return
   }
   state.headerRow = findHeaderRow(state.worksheet)
-  state.colMap = getColumnMap(state.worksheet, state.headerRow)
+  state.columnMap = getColumnMap(state.worksheet, state.headerRow)
   setText('highlightSheetName', state.worksheet.Name)
   renderSourceSelect()
   rebuildColumns()

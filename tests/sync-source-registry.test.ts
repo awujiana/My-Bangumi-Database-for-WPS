@@ -29,8 +29,9 @@ const mockReadRangeValues = vi.hoisted(() =>
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
+          for (let column = startCol; column <= endCol; column += 1) {
+            const value = mockGetCellValue(worksheet, row, column) as
+              string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)

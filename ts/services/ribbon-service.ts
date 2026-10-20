@@ -173,7 +173,7 @@ function collectEntryConflicts(
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param worksheet 工作表对象
- * @param colMap 列映射
+ * @param columnMap 列映射
  * @param lastRow 数据最后一行
  * @param headerRow 表头行
  * @param options 可选参数 { incremental: boolean }
@@ -181,7 +181,7 @@ function collectEntryConflicts(
  */
 export function getSyncPreview(
   worksheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   lastRow: number,
   headerRow: number,
   options?: { incremental?: boolean; fingerprintMap?: Map<string, string> },
@@ -218,7 +218,7 @@ export function getSyncPreview(
   // 与上传同步（exceltobangumi）共用 tools/util/field-getter.ts 的一份实现
   const getField = createBatchFieldGetter(
     worksheet,
-    colMap,
+    columnMap,
     startRow,
     lastRow,
     SYNC_PREVIEW_READ_COLUMNS,
@@ -251,7 +251,7 @@ export function getSyncPreview(
       valid += 1
 
       // 检查是否已上传（序列号列颜色）
-      const seqCol = colMap.get('序列号') ?? 4
+      const seqCol = columnMap.get('序列号') ?? 4
       const seqCell = getCell(worksheet, rowNumber, seqCol)
       const isUploaded =
         seqCell?.Interior &&
@@ -361,7 +361,7 @@ interface BgmCollectionEntry {
  */
 export async function detectConflicts(
   worksheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   lastRow: number,
   headerRow: number,
   token: string,
@@ -429,18 +429,18 @@ export async function detectConflicts(
   const conflictKeys = ['Bangumi_URL', '是否看完', '名称'] as const
   let conflictMaxCol = 1
   for (const key of conflictKeys) {
-    const col = colMap.get(key)
-    if (col !== undefined) conflictMaxCol = Math.max(conflictMaxCol, col)
+    const column = columnMap.get(key)
+    if (column !== undefined) conflictMaxCol = Math.max(conflictMaxCol, column)
   }
   const allData = readRangeValues(worksheet, startRow, lastRow, 1, conflictMaxCol)
 
   const getField = (row: number, key: string): string => {
-    const col = colMap.get(key)
-    if (col === undefined) return ''
+    const column = columnMap.get(key)
+    if (column === undefined) return ''
     const rowData = allData[row - startRow]
-    if (rowData && col - 1 < rowData.length) return trim(rowData[col - 1])
+    if (rowData && column - 1 < rowData.length) return trim(rowData[column - 1])
     // 矩形读不可用（宿主/桩未返回完整矩形）→ 回退逐格读，行为与改造前一致
-    return trim(getCellValue(worksheet, row, col))
+    return trim(getCellValue(worksheet, row, column))
   }
 
   for (const rowNumber of rowsToProcess) {
@@ -495,14 +495,14 @@ export async function syncWithConfirmation(): Promise<void> {
 
   const headerRow = findHeaderRow(worksheet) || 1
   const lastRow = getLastRow(worksheet)
-  const colMap = getColumnMap(worksheet, headerRow)
-  if (!colMap.has('Bangumi_URL')) {
+  const columnMap = getColumnMap(worksheet, headerRow)
+  if (!columnMap.has('Bangumi_URL')) {
     void wpsMessageBox('未找到 Bangumi URL 列', 0, 48)
     return
   }
 
   // 1. 预览统计
-  const preview = getSyncPreview(worksheet, colMap, lastRow, headerRow)
+  const preview = getSyncPreview(worksheet, columnMap, lastRow, headerRow)
 
   // 2. 读取 Ribbon 复选框状态（冲突策略 + 增量同步）
   let conflictStrategy: 'excel' | 'skip' = 'excel'
@@ -546,7 +546,7 @@ export async function syncWithConfirmation(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...')
     const { conflicts, conflictCount } = await detectConflicts(
       worksheet,
-      colMap,
+      columnMap,
       lastRow,
       headerRow,
       token,
@@ -572,7 +572,7 @@ export async function syncWithConfirmation(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...')
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
-    const result = await SyncToBangumiAsync(worksheet, colMap, token, lastRow, headerRow, {
+    const result = await SyncToBangumiAsync(worksheet, columnMap, token, lastRow, headerRow, {
       ...(skipSids !== undefined && { skipSids }),
       incremental: isIncremental,
       onProgress: (current, total, message) => {

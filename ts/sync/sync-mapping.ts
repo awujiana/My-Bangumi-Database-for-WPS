@@ -101,7 +101,7 @@ const EXTENDED_GROUP_BY_COLUMN: Readonly<Record<string, SyncMappingGroup>> = {
 /**
  * 构建列映射行（同步前确认框的数据源）
  *
- * @param localColumns 本地表头列名集合（colMap 的键）
+ * @param localColumns 本地表头列名集合（columnMap 的键）
  * @returns 按分组固定顺序排列的映射行；UI 状态取默认值（有列选中 / 缺列不选）
  */
 export function buildSyncMappingRows(localColumns: readonly string[]): SyncMappingRow[] {
@@ -206,7 +206,7 @@ export function findOverrideConflicts(rows: readonly SyncMappingRow[]): string[]
  *
  * 原理：computeDiff / writeRemoteEntryToRow / collectMissingColumns 全链路按
  * **默认列名**寻址。把 override 列的值复制一份到默认列名键下，这三个消费方
- * 就无需任何改动（core 侧另把 colMap 的默认列名指向 override 列的列号）。
+ * 就无需任何改动（core 侧另把 columnMap 的默认列名指向 override 列的列号）。
  *
  * @param entries 本地条目映射（SID → 行），**原地修改**
  * @param overrides 默认列名 → 目标列名
@@ -252,31 +252,31 @@ export function excludedColumnClosure(excludedColumns: readonly string[]): Set<s
 /**
  * 剔除列：返回不含排除列的新 Map（原 Map 不动）
  *
- * 排除的落地方式就是「从 colMap 摘列」——下游所有写入点（批量写 / 逐字段写 /
- * 回退）都经 colMap 寻址，列不在映射里即自然跳过，无需逐函数加参。
+ * 排除的落地方式就是「从 columnMap 摘列」——下游所有写入点（批量写 / 逐字段写 /
+ * 回退）都经 columnMap 寻址，列不在映射里即自然跳过，无需逐函数加参。
  */
 export function withoutColumns(
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   excluded: ReadonlySet<string>,
 ): Map<string, number> {
   const kept = new Map<string, number>()
-  for (const [name, index] of colMap) {
+  for (const [name, index] of columnMap) {
     if (!excluded.has(name)) kept.set(name, index)
   }
   return kept
 }
 
 /**
- * 列名改写：把 colMap 里默认列的列号替换为目标列的列号
+ * 列名改写：把 columnMap 里默认列的列号替换为目标列的列号
  *
  * 与 {@link applyColumnOverrides} 成对使用：一个改本地数据侧（字段键），
  * 一个改写入侧（列号），computeDiff / 写入口都按默认列名寻址即可命中用户选的列。
  */
 export function remapColumnIndices(
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   remap: ReadonlyMap<string, number>,
 ): Map<string, number> {
-  const remapped = new Map(colMap)
+  const remapped = new Map(columnMap)
   for (const [from, to] of remap) {
     remapped.set(from, to)
   }

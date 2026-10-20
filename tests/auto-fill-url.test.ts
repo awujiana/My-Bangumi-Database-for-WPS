@@ -55,7 +55,7 @@ function stubSheet(cells: Record<string, string>, lastRow: number): void {
   vi.mocked(getLastRow).mockReturnValue(lastRow)
   vi.mocked(trim).mockImplementation((value) => (value ?? '').trim())
   vi.mocked(getCellValue).mockImplementation(
-    (_ws: unknown, row: number, col: number) => cells[`${String(row)}:${String(col)}`] ?? '',
+    (_ws: unknown, row: number, column: number) => cells[`${String(row)}:${String(column)}`] ?? '',
   )
 }
 
@@ -100,18 +100,18 @@ describe('tools/auto-fill-url', () => {
 
     beforeEach(() => {
       vi.mocked(getCellValue).mockImplementation(
-        (_ws: unknown, row: number, col: number) => data[row]?.[col] ?? '',
+        (_ws: unknown, row: number, column: number) => data[row]?.[column] ?? '',
       )
       vi.mocked(trim).mockImplementation((value) => (value ?? '').trim())
     })
 
     it('从有 URL 的同行收集 名称/别名 → URL 映射', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['Bangumi_URL', 2],
         ['别名', 3],
       ])
-      const map = _buildNameUrlMap({} as never, 1, 3, colMap)
+      const map = _buildNameUrlMap({} as never, 1, 3, columnMap)
       expect(map).toEqual({
         NameA: 'http://a',
         AliasA1: 'http://a',
@@ -121,8 +121,8 @@ describe('tools/auto-fill-url', () => {
     })
 
     it('缺少 URL 列或名称列时返回空映射', () => {
-      const colMap = new Map<string, number>([['其他', 1]])
-      const map = _buildNameUrlMap({} as never, 1, 3, colMap)
+      const columnMap = new Map<string, number>([['其他', 1]])
+      const map = _buildNameUrlMap({} as never, 1, 3, columnMap)
       expect(map).toEqual({})
     })
 
@@ -132,13 +132,13 @@ describe('tools/auto-fill-url', () => {
         3: { 1: 'X', 2: 'u2' },
       }
       vi.mocked(getCellValue).mockImplementation(
-        (_ws: unknown, row: number, col: number) => dup[row]?.[col] ?? '',
+        (_ws: unknown, row: number, column: number) => dup[row]?.[column] ?? '',
       )
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['Bangumi_URL', 2],
       ])
-      const map = _buildNameUrlMap({} as never, 1, 3, colMap)
+      const map = _buildNameUrlMap({} as never, 1, 3, columnMap)
       expect(map).toEqual({ X: 'u1' })
     })
   })

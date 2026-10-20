@@ -20,7 +20,7 @@ export type UndoEntry =
   | {
       type: 'cell'
       row: number
-      col: number
+      column: number
       oldValue: string
       updatedValue: string
     }
@@ -130,7 +130,7 @@ export function undoLastSync(): number {
   for (let index = cellEntries.length - 1; index >= 0; index -= 1) {
     const entry = cellEntries[index]
     if (entry) {
-      setCellValue(worksheet, entry.row, entry.col, entry.oldValue)
+      setCellValue(worksheet, entry.row, entry.column, entry.oldValue)
     }
   }
 
@@ -184,10 +184,10 @@ function restoreDeletedRowWithWs(worksheet: WpsWorksheet, snapshot: RowSnapshot)
   }
 
   // 恢复该行所有列的值
-  for (const [colString, value] of Object.entries(snapshot.values)) {
-    const col = Number(colString)
-    if (!Number.isNaN(col)) {
-      setCellValue(worksheet, snapshot.row, col, value)
+  for (const [columnString, value] of Object.entries(snapshot.values)) {
+    const column = Number(columnString)
+    if (!Number.isNaN(column)) {
+      setCellValue(worksheet, snapshot.row, column, value)
     }
   }
 }

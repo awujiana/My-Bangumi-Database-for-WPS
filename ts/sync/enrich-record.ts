@@ -13,7 +13,7 @@ import {
   bgmLog,
   getApp,
   getLastRow,
-  colNumberToLetter,
+  columnNumberToLetter,
   setCellValue,
   readRangeValues,
   BGM,
@@ -114,14 +114,14 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
 
   if (enrichSheet) {
     for (const [index, expectedHeader] of ENRICH_RECORD_COLUMNS.entries()) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = enrichSheet.Range(`${colLetter}1`)
+      const columnLetter = columnNumberToLetter(index + 1)
+      const cell = enrichSheet.Range(`${columnLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
       if (currentHeader !== expectedHeader) {
         cell.Value2 = expectedHeader
         bgmLog(
           LOG_LEVELS.INFO,
-          `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
+          `修复表头: ${columnLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
         )
       }
     }
@@ -137,7 +137,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
       BGM.handleError(moveError, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
     }
 
-    const lastColLetter = colNumberToLetter(ENRICH_RECORD_COLUMNS.length)
+    const lastColLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const fullRange = enrichSheet.Range(`A1:${lastColLetter}1`)
     try {
       if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
@@ -190,7 +190,7 @@ export function addEnrichRecord(parameters: AddEnrichRecordParameters): boolean 
     }
 
     const actionColor = getActionColor(parameters.action)
-    const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
+    const actionColLetter = columnNumberToLetter(ENRICH_RECORD_COL.ACTION)
     const actionCell = sheet.Range(`${actionColLetter}${String(nextRow)}`)
     if (actionCell.Interior) {
       actionCell.Interior.Color = actionColor
@@ -239,8 +239,8 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): boolean 
     ])
 
     const endRow = startRow + rows.length - 1
-    const startColLetter = colNumberToLetter(1)
-    const endColLetter = colNumberToLetter(ENRICH_RECORD_COLUMNS.length)
+    const startColLetter = columnNumberToLetter(1)
+    const endColLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const range = sheet.Range(
       `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
     )
@@ -250,7 +250,7 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): boolean 
       const row = startRow + index
       const action = rowValues[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
-      const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
+      const actionColLetter = columnNumberToLetter(ENRICH_RECORD_COL.ACTION)
       const cell = sheet.Range(`${actionColLetter}${String(row)}`)
       if (cell.Interior) {
         cell.Interior.Color = color
@@ -346,14 +346,16 @@ export function formatEnrichRecordSheet(): void {
     headerRange.HorizontalAlignment = -4108
 
     if (lastRow >= 2) {
-      const dataRange = sheet.Range(`A${String(2)}:${colNumberToLetter(lastCol)}${String(lastRow)}`)
+      const dataRange = sheet.Range(
+        `A${String(2)}:${columnNumberToLetter(lastCol)}${String(lastRow)}`,
+      )
       dataRange.Borders.LineStyle = 1
     }
 
     for (let c = 1; c <= lastCol; c += 1) {
-      const colLetter = colNumberToLetter(c)
-      const colRange = sheet.Range(`${colLetter}:${colLetter}`)
-      colRange.ColumnWidth = 15
+      const columnLetter = columnNumberToLetter(c)
+      const columnRange = sheet.Range(`${columnLetter}:${columnLetter}`)
+      columnRange.ColumnWidth = 15
     }
 
     const nameCol = sheet.Range('C:C')

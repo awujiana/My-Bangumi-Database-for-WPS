@@ -47,12 +47,13 @@ const m = vi.hoisted(() => ({
   // panel/clean-engine.js
   inspectWorksheet: vi.fn<(worksheet: unknown) => unknown>(),
   scanCleanRules: vi.fn<(ruleIds: string[], options: unknown) => unknown>(),
-  runCleanPlans: vi.fn<
-    (
-      scanResult: unknown,
-      onProgress: (done: number, total: number, message: string) => void,
-    ) => Promise<unknown>
-  >(),
+  runCleanPlans:
+    vi.fn<
+      (
+        scanResult: unknown,
+        onProgress: (done: number, total: number, message: string) => void,
+      ) => Promise<unknown>
+    >(),
   formatBytes: vi.fn<(bytes: number) => string>(),
   // panel/clean-engine.js（isWorkbookAllowed：与引擎同一函数，页面不再有本地副本）
   isWorkbookAllowed: vi.fn<(path: string) => boolean>(),
@@ -283,7 +284,7 @@ function hitScanResult(): unknown {
         targetKey: 'A.xlsx::动画',
         targetLabel: 'A / 动画',
         deleteRows: [7, 9],
-        changes: [{ row: 5, col: 3, columnName: '标签/分级', oldValue: 'a', nextValue: 'b' }],
+        changes: [{ row: 5, column: 3, columnName: '标签/分级', oldValue: 'a', nextValue: 'b' }],
         estimatedBytes: 4096,
       },
     ],
@@ -401,10 +402,9 @@ async function mountRunnable(): Promise<void> {
   clickById('cleanLoadSheetsBtn')
   m.scanCleanRules.mockReturnValue(hitScanResult())
   clickById('cleanScanBtn')
-    await flushAsync()
+  await flushAsync()
   m.appendOperationLog.mockClear()
 }
-
 
 async function loadPage(): Promise<void> {
   vi.resetModules()
@@ -574,7 +574,9 @@ describe('handleLoadSheets', () => {
 
   it('一张都没识别到时追加引导 warn 日志', async () => {
     installApp(
-      makeWorkbooks([makeWorkbook({ name: 'A', fullName: 'D:/A.xlsx', sheets: [makeSheet('表1')] })]),
+      makeWorkbooks([
+        makeWorkbook({ name: 'A', fullName: 'D:/A.xlsx', sheets: [makeSheet('表1')] }),
+      ]),
     )
     m.inspectWorksheet.mockReturnValue({
       eligible: false,
@@ -822,9 +824,7 @@ describe('renderSheetList 交互', () => {
       ?.click()
     expect(storage.get('bgm_clean_sheets:D:/A.xlsx')).toBe('[]')
 
-    byId('cleanSheetList')
-      .querySelector<HTMLButtonElement>('[data-group-all="D:/A.xlsx"]')
-      ?.click()
+    byId('cleanSheetList').querySelector<HTMLButtonElement>('[data-group-all="D:/A.xlsx"]')?.click()
     expect(JSON.parse(storage.get('bgm_clean_sheets:D:/A.xlsx') ?? '[]')).toEqual([
       '动画',
       '新番表',
@@ -1001,7 +1001,9 @@ describe('handleScan', () => {
     await flushAsync()
 
     const detail = byId('cleanPreviewDetail')
-    expect(detail.querySelector('.diff-row-context')?.textContent).toContain('第 1 组 · 名称「动画A」')
+    expect(detail.querySelector('.diff-row-context')?.textContent).toContain(
+      '第 1 组 · 名称「动画A」',
+    )
     const keepRow = detail.querySelector('.diff-row-keep')
     expect(keepRow?.querySelector('.diff-row-num')?.textContent).toBe('7')
     expect(keepRow?.textContent).toContain('保留')
@@ -1170,7 +1172,13 @@ describe('handleRun / executeClean', () => {
       return {
         targets: [
           { targetKey: 'k1', targetLabel: 'A / 动画', deletedRows: 2, changedCells: 1 },
-          { targetKey: 'k2', targetLabel: 'A / 新番', deletedRows: 0, changedCells: 0, error: '被保护' },
+          {
+            targetKey: 'k2',
+            targetLabel: 'A / 新番',
+            deletedRows: 0,
+            changedCells: 0,
+            error: '被保护',
+          },
         ],
         deletedRows: 2,
         changedCells: 1,
@@ -1214,7 +1222,13 @@ describe('handleRun / executeClean', () => {
     m.runCleanPlans.mockResolvedValue({
       targets: [
         { targetKey: 'k1', targetLabel: 'A / 动画', deletedRows: 1, changedCells: 0 },
-        { targetKey: 'k2', targetLabel: 'A / 新番', deletedRows: 0, changedCells: 0, error: '锁表' },
+        {
+          targetKey: 'k2',
+          targetLabel: 'A / 新番',
+          deletedRows: 0,
+          changedCells: 0,
+          error: '锁表',
+        },
       ],
       deletedRows: 1,
       changedCells: 0,

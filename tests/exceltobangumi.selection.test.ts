@@ -109,7 +109,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getColumnMap: mockGetColumnMap,
   loadBgToken: mockLoadBgToken,
   clearSheetCache: mockClearSheetCache,
-  colNumberToLetter: (col: number) => String.fromCodePoint(64 + col),
+  columnNumberToLetter: (column: number) => String.fromCodePoint(64 + column),
   trim: (value: string) => value.trim(),
   delay: mockDelay,
   calcFingerprint: mockCalcFingerprint,
@@ -334,8 +334,8 @@ function firstMessageBox(): string {
 function setupExecution(
   options: {
     rows?: number[]
-    colMap?: Map<string, number>
-    cellValue?: (row: number, col: number) => string
+    columnMap?: Map<string, number>
+    cellValue?: (row: number, column: number) => string
   } = {},
 ): void {
   const worksheet = createWorksheet()
@@ -343,11 +343,11 @@ function setupExecution(
     createApp({ worksheet, selection: createSelection({ rowNumbers: options.rows ?? [2] }) }),
   )
   mockFindHeaderRow.mockReturnValue(1)
-  mockGetColumnMap.mockReturnValue(options.colMap ?? new Map([['Bangumi_URL', 5]]))
+  mockGetColumnMap.mockReturnValue(options.columnMap ?? new Map([['Bangumi_URL', 5]]))
   const { cellValue } = options
   if (cellValue) {
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) =>
-      cellValue(row, col),
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) =>
+      cellValue(row, column),
     )
   }
   flags.enterRunning = true
@@ -365,11 +365,11 @@ function progressHandlers(): { onPause: () => void; onResume: () => void; onStop
 /** 选区同步用例的标准取值：URL / 名称 / 状态 / 集数，其余为空 */
 function fullCellValue(options: { status?: string; ep?: string; url?: string } = {}) {
   const { status = '2', ep = '12', url = 'https://bgm.tv/subject/12345' } = options
-  return (row: number, col: number): string => {
-    if (col === 5) return url
-    if (col === 2) return `条目${String(row)}`
-    if (col === 3) return status
-    if (col === 7) return ep
+  return (row: number, column: number): string => {
+    if (column === 5) return url
+    if (column === 2) return `条目${String(row)}`
+    if (column === 3) return status
+    if (column === 7) return ep
     return ''
   }
 }
@@ -377,10 +377,10 @@ function fullCellValue(options: { status?: string; ep?: string; url?: string } =
 /** 批量同步用例的标准取值：URL 固定为 subject/1，只关心状态与集数 */
 function batchCellValue(options: { status?: string; ep?: string } = {}) {
   const { status = '2', ep = '12' } = options
-  return (_ws: unknown, _row: number, col: number): string => {
-    if (col === 5) return 'https://bgm.tv/subject/1'
-    if (col === 3) return status
-    if (col === 7) return ep
+  return (_ws: unknown, _row: number, column: number): string => {
+    if (column === 5) return 'https://bgm.tv/subject/1'
+    if (column === 3) return status
+    if (column === 7) return ep
     return ''
   }
 }
@@ -894,7 +894,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     /** 标准取值：URL / 名称 / 状态 / 集数，其余为空（实现见模块作用域 fullCellValue） */
 
     it('成功同步一条：POST 请求体、进度更新、按 type=2 标记章节并输出汇总', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
 
       await syncSelectedRows()
 
@@ -961,7 +961,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('请求体为空（状态无法识别）→ 提示并计入跳过', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '???' }) })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '???' }) })
 
       await syncSelectedRows()
 
@@ -971,7 +971,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('服务端非 2xx → 计入失败并记录状态码', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
       mockBgmRequestSync.mockResolvedValue({ code: 400, message: 'Bad Request' })
 
       await syncSelectedRows()
@@ -981,7 +981,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('观看状态非「看过/在看」但有集数 → 跳过章节标记', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '1' }) })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '1' }) })
 
       await syncSelectedRows()
 
@@ -990,7 +990,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('章节标记失败 → 仅记录结果，不影响主流程', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
       mockMarkEpisodes.mockResolvedValue({ success: false, message: '章节接口 500' })
 
       await syncSelectedRows()
@@ -1000,7 +1000,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('URL 非 Bangumi 链接 → 提示并跳过', async () => {
       setupExecution({
-        colMap: FULL_COL_MAP,
+        columnMap: FULL_COL_MAP,
         cellValue: fullCellValue({ url: 'https://example.com/anime' }),
       })
 
@@ -1011,7 +1011,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('URL 为空 → 提示并跳过', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '' }) })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '' }) })
 
       await syncSelectedRows()
 
@@ -1019,7 +1019,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('单行处理抛错 → 计入失败并写进度，不中断后续行', async () => {
-      setupExecution({ rows: [2, 3], colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ rows: [2, 3], columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
       mockGetCellValue.mockImplementation(() => {
         throw new Error('读取单元格失败')
       })
@@ -1049,7 +1049,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('请求体 JSON 解析失败 → 记 WARN 且不标记章节', async () => {
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
       // buildJsonPayload 产出的始终是合法 JSON，故直接让解析器抛错以覆盖防御分支
       const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation(() => {
         throw new SyntaxError('请求体损坏')
@@ -1068,7 +1068,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('形似 Bangumi 但 ID 超长 → 提示无法提取 Subject ID 并跳过', async () => {
       // 纯数字被 isBangumiUrl 接受，但 9 位超出 extractSubjectId 的 1-8 位校验
-      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '123456789' }) })
+      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '123456789' }) })
 
       await syncSelectedRows()
 

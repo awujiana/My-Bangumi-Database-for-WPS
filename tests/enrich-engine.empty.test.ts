@@ -34,23 +34,23 @@ function sheetNameOf(worksheet: unknown): string {
   return (worksheet as { Name?: string } | null | undefined)?.Name ?? 'worksheet'
 }
 
-function cellKey(sheetName: string, row: number, col: number): string {
-  return `${sheetName}_${String(row)}_${String(col)}`
+function cellKey(sheetName: string, row: number, column: number): string {
+  return `${sheetName}_${String(row)}_${String(column)}`
 }
 
-function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
-  return store.get(cellKey(sheetNameOf(worksheet), row, col)) ?? ''
+function mockGetCellValue(worksheet: unknown, row: number, column: number): string {
+  return store.get(cellKey(sheetNameOf(worksheet), row, column)) ?? ''
 }
 
-function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
-  store.set(cellKey(sheetNameOf(worksheet), row, col), String(value))
+function mockSetCellValue(worksheet: unknown, row: number, column: number, value: unknown): void {
+  store.set(cellKey(sheetNameOf(worksheet), row, column), String(value))
 }
 
 function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
   const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
-    for (let col = 1; col <= 12; col += 1) {
-      const value = (store.get(cellKey(sheetName, row, col)) ?? '').trim()
+    for (let column = 1; column <= 12; column += 1) {
+      const value = (store.get(cellKey(sheetName, row, column)) ?? '').trim()
       if (value.includes('名称') || value.toLowerCase().includes('name')) return row
     }
   }
@@ -60,16 +60,16 @@ function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
 function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, number> {
   const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
-  for (let col = 1; col <= 12; col += 1) {
-    const value = (store.get(cellKey(sheetName, headerRow, col)) ?? '').trim()
-    if (value) map.set(value, col)
+  for (let column = 1; column <= 12; column += 1) {
+    const value = (store.get(cellKey(sheetName, headerRow, column)) ?? '').trim()
+    if (value) map.set(value, column)
   }
   return map
 }
 
 function hasRowValue(sheetName: string, row: number): boolean {
-  for (let col = 1; col <= 12; col += 1) {
-    if ((store.get(cellKey(sheetName, row, col)) ?? '').trim()) return true
+  for (let column = 1; column <= 12; column += 1) {
+    if ((store.get(cellKey(sheetName, row, column)) ?? '').trim()) return true
   }
   return false
 }
@@ -101,8 +101,8 @@ function mockReadRangeValues(
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let col = startCol; col <= endCol; col += 1) {
-      rowValues.push(store.get(cellKey(sheetName, row, col)) ?? '')
+    for (let column = startCol; column <= endCol; column += 1) {
+      rowValues.push(store.get(cellKey(sheetName, row, column)) ?? '')
     }
     result.push(rowValues)
   }

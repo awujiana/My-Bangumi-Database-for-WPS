@@ -110,7 +110,7 @@ export interface ConflictResolution {
 }
 
 /**
- * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
+ * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（columnMap key）
  *
  * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
  *
@@ -204,7 +204,7 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
   return result
 }
 
-/** 本地 Bangumi URL 列名（colMap key，由 sid 构造写入，非远程字段） */
+/** 本地 Bangumi URL 列名（columnMap key，由 sid 构造写入，非远程字段） */
 const BANGUMI_URL_COLUMN = 'Bangumi_URL'
 
 /**
@@ -302,15 +302,15 @@ export function collectRemoteEmptyFields(
  *
  * 判据（两条同时成立才计入）：
  * 1. 远程条目中该字段**确有数据**（避免为全空字段骚扰用户加列）；
- * 2. 本地 colMap 中该字段的**所有候选列名都不存在**（含别名，见 getExcelAliases）。
+ * 2. 本地 columnMap 中该字段的**所有候选列名都不存在**（含别名，见 getExcelAliases）。
  *
  * @param remotes 本次参与同步的远程条目
- * @param colMap  本地列映射（getColumnMap 结果）
+ * @param columnMap  本地列映射（getColumnMap 结果）
  * @returns 需用户自行添加的表头名清单（去重，核心字段在前，其余按 EXTENDED_FIELD_MAP 顺序）
  */
 export function collectMissingColumns(
   remotes: readonly GithubRemoteEntry[],
-  colMap: ReadonlyMap<string, number>,
+  columnMap: ReadonlyMap<string, number>,
 ): string[] {
   // 1. 汇总远程条目中「有数据」的字段
   const fieldsWithData = new Set<string>()
@@ -330,7 +330,7 @@ export function collectMissingColumns(
   const checkField = (field: string, candidates: readonly string[], header: string): void => {
     if (!fieldsWithData.has(field)) return
     if (seen.has(header)) return
-    const isAnyColumnPresent = candidates.some((name) => colMap.has(name))
+    const isAnyColumnPresent = candidates.some((name) => columnMap.has(name))
     if (isAnyColumnPresent) return
     seen.add(header)
     missing.push(header)
@@ -338,7 +338,7 @@ export function collectMissingColumns(
 
   // 2. Bangumi URL 列由 sid 构造（远程条目本身不含该字段），
   //    只要有条目参与同步而本地缺此列，就无法按 SID 定位行（会被整表当作新增）。
-  const isUrlColumnMissing = remotes.length > 0 && !colMap.has(BANGUMI_URL_COLUMN)
+  const isUrlColumnMissing = remotes.length > 0 && !columnMap.has(BANGUMI_URL_COLUMN)
   if (isUrlColumnMissing) {
     seen.add(BANGUMI_URL_COLUMN)
     missing.push(BANGUMI_URL_COLUMN)

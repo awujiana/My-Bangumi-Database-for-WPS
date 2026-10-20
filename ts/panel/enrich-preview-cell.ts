@@ -67,7 +67,7 @@ function renderTagChipsCell(value: string): string {
   const chips = splitListValues(value)
     .map((tag) => coloredChipHtml(tag, 'tag-chip'))
     .join('')
-  return `<td class="col-tags">${chips}</td>`
+  return `<td class="column-tags">${chips}</td>`
 }
 
 /** 首播日期单元格：相同日期同色徽章（可在设置页关闭） */
@@ -89,7 +89,7 @@ export function renderPlatformChipsCell(parts: string[]): string {
         : `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
     )
     .join('')
-  return `<td class="col-platform">${chips}</td>`
+  return `<td class="column-platform">${chips}</td>`
 }
 
 /** 数据预览单元格渲染：名称加粗、周更/播放平台以徽章形式展示 */
@@ -98,7 +98,7 @@ export function renderPreviewCell(fieldKey: ScalarMappingKey, rawValue: string):
   if (!value) return '<td></td>'
   const escaped = escapeHtml(value)
   if (fieldKey === 'nameCol') {
-    return `<td class="col-name" title="${escaped}"><span class="preview-name">${escaped}</span></td>`
+    return `<td class="column-name" title="${escaped}"><span class="preview-name">${escaped}</span></td>`
   }
   if (fieldKey === 'platformCol' || fieldKey === 'exclusiveCol') {
     return renderPlatformChipsCell(splitListValues(value))

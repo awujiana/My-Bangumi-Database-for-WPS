@@ -80,9 +80,9 @@ const mockBgmLogn = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(10))
 const mockColNumberToLetter = vi.hoisted(() =>
-  vi.fn((col: number) => {
+  vi.fn((column: number) => {
     let result = ''
-    let n = col
+    let n = column
     while (n > 0) {
       const remainder = (n - 1) % 26
       result = String.fromCodePoint(65 + remainder) + result
@@ -100,7 +100,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
   getApp: mockGetApp,
   getLastRow: mockGetLastRow,
-  colNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColNumberToLetter,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
@@ -311,9 +311,9 @@ describe('syncRecord', () => {
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
       mockGetLastRow.mockReturnValue(5)
-      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
         const r = row as number
-        const c = col as number
+        const c = column as number
         if (r === 2) {
           if (c === 5) return 'test-sid'
           if (c === 4) return 'http://example.com'
@@ -717,9 +717,9 @@ describe('syncRecord', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
       mockGetLastRow.mockReturnValue(5)
       // 设置旧数据（第2行开始）
-      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
         const r = row as number
-        const c = col as number
+        const c = column as number
         if (r === 2) {
           // 旧结构 SID 在第5列
           if (c === 5) return 'migrate-sid-1'
@@ -763,9 +763,9 @@ describe('syncRecord', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
       mockGetLastRow.mockReturnValue(5)
       // 设置旧数据（SID 在第1列的11列结构）
-      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
         const r = row as number
-        const c = col as number
+        const c = column as number
         if (r === 2) {
           // SID 在第1列
           if (c === 1) return 'migrate-sid-2'
@@ -988,9 +988,9 @@ describe('syncRecord', () => {
     it('无重复 SID 时应直接返回 true', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockGetLastRow.mockReturnValue(5)
-      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
         const r = row as number
-        const c = col as number
+        const c = column as number
         if (c === 1) return `unique-sid-${String(r)}`
         return ''
       })
@@ -1001,8 +1001,8 @@ describe('syncRecord', () => {
     it('有重复 SID 时应合并并删除', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockGetLastRow.mockReturnValue(5)
-      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-        const c = col as number
+      mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
+        const c = column as number
         // 所有行都是相同 SID
         if (c === 1) return 'dup-sid'
         // count
@@ -1193,7 +1193,7 @@ describe('syncRecord', () => {
         bgmLog: mockBgmLogn,
         getApp: mockGetApp,
         getLastRow: mockGetLastRow,
-        colNumberToLetter: mockColNumberToLetter,
+        columnNumberToLetter: mockColNumberToLetter,
         getCellValue: mockGetCellValue,
         setCellValue: mockSetCellValue,
         readRangeValues: mockReadRangeValues,
@@ -1506,11 +1506,11 @@ describe('syncRecord', () => {
         ],
       ])
       // getCellValue 按列返回不同值，避免 deduplicateSyncRecords 误判重复
-      mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
+      mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
         // SID 列
-        if (col === 1) return 'upd-sid'
+        if (column === 1) return 'upd-sid'
         // COUNT 列
-        if (col === 7) return '5'
+        if (column === 7) return '5'
         return ''
       })
 
@@ -1565,9 +1565,9 @@ describe('syncRecord', () => {
           '',
         ],
       ])
-      mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-        if (col === 1) return 'partial-sid'
-        if (col === 7) return '2'
+      mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+        if (column === 1) return 'partial-sid'
+        if (column === 7) return '2'
         return ''
       })
 
@@ -1704,9 +1704,9 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'update-sid'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'update-sid'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -1753,9 +1753,9 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'partial-sid'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'partial-sid'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -1789,9 +1789,9 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'coll-sid'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'coll-sid'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -1822,9 +1822,9 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'fp-sid'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'fp-sid'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -2042,9 +2042,9 @@ describe('addSyncRecord 完整字段覆盖', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'upd-all'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'upd-all'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -2095,9 +2095,9 @@ describe('addSyncRecords 成功路径', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'existing-sid'
-      if (col === 7) return '2'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'existing-sid'
+      if (column === 7) return '2'
       return ''
     })
 
@@ -2220,15 +2220,15 @@ describe('buildCache message 字段 (line 337)', () => {
         '测试内容',
         'success',
         '看',
-        // MESSAGE 字段 (col 11)
+        // MESSAGE 字段 (column 11)
         '这是一条测试备注信息',
         'fp-msg-001',
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'msg-sid'
-      if (col === 7) return '1'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'msg-sid'
+      if (column === 7) return '1'
       return ''
     })
 
@@ -2255,14 +2255,14 @@ describe('buildCache message 字段 (line 337)', () => {
         '测试内容',
         'success',
         '看',
-        // MESSAGE 字段 (col 11) 缺失
+        // MESSAGE 字段 (column 11) 缺失
         'fp-no-msg',
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'no-msg-sid'
-      if (col === 7) return '1'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'no-msg-sid'
+      if (column === 7) return '1'
       return ''
     })
 
@@ -2299,10 +2299,10 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
 
     mockReadRangeValues.mockReturnValue([])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: number, col: number) => {
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: number, column: number) => {
       if (row === 2) {
-        if (col === 1) return 'old-sid-1'
-        if (col === 7) return '3'
+        if (column === 1) return 'old-sid-1'
+        if (column === 7) return '3'
       }
       return ''
     })
@@ -2529,9 +2529,9 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'valid-sid-343'
-      if (col === 7) return '1'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'valid-sid-343'
+      if (column === 7) return '1'
       return ''
     })
 
@@ -2599,9 +2599,9 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       ],
     ])
 
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-      if (col === 1) return 'valid-sid-343b'
-      if (col === 7) return '1'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
+      if (column === 1) return 'valid-sid-343b'
+      if (column === 7) return '1'
       return ''
     })
 
@@ -2864,8 +2864,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(4)
     // 两行相同SID但COUNT列为空 → parseInt('') || 1 = 1
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-      const c = col as number
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
+      const c = column as number
       if (c === 1) return 'dup-count-sid'
       // COUNT列为空
       if (c === 7) return ''
@@ -2878,8 +2878,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
   it('COUNT 列含非数字时合并回退到默认值 1', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(4)
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-      const c = col as number
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
+      const c = column as number
       if (c === 1) return 'dup-numeric-sid'
       // COUNT列非数字
       if (c === 7) return 'N/A'
@@ -2892,9 +2892,9 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
   it('COUNT 列混合有效数字与空值时正确累加', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(4)
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (c === 1) return 'mixed-count-sid'
       if (c === 7) {
         // 不同行不同count值
@@ -3070,9 +3070,9 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
 
     // 模拟 rows 数组首位为 undefined 的场景
     // 正常情况下 rows 至少有一行有效数据，这里测试边界防御
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (c === 1) return `sid-${String(r)}`
       if (c === 7) return '1'
       return ''
@@ -3109,9 +3109,9 @@ describe('deduplicateSyncRecords 分支覆盖', () => {
   it('无重复 SID 时不应触发去重日志 (line 666)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(3)
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (c === 1) return `sid-${String(r)}`
       if (c === 7) return '1'
       return ''
@@ -3177,9 +3177,9 @@ describe('deduplicateSyncRecords 重复 SID 合并 (lines 489-503)', () => {
     mockGetLastRow.mockReturnValue(4)
     // 3 行同 SID（对应数据行 2/3/4）
     mockReadRangeValues.mockReturnValue([['dup-sid'], ['dup-sid'], ['dup-sid']])
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, col: unknown) => {
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, column: unknown) => {
       // COUNT 列（第 7 列）每行都是 2
-      if ((col as number) === 7) return '2'
+      if ((column as number) === 7) return '2'
       return ''
     })
 
@@ -3207,8 +3207,8 @@ describe('deduplicateSyncRecords 重复 SID 合并 (lines 489-503)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)
     mockReadRangeValues.mockReturnValue([['sid-a'], ['sid-a'], ['sid-b'], ['sid-b']])
-    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, col: unknown) => {
-      if ((col as number) === 7) return '3'
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, column: unknown) => {
+      if ((column as number) === 7) return '3'
       return ''
     })
 

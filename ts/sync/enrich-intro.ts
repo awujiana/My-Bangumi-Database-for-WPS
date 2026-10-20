@@ -79,20 +79,20 @@ export function enrichIntroData(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   conflicts: ConflictInfo[],
   animeRow: number,
   matchedAnimeName: string,
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = colMap.get('特点/印象')
+  const bangumiFeatureCol = columnMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
     const rawValue = incomingData[sourceKey] ?? ''
     if (!isEmptyValue(rawValue)) {
       const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
-      const targetCol = colMap.get(targetColName)
+      const targetCol = columnMap.get(targetColName)
       if (targetCol !== undefined) {
         const oldValue = readTargetCell(sheet, cache, row, targetCol)
         if (isEmptyValue(oldValue)) {
@@ -205,11 +205,11 @@ export function enrichOpEdPv(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = colMap.get('特点/印象')
+  const bangumiFeatureCol = columnMap.get('特点/印象')
   if (!bangumiFeatureCol) return
 
   const parts: string[] = []
@@ -276,7 +276,8 @@ export function readIntroSheetRow(
   mapping: EnrichColumnMapping,
   rowCells?: readonly string[],
 ): Record<string, string> {
-  const cell = (col: number): string => rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+  const cell = (column: number): string =>
+    rowCells?.[column - 1] ?? getCellValue(sheet, row, column)
   const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
   if (mapping.introCol) data['简介'] = cell(mapping.introCol) || ''
   if (mapping.studioCol) data['动画制作'] = cell(mapping.studioCol) || ''
@@ -331,8 +332,10 @@ function countIntroHeaderHits(
   scanBlock?: readonly string[][] | null,
 ): number {
   let hits = 0
-  for (let col = 1; col <= INTRO_SCAN_COLUMNS; col += 1) {
-    const raw = scanBlock ? (scanBlock[row - 1]?.[col - 1] ?? '') : getCellValue(sheet, row, col)
+  for (let column = 1; column <= INTRO_SCAN_COLUMNS; column += 1) {
+    const raw = scanBlock
+      ? (scanBlock[row - 1]?.[column - 1] ?? '')
+      : getCellValue(sheet, row, column)
     const value = raw.trim()
     if (value && INTRO_SHEET_HEADER_KEYWORDS.some((keyword) => value.includes(keyword))) {
       hits += 1

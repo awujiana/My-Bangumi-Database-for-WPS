@@ -148,14 +148,14 @@ import { getLastSessionDescription, undoLastSync } from '../ts/sync/undo-stack.j
  * 地址解析自己做，才能让「真实 readRangeValues」跑在可控数据上。
  */
 class FakeSheet {
-  /** key: `${row}:${col}` */
+  /** key: `${row}:${column}` */
   private readonly cells = new Map<string, string>()
 
   /** 行号 → 序列号列底色（用于「已上传」判定） */
   private readonly rowColors = new Map<number, number>()
 
-  set(row: number, col: number, value: string): this {
-    this.cells.set(`${String(row)}:${String(col)}`, value)
+  set(row: number, column: number, value: string): this {
+    this.cells.set(`${String(row)}:${String(column)}`, value)
     return this
   }
 
@@ -174,8 +174,8 @@ class FakeSheet {
       const matrix: string[][] = []
       for (let row = startRow; row <= endRow; row += 1) {
         const rowValues: string[] = []
-        for (let col = startCol; col <= endCol; col += 1) {
-          rowValues.push(this.cells.get(`${String(row)}:${String(col)}`) ?? '')
+        for (let column = startCol; column <= endCol; column += 1) {
+          rowValues.push(this.cells.get(`${String(row)}:${String(column)}`) ?? '')
         }
         matrix.push(rowValues)
       }
@@ -184,11 +184,11 @@ class FakeSheet {
 
     const cellMatch = /^([A-Z]+)(\d+)$/.exec(address)
     if (!cellMatch) return {}
-    const col = columnToNumber(cellMatch[1] ?? 'A')
+    const column = columnToNumber(cellMatch[1] ?? 'A')
     const row = Number(cellMatch[2])
     const color = this.rowColors.get(row)
     return {
-      Value2: this.cells.get(`${String(row)}:${String(col)}`) ?? '',
+      Value2: this.cells.get(`${String(row)}:${String(column)}`) ?? '',
       ...(color !== undefined && { Interior: { Color: color } }),
     }
   }
@@ -268,7 +268,10 @@ afterEach(() => {
 // ========== 用例共用工厂（模块作用域，便于复用且避免函数嵌套告警） ==========
 
 /** 远程条目工厂（`detectGithubConflicts` 用例共用） */
-const remoteEntry = (over: Partial<GithubRemoteEntry>): GithubRemoteEntry => ({ sid: '100', ...over })
+const remoteEntry = (over: Partial<GithubRemoteEntry>): GithubRemoteEntry => ({
+  sid: '100',
+  ...over,
+})
 
 /** 本地行条目工厂（`detectGithubConflicts` 用例共用） */
 const localEntry = (fields: Record<string, string>, row = 2): LocalRowEntry => ({
@@ -488,7 +491,11 @@ describe('ribbon-service · getSyncPreview', () => {
       fingerprintMap,
     })
 
-    expect(preview).toMatchObject({ alreadyUploaded: 1, incrementalSkipped: 1, plannedSyncCount: 0 })
+    expect(preview).toMatchObject({
+      alreadyUploaded: 1,
+      incrementalSkipped: 1,
+      plannedSyncCount: 0,
+    })
   })
 
   it('增量模式 + 已上传 + 指纹不一致 → 重新进入待同步', () => {
@@ -508,7 +515,11 @@ describe('ribbon-service · getSyncPreview', () => {
       fingerprintMap,
     })
 
-    expect(preview).toMatchObject({ alreadyUploaded: 1, incrementalSkipped: 0, plannedSyncCount: 1 })
+    expect(preview).toMatchObject({
+      alreadyUploaded: 1,
+      incrementalSkipped: 0,
+      plannedSyncCount: 1,
+    })
   })
 
   it('增量模式 + 未上传 + 指纹一致 → 计入增量跳过而非待同步', () => {
@@ -558,10 +569,10 @@ describe('ribbon-service · getSyncPreview', () => {
     const sheet = new FakeSheet()
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
-    const colMap = buildColMap()
-    colMap.delete('序列号')
+    const columnMap = buildColMap()
+    columnMap.delete('序列号')
 
-    expect(() => getSyncPreview(asSheet(sheet), colMap, 2, HEADER_ROW)).not.toThrow()
+    expect(() => getSyncPreview(asSheet(sheet), columnMap, 2, HEADER_ROW)).not.toThrow()
   })
 
   it('状态列缺失时按「状态 → 观看状态」链路回退取值', () => {
@@ -570,10 +581,10 @@ describe('ribbon-service · getSyncPreview', () => {
     sheet.set(2, COL_NAME, '动画A')
     sheet.set(2, COL_EPISODES, '12')
     m.getLastRow.mockReturnValue(2)
-    const colMap = buildColMap()
-    colMap.delete('是否看完')
+    const columnMap = buildColMap()
+    columnMap.delete('是否看完')
 
-    const preview = getSyncPreview(asSheet(sheet), colMap, 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), columnMap, 2, HEADER_ROW)
 
     // 两条备用列都不在映射里 → 取到空串，计入 emptyStatus
     expect(preview).toMatchObject({ valid: 1, emptyStatus: 1 })
@@ -693,10 +704,10 @@ describe('ribbon-service · detectConflicts', () => {
     const sheet = new FakeSheet()
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', status: '看过' })
     m.getLastRow.mockReturnValue(2)
-    const colMap = buildColMap()
-    colMap.delete('名称')
+    const columnMap = buildColMap()
+    columnMap.delete('名称')
 
-    const result = await detectConflicts(asSheet(sheet), colMap, 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), columnMap, 2, HEADER_ROW, 't0ken')
 
     expect(result.conflicts).toEqual([
       { row: 2, sid: '100', name: '', existingType: 1, incomingType: 2 },
@@ -737,9 +748,9 @@ describe('ribbon-service · syncWithConfirmation', () => {
   it('缺少 Bangumi_URL 列 → 提示并返回', async () => {
     m.getDataSheet.mockReturnValue(asSheet(goodSheet()))
     m.loadBgToken.mockReturnValue('t0ken')
-    const colMap = buildColMap()
-    colMap.delete('Bangumi_URL')
-    m.getColumnMap.mockReturnValue(colMap)
+    const columnMap = buildColMap()
+    columnMap.delete('Bangumi_URL')
+    m.getColumnMap.mockReturnValue(columnMap)
 
     await syncWithConfirmation()
 
@@ -774,7 +785,9 @@ describe('ribbon-service · syncWithConfirmation', () => {
       },
     }
     m.getApp.mockReturnValue(app)
-    m.fetchAllUserCollections.mockResolvedValue([{ subject_id: 100, type: 1, tags: [], comment: '' }])
+    m.fetchAllUserCollections.mockResolvedValue([
+      { subject_id: 100, type: 1, tags: [], comment: '' },
+    ])
     m.syncToBangumiAsync.mockImplementation(
       (
         _ws: unknown,
@@ -968,11 +981,9 @@ describe('ribbon-service · setTokenForRibbon', () => {
     m.storeBgToken.mockReturnValue(true)
     // setTokenForRibbon 先直接调一次 BGM.notifyTokenUpdated()（无 try/catch），
     // 再由 notifyPanelTokenUpdated() 内层 try/catch 保护第二次调用 → 让第二次抛错
-    m.notifyTokenUpdated
-      .mockReturnValueOnce(undefined)
-      .mockImplementationOnce(() => {
-        throw new Error('事件总线不可用')
-      })
+    m.notifyTokenUpdated.mockReturnValueOnce(undefined).mockImplementationOnce(() => {
+      throw new Error('事件总线不可用')
+    })
 
     expect(setTokenForRibbon()).toBe(true)
     expect(m.handleError).toHaveBeenCalledWith(expect.any(Error), { showAlert: false })

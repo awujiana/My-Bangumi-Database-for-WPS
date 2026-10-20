@@ -53,7 +53,7 @@ import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.j
 import { createSyncControlHandlers } from '../../core/sync-progress-handlers.js'
 import { createStatusBarWriter } from '../../tools/util/status-bar.js'
 import { ensureSheetHeaders, readRangeCellValues } from '../../tools/util/index.js'
-import { colNumberToLetter } from '../../tools/string-utilities.js'
+import { columnNumberToLetter } from '../../tools/string-utilities.js'
 import type { WpsApp, WpsCellValue, WpsWorksheet } from '../../tools/wps.js'
 
 import { _T } from './_constants.js'
@@ -126,7 +126,7 @@ interface BangumiCollectionItem {
  */
 interface SyncPreparedData {
   worksheet: WpsWorksheet
-  colMap: Map<string, number>
+  columnMap: Map<string, number>
   token: string
   lastRow: number
   headerRow: number
@@ -140,7 +140,7 @@ interface SyncPreparedData {
 
 /** 收藏填充的单行待写单元格（列号 + 值；口径与旧逐格写逐字一致） */
 interface FillWrites {
-  col: number
+  column: number
   value: unknown
 }
 
@@ -155,7 +155,7 @@ const FILL_BATCH_ROWS = 200
 
 /**
  * 将 Bangumi 收藏列表填充到空工作表。
- * 仅写入 colMap 中存在的列，避免向不存在的列写入。
+ * 仅写入 columnMap 中存在的列，避免向不存在的列写入。
  *
  * **批量写（§5.6 A3）**：旧实现每条收藏逐格写 ~8 列（500 条 ≈ 4000 次 COM）。
  * 现改为「连续行合并成一次 `Range.Value2` 矩形写」（500 条 ≈ 十余次）：
@@ -173,7 +173,7 @@ async function _fillSheetWithCollections(
   worksheet: WpsWorksheet,
   collections: BangumiCollectionItem[],
   headerRow: number,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
 ): Promise<number> {
   const total = collections.length
 
@@ -191,46 +191,46 @@ async function _fillSheetWithCollections(
 
       const writes: FillWrites[] = []
 
-      const seqCol = colMap.get('序列号')
-      if (seqCol !== undefined) writes.push({ col: seqCol, value: index + 1 })
+      const seqCol = columnMap.get('序列号')
+      if (seqCol !== undefined) writes.push({ column: seqCol, value: index + 1 })
 
-      const nameCol = colMap.get('名称')
-      if (nameCol !== undefined && name) writes.push({ col: nameCol, value: name })
+      const nameCol = columnMap.get('名称')
+      if (nameCol !== undefined && name) writes.push({ column: nameCol, value: name })
 
-      const aliasCol = colMap.get('别名')
-      if (aliasCol !== undefined && alias) writes.push({ col: aliasCol, value: alias })
+      const aliasCol = columnMap.get('别名')
+      if (aliasCol !== undefined && alias) writes.push({ column: aliasCol, value: alias })
 
-      const urlCol = colMap.get('Bangumi_URL')
-      if (urlCol !== undefined) writes.push({ col: urlCol, value: url })
+      const urlCol = columnMap.get('Bangumi_URL')
+      if (urlCol !== undefined) writes.push({ column: urlCol, value: url })
 
-      const categoryCol = colMap.get('类别')
+      const categoryCol = columnMap.get('类别')
       if (categoryCol !== undefined) {
-        writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '' })
+        writes.push({ column: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '' })
       }
 
-      const finishedCol = colMap.get('是否看完')
+      const finishedCol = columnMap.get('是否看完')
       if (finishedCol !== undefined) {
         // type 2 = 看过，视为已看完；其余状态视为未看完
-        writes.push({ col: finishedCol, value: item.type === 2 ? '是' : '否' })
+        writes.push({ column: finishedCol, value: item.type === 2 ? '是' : '否' })
       }
 
-      const scoreCol = colMap.get('打分')
+      const scoreCol = columnMap.get('打分')
       if (scoreCol !== undefined && item.rate != null)
-        writes.push({ col: scoreCol, value: item.rate })
+        writes.push({ column: scoreCol, value: item.rate })
 
-      const tagsCol = colMap.get('标签/分级')
+      const tagsCol = columnMap.get('标签/分级')
       if (tagsCol !== undefined && item.tags && item.tags.length > 0) {
-        writes.push({ col: tagsCol, value: item.tags.join(', ') })
+        writes.push({ column: tagsCol, value: item.tags.join(', ') })
       }
 
-      const commentCol = colMap.get('剧透/感言')
+      const commentCol = columnMap.get('剧透/感言')
       if (commentCol !== undefined && item.comment) {
-        writes.push({ col: commentCol, value: item.comment })
+        writes.push({ column: commentCol, value: item.comment })
       }
 
       pending.push({ row, writes })
-      for (const { col } of writes) {
-        if (col > maxWriteCol) maxWriteCol = col
+      for (const { column } of writes) {
+        if (column > maxWriteCol) maxWriteCol = column
       }
     }
 
@@ -251,8 +251,8 @@ async function _fillSheetWithCollections(
   const lastRow = pending.at(-1)?.row ?? 0
   const oldRows =
     maxWriteCol > 0 ? readRangeCellValues(worksheet, firstRow, lastRow, 1, maxWriteCol) : []
-  const oldValueAt = (row: number, col: number): WpsCellValue =>
-    oldRows[row - firstRow]?.[col - 1] ?? null
+  const oldValueAt = (row: number, column: number): WpsCellValue =>
+    oldRows[row - firstRow]?.[column - 1] ?? null
 
   // 3. 连续行分批矩形写；批写失败回退该批逐格 setCellValue
   let batchStart = 0
@@ -271,9 +271,9 @@ async function _fillSheetWithCollections(
 
     const values: WpsCellValue[][] = batch.map(({ row, writes }) => {
       const line: WpsCellValue[] = []
-      for (let col = 1; col <= maxWriteCol; col += 1) {
-        const override = writes.find((write) => write.col === col)
-        line.push(override ? (override.value as WpsCellValue) : oldValueAt(row, col))
+      for (let column = 1; column <= maxWriteCol; column += 1) {
+        const override = writes.find((write) => write.column === column)
+        line.push(override ? (override.value as WpsCellValue) : oldValueAt(row, column))
       }
       return line
     })
@@ -282,7 +282,7 @@ async function _fillSheetWithCollections(
     if (maxWriteCol > 0) {
       try {
         const range = worksheet.Range(
-          `${colNumberToLetter(1)}${String(batchFirstRow)}:${colNumberToLetter(maxWriteCol)}${String(batchLastRow)}`,
+          `${columnNumberToLetter(1)}${String(batchFirstRow)}:${columnNumberToLetter(maxWriteCol)}${String(batchLastRow)}`,
         )
         range.Value2 = values
         isBatchOk = true
@@ -303,8 +303,8 @@ async function _fillSheetWithCollections(
       // 回退路径与旧实现逐字一致：逐格 setCellValue，统计失败行
       for (const { row, writes } of batch) {
         let isRowOk = true
-        for (const { col, value } of writes) {
-          if (!setCellValue(worksheet, row, col, value)) {
+        for (const { column, value } of writes) {
+          if (!setCellValue(worksheet, row, column, value)) {
             isRowOk = false
           }
         }
@@ -419,10 +419,10 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   const lastRow = getLastRow(worksheet)
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 最后一行: ${String(lastRow)}`)
 
-  const colMap = getColumnMap(worksheet, headerRow)
-  bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 列映射完成，共 ${String(colMap.size)} 列`)
+  const columnMap = getColumnMap(worksheet, headerRow)
+  bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 列映射完成，共 ${String(columnMap.size)} 列`)
 
-  if (!colMap.has('Bangumi_URL')) {
+  if (!columnMap.has('Bangumi_URL')) {
     bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到 Bangumi_URL 列')
     showAlert('未找到 "Bangumi URL" 列！')
     bgmLog(
@@ -455,7 +455,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
 
   return {
     worksheet,
-    colMap,
+    columnMap,
     token,
     lastRow,
     headerRow,
@@ -475,7 +475,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
 async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolean> {
   const {
     worksheet,
-    colMap,
+    columnMap,
     token,
     lastRow,
     headerRow,
@@ -488,7 +488,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
   // 7. 获取同步预览统计（传入增量同步选项）
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计')
-  const preview = getSyncPreview(worksheet, colMap, lastRow, headerRow, {
+  const preview = getSyncPreview(worksheet, columnMap, lastRow, headerRow, {
     incremental,
     ...(fingerprintMap !== undefined && { fingerprintMap }),
   })
@@ -509,7 +509,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 开始检测冲突...')
     const { conflicts, conflictCount } = await detectConflicts(
       worksheet,
-      colMap,
+      columnMap,
       lastRow,
       headerRow,
       token,
@@ -596,7 +596,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...')
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
-    const result = await SyncToBangumiAsync(worksheet, colMap, token, lastRow, headerRow, {
+    const result = await SyncToBangumiAsync(worksheet, columnMap, token, lastRow, headerRow, {
       ...(conflictSids !== undefined && { skipSids: conflictSids }),
       incremental,
       onProgress: (current: number, total: number, statusMessage: string) => {
@@ -799,7 +799,7 @@ async function _doAPISync(
   // undefined」的风险；此前的 typeof 死守卫（: 1 / : 200 / : new Map）会静默产出
   // 错误默认值，已删除。函数缺失的模块加载竞态由 syncFromPanel 入口的早退守卫兜住。
   let headerRow = findHeaderRow(worksheet)
-  let colMap = getColumnMap(worksheet, headerRow)
+  let columnMap = getColumnMap(worksheet, headerRow)
   let lastRow = getLastRow(worksheet)
 
   // 空表时提供从 Bangumi API 自动填充
@@ -819,15 +819,15 @@ async function _doAPISync(
     }
 
     // 缺少表头时先写入标准表头
-    if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
+    if (headerRow === 0 || !columnMap.has('Bangumi_URL')) {
       if (!ensureSheetHeaders(worksheet)) {
         showAlert('工作表为空且无法写入标准表头，请检查工作表状态。')
         return
       }
       clearSheetCache(worksheet)
       headerRow = findHeaderRow(worksheet)
-      colMap = getColumnMap(worksheet, headerRow)
-      if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
+      columnMap = getColumnMap(worksheet, headerRow)
+      if (headerRow === 0 || !columnMap.has('Bangumi_URL')) {
         showAlert('写入标准表头后仍未找到 Bangumi URL 列，请检查模板。')
         return
       }
@@ -838,7 +838,7 @@ async function _doAPISync(
       worksheet,
       userCollections,
       headerRow,
-      colMap,
+      columnMap,
     )
     if (filledCount === 0) {
       showAlert('未能写入任何收藏数据，请检查工作表是否可编辑。')
@@ -853,11 +853,11 @@ async function _doAPISync(
     clearSheetCache(worksheet)
     lastRow = getLastRow(worksheet, true, headerRow)
     headerRow = findHeaderRow(worksheet)
-    colMap = getColumnMap(worksheet, headerRow)
+    columnMap = getColumnMap(worksheet, headerRow)
   }
 
   // 3. 必须有 Bangumi_URL 列
-  if (!colMap.has('Bangumi_URL')) {
+  if (!columnMap.has('Bangumi_URL')) {
     showAlert('未找到 Bangumi URL 列！')
     return
   }
@@ -965,8 +965,8 @@ async function _doAPISync(
       bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 切回数据工作表失败: ${(error as Error).message}`)
     }
 
-    const urlCol = colMap.get('Bangumi_URL')
-    const seqColForLocate = colMap.get('序列号') ?? 9
+    const urlCol = columnMap.get('Bangumi_URL')
+    const seqColForLocate = columnMap.get('序列号') ?? 9
     BGM.sync.updatePosition(worksheet, 0, seqColForLocate)
 
     let matchedCount = 0
@@ -991,7 +991,7 @@ async function _doAPISync(
       const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
       let isMatched = false
       if (sid && collectionMap.has(sid)) {
-        const seqCol = colMap.get('序列号') ?? 9
+        const seqCol = columnMap.get('序列号') ?? 9
         const seqCell = getCell(worksheet, row, seqCol)
         if (seqCell?.Interior) {
           const syncCount = syncCountMap.get(sid) ?? 0

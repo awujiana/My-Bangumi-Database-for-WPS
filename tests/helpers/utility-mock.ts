@@ -33,9 +33,9 @@ import { vi } from 'vitest'
 import { ErrorLevel } from '../../ts/core/constants.js'
 
 /** 列号 → 字母（1→A、26→Z、27→AA），与 `tools/string-utilities` 的真实实现等价 */
-export function numberToColumnLetters(col: number): string {
+export function numberToColumnLetters(column: number): string {
   let result = ''
-  let remaining = col
+  let remaining = column
   while (remaining > 0) {
     result = String.fromCodePoint(65 + ((remaining - 1) % 26)) + result
     remaining = Math.floor((remaining - 1) / 26)
@@ -50,7 +50,7 @@ export function numberToColumnLetters(col: number): string {
 export const utilityMock = {
   bgmLog: vi.fn<(level: number, message: string) => void>(),
   getApp: vi.fn<() => unknown>(() => null),
-  getCellValue: vi.fn<(worksheet: unknown, row: number, col: number) => string>(() => ''),
+  getCellValue: vi.fn<(worksheet: unknown, row: number, column: number) => string>(() => ''),
   getLastRow: vi.fn<(worksheet: unknown) => number>(() => 0),
   setCellValue: vi.fn<(...input: unknown[]) => boolean>(() => true),
   readRangeValues: vi.fn<(...input: unknown[]) => string[][]>(() => []),
@@ -58,7 +58,7 @@ export const utilityMock = {
   getColumnMap: vi.fn<(worksheet: unknown, headerRow?: number) => Map<string, number>>(
     () => new Map(),
   ),
-  colNumberToLetter: vi.fn((col: number) => numberToColumnLetters(col)),
+  columnNumberToLetter: vi.fn((column: number) => numberToColumnLetters(column)),
   BGM: {
     Dialog: {
       alert: vi.fn<(title: string, message?: string) => void>(),
@@ -83,7 +83,7 @@ const utilityFns = [
   utilityMock.readRangeValues,
   utilityMock.findHeaderRow,
   utilityMock.getColumnMap,
-  utilityMock.colNumberToLetter,
+  utilityMock.columnNumberToLetter,
   utilityMock.BGM.Dialog.alert,
   utilityMock.BGM.Dialog.error,
   utilityMock.BGM.Dialog.confirm,
@@ -110,7 +110,7 @@ export function resetUtilityMock(): void {
   utilityMock.readRangeValues.mockReturnValue([])
   utilityMock.findHeaderRow.mockReturnValue(1)
   utilityMock.getColumnMap.mockReturnValue(new Map())
-  utilityMock.colNumberToLetter.mockImplementation(numberToColumnLetters)
+  utilityMock.columnNumberToLetter.mockImplementation(numberToColumnLetters)
 }
 
 /** 取 `bgmLog` 的**消息体**列表（`LOG_LEVELS.INFO` 是数字 1，别用 `expect.any(String)` 匹级别） */

@@ -163,23 +163,23 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
   const mapping: EnrichColumnMapping = { nameCol: 0 }
 
   const maxCols = 50
-  for (let col = 1; col <= maxCols; col += 1) {
-    const headerValue = getCellValue(sheet, headerRow, col).trim()
+  for (let column = 1; column <= maxCols; column += 1) {
+    const headerValue = getCellValue(sheet, headerRow, column).trim()
     if (headerValue) {
       const normalizedHeader = headerValue.toLowerCase()
       const field = findKeywordField(normalizedHeader)
       if (field === 'nameCol' && mapping.nameCol === 0) {
-        mapping.nameCol = col
+        mapping.nameCol = column
       } else if (field === 'platformCol' && mapping.platformCol !== undefined) {
         // 重复的「播放平台」表头：横向多列平台，追加进额外平台列
-        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), col]
+        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), column]
       } else if (
         field !== null &&
         field !== 'nameCol' &&
         field !== 'platformExtraCols' &&
         mapping[field] === undefined
       ) {
-        mapping[field] = col
+        mapping[field] = column
       }
     }
   }
@@ -191,9 +191,9 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
     mapping.exclusiveCol &&
     mapping.exclusiveCol > mapping.platformCol + 1
   ) {
-    for (let col = mapping.platformCol + 1; col < mapping.exclusiveCol; col += 1) {
-      if (getCellValue(sheet, headerRow, col).trim() === '') {
-        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), col]
+    for (let column = mapping.platformCol + 1; column < mapping.exclusiveCol; column += 1) {
+      if (getCellValue(sheet, headerRow, column).trim() === '') {
+        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), column]
       }
     }
   }
@@ -224,8 +224,8 @@ export function mappingMaxCol(mapping: EnrichColumnMapping): number {
   }
   const extraCols = mapping.platformExtraCols
   if (extraCols) {
-    for (const col of extraCols) {
-      if (col > max) max = col
+    for (const column of extraCols) {
+      if (column > max) max = column
     }
   }
   return max
@@ -243,14 +243,14 @@ export function readPlatformValues(
 ): string[] {
   // 缺省列用 0 占位，先过滤掉：循环里再判空会让整段被 if 包住（unicorn/prefer-continue
   // 与 no-continue 互相打架），过滤后循环体是平的
-  const cols = [
+  const columns = [
     mapping.platformCol ?? 0,
     ...(mapping.platformExtraCols ?? []),
     mapping.exclusiveCol ?? 0,
-  ].filter((col) => col > 0)
+  ].filter((column) => column > 0)
   const values: string[] = []
-  for (const col of cols) {
-    const raw = rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+  for (const column of columns) {
+    const raw = rowCells?.[column - 1] ?? getCellValue(sheet, row, column)
     for (const part of raw.split(/[,，、/|]/)) {
       const value = part.trim()
       if (value && !shouldFilterNoise(value) && !values.includes(value)) values.push(value)
@@ -309,20 +309,20 @@ function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout
   const scanBlock = readRangeValues(sheet, 1, scanEndRow, 1, scanCols)
   const isRectReadUsable =
     scanBlock.length === scanEndRow && scanBlock.every((line) => line.length >= scanCols)
-  const cellAt = (row: number, col: number): string =>
-    isRectReadUsable ? (scanBlock[row - 1]?.[col - 1] ?? '') : getCellValue(sheet, row, col)
+  const cellAt = (row: number, column: number): string =>
+    isRectReadUsable ? (scanBlock[row - 1]?.[column - 1] ?? '') : getCellValue(sheet, row, column)
 
   for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
     let matchedFields = 0
     let rowFirstFieldCol = 0
-    for (let col = 1; col <= scanCols; col += 1) {
-      const value = cellAt(row, col).trim().toLowerCase()
+    for (let column = 1; column <= scanCols; column += 1) {
+      const value = cellAt(row, column).trim().toLowerCase()
       if (
         value &&
         ANIME_SOURCE_HEADER_KEYWORDS.some((keyword) => value === keyword.toLowerCase())
       ) {
         matchedFields += 1
-        if (rowFirstFieldCol === 0) rowFirstFieldCol = col
+        if (rowFirstFieldCol === 0) rowFirstFieldCol = column
       }
     }
     if (matchedFields >= 3) {
@@ -370,19 +370,19 @@ export function findAliasColumn(sheet: WpsWorksheet): number {
   if (headerRow === 0) return 0
 
   const headerBlock = readScanBlock(sheet, headerRow, headerRow, ALIAS_SCAN_COLUMNS)
-  const headerAt = (col: number): string =>
-    (headerBlock ? (headerBlock[0]?.[col - 1] ?? '') : getCellValue(sheet, headerRow, col))
+  const headerAt = (column: number): string =>
+    (headerBlock ? (headerBlock[0]?.[column - 1] ?? '') : getCellValue(sheet, headerRow, column))
       .trim()
       .toLowerCase()
 
-  for (let col = 1; col <= ALIAS_SCAN_COLUMNS; col += 1) {
-    const headerValue = headerAt(col)
+  for (let column = 1; column <= ALIAS_SCAN_COLUMNS; column += 1) {
+    const headerValue = headerAt(column)
     if (
       headerValue.includes('别名') ||
       headerValue.includes('alias') ||
       headerValue.includes('原名')
     ) {
-      return col
+      return column
     }
   }
   return 0
@@ -412,10 +412,10 @@ export function readScanBlock(
   sheet: WpsWorksheet,
   startRow: number,
   endRow: number,
-  colCount: number,
+  columnCount: number,
 ): readonly string[][] | null {
-  const block = readRangeValues(sheet, startRow, endRow, 1, colCount)
+  const block = readRangeValues(sheet, startRow, endRow, 1, columnCount)
   const rowCount = endRow - startRow + 1
-  const isShapeOk = block.length === rowCount && block.every((line) => line.length >= colCount)
+  const isShapeOk = block.length === rowCount && block.every((line) => line.length >= columnCount)
   return isShapeOk ? block : null
 }

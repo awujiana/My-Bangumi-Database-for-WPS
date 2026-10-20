@@ -127,13 +127,13 @@ function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColum
 
   const maxCols = 50
   const { headerRow } = state
-  const colOptions: { col: number; header: string }[] = []
+  const columnOptions: { column: number; header: string }[] = []
 
   // 覆盖全部列（含表头为空的列）：Hazx 模板的名称列 C 没有表头，
   // 若只列有表头的列，自动识别的名称列将无法在下拉中回显
-  for (let col = 1; col <= maxCols; col += 1) {
-    const header = getCellValue(worksheet, headerRow, col).trim()
-    colOptions.push({ col, header })
+  for (let column = 1; column <= maxCols; column += 1) {
+    const header = getCellValue(worksheet, headerRow, column).trim()
+    columnOptions.push({ column, header })
   }
 
   let html = ''
@@ -142,12 +142,12 @@ function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColum
     const currentCol = mapping[field.key]
     const selectedValue = currentCol ? String(currentCol) : ''
 
-    const optionsHtml = `<option value="">-- 未映射 --</option>${colOptions
+    const optionsHtml = `<option value="">-- 未映射 --</option>${columnOptions
       .map((o) => {
         const optionLabel = o.header
-          ? `${escapeHtml(o.header)} (列${String(o.col)})`
-          : `(列${String(o.col)}，无表头)`
-        return `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${optionLabel}</option>`
+          ? `${escapeHtml(o.header)} (列${String(o.column)})`
+          : `(列${String(o.column)}，无表头)`
+        return `<option value="${String(o.column)}" ${String(o.column) === selectedValue ? 'selected' : ''}>${optionLabel}</option>`
       })
       .join('')}`
 
@@ -381,14 +381,14 @@ const SOURCE_CMP_FIELDS: { key: ScalarMappingKey; label: string }[] = [
 ]
 
 /** 匹配结果对比表格：目标表侧展示的字段（按目标表表头动态读取） */
-const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: string }[] = [
-  { colKey: '周更时间', label: '周更' },
-  { colKey: '开播日期', label: '首播' },
-  { colKey: '集数', label: '集数' },
-  { colKey: '在线播放平台', label: '平台' },
-  { colKey: '标签/分级', label: '标签', fallbackColKey: '标签' },
-  { colKey: '特点/印象', label: '特点' },
-  { colKey: '别名', label: '别名' },
+const TARGET_CMP_FIELDS: { columnKey: string; label: string; fallbackColKey?: string }[] = [
+  { columnKey: '周更时间', label: '周更' },
+  { columnKey: '开播日期', label: '首播' },
+  { columnKey: '集数', label: '集数' },
+  { columnKey: '在线播放平台', label: '平台' },
+  { columnKey: '标签/分级', label: '标签', fallbackColKey: '标签' },
+  { columnKey: '特点/印象', label: '特点' },
+  { columnKey: '别名', label: '别名' },
 ]
 
 // 着色工具（TAGS / 首播 / 平台按内容稳定配色）已抽至 ./enrich-preview-cell.ts（renderPreviewCell / renderPlatformChipsCell）
@@ -435,7 +435,7 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
   if (thead) {
     thead.innerHTML = sanitizeTableRows(
       `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}${introFields
-        .map((f) => `<th class="col-intro">${escapeHtml(f.label)}</th>`)
+        .map((f) => `<th class="column-intro">${escapeHtml(f.label)}</th>`)
         .join('')}</tr>`,
     )
   }
@@ -468,18 +468,19 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
         if (platforms.length > 0) hasData = true
         rowCells.push(renderPlatformChipsCell(platforms))
       } else {
-        const col = mapping[f.key] ?? 0
-        const value = getCellValue(worksheet, row, col)
+        const column = mapping[f.key] ?? 0
+        const value = getCellValue(worksheet, row, column)
         if (value.trim()) hasData = true
         rowCells.push(renderPreviewCell(f.key, value))
       }
     }
     for (const f of introFields) {
-      const col = state.introContext?.mapping[f.key] ?? 0
-      const value = introRow !== undefined && col > 0 ? getCellValue(introSheet, introRow, col) : ''
+      const column = state.introContext?.mapping[f.key] ?? 0
+      const value =
+        introRow !== undefined && column > 0 ? getCellValue(introSheet, introRow, column) : ''
       if (value.trim()) hasData = true
       rowCells.push(
-        `<td class="col-intro" title="${escapeHtml(value.trim())}">${escapeHtml(value.trim())}</td>`,
+        `<td class="column-intro" title="${escapeHtml(value.trim())}">${escapeHtml(value.trim())}</td>`,
       )
     }
     if (hasData) {
@@ -653,12 +654,12 @@ function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult
     // 平台聚合时独播已并入平台项，不重复展示
     const isMergedExclusive = hasPlatformCol && field.key === 'exclusiveCol'
     if (!isMergedExclusive) {
-      const col = mapping[field.key] ?? 0
-      if (col > 0) {
+      const column = mapping[field.key] ?? 0
+      if (column > 0) {
         const value =
           hasPlatformCol && field.key === 'platformCol'
             ? readPlatformValues(sourceSheet, match.animeRow, mapping).join(' | ')
-            : getCellValue(sourceSheet, match.animeRow, col).trim()
+            : getCellValue(sourceSheet, match.animeRow, column).trim()
         if (value) items.push({ label: field.label, value })
       }
     }
@@ -670,9 +671,9 @@ function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult
     const introRow = intro.nameIndex.get(normalizeName(match.matchedAnimeName))
     if (introRow !== undefined) {
       for (const field of INTRO_PREVIEW_FIELDS) {
-        const col = intro.mapping[field.key] ?? 0
-        if (col > 0) {
-          const value = getCellValue(intro.sheet, introRow, col).trim()
+        const column = intro.mapping[field.key] ?? 0
+        if (column > 0) {
+          const value = getCellValue(intro.sheet, introRow, column).trim()
           if (value) items.push({ label: field.label, value })
         }
       }
@@ -693,11 +694,11 @@ function buildTargetCmpTags(
   }
   const items: { label: string; value: string }[] = []
   for (const field of TARGET_CMP_FIELDS) {
-    const col =
-      targetColMap.get(field.colKey) ??
+    const column =
+      targetColMap.get(field.columnKey) ??
       (field.fallbackColKey ? targetColMap.get(field.fallbackColKey) : undefined)
-    if (col && col > 0) {
-      const value = getCellValue(targetSheet, match.bangumiRow, col).trim()
+    if (column && column > 0) {
+      const value = getCellValue(targetSheet, match.bangumiRow, column).trim()
       if (value) items.push({ label: field.label, value })
     }
   }

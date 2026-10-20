@@ -29,7 +29,7 @@ import type { DialogOptions } from '../../ui/dialog.js'
 import { BGM_EVENTS, eventBus } from '../events.js'
 // 字符串工具已拆分到 string-utilities.ts，此处 import 供内部调用，并 re-export 保持向后兼容
 import { logger } from '../logger.js'
-import { colNumberToLetter } from '../string-utilities.js'
+import { columnNumberToLetter } from '../string-utilities.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
 import type { WpsApp, WpsWorksheet } from '../wps.js'
@@ -276,8 +276,8 @@ export const BGM: {
       if (!this.currentRow || this.currentRow < 1 || !this.currentSheet) return false
       try {
         const worksheet = this.currentSheet
-        const col = this.currentCol > 0 ? this.currentCol : 1
-        const cellAddr = `${colNumberToLetter(col)}${String(this.currentRow)}`
+        const column = this.currentCol > 0 ? this.currentCol : 1
+        const cellAddr = `${columnNumberToLetter(column)}${String(this.currentRow)}`
         const cell = worksheet.Range(cellAddr)
         cell.Select()
         bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
@@ -291,12 +291,12 @@ export const BGM: {
     },
 
     /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
-    updatePosition(worksheet: WpsWorksheet | null | undefined, row: number, col?: number): void {
+    updatePosition(worksheet: WpsWorksheet | null | undefined, row: number, column?: number): void {
       // 行号范围校验：必须为非负整数
       if (!Number.isSafeInteger(row) || row < 0) return
       if (worksheet !== undefined) this.currentSheet = worksheet
       this.currentRow = row
-      if (col !== undefined && col > 0) this.currentCol = col
+      if (column !== undefined && column > 0) this.currentCol = column
     },
 
     resetStopFlag(): void {
@@ -1412,4 +1412,4 @@ export function showSettingsPanel(): void {
   }
 }
 
-export { trim, escapeHtml, calcFingerprint, colNumberToLetter } from '../string-utilities.js'
+export { trim, escapeHtml, calcFingerprint, columnNumberToLetter } from '../string-utilities.js'

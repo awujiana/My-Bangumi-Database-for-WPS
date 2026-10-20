@@ -270,7 +270,7 @@ describe('findHeaderRow', () => {
   it('识别含 3+ 个表头关键字的行', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-FHR-1' })
     // 表头行（row 1）含：序列号、名称、Bangumi URL、是否看完 4 个关键字
-    mockState.getCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
+    mockState.getCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
       if (row === 1) {
         const headers: Record<number, string> = {
           1: '序列号',
@@ -278,7 +278,7 @@ describe('findHeaderRow', () => {
           3: 'Bangumi URL',
           4: '是否看完',
         }
-        return headers[col] ?? ''
+        return headers[column] ?? ''
       }
       return ''
     })
@@ -324,7 +324,7 @@ describe('findHeaderRow', () => {
 describe('getColumnMap', () => {
   it('通过表头规则映射列', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
+    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
       const headers: Record<number, string> = {
         1: '序列号',
         2: '名称',
@@ -332,69 +332,69 @@ describe('getColumnMap', () => {
         4: '是否看完',
         5: '评分',
       }
-      return headers[col] ?? ''
+      return headers[column] ?? ''
     })
-    const colMap = getColumnMap(worksheet as never, 1)
-    expect(colMap.has('序列号')).toBe(true)
-    expect(colMap.has('名称')).toBe(true)
-    expect(colMap.has('是否看完')).toBe(true)
+    const columnMap = getColumnMap(worksheet as never, 1)
+    expect(columnMap.has('序列号')).toBe(true)
+    expect(columnMap.has('名称')).toBe(true)
+    expect(columnMap.has('是否看完')).toBe(true)
     // 「评分」独立成 key（Bangumi 站评分），与个人主观「打分」列区分；
     // 依赖 constants.ts 中「评分」规则排在 /打分|评分|分数/ 之前，否则会被吞成「打分」
-    expect(colMap.has('评分')).toBe(true)
-    expect(colMap.get('序列号')).toBe(1)
-    expect(colMap.get('名称')).toBe(2)
-    expect(colMap.get('是否看完')).toBe(4)
-    expect(colMap.get('评分')).toBe(5)
+    expect(columnMap.has('评分')).toBe(true)
+    expect(columnMap.get('序列号')).toBe(1)
+    expect(columnMap.get('名称')).toBe(2)
+    expect(columnMap.get('是否看完')).toBe(4)
+    expect(columnMap.get('评分')).toBe(5)
   })
 
   it('「打分」与「评分」是相互独立的两个 key，互不抢占', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1b' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
+    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
       const headers: Record<number, string> = {
         1: '打分',
         2: '评分',
         3: '排名',
       }
-      return headers[col] ?? ''
+      return headers[column] ?? ''
     })
-    const colMap = getColumnMap(worksheet as never, 1)
+    const columnMap = getColumnMap(worksheet as never, 1)
 
-    expect(colMap.get('打分')).toBe(1)
-    expect(colMap.get('评分')).toBe(2)
-    expect(colMap.get('排名')).toBe(3)
+    expect(columnMap.get('打分')).toBe(1)
+    expect(columnMap.get('评分')).toBe(2)
+    expect(columnMap.get('排名')).toBe(3)
   })
 
   it('未匹配到序列号列时使用第一个非空列作为回退', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-2' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
+    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
       // 第一列是 "名称"，没有显式的序列号
       const headers: Record<number, string> = {
         1: '名称',
         2: 'Bangumi URL',
       }
-      return headers[col] ?? ''
+      return headers[column] ?? ''
     })
-    const colMap = getColumnMap(worksheet as never, 1)
+    const columnMap = getColumnMap(worksheet as never, 1)
     // 名称映射到列 1，Bangumi URL 映射到列 2
-    expect(colMap.has('名称')).toBe(true)
-    expect(colMap.has('Bangumi_URL')).toBe(true)
+    expect(columnMap.has('名称')).toBe(true)
+    expect(columnMap.has('Bangumi_URL')).toBe(true)
     // 回退逻辑：firstNonEmptyCol=1 已被 "名称" 占用，向后查找非空列，
     // 但列 3 之后均为空，因此不会设置 "序列号"
-    expect(colMap.has('序列号')).toBe(false)
+    expect(columnMap.has('序列号')).toBe(false)
   })
 
   it('空表头返回空 Map 或仅含回退序列号', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-3' })
     mockState.getCellValue.mockReturnValue('')
-    const colMap = getColumnMap(worksheet as never, 1)
-    expect(colMap.size).toBe(0)
+    const columnMap = getColumnMap(worksheet as never, 1)
+    expect(columnMap.size).toBe(0)
   })
 
   it('null/undefined worksheet 返回空 Map', () => {
     // 必须显式让 getCellValue 返回空字符串，否则默认 undefined 会被 String() 转为 'undefined'
     mockState.getCellValue.mockReturnValue('')
-    const colMap = getColumnMap(null, 1)
-    expect(colMap.size).toBe(0)
+    const columnMap = getColumnMap(null, 1)
+    expect(columnMap.size).toBe(0)
   })
 
   it('缓存命中：第二次调用不重新扫描', () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-function colToLetter(col: number): string {
+function columnToLetter(column: number): string {
   let result = ''
-  let n = col
+  let n = column
   while (n > 0) {
     const remainder = (n - 1) % 26
     result = String.fromCodePoint(65 + remainder) + result
@@ -11,7 +11,7 @@ function colToLetter(col: number): string {
   return result
 }
 
-const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumberToLetter } =
+const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, columnNumberToLetter } =
   vi.hoisted(() => {
     const panelConfig = { MAX_SCAN_ROWS: 50, MAX_SCAN_COLUMNS: 10 }
     const headerKeywords = [
@@ -51,7 +51,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumber
       HEADER_KEYWORDS: headerKeywords,
       COLUMN_RULES: columnRules,
       STANDARD_HEADERS: standardHeaders,
-      colNumberToLetter: colToLetter,
+      columnNumberToLetter: columnToLetter,
     }
   })
 
@@ -64,7 +64,7 @@ vi.mock('../ts/core/constants.js', () => ({
 }))
 
 vi.mock('../ts/tools/string-utilities.js', () => ({
-  colNumberToLetter,
+  columnNumberToLetter,
   trim: (s: string) => s.trim(),
 }))
 
@@ -137,7 +137,7 @@ function createRangeMock(implementation?: (address: string) => unknown): RangeMo
 
 /** 测试用 `Cells.Item` mock（理由同 RangeMock） */
 interface CellItemMock {
-  (row: number, col: number): WpsRange
+  (row: number, column: number): WpsRange
   mockReturnValue(value: unknown): CellItemMock
 }
 
@@ -416,13 +416,13 @@ function makeIo(seed: Record<string, string> = {}) {
   return {
     stats,
     io: {
-      read: (_ws: unknown, row: number, col: number): string => {
+      read: (_ws: unknown, row: number, column: number): string => {
         stats.reads += 1
-        return store.get(`${String(row)}:${String(col)}`) ?? ''
+        return store.get(`${String(row)}:${String(column)}`) ?? ''
       },
-      write: (_ws: unknown, row: number, col: number, value: string): void => {
+      write: (_ws: unknown, row: number, column: number, value: string): void => {
         stats.writes += 1
-        store.set(`${String(row)}:${String(col)}`, value)
+        store.set(`${String(row)}:${String(column)}`, value)
       },
     },
     store,
@@ -485,7 +485,7 @@ describe('createSheetCellCache', () => {
 
   it('播种失败（形状不符）时读写全部回落，行为与不建缓存一致', () => {
     // 列宽不足 → readRowsCache 返回 null
-    const worksheet = createGridWs([['only-one-col']])
+    const worksheet = createGridWs([['only-one-column']])
     const { io, stats } = makeIo({ '1:1': 'fallback' })
     const cache = createSheetCellCache(worksheet, [1], 2, io)
 
@@ -782,8 +782,8 @@ describe('getLastRow', () => {
       End: vi.fn().mockReturnValue({ Row: 40 }),
     }
     worksheet.Range = createRangeMock(() => anchorCell)
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
-      col === 1 ? '序列号' : '',
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) =>
+      column === 1 ? '序列号' : '',
     )
     const result = getLastRow(worksheet, false, 1)
     expect(result).toBeDefined()
@@ -804,9 +804,9 @@ describe('findHeaderRow', () => {
   })
 
   it('应在找到多个关键字时返回行号', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 1) {
         if (c === 1) return '名称'
         if (c === 2) return '标题'
@@ -834,9 +834,9 @@ describe('findHeaderRow', () => {
   })
 
   it('startRow 参数应从指定行开始扫描', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 3) {
         if (c === 1) return '名称'
         if (c === 2) return '标题'
@@ -861,8 +861,8 @@ describe('getColumnMap', () => {
   })
 
   it('应建立列映射', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
-      const c = col as number
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
+      const c = column as number
       if (c === 1) return '序列号'
       if (c === 2) return '名称'
       if (c === 3) return 'Bangumi URL'
@@ -878,8 +878,8 @@ describe('getColumnMap', () => {
   })
 
   it('序列号列回退：第一个非空列未被占用时使用', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
-      const c = col as number
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
+      const c = column as number
       // 非标准序列号名，但非空
       if (c === 1) return '自定义ID'
       if (c === 2) return '名称'
@@ -893,8 +893,8 @@ describe('getColumnMap', () => {
   })
 
   it('序列号列回退：第一个非空列被占用时使用下一个未被占用的列', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
-      const c = col as number
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
+      const c = column as number
       // 第一个非空列已被'名称'映射占用
       if (c === 1) return '名称'
       // 不匹配任何规则，成为序列号回退候选
@@ -1029,9 +1029,9 @@ describe('ensureSheetHeaders', () => {
 
   it('已有表头时应返回 false', () => {
     // Mock findHeaderRow to return 1 (found)
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 1 && c <= 3) return ['名称', '标题', 'bangumi'][c - 1] ?? ''
       return ''
     })
@@ -1113,9 +1113,9 @@ describe('ensureSheetHeaders', () => {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
       // First 5 columns fail
-      const colLetter = address.replace(/[0-9]/g, '')
-      const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
-      if (colIndex <= 5) {
+      const columnLetter = address.replace(/[0-9]/g, '')
+      const columnIndex = (columnLetter.codePointAt(0) ?? 0) - 64
+      if (columnIndex <= 5) {
         return {
           Interior: { Color: 0 },
           Font: { Bold: false },
@@ -1161,9 +1161,9 @@ describe('ensureSheetHeaders', () => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
-      const colLetter = address.replace(/[0-9]/g, '')
-      const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
-      if (colIndex > 5 && colIndex <= 7) {
+      const columnLetter = address.replace(/[0-9]/g, '')
+      const columnIndex = (columnLetter.codePointAt(0) ?? 0) - 64
+      if (columnIndex > 5 && columnIndex <= 7) {
         return {
           Interior: { Color: 0 },
           Font: { Bold: false },
@@ -1288,9 +1288,9 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('找到序号列时应返回正确列号', () => {
     const worksheet = createMockWorksheet({ name: 'AnchorCol' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 1) {
         if (c === 1) return '序号'
         if (c === 2) return '名称'
@@ -1313,9 +1313,9 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('找到 Bangumi URL 列时应返回该列', () => {
     const worksheet = createMockWorksheet({ name: 'UrlCol' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 1) {
         if (c === 1) return 'ID'
         if (c === 2) return '标题'
@@ -1351,9 +1351,9 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('锚定列定位异常时应回退', () => {
     const worksheet = createMockWorksheet({ name: 'AnchorFail' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
       const r = row as number
-      const c = col as number
+      const c = column as number
       if (r === 1 && c === 1) return '序号'
       return ''
     })

@@ -113,10 +113,10 @@ export function computeDateStatsFromSheet(): DateStats {
 
   const headerRow = findHeaderRow(worksheet) || 1
   const lastRow = getLastRow(worksheet)
-  const colMap = getColumnMap(worksheet, headerRow)
+  const columnMap = getColumnMap(worksheet, headerRow)
 
-  const dateCol = colMap.get('开播日期')
-  const urlCol = colMap.get('Bangumi_URL')
+  const dateCol = columnMap.get('开播日期')
+  const urlCol = columnMap.get('Bangumi_URL')
   if (dateCol === undefined || urlCol === undefined) {
     return stats
   }

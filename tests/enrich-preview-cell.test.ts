@@ -40,7 +40,7 @@ describe('panel/enrich-preview-cell', () => {
 
     it('名称列加粗渲染', () => {
       expect(renderPreviewCell('nameCol', 'Hi')).toBe(
-        '<td class="col-name" title="Hi"><span class="preview-name">Hi</span></td>',
+        '<td class="column-name" title="Hi"><span class="preview-name">Hi</span></td>',
       )
     })
 
@@ -58,7 +58,7 @@ describe('panel/enrich-preview-cell', () => {
   describe('renderPreviewCell - tagsCol', () => {
     it('tagsColor 开启时每项渲染彩色 tag-chip', () => {
       const html = renderPreviewCell('tagsCol', 'A|B')
-      expect(html).toMatch(/^<td class="col-tags">/)
+      expect(html).toMatch(/^<td class="column-tags">/)
       expect(html).toContain('class="tag-chip"')
       expect(html).toContain('>A</span>')
       expect(html).toContain('>B</span>')
@@ -91,8 +91,8 @@ describe('panel/enrich-preview-cell', () => {
 
   describe('renderPreviewCell - 平台列', () => {
     it('platformCol / exclusiveCol 复用平台徽章', () => {
-      expect(renderPreviewCell('platformCol', 'B站')).toContain('class="col-platform"')
-      expect(renderPreviewCell('exclusiveCol', 'B站')).toContain('class="col-platform"')
+      expect(renderPreviewCell('platformCol', 'B站')).toContain('class="column-platform"')
+      expect(renderPreviewCell('exclusiveCol', 'B站')).toContain('class="column-platform"')
     })
 
     it('platformColor 关闭时不写内联 style', () => {
@@ -179,7 +179,7 @@ describe('panel/enrich-preview-cell', () => {
       const first = renderPlatformChipsCell(['B站'])
       const second = renderPlatformChipsCell(['B站'])
       expect(first).toBe(second)
-      expect(first).toMatch(/^<td class="col-platform">/)
+      expect(first).toMatch(/^<td class="column-platform">/)
       expect(first).toContain('class="platform-chip"')
       expect(first).toContain('style="background:rgba(')
     })
@@ -187,7 +187,7 @@ describe('panel/enrich-preview-cell', () => {
     it('platformColor 关闭时纯文本徽章', () => {
       setConfig({ platformColor: false })
       expect(renderPlatformChipsCell(['B站', 'A站'])).toBe(
-        '<td class="col-platform"><span class="platform-chip" title="B站">B站</span><span class="platform-chip" title="A站">A站</span></td>',
+        '<td class="column-platform"><span class="platform-chip" title="B站">B站</span><span class="platform-chip" title="A站">A站</span></td>',
       )
     })
   })

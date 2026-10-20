@@ -31,10 +31,10 @@ export { isBangumiUrl, extractSubjectId, mapWatchStatus } from './pure-utilities
 const DEFAULT_SEQ_COL = 4
 
 /**
- * 获取序列号列索引（支持 colMap 或默认列号）
+ * 获取序列号列索引（支持 columnMap 或默认列号）
  */
-export function getSeqColIndex(colMap: Map<string, number> | undefined): number {
-  const seqCol = colMap?.get('序列号') ?? DEFAULT_SEQ_COL
+export function getSeqColIndex(columnMap: Map<string, number> | undefined): number {
+  const seqCol = columnMap?.get('序列号') ?? DEFAULT_SEQ_COL
   // 列号从 1 开始：0 是无效列号，须回退到默认列（原 `||` 的兜底语义）
   return seqCol === 0 ? DEFAULT_SEQ_COL : seqCol
 }

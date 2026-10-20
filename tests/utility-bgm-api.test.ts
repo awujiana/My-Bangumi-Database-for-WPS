@@ -45,7 +45,7 @@ vi.mock('../ts/core/ui-bridge.js', () => ({
 import { LOG_LEVELS, ErrorLevel } from '../ts/core/constants.js'
 import { BgmError } from '../ts/core/result.js'
 import { logger } from '../ts/tools/logger.js'
-import { colNumberToLetter } from '../ts/tools/string-utilities.js'
+import { columnNumberToLetter } from '../ts/tools/string-utilities.js'
 import { BGM_EVENTS, eventBus } from '../ts/tools/events.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 import { BGM } from '../ts/tools/util/index.js'
@@ -698,7 +698,7 @@ describe('BGM.sync · 等待恢复与定位', () => {
     BGM.sync.currentCol = 0
 
     expect(BGM.sync.locateCurrentCell()).toBe(true)
-    expect(rangeAddresses).toEqual([`${colNumberToLetter(1)}12`])
+    expect(rangeAddresses).toEqual([`${columnNumberToLetter(1)}12`])
     expect(select).toHaveBeenCalledTimes(1)
   })
 
@@ -723,7 +723,7 @@ describe('BGM.sync · 等待恢复与定位', () => {
     expect(mocks.notify.toast).toHaveBeenCalledWith('定位单元格失败: 裸字符串错误', 'error')
   })
 
-  it('updatePosition：非法行号忽略；undefined 保留原工作表；col<=0 不更新', () => {
+  it('updatePosition：非法行号忽略；undefined 保留原工作表；column<=0 不更新', () => {
     const sheet = createFakeSheet(vi.fn())
     BGM.sync.currentSheet = sheet
     BGM.sync.updatePosition(sheet, 1.5)

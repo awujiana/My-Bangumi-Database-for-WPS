@@ -8,9 +8,9 @@
  * 等副作用（副作用链：string-utilities → crypto → index → handlers）。
  *
  * 注意：escapeHtml 依赖浏览器 DOM API（document.createElement），需要在 jsdom 环境
- * 下运行；在纯 Node 环境下调用会抛 ReferenceError。colNumberToLetter 与 trim 无环境依赖。
+ * 下运行；在纯 Node 环境下调用会抛 ReferenceError。columnNumberToLetter 与 trim 无环境依赖。
  *
- * 历史背景：原 string-utilities.ts 同时导出 colNumberToLetter / escapeHtml / trim / calcFingerprint，
+ * 历史背景：原 string-utilities.ts 同时导出 columnNumberToLetter / escapeHtml / trim / calcFingerprint，
  * 其中 calcFingerprint 依赖 core/token-payload.calcChecksum，而 crypto.ts 又 import 自 index.ts，
  * 触发整条副作用链。为支持纯函数单元测试，将无依赖的三个函数抽取到本模块。
  */
@@ -18,12 +18,12 @@
 /**
  * 列号转字母 (A, B, ..., Z, AA, AB, ...)
  *
- * @param col - 列号（1-based）
- * @returns 对应的字母表示；col <= 0 时返回空字符串
+ * @param column - 列号（1-based）
+ * @returns 对应的字母表示；column <= 0 时返回空字符串
  */
-export function colNumberToLetter(col: number): string {
+export function columnNumberToLetter(column: number): string {
   let letter = ''
-  let remaining = col
+  let remaining = column
   while (remaining > 0) {
     const module_ = (remaining - 1) % 26
     letter = String.fromCodePoint(65 + module_) + letter

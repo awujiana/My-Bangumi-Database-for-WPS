@@ -66,7 +66,7 @@ export interface CleanTargetInfo {
   /** 最后数据行号 */
   lastRow: number
   /** 列名 → 列号 */
-  colMap: Map<string, number>
+  columnMap: Map<string, number>
   /** 工作表对象（执行阶段使用） */
   worksheet: WpsWorksheet
 }
@@ -76,7 +76,7 @@ export interface CellChange {
   /** Excel 行号 */
   row: number
   /** 列号 */
-  col: number
+  column: number
   /** 列名（用于日志展示） */
   columnName: string
   /** 原值 */
@@ -200,8 +200,8 @@ function isSheetAllowed(sheetName: string): boolean {
 // 新番表无「名称」表头（番剧名列表头为空），不能走标准特征列判定，改用专属签名识别并构造「名称 + 标签/分级」最小列映射以复用现有标签规则。
 
 /** 列映射是否命中任一「Bangumi 数据表特征列」（配置驱动：见 CLEAN_TARGETS.identityColumns） */
-function hasIdentityColumn(colMap: ReadonlyMap<string, number>): boolean {
-  return CLEAN_TARGETS.identityColumns.some((key) => colMap.has(key))
+function hasIdentityColumn(columnMap: ReadonlyMap<string, number>): boolean {
+  return CLEAN_TARGETS.identityColumns.some((key) => columnMap.has(key))
 }
 
 /** 新番表表头扫描区：前 30 行 × 前 50 列 */
@@ -233,8 +233,8 @@ function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
   }
   for (let row = 1; row <= XINFAN_SCAN_ROWS; row += 1) {
     const cells: string[] = []
-    for (let col = 1; col <= XINFAN_SCAN_COLS; col += 1) {
-      cells.push(getCellValue(worksheet, row, col))
+    for (let column = 1; column <= XINFAN_SCAN_COLS; column += 1) {
+      cells.push(getCellValue(worksheet, row, column))
     }
     if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) return row
   }
@@ -244,61 +244,61 @@ function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
 /** 查找锚点列（表头含 nameAnchorKeyword，默认「周更时间」）；找不到返回 0 */
 function findXinFanAnchorCol(worksheet: WpsWorksheet, headerRow: number): number {
   const anchor = XINFAN_HEADER.nameAnchorKeyword.toLowerCase()
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCellValue(worksheet, headerRow, col).toLowerCase()
-    if (value.includes(anchor)) return col
+  for (let column = 1; column <= 50; column += 1) {
+    const value = getCellValue(worksheet, headerRow, column).toLowerCase()
+    if (value.includes(anchor)) return column
   }
   return 0
 }
 
 /** 名称列候选（表头为空）在数据区前 nameProbeRows 行是否有非空值 */
-function hasNameProbeValue(worksheet: WpsWorksheet, headerRow: number, col: number): boolean {
+function hasNameProbeValue(worksheet: WpsWorksheet, headerRow: number, column: number): boolean {
   const rows = readRangeValues(
     worksheet,
     headerRow + 1,
     headerRow + XINFAN_HEADER.nameProbeRows,
-    col,
-    col,
+    column,
+    column,
   )
   return rows.some((row) => (row[0] ?? '').trim() !== '')
 }
 
 /**
- * 为新番表构造最小 colMap：
+ * 为新番表构造最小 columnMap：
  * - 名称列：锚点列（周更时间）左侧最近一个「表头为空 + 数据区有值」的列
  *   （新番表布局中该列紧邻周更时间左侧，可稳定绕开同为空的播放时间列）；
  * - 标签列：表头命中 tagHeaderKeywords 时映射为「标签/分级」，复用 tag-format / noise-tags 规则。
  */
 function buildXinFanColumnMap(worksheet: WpsWorksheet, headerRow: number): Map<string, number> {
-  const colMap = new Map<string, number>()
+  const columnMap = new Map<string, number>()
 
   const anchorCol = findXinFanAnchorCol(worksheet, headerRow)
   let nameCol: number | undefined
   if (anchorCol > 1) {
-    for (let col = anchorCol - 1; col >= 1; col -= 1) {
-      if (getCellValue(worksheet, headerRow, col).trim() !== '') break
-      if (hasNameProbeValue(worksheet, headerRow, col)) {
-        nameCol = col
+    for (let column = anchorCol - 1; column >= 1; column -= 1) {
+      if (getCellValue(worksheet, headerRow, column).trim() !== '') break
+      if (hasNameProbeValue(worksheet, headerRow, column)) {
+        nameCol = column
         break
       }
     }
   }
-  if (nameCol) colMap.set('名称', nameCol)
+  if (nameCol) columnMap.set('名称', nameCol)
 
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCellValue(worksheet, headerRow, col).trim()
+  for (let column = 1; column <= 50; column += 1) {
+    const value = getCellValue(worksheet, headerRow, column).trim()
     if (
       value &&
       XINFAN_HEADER.tagHeaderKeywords.some((keyword) =>
         value.toLowerCase().includes(keyword.toLowerCase()),
       )
     ) {
-      colMap.set('标签/分级', col)
+      columnMap.set('标签/分级', column)
       break
     }
   }
 
-  return colMap
+  return columnMap
 }
 
 /**
@@ -351,8 +351,8 @@ function readLastRow(worksheet: WpsWorksheet): number {
 function readHeaderLabels(worksheet: WpsWorksheet, headerRow: number): string[] {
   const labels: string[] = []
   if (!headerRow) return labels
-  for (let col = 1; col <= 40 && labels.length < 8; col += 1) {
-    const text = getCellValue(worksheet, headerRow, col).trim()
+  for (let column = 1; column <= 40 && labels.length < 8; column += 1) {
+    const text = getCellValue(worksheet, headerRow, column).trim()
     if (text) labels.push(text)
   }
   return labels
@@ -361,7 +361,7 @@ function readHeaderLabels(worksheet: WpsWorksheet, headerRow: number): string[] 
 /** 工作表结构解析结果（表头行 / 列映射 / 是否新番表） */
 interface SheetLayoutInfo {
   headerRow: number
-  colMap: Map<string, number>
+  columnMap: Map<string, number>
   isXinFan: boolean
 }
 
@@ -383,9 +383,9 @@ function resolveSheetLayout(worksheet: WpsWorksheet): SheetLayoutInfo {
 
   if (headerRow) {
     try {
-      return { headerRow, colMap: getColumnMap(worksheet, headerRow), isXinFan: false }
+      return { headerRow, columnMap: getColumnMap(worksheet, headerRow), isXinFan: false }
     } catch {
-      return { headerRow, colMap: new Map(), isXinFan: false }
+      return { headerRow, columnMap: new Map(), isXinFan: false }
     }
   }
 
@@ -394,14 +394,14 @@ function resolveSheetLayout(worksheet: WpsWorksheet): SheetLayoutInfo {
     if (xinFanHeaderRow) {
       return {
         headerRow: xinFanHeaderRow,
-        colMap: buildXinFanColumnMap(worksheet, xinFanHeaderRow),
+        columnMap: buildXinFanColumnMap(worksheet, xinFanHeaderRow),
         isXinFan: true,
       }
     }
   } catch {
     // 忽略新番表探测异常
   }
-  return { headerRow: 0, colMap: new Map(), isXinFan: false }
+  return { headerRow: 0, columnMap: new Map(), isXinFan: false }
 }
 
 /**
@@ -413,13 +413,13 @@ function resolveSheetLayout(worksheet: WpsWorksheet): SheetLayoutInfo {
  *  2. 新番表路径：表头无特征列，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
  */
 export function inspectWorksheet(worksheet: WpsWorksheet): SheetInspection {
-  const { headerRow, colMap, isXinFan } = resolveSheetLayout(worksheet)
+  const { headerRow, columnMap, isXinFan } = resolveSheetLayout(worksheet)
 
   const lastRow = readLastRow(worksheet)
   const dataRows = headerRow > 0 ? Math.max(0, lastRow - headerRow) : Math.max(0, lastRow - 1)
-  const hasNameColumn = colMap.has('名称')
+  const hasNameColumn = columnMap.has('名称')
   // 身份判定：命中特征列（名称 / Bangumi_URL），或命中月历式新番表专属签名
-  const isBangumiSheet = hasIdentityColumn(colMap) || isXinFan
+  const isBangumiSheet = hasIdentityColumn(columnMap) || isXinFan
 
   let reason = ''
   if (!headerRow) {
@@ -480,11 +480,11 @@ function buildTarget(
   if (!sheetName || !isSheetAllowed(sheetName)) return null
 
   const layout = resolveSheetLayout(worksheet)
-  if (!isForced && !hasIdentityColumn(layout.colMap) && !layout.isXinFan) return null
+  if (!isForced && !hasIdentityColumn(layout.columnMap) && !layout.isXinFan) return null
 
   // 未识别到表头时退化为第 1 行表头 + 空列映射（规则按列缺失自行跳过）
   const headerRow = layout.headerRow > 0 ? layout.headerRow : 1
-  const colMap = layout.headerRow > 0 ? layout.colMap : new Map<string, number>()
+  const columnMap = layout.headerRow > 0 ? layout.columnMap : new Map<string, number>()
 
   const lastRow = readLastRow(worksheet)
   const dataRows = lastRow - headerRow
@@ -499,7 +499,7 @@ function buildTarget(
     label: `${wb.Name} / ${sheetName}`,
     headerRow,
     lastRow,
-    colMap,
+    columnMap,
     worksheet,
   }
 }
@@ -617,10 +617,10 @@ export function estimateRowBytes(target: CleanTargetInfo, block?: readonly strin
 /** 解析规则目标列：按配置的关键字顺序取首个命中的列 */
 function resolveColumn(target: CleanTargetInfo, keywords: readonly string[]): number | undefined {
   for (const keyword of keywords) {
-    const col = target.colMap.get(keyword)
-    if (col) return col
+    const column = target.columnMap.get(keyword)
+    if (column) return column
     // 退化匹配：列键包含关键字（兼容「标签/分级」等组合表头）
-    for (const [key, value] of target.colMap) {
+    for (const [key, value] of target.columnMap) {
       if (key.includes(keyword)) return value
     }
   }
@@ -628,11 +628,11 @@ function resolveColumn(target: CleanTargetInfo, keywords: readonly string[]): nu
 }
 
 /** 列号 → 列名（日志展示用） */
-function columnName(target: CleanTargetInfo, col: number): string {
-  for (const [key, value] of target.colMap) {
-    if (value === col) return key
+function columnName(target: CleanTargetInfo, column: number): string {
+  for (const [key, value] of target.columnMap) {
+    if (value === column) return key
   }
-  return `第${String(col)}列`
+  return `第${String(column)}列`
 }
 
 /** 扫描 cellTransform 类规则 */
@@ -650,13 +650,19 @@ function scanCellTransform(
   if (!rule.transform) return skippedPlan(base, '规则未配置变换函数')
 
   const keywords = rule.columns ?? []
-  const col = resolveColumn(target, keywords)
-  if (!col) return skippedPlan(base, `未找到目标列（${keywords.join(' / ')}）`)
+  const column = resolveColumn(target, keywords)
+  if (!column) return skippedPlan(base, `未找到目标列（${keywords.join(' / ')}）`)
 
   // 需要「名称」参照列的变换（别名去重）额外读取名称列
   const isNameRequired = rule.transform === 'dedupAliasAgainstName'
-  const nameCol = isNameRequired ? target.colMap.get('名称') : undefined
-  const values = readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, col, col)
+  const nameCol = isNameRequired ? target.columnMap.get('名称') : undefined
+  const values = readRangeValues(
+    target.worksheet,
+    target.headerRow + 1,
+    target.lastRow,
+    column,
+    column,
+  )
   const names = nameCol
     ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, nameCol, nameCol)
     : null
@@ -673,8 +679,8 @@ function scanCellTransform(
       if (outcome.changed) {
         changes.push({
           row,
-          col,
-          columnName: columnName(target, col),
+          column,
+          columnName: columnName(target, column),
           oldValue,
           nextValue: outcome.value,
         })
@@ -797,8 +803,8 @@ function scanRowRule(
 
   const changes: CellChange[] = plan.changes.map((change: RowChange) => ({
     row: change.row,
-    col: change.col,
-    columnName: columnName(target, change.col),
+    column: change.column,
+    columnName: columnName(target, change.column),
     // 行级变更（标签合并）的旧值由计划顺带采集；未提供时为空串
     oldValue: change.oldValue ?? '',
     nextValue: change.value,
@@ -942,7 +948,7 @@ interface AggregatedTargetPlan {
   target: CleanTargetInfo
   /** 待删除行号 */
   removedRows: Set<number>
-  /** key = `${row}:${col}` */
+  /** key = `${row}:${column}` */
   changes: Map<string, CellChange>
 }
 
@@ -966,7 +972,7 @@ function mergePlanChanges(bucket: AggregatedTargetPlan, plan: RulePlan): void {
     if (bucket.removedRows.has(change.row)) {
       // 行将被删除 → 写入无意义
     } else {
-      const key = `${String(change.row)}:${String(change.col)}`
+      const key = `${String(change.row)}:${String(change.column)}`
       const existing = bucket.changes.get(key)
       if (existing) {
         bucket.changes.set(key, {
@@ -1028,9 +1034,11 @@ export async function runCleanPlans(
     try {
       // 让出一次事件循环，使进度条有机会重绘（WPS COM 调用为同步阻塞）
       await Promise.resolve()
-      const changes = [...bucket.changes.values()].sort((a, b) => a.row - b.row || a.col - b.col)
+      const changes = [...bucket.changes.values()].sort(
+        (a, b) => a.row - b.row || a.column - b.column,
+      )
       for (const change of changes) {
-        setCellValue(target.worksheet, change.row, change.col, change.nextValue)
+        setCellValue(target.worksheet, change.row, change.column, change.nextValue)
       }
       changedCells += changes.length
 

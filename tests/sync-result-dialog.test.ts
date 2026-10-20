@@ -33,23 +33,23 @@ let isDataSheetMissing = false
 /** 数据表桩：被 mock 生产代码原样回传，测试只关心「非空」 */
 const DATA_SHEET = { Name: 'data' }
 
-function cellKey(row: number, col: number): string {
-  return `${String(row)}_${String(col)}`
+function cellKey(row: number, column: number): string {
+  return `${String(row)}_${String(column)}`
 }
 
-function getCell(row: number, col: number): string {
-  return store.get(cellKey(row, col)) ?? ''
+function getCell(row: number, column: number): string {
+  return store.get(cellKey(row, column)) ?? ''
 }
 
-function setCell(row: number, col: number, value: string): void {
-  store.set(cellKey(row, col), value)
+function setCell(row: number, column: number, value: string): void {
+  store.set(cellKey(row, column), value)
 }
 
 /** 首个有任意非空值的行（1..10） */
 function findHeaderRowStub(): number {
   for (let row = 1; row <= 10; row += 1) {
-    for (let col = 1; col <= 12; col += 1) {
-      if (getCell(row, col).trim()) return row
+    for (let column = 1; column <= 12; column += 1) {
+      if (getCell(row, column).trim()) return row
     }
   }
   return 0
@@ -57,9 +57,9 @@ function findHeaderRowStub(): number {
 
 function getColumnMapStub(_sheet: unknown, headerRow: number): Map<string, number> {
   const map = new Map<string, number>()
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCell(headerRow, col).trim()
-    if (value) map.set(value, col)
+  for (let column = 1; column <= 50; column += 1) {
+    const value = getCell(headerRow, column).trim()
+    if (value) map.set(value, column)
   }
   return map
 }
@@ -76,8 +76,8 @@ function getLastRowStub(): number {
 }
 
 function hasAnyValueInRow(row: number): boolean {
-  for (let col = 1; col <= 50; col += 1) {
-    if (getCell(row, col).trim()) return true
+  for (let column = 1; column <= 50; column += 1) {
+    if (getCell(row, column).trim()) return true
   }
   return false
 }
@@ -96,9 +96,9 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mocks.bgmLog,
   BGM: { handleError: vi.fn(), ErrorLevel: { ERROR: 'ERROR' } },
   getDataSheet: () => (isDataSheetMissing ? null : DATA_SHEET),
-  getCellValue: (_sheet: unknown, row: number, col: number) => getCell(row, col),
-  setCellValue: (_sheet: unknown, row: number, col: number, value: unknown) => {
-    setCell(row, col, String(value))
+  getCellValue: (_sheet: unknown, row: number, column: number) => getCell(row, column),
+  setCellValue: (_sheet: unknown, row: number, column: number, value: unknown) => {
+    setCell(row, column, String(value))
   },
   getLastRow: getLastRowStub,
   findHeaderRow: findHeaderRowStub,

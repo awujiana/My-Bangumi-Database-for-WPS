@@ -196,7 +196,7 @@ describe('showConflictResolver - 批量选择', () => {
 
     // 先切换部分为 remote
     const remoteRadios = document.querySelectorAll<HTMLInputElement>(
-      '.conflict-col-select input[value="remote"]',
+      '.conflict-column-select input[value="remote"]',
     )
     remoteRadios.forEach((r) => {
       r.checked = true

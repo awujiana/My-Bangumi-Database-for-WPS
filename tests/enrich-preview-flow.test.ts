@@ -49,7 +49,7 @@ const m = vi.hoisted(() => ({
   // tools/string-utilities.js
   escapeHtml: vi.fn<(value: string) => string>(),
   // tools/util/index.js
-  getCellValue: vi.fn<(worksheet?: unknown, row?: number, col?: number) => string>(),
+  getCellValue: vi.fn<(worksheet?: unknown, row?: number, column?: number) => string>(),
   getLastRow: vi.fn<(worksheet?: unknown) => number>(),
   findHeaderRow: vi.fn<(worksheet?: unknown) => number>(),
   getColumnMap: vi.fn<(worksheet?: unknown, headerRow?: number) => Map<string, number>>(),
@@ -350,13 +350,13 @@ function sourceHeaderLabels(): (string | null)[] {
 /** 单元格坐标 → 值；未设置的坐标返回空串（与真实空单元格一致） */
 let cellMap = new Map<string, string>()
 
-function setCell(row: number, col: number, value: string): void {
-  cellMap.set(`${String(row)}:${String(col)}`, value)
+function setCell(row: number, column: number, value: string): void {
+  cellMap.set(`${String(row)}:${String(column)}`, value)
 }
 
 /** 给某一列的若干行填同一个值 */
-function fillRows(rows: number[], col: number, value: string): void {
-  for (const row of rows) setCell(row, col, value)
+function fillRows(rows: number[], column: number, value: string): void {
+  for (const row of rows) setCell(row, column, value)
 }
 
 function loggedMessages(): string[] {
@@ -408,9 +408,9 @@ function anchorDefaults(): void {
   m.sanitizeTableRows.mockImplementation((html) => html)
   m.renderStatCards.mockReturnValue(undefined)
   m.escapeHtml.mockImplementation((value) => value)
-  m.getCellValue.mockImplementation((_ws, row, col) => {
-    if (row === undefined || col === undefined) return ''
-    return cellMap.get(`${String(row)}:${String(col)}`) ?? ''
+  m.getCellValue.mockImplementation((_ws, row, column) => {
+    if (row === undefined || column === undefined) return ''
+    return cellMap.get(`${String(row)}:${String(column)}`) ?? ''
   })
   m.getLastRow.mockReturnValue(0)
   m.findHeaderRow.mockReturnValue(1)

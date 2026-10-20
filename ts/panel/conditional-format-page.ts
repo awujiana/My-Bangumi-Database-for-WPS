@@ -11,7 +11,7 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { showInput, showToast } from '../ui/dialog.js'
-import { escapeHtml, colNumberToLetter } from '../tools/string-utilities.js'
+import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js'
 import {
   bgmLog,
   findHeaderRow,
@@ -577,13 +577,13 @@ function detectColumns(): { seasonCol: string; nameCol: string; firstRow: number
   const entry = selectedSheet()
   if (!entry) return null
   const headerRow = findHeaderRow(entry.worksheet)
-  const colMap = getColumnMap(entry.worksheet, headerRow)
-  const seasonColNumber = colMap.get('开播季度')
-  const nameColNumber = colMap.get('名称')
+  const columnMap = getColumnMap(entry.worksheet, headerRow)
+  const seasonColNumber = columnMap.get('开播季度')
+  const nameColNumber = columnMap.get('名称')
   if (seasonColNumber === undefined || nameColNumber === undefined) return null
   return {
-    seasonCol: colNumberToLetter(seasonColNumber),
-    nameCol: colNumberToLetter(nameColNumber),
+    seasonCol: columnNumberToLetter(seasonColNumber),
+    nameCol: columnNumberToLetter(nameColNumber),
     firstRow: headerRow + 1,
   }
 }

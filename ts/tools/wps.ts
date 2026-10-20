@@ -144,7 +144,7 @@ export interface WpsCells {
   /** 单元格总数（全表单元格数，通常很大） */
   Count: number
   /** 获取指定行列的单元格（1‑based） */
-  Item(row: number, col: number): WpsRange
+  Item(row: number, column: number): WpsRange
 }
 
 // ========== WPS 自动筛选 ==========

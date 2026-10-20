@@ -19,11 +19,7 @@ import {
   readRangeValues,
 } from '../tools/util/index.js'
 import type { WpsWorksheet } from '../tools/wps.js'
-import {
-  findAliasColumn,
-  getBangumiColumnMap,
-  readPlatformValues,
-} from './enrich-layout.js'
+import { findAliasColumn, getBangumiColumnMap, readPlatformValues } from './enrich-layout.js'
 import type { EnrichColumnMapping } from './enrich-layout.js'
 import { normalizeName, splitAliases, TAG_SEPARATOR } from './enrich-normalize.js'
 import type { EnrichConfig, MatchResult } from './enrich-types.js'
@@ -39,7 +35,8 @@ export function readNewAnimeRow(
   mapping: EnrichColumnMapping,
   rowCells?: readonly string[],
 ): Record<string, string> {
-  const cell = (col: number): string => rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+  const cell = (column: number): string =>
+    rowCells?.[column - 1] ?? getCellValue(sheet, row, column)
   const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
   if (mapping.tagsCol) data.TAGS = cell(mapping.tagsCol) || ''
   if (mapping.premiereCol) data['首播'] = cell(mapping.premiereCol) || ''

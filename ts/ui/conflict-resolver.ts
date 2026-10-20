@@ -169,17 +169,17 @@ function createConflictModal(
     tr.appendChild(fieldTd)
 
     const localTd = document.createElement('td')
-    localTd.className = 'conflict-col-local'
+    localTd.className = 'conflict-column-local'
     localTd.textContent = conflict.localValue
     tr.appendChild(localTd)
 
     const remoteTd = document.createElement('td')
-    remoteTd.className = 'conflict-col-remote'
+    remoteTd.className = 'conflict-column-remote'
     remoteTd.textContent = conflict.remoteValue
     tr.appendChild(remoteTd)
 
     const selectTd = document.createElement('td')
-    selectTd.className = 'conflict-col-select'
+    selectTd.className = 'conflict-column-select'
 
     const radioName = `conflict-${String(index)}`
 

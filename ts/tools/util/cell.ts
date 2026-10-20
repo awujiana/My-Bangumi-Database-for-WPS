@@ -6,7 +6,7 @@
  *              但仅在函数体内引用，运行时安全。
  */
 import { LOG_LEVELS } from '../../core/constants.js'
-import { colNumberToLetter } from '../string-utilities.js'
+import { columnNumberToLetter } from '../string-utilities.js'
 import type { WpsWorksheet, WpsRange, WpsCellValue } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM.handleError / bgmLog / getApp，运行时安全
@@ -16,10 +16,10 @@ import { BGM, bgmLog, getApp } from './index.js'
 export function getCell(
   worksheet: WpsWorksheet | null | undefined,
   row: number,
-  col: number,
+  column: number,
 ): WpsRange | null {
   if (!worksheet) return null
-  const address = colNumberToLetter(col) + String(row)
+  const address = columnNumberToLetter(column) + String(row)
   return worksheet.Range(address)
 }
 
@@ -83,17 +83,17 @@ function getCellRawValue(cell: WpsRange | null | undefined): unknown {
  * 获取单元格的值
  * @param worksheet - 工作表对象，可能为 null 或 undefined
  * @param row - 行号
- * @param col - 列号
+ * @param column - 列号
  * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
  */
 export function getCellValue(
   worksheet: WpsWorksheet | null | undefined,
   row: number,
-  col: number,
+  column: number,
 ): string {
   if (!worksheet) return ''
   try {
-    const address = colNumberToLetter(col) + String(row)
+    const address = columnNumberToLetter(column) + String(row)
     const cell = worksheet.Range(address)
     const raw = getCellRawValue(cell)
     if (raw == null) return ''
@@ -111,13 +111,13 @@ export function getCellValue(
 export function setCellValue(
   worksheet: WpsWorksheet | null | undefined,
   row: number,
-  col: number,
+  column: number,
   value: unknown,
 ): boolean {
   try {
-    const cell = getCell(worksheet, row, col)
+    const cell = getCell(worksheet, row, column)
     if (!cell) {
-      bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${String(row)}, ${String(col)})`)
+      bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${String(row)}, ${String(column)})`)
       return false
     }
     cell.Value2 = value as WpsCellValue

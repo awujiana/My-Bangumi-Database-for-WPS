@@ -316,7 +316,7 @@ export {
   // 获取 WPS Application 对象
   getApp,
   // 列号转字母
-  colNumberToLetter,
+  columnNumberToLetter,
   // 安全获取单元格对象
   getCell,
   // 安全获取单元格值（单元格文本兼容多种取值方式）

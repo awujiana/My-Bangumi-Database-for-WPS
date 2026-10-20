@@ -29,7 +29,7 @@ function makeRow(overrides: Partial<SyncMappingRow>): SyncMappingRow {
   }
 }
 
-/** 构造本地列集合（模拟 colMap 的键） */
+/** 构造本地列集合（模拟 columnMap 的键） */
 function localColumns(...names: string[]): string[] {
   return names
 }
@@ -224,16 +224,16 @@ describe('withoutColumns', () => {
 
 describe('remapColumnIndices', () => {
   it('应把默认列的列号替换为目标列的列号（其余列不动）', () => {
-    const colMap = new Map([
+    const columnMap = new Map([
       ['导演', 3],
       ['监督', 9],
       ['音乐', 4],
     ])
-    const remapped = remapColumnIndices(colMap, new Map([['导演', 9]]))
+    const remapped = remapColumnIndices(columnMap, new Map([['导演', 9]]))
     expect(remapped.get('导演')).toBe(9)
     expect(remapped.get('监督')).toBe(9)
     expect(remapped.get('音乐')).toBe(4)
     // 原 Map 不动
-    expect(colMap.get('导演')).toBe(3)
+    expect(columnMap.get('导演')).toBe(3)
   })
 })

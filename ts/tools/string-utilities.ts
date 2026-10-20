@@ -4,7 +4,7 @@
  * @description 提供 Excel 列号转换、字符串修剪、HTML 转义、指纹计算等函数。
  *
  * 模块拆分说明：
- *   - colNumberToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
+ *   - columnNumberToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
  *     ./string-utilities-pure.js（零依赖模块）。本模块 re-export 以保持向后兼容。
  *   - calcFingerprint 依赖 core/token-payload 中的 calcChecksum（纯算术函数），但
  *     crypto.ts 又 import 自 index.ts，会随 utility.ts 一同进入已有的循环依赖链
@@ -31,4 +31,4 @@ export function calcFingerprint(fields: string[]): string {
   return calcChecksum(raw).toString(16).padStart(4, '0')
 }
 
-export { colNumberToLetter, escapeHtml, trim } from './string-utilities-pure.js'
+export { columnNumberToLetter, escapeHtml, trim } from './string-utilities-pure.js'

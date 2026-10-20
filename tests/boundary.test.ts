@@ -23,7 +23,7 @@ vi.hoisted(() => {
 })
 
 import { Result, BgmError } from '../ts/core/result.js'
-import { colNumberToLetter, escapeHtml, trim } from '../ts/tools/string-utilities-pure.js'
+import { columnNumberToLetter, escapeHtml, trim } from '../ts/tools/string-utilities-pure.js'
 import {
   isBangumiUrl,
   extractSubjectId,
@@ -93,35 +93,35 @@ describe('空值边界', () => {
     })
   })
 
-  describe('colNumberToLetter 处理边界列号', () => {
+  describe('columnNumberToLetter 处理边界列号', () => {
     it('列号 1 返回 "A"', () => {
-      expect(colNumberToLetter(1)).toBe('A')
+      expect(columnNumberToLetter(1)).toBe('A')
     })
 
     it('列号 0 返回空字符串或特定值（边界）', () => {
-      // colNumberToLetter(0) 的行为：可能返回空字符串或抛错，验证不崩溃
-      const result = colNumberToLetter(0)
+      // columnNumberToLetter(0) 的行为：可能返回空字符串或抛错，验证不崩溃
+      const result = columnNumberToLetter(0)
       expect(typeof result).toBe('string')
     })
 
     it('列号 26 返回 "Z"', () => {
-      expect(colNumberToLetter(26)).toBe('Z')
+      expect(columnNumberToLetter(26)).toBe('Z')
     })
 
     it('列号 27 返回 "AA"', () => {
-      expect(colNumberToLetter(27)).toBe('AA')
+      expect(columnNumberToLetter(27)).toBe('AA')
     })
 
     it('列号 52 返回 "AZ"', () => {
-      expect(colNumberToLetter(52)).toBe('AZ')
+      expect(columnNumberToLetter(52)).toBe('AZ')
     })
 
     it('列号 702 返回 "ZZ"', () => {
-      expect(colNumberToLetter(702)).toBe('ZZ')
+      expect(columnNumberToLetter(702)).toBe('ZZ')
     })
 
     it('列号 703 返回 "AAA"', () => {
-      expect(colNumberToLetter(703)).toBe('AAA')
+      expect(columnNumberToLetter(703)).toBe('AAA')
     })
   })
 
@@ -286,30 +286,30 @@ describe('极值边界', () => {
     })
   })
 
-  describe('colNumberToLetter 处理极值列号', () => {
+  describe('columnNumberToLetter 处理极值列号', () => {
     it('列号 1000 应返回有效字符串', () => {
-      const result = colNumberToLetter(1000)
+      const result = columnNumberToLetter(1000)
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
     it('列号 10000 应返回有效字符串', () => {
-      const result = colNumberToLetter(10_000)
+      const result = columnNumberToLetter(10_000)
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
     it('列号 16384 (XFD, Excel 上限) 应返回 "XFD"', () => {
-      expect(colNumberToLetter(16_384)).toBe('XFD')
+      expect(columnNumberToLetter(16_384)).toBe('XFD')
     })
 
     it('负数列号应返回空字符串或特定值（不抛错）', () => {
-      const result = colNumberToLetter(-1)
+      const result = columnNumberToLetter(-1)
       expect(typeof result).toBe('string')
     })
 
     it('列号 NaN 应返回空字符串或特定值（不抛错）', () => {
-      const result = colNumberToLetter(NaN)
+      const result = columnNumberToLetter(NaN)
       expect(typeof result).toBe('string')
     })
   })
@@ -709,12 +709,12 @@ describe('并发调用边界', () => {
     })
   })
 
-  describe('colNumberToLetter 并发调用', () => {
+  describe('columnNumberToLetter 并发调用', () => {
     it('1000 次调用返回一致结果', () => {
       const results: string[] = []
       for (let index = 0; index < 1000; index += 1) {
         // AA
-        results.push(colNumberToLetter(27))
+        results.push(columnNumberToLetter(27))
       }
       expect(results).toHaveLength(1000)
       expect(results.every((r) => r === 'AA')).toBe(true)

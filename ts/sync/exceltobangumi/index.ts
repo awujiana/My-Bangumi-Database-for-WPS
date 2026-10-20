@@ -23,7 +23,7 @@ import {
   trim,
   getColumnMap,
   findHeaderRow,
-  colNumberToLetter,
+  columnNumberToLetter,
   loadBgToken,
   BGM,
   _getUserApiPath,
@@ -138,8 +138,8 @@ const MIN_REQUEST_INTERVAL = 100
  */
 function isCellMarkedSuccess(worksheet: WpsWorksheet, row: number, seqCol?: number): boolean {
   try {
-    const col = seqCol ?? _DEFAULT_SEQ_COL
-    const cell = getCell(worksheet, row, col)
+    const column = seqCol ?? _DEFAULT_SEQ_COL
+    const cell = getCell(worksheet, row, column)
     if (!cell?.Interior) return false
     const color = cell.Interior.Color
     return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(color)
@@ -399,7 +399,7 @@ function processRowToSyncTaskInner(
  * 协调 fetchVisibleRowsForSync → buildFingerprintMap → processRowToSyncTask 三个子步骤，
  * 完成筛选可见行、批量读取数据缓存、构建历史指纹映射、收集所有需要同步的任务。
  * @param worksheet 工作表
- * @param colMap 列映射
+ * @param columnMap 列映射
  * @param options 同步选项
  * @param startRow 起始数据行（headerRow + 1）
  * @param lastRow 最后一行
@@ -408,7 +408,7 @@ function processRowToSyncTaskInner(
  */
 function prepareSyncTasks(
   worksheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   options: SyncOptions | undefined,
   startRow: number,
   lastRow: number,
@@ -422,7 +422,13 @@ function prepareSyncTasks(
   const rowsToProcess = fetchVisibleRowsForSync(worksheet, startRow, lastRow, headerRow)
 
   // 步骤2：批量读取数据缓存（性能关键）
-  const getField = createBatchFieldGetter(worksheet, colMap, startRow, lastRow, BATCH_READ_COLUMNS)
+  const getField = createBatchFieldGetter(
+    worksheet,
+    columnMap,
+    startRow,
+    lastRow,
+    BATCH_READ_COLUMNS,
+  )
 
   // 步骤3：构建历史指纹映射（数据获取）
   const fingerprintMap = buildFingerprintMap(options?.incremental)
@@ -670,7 +676,7 @@ async function executeBatchSync(
 
 export async function SyncToBangumiAsync(
   worksheet: WpsWorksheet,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   token: string,
   lastRow: number,
   headerRow: number,
@@ -679,7 +685,7 @@ export async function SyncToBangumiAsync(
   const result: _SyncResultStats = { success: 0, fail: 0, skip: 0, stopped: false }
   const startRow = headerRow + 1
   const startTime = Date.now()
-  const seqCol = getSeqColIndex(colMap)
+  const seqCol = getSeqColIndex(columnMap)
   const userIdPath = _getUserApiPath()
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========')
@@ -696,13 +702,13 @@ export async function SyncToBangumiAsync(
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${String(lastRow)}`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync]   - 序列号列: ${String(seqCol)} (列${colNumberToLetter(seqCol)})`,
+    `[SyncToBangumiAsync]   - 序列号列: ${String(seqCol)} (列${columnNumberToLetter(seqCol)})`,
   )
 
   // 步骤 1-4: 预处理（筛选可见行 + 数据缓存 + 指纹映射 + 任务收集）
   const { syncTasks, skip, fail } = prepareSyncTasks(
     worksheet,
-    colMap,
+    columnMap,
     options,
     startRow,
     lastRow,
@@ -824,13 +830,13 @@ function collectSelectedRows(app: WpsApp): number[] {
  * @param worksheet 工作表
  * @param rawRows 原始选中行号
  * @param headerRow 表头行号
- * @returns 准备结果（rows/colMap/token）；若校验失败则返回 null（已提示用户）
+ * @returns 准备结果（rows/columnMap/token）；若校验失败则返回 null（已提示用户）
  */
 async function validateSelectedRows(
   worksheet: WpsWorksheet,
   rawRows: number[],
   headerRow: number,
-): Promise<{ rows: number[]; colMap: Map<string, number>; token: string } | null> {
+): Promise<{ rows: number[]; columnMap: Map<string, number>; token: string } | null> {
   // 排除表头行
   const rows = rawRows.filter((r) => r > headerRow)
   bgmLog(
@@ -864,14 +870,14 @@ async function validateSelectedRows(
   }
 
   clearSheetCache(worksheet)
-  const colMap = getColumnMap(worksheet, headerRow)
-  bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${String(colMap.size)} 列`)
+  const columnMap = getColumnMap(worksheet, headerRow)
+  bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${String(columnMap.size)} 列`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[syncSelectedRows] 集数列号: ${String(colMap.get('集数') ?? '')}, 集号列号: ${String(colMap.get('集号') ?? '')}, Bangumi_URL列号: ${String(colMap.get('Bangumi_URL') ?? '')}`,
+    `[syncSelectedRows] 集数列号: ${String(columnMap.get('集数') ?? '')}, 集号列号: ${String(columnMap.get('集号') ?? '')}, Bangumi_URL列号: ${String(columnMap.get('Bangumi_URL') ?? '')}`,
   )
 
-  if (!colMap.has('Bangumi_URL')) {
+  if (!columnMap.has('Bangumi_URL')) {
     bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未找到 Bangumi_URL 列')
     void wpsMessageBox('未找到 Bangumi URL 列', 0, 48)
     return null
@@ -885,14 +891,14 @@ async function validateSelectedRows(
   }
   bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Token 已设置（长度: ${String(token.length)}）`)
 
-  return { rows, colMap, token }
+  return { rows, columnMap, token }
 }
 
 /**
  * 执行选中行同步（启动状态机、显示进度弹窗、循环同步、完成弹窗、异常处理、重置状态机）
  * @param worksheet 工作表
  * @param rows 待同步行号数组（已排除表头）
- * @param colMap 列映射
+ * @param columnMap 列映射
  * @param token Bangumi Token
  * @param headerRow 表头行号
  * @param startTime 同步开始时间戳（用于耗时统计）
@@ -900,7 +906,7 @@ async function validateSelectedRows(
 async function executeSelectedSync(
   worksheet: WpsWorksheet,
   rows: number[],
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   token: string,
   headerRow: number,
   startTime: number,
@@ -908,8 +914,8 @@ async function executeSelectedSync(
   // 用对象包裹运行态标志，避免闭包内赋值不被类型收窄识别（ESLint no-unnecessary-condition 误报恒为 false）
   const runState: { entered: boolean } = { entered: false }
   // 上游 prepareSelectedSync 已校验列存在；?? 0 仅为类型层兜底（列号 1-based，0 不合法）
-  const urlCol = colMap.get('Bangumi_URL') ?? 0
-  const nameCol = colMap.get('名称')
+  const urlCol = columnMap.get('Bangumi_URL') ?? 0
+  const nameCol = columnMap.get('名称')
   const runSelectedRowsLoop = async (): Promise<void> => {
     // P2：进入运行状态（防重入 + 重置标志 + 置位）
     if (!BGM.sync.enterRunningState()) return
@@ -957,7 +963,7 @@ async function executeSelectedSync(
     }
     const readField = createBatchFieldGetter(
       worksheet,
-      colMap,
+      columnMap,
       batchMinRow,
       batchMaxRow,
       BATCH_READ_COLUMNS,
@@ -1006,7 +1012,7 @@ async function executeSelectedSync(
                 `⏳️ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
               )
 
-              const finishCol = colMap.get('完播日')
+              const finishCol = columnMap.get('完播日')
               const finishedDate =
                 finishCol === undefined ? '' : trim(readField(rowNumber, '完播日') || '')
               const jsonBody = buildJsonPayload((key) => readField(rowNumber, key), finishedDate)
@@ -1243,7 +1249,7 @@ export async function syncSelectedRows(): Promise<void> {
     await executeSelectedSync(
       worksheet,
       validated.rows,
-      validated.colMap,
+      validated.columnMap,
       validated.token,
       headerRow,
       startTime,

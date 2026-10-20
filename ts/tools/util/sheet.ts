@@ -11,7 +11,7 @@ import {
   COLUMN_RULES,
   STANDARD_HEADERS,
 } from '../../core/constants.js'
-import { colNumberToLetter, trim } from '../string-utilities.js'
+import { columnNumberToLetter, trim } from '../string-utilities.js'
 import type { WpsCellValue, WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
@@ -131,13 +131,13 @@ function preserveCellValue(cell: unknown): WpsCellValue {
  *
  * @param raw `Range.Value2` 的返回值
  * @param rowCount 请求的行数（endRow - startRow + 1）
- * @param colCount 请求的列数（endCol - startCol + 1）
+ * @param columnCount 请求的列数（endCol - startCol + 1）
  * @returns 二维数组；形状不可信时返回 `null`
  */
 function normalizeValue2Shape(
   raw: unknown,
   rowCount: number,
-  colCount: number,
+  columnCount: number,
 ): unknown[][] | null {
   // 单单元格：宿主返回标量
   if (!Array.isArray(raw)) return [[raw]]
@@ -145,7 +145,7 @@ function normalizeValue2Shape(
   if (Array.isArray(raw[0])) return raw as unknown[][]
   // 一维数组：按请求形状决定它是「一行」还是「一列」
   if (rowCount === 1) return [raw as unknown[]]
-  if (colCount === 1) return (raw as unknown[]).map((cell) => [cell])
+  if (columnCount === 1) return (raw as unknown[]).map((cell) => [cell])
   // 请求多行多列却拿回一维：无法判定归属，宁可判为读取失败
   return null
 }
@@ -172,20 +172,20 @@ function readRect<T>(
   if (!worksheet) return null
   try {
     const range = worksheet.Range(
-      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
+      `${columnNumberToLetter(startCol)}${String(startRow)}:${columnNumberToLetter(endCol)}${String(endRow)}`,
     )
     // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
     // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
     const raw: unknown = range.Value2
     if (!raw) return null
     const rowCount = endRow - startRow + 1
-    const colCount = endCol - startCol + 1
-    const rows = normalizeValue2Shape(raw, rowCount, colCount)
+    const columnCount = endCol - startCol + 1
+    const rows = normalizeValue2Shape(raw, rowCount, columnCount)
     // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
     if (!rows) return null
     // 单行读回宽度不足 ⇒ 后续「读-改-写」会把缺失列写成空值，等于静默清数据；
     // 按读取失败处理（与 githubSync 的不变式一致）。
-    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return null
+    if (rowCount === 1 && (rows[0]?.length ?? 0) < columnCount) return null
     return rows.map((row) => row.map((cell) => convert(cell)))
   } catch {
     return null
@@ -227,12 +227,12 @@ export interface SheetCellCache {
    * 读单元格：命中缓存直接返回（写后读拿到的是新值）；
    * 未命中回落 `getCellValue` 并回填缓存。
    */
-  read(row: number, col: number): string
+  read(row: number, column: number): string
   /**
    * 写单元格：**先写 COM**，成功后才更新缓存。
    * 写抛错时不更新缓存——缓存保持与工作表一致（旧值仍是表里的真实值）。
    */
-  write(row: number, col: number, value: string): void
+  write(row: number, column: number, value: string): void
 }
 
 /**
@@ -244,14 +244,14 @@ export interface SheetCellCache {
  * 打到无宿主的真实封装上（写变 no-op）。
  */
 export interface SheetCellIo {
-  read(worksheet: WpsWorksheet, row: number, col: number): string
-  write(worksheet: WpsWorksheet, row: number, col: number, value: string): void
+  read(worksheet: WpsWorksheet, row: number, column: number): string
+  write(worksheet: WpsWorksheet, row: number, column: number, value: string): void
 }
 
 const realCellIo: SheetCellIo = {
-  read: (worksheet, row, col) => getCellValue(worksheet, row, col),
-  write: (worksheet, row, col, value) => {
-    setCellValue(worksheet, row, col, value)
+  read: (worksheet, row, column) => getCellValue(worksheet, row, column),
+  write: (worksheet, row, column, value) => {
+    setCellValue(worksheet, row, column, value)
   },
 }
 
@@ -279,23 +279,23 @@ export function createSheetCellCache(
   const seeded = readRowsCache(worksheet, rows, maxCol)
   if (seeded) {
     for (const [row, line] of seeded) {
-      for (let col = 1; col <= maxCol; col += 1) {
-        cells.set(`${String(row)}:${String(col)}`, line[col - 1] ?? '')
+      for (let column = 1; column <= maxCol; column += 1) {
+        cells.set(`${String(row)}:${String(column)}`, line[column - 1] ?? '')
       }
     }
   }
   return {
-    read(row: number, col: number): string {
-      const key = `${String(row)}:${String(col)}`
+    read(row: number, column: number): string {
+      const key = `${String(row)}:${String(column)}`
       const hit = cells.get(key)
       if (hit !== undefined) return hit
-      const value = io.read(worksheet, row, col)
+      const value = io.read(worksheet, row, column)
       cells.set(key, value)
       return value
     },
-    write(row: number, col: number, value: string): void {
-      io.write(worksheet, row, col, value)
-      cells.set(`${String(row)}:${String(col)}`, value)
+    write(row: number, column: number, value: string): void {
+      io.write(worksheet, row, column, value)
+      cells.set(`${String(row)}:${String(column)}`, value)
     },
   }
 }
@@ -414,11 +414,11 @@ export function findHeaderRow(
  */
 function readRowCellsByCell(worksheet: WpsWorksheet | null | undefined, row: number): string[] {
   const cells: string[] = []
-  for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
+  for (let column = 1; column <= PANEL_CONFIG.MAX_SCAN_COLUMNS; column += 1) {
     try {
       // 取值即转小写（与改造前一致）：取不到或不是字符串会抛错，
       // 由下面的 catch 按空串处理，不因此把整行判为「非表头行」。
-      cells.push(getCellValue(worksheet, row, col).toLowerCase())
+      cells.push(getCellValue(worksheet, row, column).toLowerCase())
     } catch {
       cells.push('')
     }
@@ -444,10 +444,10 @@ function isRowHeaderMatch(rowCells: string[]): boolean {
  * 按 COLUMN_RULES 规则将表头列名匹配为列映射 key
  * 首个命中的未占用 key 优先，已占用则继续尝试后续规则
  */
-function applyColumnRules(colMap: Map<string, number>, colName: string, index: number): void {
+function applyColumnRules(columnMap: Map<string, number>, columnName: string, index: number): void {
   for (const [pattern, key] of COLUMN_RULES) {
-    if (pattern.test(colName) && !colMap.has(key)) {
-      colMap.set(key, index)
+    if (pattern.test(columnName) && !columnMap.has(key)) {
+      columnMap.set(key, index)
       // 匹配到未映射的 key，处理下一列
       break
     }
@@ -467,7 +467,7 @@ export function getColumnMap(
   const sheetName = worksheet?.Name ?? ''
   const cacheKey = `${sheetName}:columnMap:${String(headerRow)}`
   return cacheGet(cacheKey, () => {
-    const colMap = new Map<string, number>()
+    const columnMap = new Map<string, number>()
     let firstNonEmptyCol: number | undefined
 
     const lastCol = 50
@@ -478,20 +478,20 @@ export function getColumnMap(
       trim(headerCells ? (headerCells[index - 1] ?? '') : getCellValue(worksheet, headerRow, index))
 
     for (let index = 1; index <= lastCol; index += 1) {
-      const colName = readColName(index)
+      const columnName = readColName(index)
       // 记录第一个非空列作为序列号列候选
-      if (!firstNonEmptyCol && colName) {
+      if (!firstNonEmptyCol && columnName) {
         firstNonEmptyCol = index
       }
-      if (colName) {
-        applyColumnRules(colMap, colName, index)
+      if (columnName) {
+        applyColumnRules(columnMap, columnName, index)
       }
     }
 
     // 如果没有通过规则匹配到序列号列，尝试找一个未被其他 key 占用的列
     // 修复：避免将"序列号"映射到已被"是否看完"等字段占用的列，导致两个字段读取同一列
-    if (!colMap.has('序列号')) {
-      const mappedCols = new Set(colMap.values())
+    if (!columnMap.has('序列号')) {
+      const mappedCols = new Set(columnMap.values())
       let seqCol: number | undefined
       if (firstNonEmptyCol && !mappedCols.has(firstNonEmptyCol)) {
         // 第一个非空列未被占用，使用它
@@ -507,7 +507,7 @@ export function getColumnMap(
         }
       }
       if (seqCol) {
-        colMap.set('序列号', seqCol)
+        columnMap.set('序列号', seqCol)
         bgmLog(
           LOG_LEVELS.INFO,
           `[getColumnMap] 序列号列未匹配到表头，使用列 ${String(seqCol)} 作为序列号列`,
@@ -515,7 +515,7 @@ export function getColumnMap(
       }
     }
 
-    return colMap
+    return columnMap
   })
 }
 
@@ -564,7 +564,7 @@ function findAnchorColumn(worksheet: WpsWorksheet, headerRow: number): number | 
   const maxCols = 50
 
   for (let c = 1; c <= maxCols; c += 1) {
-    const value = worksheet.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
+    const value = worksheet.Range(`${columnNumberToLetter(c)}${String(headerRow)}`).Value2
     if (value != null) {
       const text = String(value).trim().toLowerCase()
       if (keywords.some((kw) => text === kw || text.includes(kw))) {
@@ -612,24 +612,24 @@ export function getLastRow(
 
     // 1. 如果提供了表头行，尝试自动选择锚定列
     if (headerRow != null && headerRow >= 1) {
-      const col = findAnchorColumn(worksheet, headerRow)
-      if (col) {
+      const column = findAnchorColumn(worksheet, headerRow)
+      if (column) {
         try {
-          // ✅ 修复点：使用 col 拼地址，而不是硬编码 D
-          const colLetter = colNumberToLetter(col)
-          const cell = worksheet.Range(`${colLetter}${String(worksheet.Rows.Count)}`)
+          // ✅ 修复点：使用 column 拼地址，而不是硬编码 D
+          const columnLetter = columnNumberToLetter(column)
+          const cell = worksheet.Range(`${columnLetter}${String(worksheet.Rows.Count)}`)
           const endCell = cell.End(-4162)
           if (endCell.Row > 0) {
             bgmLog(
               LOG_LEVELS.INFO,
-              `根据表头找到锚定列 ${String(col)}(${colLetter})，最后行: ${String(endCell.Row)}`,
+              `根据表头找到锚定列 ${String(column)}(${columnLetter})，最后行: ${String(endCell.Row)}`,
             )
             return endCell.Row
           }
         } catch (error) {
           bgmLog(
             LOG_LEVELS.WARN,
-            `锚定列 ${String(col)} 定位失败: ${(error as Error).message}，回退到原有逻辑`,
+            `锚定列 ${String(column)} 定位失败: ${(error as Error).message}，回退到原有逻辑`,
           )
         }
       }
@@ -854,22 +854,22 @@ export function ensureSheetHeaders(worksheet: WpsWorksheet | null | undefined): 
 function setCellValueDirect(
   worksheet: WpsWorksheet,
   row: number,
-  col: number,
+  column: number,
   value: string,
 ): boolean {
-  const address = colNumberToLetter(col) + String(row)
+  const address = columnNumberToLetter(column) + String(row)
 
-  // 方案 1: Cells.Item(row, col) + FormulaR1C1
+  // 方案 1: Cells.Item(row, column) + FormulaR1C1
   // 完全不同的 COM 路径（Cells.Item 而非 Range）+ 不同属性（FormulaR1C1 而非 Formula/Value/Value2），
   // 最大概率绕过 WPS COM 桥接层 Proxy 拦截。
   try {
-    const cell = worksheet.Cells.Item(row, col)
+    const cell = worksheet.Cells.Item(row, column)
     cell.FormulaR1C1 = value
     return true
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Cells.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
+      `[setCellValueDirect] Cells.FormulaR1C1 (${String(row)},${String(column)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -881,7 +881,7 @@ function setCellValueDirect(
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Formula (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
+      `[setCellValueDirect] Range.Formula (${String(row)},${String(column)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -893,7 +893,7 @@ function setCellValueDirect(
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
+      `[setCellValueDirect] Range.FormulaR1C1 (${String(row)},${String(column)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -905,7 +905,7 @@ function setCellValueDirect(
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value2 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
+      `[setCellValueDirect] Range.Value2 (${String(row)},${String(column)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -917,13 +917,13 @@ function setCellValueDirect(
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
+      `[setCellValueDirect] Range.Value (${String(row)},${String(column)}) 失败: ${(error as Error).message}`,
     )
   }
 
   bgmLog(
     LOG_LEVELS.ERROR,
-    `[setCellValueDirect] 所有写入方式均失败 (${String(row)},${String(col)})`,
+    `[setCellValueDirect] 所有写入方式均失败 (${String(row)},${String(column)})`,
   )
   return false
 }

@@ -47,8 +47,8 @@ vi.mock('../ts/tools/locked-sheet.js', () => ({
   countDataRowsAfter: (worksheet: WpsWorksheet, headerRow: number): number => {
     /** 该行前 MAX_SCAN_COLUMNS(60) 列是否有值 */
     const hasCellValue = (row: number): boolean => {
-      for (let col = 1; col <= 60; col += 1) {
-        if (String(m.getCellValue(worksheet, row, col) ?? '').trim()) {
+      for (let column = 1; column <= 60; column += 1) {
+        if (String(m.getCellValue(worksheet, row, column) ?? '').trim()) {
           return true
         }
       }

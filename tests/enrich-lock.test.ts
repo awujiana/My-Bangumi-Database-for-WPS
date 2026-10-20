@@ -282,10 +282,10 @@ function setupBasicDom(): void {
 /** 配置跨工作簿扫描的 getCellValue / findHeaderRow mock（基于 worksheet._scan） */
 function setupScanMocks(): void {
   mockFindHeaderRow.mockImplementation((worksheet: ScanSheet) => worksheet._scan?.headerRow ?? 0)
-  mockGetCellValue.mockImplementation((worksheet: ScanSheet, row: number, col: number) => {
+  mockGetCellValue.mockImplementation((worksheet: ScanSheet, row: number, column: number) => {
     const scan = worksheet._scan
     if (!scan) return ''
-    if (row === scan.headerRow) return col <= scan.headerKeyCount ? '名称' : ''
+    if (row === scan.headerRow) return column <= scan.headerKeyCount ? '名称' : ''
     if (row > scan.headerRow && row <= scan.headerRow + scan.dataCount) return '追踪数据'
     return ''
   })

@@ -25,11 +25,11 @@ export function enrichTags(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiTagsCol = colMap.get('标签/分级') ?? colMap.get('标签')
+  const bangumiTagsCol = columnMap.get('标签/分级') ?? columnMap.get('标签')
   if (!bangumiTagsCol) return
 
   const incomingTags = incomingData.TAGS ?? ''
@@ -76,11 +76,11 @@ export function enrichPlatform(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const targetCol = colMap.get('在线播放平台') ?? colMap.get('播放平台')
+  const targetCol = columnMap.get('在线播放平台') ?? columnMap.get('播放平台')
   if (!targetCol) return
 
   const incomingPlatforms = incomingData['播放平台'] ?? ''
@@ -127,11 +127,11 @@ export function enrichDate(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiDateCol = colMap.get('开播日期')
+  const bangumiDateCol = columnMap.get('开播日期')
   if (!bangumiDateCol) return
 
   const date = incomingData['首播'] ?? ''
@@ -166,11 +166,11 @@ export function enrichEpisodes(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiEpisodesCol = colMap.get('集数')
+  const bangumiEpisodesCol = columnMap.get('集数')
   if (!bangumiEpisodesCol) return
 
   const incomingEpisodes = incomingData['集数'] ?? ''
@@ -205,11 +205,11 @@ export function enrichFeatures(
   sheet: WpsWorksheet,
   row: number,
   incomingData: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = colMap.get('特点/印象')
+  const bangumiFeatureCol = columnMap.get('特点/印象')
   if (!bangumiFeatureCol) return
 
   const featureParts: string[] = []

@@ -32,8 +32,9 @@ const mockReadRangeValues = vi.hoisted(() =>
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
+          for (let column = startCol; column <= endCol; column += 1) {
+            const value = mockGetCellValue(worksheet, row, column) as
+              string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)
@@ -60,8 +61,9 @@ const mockReadRangeCellValues = vi.hoisted(() =>
         const rows: (string | number | boolean | Date | null)[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
-          for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
+          for (let column = startCol; column <= endCol; column += 1) {
+            const value = mockGetCellValue(worksheet, row, column) as
+              string | number | boolean | null
             line.push(value ?? null)
           }
           rows.push(line)
@@ -185,7 +187,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
-  colNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColNumberToLetter,
   trim: vi.fn((v: string) => v.trim()),
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -296,7 +298,7 @@ function createMockSheet(
     rows?: unknown[][]
 
     // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
-    colMap?: Map<string, number>
+    columnMap?: Map<string, number>
   } = {},
 ) {
   const rows = options.rows ?? []

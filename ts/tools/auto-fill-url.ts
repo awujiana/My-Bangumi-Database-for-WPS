@@ -33,14 +33,14 @@ function _buildNameUrlMap(
   worksheet: WpsWorksheet,
   headerRow: number,
   lastRow: number,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
 ): NameUrlMap {
   const nameUrlMap: NameUrlMap = {}
 
-  const urlCol = colMap.get('Bangumi_URL')
-  const nameCol = colMap.get('名称')
+  const urlCol = columnMap.get('Bangumi_URL')
+  const nameCol = columnMap.get('名称')
   if (!urlCol || !nameCol) return nameUrlMap
-  const aliasCol = colMap.get('别名')
+  const aliasCol = columnMap.get('别名')
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
     const urlValue = trim(getCellValue(worksheet, row, urlCol))
@@ -81,9 +81,9 @@ export function autoFillUrls(): AutoFillResult {
       return result
     }
 
-    const colMap = getColumnMap(worksheet, headerRow)
-    const urlCol = colMap.get('Bangumi_URL')
-    const nameCol = colMap.get('名称')
+    const columnMap = getColumnMap(worksheet, headerRow)
+    const urlCol = columnMap.get('Bangumi_URL')
+    const nameCol = columnMap.get('名称')
     if (urlCol === undefined || nameCol === undefined) {
       BGM.Dialog.alert('未找到 "Bangumi_URL" 或 "名称" 列', '提示')
       return result
@@ -100,7 +100,7 @@ export function autoFillUrls(): AutoFillResult {
       `[autoFillUrls] 表头行: ${String(headerRow)}, 最后数据行: ${String(lastRow)}, URL列: ${String(urlCol)}, 名称列: ${String(nameCol)}`,
     )
 
-    const nameUrlMap = _buildNameUrlMap(worksheet, headerRow, lastRow, colMap)
+    const nameUrlMap = _buildNameUrlMap(worksheet, headerRow, lastRow, columnMap)
     const mappedKeys = Object.keys(nameUrlMap).length
     result.mappedNames = mappedKeys
 
@@ -143,11 +143,11 @@ export function showAutoFillUrlDialog(): void {
     return
   }
 
-  const colMap = getColumnMap(worksheet, headerRow)
-  const nameCount = colMap.has('名称') ? colMap.get('名称') : '?'
-  const urlCount = colMap.has('Bangumi_URL') ? colMap.get('Bangumi_URL') : '未找到'
+  const columnMap = getColumnMap(worksheet, headerRow)
+  const nameCount = columnMap.has('名称') ? columnMap.get('名称') : '?'
+  const urlCount = columnMap.has('Bangumi_URL') ? columnMap.get('Bangumi_URL') : '未找到'
 
-  if (!colMap.has('Bangumi_URL') || !colMap.has('名称')) {
+  if (!columnMap.has('Bangumi_URL') || !columnMap.has('名称')) {
     BGM.Dialog.alert('未找到 "Bangumi_URL" 或 "名称" 列，无法执行', '提示')
     return
   }

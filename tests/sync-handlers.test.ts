@@ -20,7 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-/** 假单元格：`row:col` → `{ Value, Interior? }` */
+/** 假单元格：`row:column` → `{ Value, Interior? }` */
 const cells = vi.hoisted(() => new Map<string, unknown>())
 
 /** BGM.sync / BGM.sheet 的运行态（getter 暴露给被测代码） */
@@ -45,8 +45,8 @@ const m = vi.hoisted(() => ({
   handleError: vi.fn(),
   getApp: vi.fn((): unknown => null),
   getCell: vi.fn(
-    (_ws: unknown, row: number, col: number): unknown =>
-      cells.get(`${String(row)}:${String(col)}`) ?? null,
+    (_ws: unknown, row: number, column: number): unknown =>
+      cells.get(`${String(row)}:${String(column)}`) ?? null,
   ),
   loadBgToken: vi.fn((): string | null => null),
   getDataSheet: vi.fn((): unknown => null),
@@ -1222,7 +1222,7 @@ describe('sync · 补充分支', () => {
 
     await runApiSync()
 
-    // §5.6 A3：改为矩形写——从批量矩阵按列下标（col-1）断言五个可选列
+    // §5.6 A3：改为矩形写——从批量矩阵按列下标（column-1）断言五个可选列
     expect(value2Writes).toHaveLength(1)
     expect(value2Writes[0]?.address).toBe('A2:L2')
     const matrix = value2Writes[0]?.value as unknown[][] | undefined

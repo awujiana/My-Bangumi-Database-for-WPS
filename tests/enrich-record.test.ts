@@ -7,9 +7,9 @@ const mockHandleError = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn<() => number>())
 const mockColNumberToLetter = vi.hoisted(() =>
-  vi.fn((col: number) => {
+  vi.fn((column: number) => {
     let result = ''
-    let n = col
+    let n = column
     while (n > 0) {
       result = String.fromCodePoint(65 + ((n - 1) % 26)) + result
       n = Math.floor((n - 1) / 26)
@@ -24,7 +24,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: mockGetApp,
   getLastRow: mockGetLastRow,
-  colNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColNumberToLetter,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
   BGM: { handleError: mockHandleError },
@@ -145,7 +145,8 @@ function createMockSheet(
   const cells = new Map<string, unknown>(Object.entries(options.cells ?? {}))
   // 同一地址必须复用同一桩：否则生产代码写入的样式与断言取到的不是同一对象
   const rangeCache = new Map<string, WpsRange>()
-  const usedRange = options.usedRange === undefined ? { Row: 1, Rows: { Count: 10 } } : options.usedRange
+  const usedRange =
+    options.usedRange === undefined ? { Row: 1, Rows: { Count: 10 } } : options.usedRange
   return {
     Name: options.name ?? 'Sheet1',
     Rows: { Count: options.rowCount ?? 50 },
@@ -190,9 +191,7 @@ function createMockWorkbook(sheets: WpsWorksheet[] = [], isThrowOnItem = false) 
 }
 
 /** 组装一条完整的富化记录参数 */
-function makeRecord(
-  overrides: Partial<AddEnrichRecordParameters> = {},
-): AddEnrichRecordParameters {
+function makeRecord(overrides: Partial<AddEnrichRecordParameters> = {}): AddEnrichRecordParameters {
   return {
     timestamp: '2026-09-14 20:00:00',
     matchType: '精确',
@@ -361,7 +360,12 @@ describe('enrich-record', () => {
 
       expect(isOk).toBe(true)
       expect(mockSetCellValue).toHaveBeenCalledTimes(9)
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COL.TIMESTAMP, '2026-09-14 20:00:00')
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        sheet,
+        11,
+        ENRICH_RECORD_COL.TIMESTAMP,
+        '2026-09-14 20:00:00',
+      )
       expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COL.ROW, 12)
       expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COL.NOTE, '备注内容')
       expect(getInteriorColor('H11')).toBe(BGM_COLOR.SUCCESS)
@@ -387,7 +391,12 @@ describe('enrich-record', () => {
 
       addEnrichRecord(makeRecord())
 
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 2, ENRICH_RECORD_COL.NAME, '葬送的芙莉莲')
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        sheet,
+        2,
+        ENRICH_RECORD_COL.NAME,
+        '葬送的芙莉莲',
+      )
     })
 
     it('UsedRange 缺失且只有 1 行时落到第 1 行', () => {
@@ -400,7 +409,12 @@ describe('enrich-record', () => {
 
       addEnrichRecord(makeRecord())
 
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 1, ENRICH_RECORD_COL.NAME, '葬送的芙莉莲')
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        sheet,
+        1,
+        ENRICH_RECORD_COL.NAME,
+        '葬送的芙莉莲',
+      )
     })
 
     it('操作单元格无 Interior 时跳过着色', () => {
@@ -631,7 +645,17 @@ describe('enrich-record', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook([sheet]) })
       mockGetLastRow.mockReturnValue(2)
       mockReadRangeValues.mockReturnValue([
-        ['t', undefined as unknown as string, 'n', 'abc', 'f', '', '', undefined as unknown as string, ''],
+        [
+          't',
+          undefined as unknown as string,
+          'n',
+          'abc',
+          'f',
+          '',
+          '',
+          undefined as unknown as string,
+          '',
+        ],
       ])
 
       const records = getAllEnrichRecords()

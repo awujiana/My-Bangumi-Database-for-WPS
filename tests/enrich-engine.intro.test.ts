@@ -37,39 +37,39 @@ function sheetNameOf(worksheet: unknown): string {
   }
 }
 
-function cellKey(sheetName: string, row: number, col: number): string {
-  return `${sheetName}_${String(row)}_${String(col)}`
+function cellKey(sheetName: string, row: number, column: number): string {
+  return `${sheetName}_${String(row)}_${String(column)}`
 }
 
-function getCell(sheetName: string, row: number, col: number): string {
-  return store.get(cellKey(sheetName, row, col)) ?? ''
+function getCell(sheetName: string, row: number, column: number): string {
+  return store.get(cellKey(sheetName, row, column)) ?? ''
 }
 
-function setCell(sheetName: string, row: number, col: number, value: string): void {
-  store.set(cellKey(sheetName, row, col), value)
+function setCell(sheetName: string, row: number, column: number, value: string): void {
+  store.set(cellKey(sheetName, row, column), value)
 }
 
 /** 该行在 1..50 列内是否存在非空值 */
 function hasAnyValue(sheetName: string, row: number): boolean {
-  for (let col = 1; col <= 50; col += 1) {
-    if (getCell(sheetName, row, col).trim()) return true
+  for (let column = 1; column <= 50; column += 1) {
+    if (getCell(sheetName, row, column).trim()) return true
   }
   return false
 }
 
-function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
-  return getCell(sheetNameOf(worksheet), row, col)
+function mockGetCellValue(worksheet: unknown, row: number, column: number): string {
+  return getCell(sheetNameOf(worksheet), row, column)
 }
 
-function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
-  setCell(sheetNameOf(worksheet), row, col, String(value))
+function mockSetCellValue(worksheet: unknown, row: number, column: number, value: unknown): void {
+  setCell(sheetNameOf(worksheet), row, column, String(value))
 }
 
 function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
   const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
-    for (let col = 1; col <= 12; col += 1) {
-      const value = getCell(sheetName, row, col).trim()
+    for (let column = 1; column <= 12; column += 1) {
+      const value = getCell(sheetName, row, column).trim()
       if (value.includes('名称') || value.toLowerCase().includes('name')) return row
     }
   }
@@ -79,9 +79,9 @@ function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
 function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, number> {
   const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCell(sheetName, headerRow, col).trim()
-    if (value) map.set(value, col)
+  for (let column = 1; column <= 50; column += 1) {
+    const value = getCell(sheetName, headerRow, column).trim()
+    if (value) map.set(value, column)
   }
   return map
 }
@@ -113,8 +113,8 @@ function mockReadRangeValues(
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let col = startCol; col <= endCol; col += 1) {
-      rowValues.push(getCell(sheetName, row, col))
+    for (let column = startCol; column <= endCol; column += 1) {
+      rowValues.push(getCell(sheetName, row, column))
     }
     result.push(rowValues)
   }
@@ -208,12 +208,12 @@ const BASE_COL_MAP = new Map<string, number>([
 
 function runIntro(
   data: Record<string, string>,
-  colMap: Map<string, number> = BASE_COL_MAP,
+  columnMap: Map<string, number> = BASE_COL_MAP,
   row = BANGUMI_ROW,
 ): { enriched: EnrichedField[]; conflicts: ConflictInfo[] } {
   const enriched: EnrichedField[] = []
   const conflicts: ConflictInfo[] = []
-  enrichIntroData(bangumiSheet, row, data, colMap, enriched, conflicts, 2, '葬送的芙莉莲')
+  enrichIntroData(bangumiSheet, row, data, columnMap, enriched, conflicts, 2, '葬送的芙莉莲')
   return { enriched, conflicts }
 }
 
@@ -299,13 +299,13 @@ describe('INTRO_FIELD_TO_BANGUMI 映射（经 enrichIntroData 验证）', () => 
   it('12 条映射全部把值写入对应目标列', () => {
     for (const { source, target, value, expected } of cases) {
       store.clear()
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         [target, 2],
         ['特点/印象', 10],
       ])
 
-      runIntro({ [source]: value }, colMap)
+      runIntro({ [source]: value }, columnMap)
 
       expect(getCell(BANGUMI, BANGUMI_ROW, 2)).toBe(expected)
       // 未回退到特点/印象
@@ -332,11 +332,11 @@ describe('INTRO_FIELD_TO_BANGUMI 映射（经 enrichIntroData 验证）', () => 
 
 function written(sourceKey: string, targetCol: string, value: string): string {
   store.clear()
-  const colMap = new Map<string, number>([
+  const columnMap = new Map<string, number>([
     ['名称', 1],
     [targetCol, 2],
   ])
-  runIntro({ [sourceKey]: value }, colMap)
+  runIntro({ [sourceKey]: value }, columnMap)
   return getCell(BANGUMI, BANGUMI_ROW, 2)
 }
 
@@ -425,12 +425,12 @@ describe('enrichIntroData 逻辑', () => {
     })
 
     it('目标列不存在时，回退到特点/印象', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['特点/印象', 10],
       ])
 
-      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, colMap)
+      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, columnMap)
 
       expect(enriched).toHaveLength(1)
       expect(enriched[0]?.fieldName).toBe('特点/印象(系列构成)')
@@ -439,9 +439,9 @@ describe('enrichIntroData 逻辑', () => {
     })
 
     it('目标列与特点/印象列都不存在时，整条字段被丢弃', () => {
-      const colMap = new Map<string, number>([['名称', 1]])
+      const columnMap = new Map<string, number>([['名称', 1]])
 
-      const { enriched, conflicts } = runIntro({ 系列构成: '虚渊玄' }, colMap)
+      const { enriched, conflicts } = runIntro({ 系列构成: '虚渊玄' }, columnMap)
 
       expect(enriched).toHaveLength(0)
       expect(conflicts).toHaveLength(0)
@@ -461,13 +461,13 @@ describe('enrichIntroData 逻辑', () => {
     })
 
     it('回退到特点/印象且内容已存在时记录 skip', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['特点/印象', 10],
       ])
       setCell(BANGUMI, BANGUMI_ROW, 10, '系列构成:虚渊玄')
 
-      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, colMap)
+      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, columnMap)
 
       expect(enriched).toHaveLength(1)
       expect(enriched[0]).toMatchObject({
@@ -479,13 +479,13 @@ describe('enrichIntroData 逻辑', () => {
     })
 
     it('回退到特点/印象且已有不同内容时追加', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['特点/印象', 10],
       ])
       setCell(BANGUMI, BANGUMI_ROW, 10, '其它:内容')
 
-      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, colMap)
+      const { enriched } = runIntro({ 系列构成: '虚渊玄' }, columnMap)
 
       expect(enriched[0]).toMatchObject({
         fieldName: '特点/印象(系列构成)',
@@ -499,46 +499,46 @@ describe('enrichIntroData 逻辑', () => {
 
   describe('特点/印象追加', () => {
     it('简介内容追加到特点/印象', () => {
-      const colMap = new Map<string, number>([['特点/印象', 10]])
+      const columnMap = new Map<string, number>([['特点/印象', 10]])
 
-      const { enriched } = runIntro({ 简介: '这是一部非常精彩的动画作品' }, colMap)
+      const { enriched } = runIntro({ 简介: '这是一部非常精彩的动画作品' }, columnMap)
 
       expect(enriched[0]?.fieldName).toBe('特点/印象(简介补充)')
       expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('简介:这是一部非常精彩的动画作品')
     })
 
     it('简介超过 80 字时截断并加省略号', () => {
-      const colMap = new Map<string, number>([['特点/印象', 10]])
+      const columnMap = new Map<string, number>([['特点/印象', 10]])
       const longIntro = 'A'.repeat(100)
 
-      runIntro({ 简介: longIntro }, colMap)
+      runIntro({ 简介: longIntro }, columnMap)
 
       const feature = getCell(BANGUMI, BANGUMI_ROW, 10)
       expect(feature).toBe(`简介:${'A'.repeat(80)}...`)
     })
 
     it('正好 80 字不截断', () => {
-      const colMap = new Map<string, number>([['特点/印象', 10]])
+      const columnMap = new Map<string, number>([['特点/印象', 10]])
       const intro = 'B'.repeat(80)
 
-      runIntro({ 简介: intro }, colMap)
+      runIntro({ 简介: intro }, columnMap)
 
       expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe(`简介:${intro}`)
     })
 
     it('已有特点/印象时追加而非替换', () => {
-      const colMap = new Map<string, number>([['特点/印象', 10]])
+      const columnMap = new Map<string, number>([['特点/印象', 10]])
       setCell(BANGUMI, BANGUMI_ROW, 10, '已有内容')
 
-      runIntro({ 简介: '新简介' }, colMap)
+      runIntro({ 简介: '新简介' }, columnMap)
 
       expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('已有内容 | 简介:新简介')
     })
 
     it('OP/ED/PV 与简介一起追加到特点/印象', () => {
-      const colMap = new Map<string, number>([['特点/印象', 10]])
+      const columnMap = new Map<string, number>([['特点/印象', 10]])
 
-      runIntro({ 简介: '好作品', OP: '主题曲', ED: '片尾曲', PV: '预告' }, colMap)
+      runIntro({ 简介: '好作品', OP: '主题曲', ED: '片尾曲', PV: '预告' }, columnMap)
 
       expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe(
         '简介:好作品 | OP:主题曲 | ED:片尾曲 | PV:预告',
@@ -548,7 +548,7 @@ describe('enrichIntroData 逻辑', () => {
 
   describe('多字段同时富化', () => {
     it('多个简介字段同时填充', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['导演', 3],
         ['脚本', 4],
@@ -558,7 +558,7 @@ describe('enrichIntroData 逻辑', () => {
 
       const { enriched, conflicts } = runIntro(
         { 导演: '新海诚', 编剧: '铃木贵昭', 音乐: '天门' },
-        colMap,
+        columnMap,
       )
 
       expect(conflicts).toHaveLength(0)
@@ -569,7 +569,7 @@ describe('enrichIntroData 逻辑', () => {
     })
 
     it('部分字段冲突时只处理空字段', () => {
-      const colMap = new Map<string, number>([
+      const columnMap = new Map<string, number>([
         ['名称', 1],
         ['导演', 3],
         ['音乐', 8],
@@ -577,7 +577,7 @@ describe('enrichIntroData 逻辑', () => {
       ])
       setCell(BANGUMI, BANGUMI_ROW, 3, '宫崎骏')
 
-      const { enriched, conflicts } = runIntro({ 导演: '新海诚', 音乐: '天门' }, colMap)
+      const { enriched, conflicts } = runIntro({ 导演: '新海诚', 音乐: '天门' }, columnMap)
 
       expect(conflicts).toHaveLength(1)
       expect(enriched.filter((item) => item.action === 'fill')).toHaveLength(1)
@@ -591,11 +591,11 @@ describe('enrichIntroData 逻辑', () => {
 describe('enrichOpEdPv 逻辑', () => {
   function runOpEdPv(
     data: Record<string, string>,
-    colMap: Map<string, number>,
+    columnMap: Map<string, number>,
     row = BANGUMI_ROW,
   ): EnrichedField[] {
     const enriched: EnrichedField[] = []
-    enrichOpEdPv(bangumiSheet, row, data, colMap, enriched)
+    enrichOpEdPv(bangumiSheet, row, data, columnMap, enriched)
     return enriched
   }
 
@@ -726,7 +726,7 @@ describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
 
 // ========== enrichAlias 逻辑测试 ==========
 
-/** 别名表头在 col 8；名称在 col 1（findHeaderRow 靠「名称」定位表头行） */
+/** 别名表头在 column 8；名称在 column 1（findHeaderRow 靠「名称」定位表头行） */
 function seedAliasHeader(): void {
   setCell(BANGUMI, 1, 1, '名称')
   setCell(BANGUMI, 1, 8, '别名')
@@ -735,11 +735,11 @@ function seedAliasHeader(): void {
 function runAlias(
   animeName: string,
   bangumiName: string | undefined,
-  colMap: Map<string, number> = new Map<string, number>([['名称', 1]]),
+  columnMap: Map<string, number> = new Map<string, number>([['名称', 1]]),
   row = BANGUMI_ROW,
 ): EnrichedField[] {
   const enriched: EnrichedField[] = []
-  enrichAlias(bangumiSheet, row, animeName, bangumiName, colMap, enriched)
+  enrichAlias(bangumiSheet, row, animeName, bangumiName, columnMap, enriched)
   return enriched
 }
 
@@ -1299,7 +1299,7 @@ describe('enrichIntroFromContext 按名称关联富化', () => {
 
 describe('简介工作表富化综合场景', () => {
   it('完整的简介富化流程（填充 / 冲突 / 标注 / 特点·印象）', () => {
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['名称', 1],
       ['导演', 3],
       ['脚本', 4],
@@ -1317,7 +1317,7 @@ describe('简介工作表富化综合场景', () => {
         音乐: '天门',
         简介: '精彩的动画',
       },
-      colMap,
+      columnMap,
     )
 
     expect(conflicts).toHaveLength(1)
@@ -1330,14 +1330,14 @@ describe('简介工作表富化综合场景', () => {
   })
 
   it('冲突经 resolveConflictField 以 append 落地', () => {
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['名称', 1],
       ['导演', 3],
       ['特点/印象', 10],
     ])
     setCell(BANGUMI, BANGUMI_ROW, 3, '宫崎骏')
 
-    const { conflicts } = runIntro({ 导演: '新海诚' }, colMap)
+    const { conflicts } = runIntro({ 导演: '新海诚' }, columnMap)
     const enriched: EnrichedField[] = []
     const conflict = conflicts[0]
     if (!conflict) throw new Error('未产生冲突记录')
@@ -1348,17 +1348,17 @@ describe('简介工作表富化综合场景', () => {
   })
 
   it('OP/ED/PV 与简介富化的组合', () => {
-    const colMap = new Map<string, number>([['特点/印象', 10]])
+    const columnMap = new Map<string, number>([['特点/印象', 10]])
 
-    runIntro({ 简介: '这是一部好作品' }, colMap)
+    runIntro({ 简介: '这是一部好作品' }, columnMap)
     const enriched: EnrichedField[] = []
-    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: '主题曲A', ED: '片尾曲B' }, colMap, enriched)
+    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: '主题曲A', ED: '片尾曲B' }, columnMap, enriched)
 
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('简介:这是一部好作品 | OP:主题曲A | ED:片尾曲B')
   })
 
   it('别名富化与简介富化的组合', () => {
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['名称', 1],
       ['导演', 3],
       ['特点/印象', 10],
@@ -1366,9 +1366,9 @@ describe('简介工作表富化综合场景', () => {
     setCell(BANGUMI, 1, 1, '名称')
     setCell(BANGUMI, 1, 8, '别名')
 
-    runIntro({ 导演: '新海诚' }, colMap)
+    runIntro({ 导演: '新海诚' }, columnMap)
     const enriched: EnrichedField[] = []
-    enrichAlias(bangumiSheet, BANGUMI_ROW, '葬送的芙莉莲', '芙莉莲', colMap, enriched)
+    enrichAlias(bangumiSheet, BANGUMI_ROW, '葬送的芙莉莲', '芙莉莲', columnMap, enriched)
 
     expect(getCell(BANGUMI, BANGUMI_ROW, 3)).toBe('新海诚')
     expect(enriched[0]?.action).toBe('append')

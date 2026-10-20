@@ -41,7 +41,7 @@ const mockState = vi.hoisted(() => ({
   findHeaderRow: vi.fn(() => 1),
   getLastRow: vi.fn(() => 1),
   getColumnMap: vi.fn(() => new Map<string, number>()),
-  getCellValue: vi.fn<(worksheet: unknown, row: number, col: number) => string>(() => ''),
+  getCellValue: vi.fn<(worksheet: unknown, row: number, column: number) => string>(() => ''),
   setCellValue: vi.fn(() => true),
   // 生产签名为 (worksheet, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
   readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
@@ -146,7 +146,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
     }
     return text.trim()
   },
-  colNumberToLetter: (n: number): string => {
+  columnNumberToLetter: (n: number): string => {
     let result = ''
     let number_ = n
     while (number_ > 0) {
@@ -367,7 +367,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
     ])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
       ['是否看完', 3],
@@ -377,7 +377,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
 
     const result = await SyncToBangumiAsync(
       mockWs as never,
-      colMap,
+      columnMap,
       'test-token',
       // lastRow
       2,
@@ -420,14 +420,14 @@ describe('Excel→Bangumi 完整同步流程', () => {
     ])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
       ['是否看完', 3],
       ['集数', 4],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
 
     // API 被调用
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -468,14 +468,14 @@ describe('5xx 重试场景', () => {
     ])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
       ['是否看完', 3],
       ['集数', 4],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
 
     // bgmRequestSync 应被调用至少一次
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -493,14 +493,14 @@ describe('5xx 重试场景', () => {
     ])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
       ['是否看完', 3],
       ['集数', 4],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
 
     // 流程应正常完成（不抛异常），失败计入 result
     expect(result.stopped).toBe(false)
@@ -583,14 +583,14 @@ describe('空 Excel 数据场景', () => {
     mockState.readRangeCellValues.mockReturnValue([])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
     const result = await SyncToBangumiAsync(
       mockWs as never,
-      colMap,
+      columnMap,
       'test-token',
       // lastRow=1（只有表头，无数据行）
       1,
@@ -613,12 +613,12 @@ describe('空 Excel 数据场景', () => {
     mockState.readRangeValues.mockReturnValue([['', '', '']])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
-    const colMap = new Map<string, number>([
+    const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
     expect(result.success).toBe(0)

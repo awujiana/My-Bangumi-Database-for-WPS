@@ -48,11 +48,11 @@ export function showSyncMappingDialog(): Promise<SyncMappingConfig | null> {
   }
 
   const headerRow = findHeaderRow(worksheet) || 1
-  const colMap = getColumnMap(worksheet, headerRow)
-  const rows = buildSyncMappingRows([...colMap.keys()])
+  const columnMap = getColumnMap(worksheet, headerRow)
+  const rows = buildSyncMappingRows([...columnMap.keys()])
 
   return new Promise<SyncMappingConfig | null>((resolve) => {
-    renderDialog(worksheet, headerRow, colMap, rows, resolve)
+    renderDialog(worksheet, headerRow, columnMap, rows, resolve)
   })
 }
 
@@ -60,7 +60,7 @@ export function showSyncMappingDialog(): Promise<SyncMappingConfig | null> {
 function renderDialog(
   worksheet: WpsWorksheet,
   headerRow: number,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   rows: SyncMappingRow[],
   resolve: (config: SyncMappingConfig | null) => void,
 ): void {
@@ -123,7 +123,7 @@ function renderDialog(
   /** 重新渲染列表（排序 / 补列后） */
   const renderList = (): void => {
     if (!list) return
-    const localColumns = [...colMap.keys()]
+    const localColumns = [...columnMap.keys()]
     list.innerHTML = rows
       .map((row, index) => renderRowHtml(row, index, rows.length, localColumns))
       .join('')
@@ -212,9 +212,9 @@ function renderDialog(
       return
     }
 
-    const { added, failed } = addHeaderColumns(worksheet, headerRow, colMap, missingNames)
+    const { added, failed } = addHeaderColumns(worksheet, headerRow, columnMap, missingNames)
     for (const name of added) {
-      const index = colMap.get(name)
+      const index = columnMap.get(name)
       const affectedRows = rows.filter((candidate) => candidate.defaultColumn === name)
       for (const row of affectedRows) {
         row.hasLocalColumn = true
@@ -317,29 +317,29 @@ function buildTargetOptions(row: SyncMappingRow, localColumns: readonly string[]
 function addHeaderColumns(
   worksheet: WpsWorksheet,
   headerRow: number,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   names: readonly string[],
 ): { added: string[]; failed: string[] } {
   let maxCol = 0
-  for (const col of colMap.values()) {
-    if (col > maxCol) maxCol = col
+  for (const column of columnMap.values()) {
+    if (column > maxCol) maxCol = column
   }
 
-  const written: { name: string; col: number }[] = []
+  const written: { name: string; column: number }[] = []
   let nextCol = maxCol
   for (const name of names) {
     nextCol += 1
     if (setCellValue(worksheet, headerRow, nextCol, name)) {
-      written.push({ name, col: nextCol })
+      written.push({ name, column: nextCol })
     }
   }
 
   const added: string[] = []
   const failed: string[] = []
-  for (const { name, col } of written) {
-    const readBack = getCellValue(worksheet, headerRow, col)
+  for (const { name, column } of written) {
+    const readBack = getCellValue(worksheet, headerRow, column)
     if (readBack === name) {
-      colMap.set(name, col)
+      columnMap.set(name, column)
       added.push(name)
     } else {
       failed.push(name)

@@ -385,8 +385,8 @@ function isRowPopulatedCells(cells: string[]): boolean {
 
 function countHeaderKeywordsInRow(worksheet: WpsWorksheet, row: number): number {
   let count = 0
-  for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-    const v = getCellValue(worksheet, row, col).toLowerCase()
+  for (let column = 1; column <= PANEL_CONFIG.MAX_SCAN_COLUMNS; column += 1) {
+    const v = getCellValue(worksheet, row, column).toLowerCase()
     if (v && HEADER_KEYWORDS.some((header) => v.includes(header.toLowerCase()))) count += 1
   }
   return count
@@ -394,8 +394,8 @@ function countHeaderKeywordsInRow(worksheet: WpsWorksheet, row: number): number 
 
 /** 判断某行「前 MAX_SCAN_COLUMNS 列中是否有任一列有值」 */
 export function isRowPopulated(worksheet: WpsWorksheet, row: number): boolean {
-  for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-    if (getCellValue(worksheet, row, col).trim()) return true
+  for (let column = 1; column <= PANEL_CONFIG.MAX_SCAN_COLUMNS; column += 1) {
+    if (getCellValue(worksheet, row, column).trim()) return true
   }
   return false
 }

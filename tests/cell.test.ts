@@ -7,9 +7,9 @@ vi.mock('../ts/tools/util/index.js', () => ({
 }))
 
 vi.mock('../ts/tools/string-utilities.js', () => ({
-  colNumberToLetter: (col: number) => {
+  columnNumberToLetter: (column: number) => {
     let result = ''
-    let n = col
+    let n = column
     while (n > 0) {
       const remainder = (n - 1) % 26
       result = String.fromCodePoint(65 + remainder) + result

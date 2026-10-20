@@ -51,28 +51,29 @@ function renderSourceDetailTable(worksheet: WpsWorksheet): string {
   const fieldByCol = new Map<number, ScalarMappingKey>()
   if (mapping) {
     for (const f of COLUMN_MAPPING_FIELDS) {
-      const col = mapping[f.key]
-      if (col && col > 0) fieldByCol.set(col, f.key)
+      const column = mapping[f.key]
+      if (column && column > 0) fieldByCol.set(column, f.key)
     }
     const extraPlatformCols = mapping.platformExtraCols ?? []
-    for (const col of extraPlatformCols) {
-      fieldByCol.set(col, 'platformCol')
+    for (const column of extraPlatformCols) {
+      fieldByCol.set(column, 'platformCol')
     }
   }
   const labelByField = new Map(COLUMN_MAPPING_FIELDS.map((f) => [f.key, f.label]))
 
   interface DetailColumn {
-    col: number
+    column: number
     label: string
     field?: ScalarMappingKey | undefined
   }
   const columns: DetailColumn[] = []
-  for (let col = 1; col <= maxCols; col += 1) {
-    const header = getCellValue(worksheet, headerRow, col).trim()
-    const field = fieldByCol.get(col)
+  for (let column = 1; column <= maxCols; column += 1) {
+    const header = getCellValue(worksheet, headerRow, column).trim()
+    const field = fieldByCol.get(column)
     if (header || field) {
-      const label = header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
-      columns.push({ col, label, field })
+      const label =
+        header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(column)}列`
+      columns.push({ column, label, field })
     }
   }
 
@@ -88,7 +89,7 @@ function renderSourceDetailTable(worksheet: WpsWorksheet): string {
     const rowCells: string[] = []
     let hasData = false
     for (const column of columns) {
-      const value = getCellValue(worksheet, row, column.col).trim()
+      const value = getCellValue(worksheet, row, column.column).trim()
       if (value) hasData = true
       if (column.field) {
         // 已映射字段复用预览渲染（空值时 renderPreviewCell 自会输出空 td）

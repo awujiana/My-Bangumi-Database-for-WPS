@@ -63,8 +63,8 @@ export function markSyncResultColor(
   isSuccess: boolean,
   seqCol?: number,
 ): void {
-  const col = seqCol ?? DEFAULT_SEQ_COL
-  const cell = getCell(worksheet, row, col)
+  const column = seqCol ?? DEFAULT_SEQ_COL
+  const cell = getCell(worksheet, row, column)
   if (cell?.Interior) {
     cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL
   }

@@ -15,7 +15,7 @@ import {
   getLastRow,
   getCellValue,
   readRangeValues,
-  colNumberToLetter,
+  columnNumberToLetter,
   trim,
   bgmLog,
 } from '../tools/util/index.js'
@@ -111,12 +111,12 @@ function fieldOrDefault(entry: Record<string, unknown>, field: string): unknown 
  *
  * @param worksheet 工作表
  * @param row 行号
- * @param col 列号
+ * @param column 列号
  * @returns 单元格显示文本，空值返回空字符串
  */
-function getCellText(worksheet: WpsWorksheet, row: number, col: number): string {
+function getCellText(worksheet: WpsWorksheet, row: number, column: number): string {
   try {
-    const address = colNumberToLetter(col) + String(row)
+    const address = columnNumberToLetter(column) + String(row)
     const cell = worksheet.Range(address)
     // 尝试读取 Text 属性（保留本地格式）
     const raw = (cell as unknown as { Text?: unknown }).Text
@@ -126,7 +126,7 @@ function getCellText(worksheet: WpsWorksheet, row: number, col: number): string 
   } catch {
     // 忽略，回退到 getCellValue
   }
-  return trim(getCellValue(worksheet, row, col))
+  return trim(getCellValue(worksheet, row, column))
 }
 
 /**
@@ -151,9 +151,9 @@ export function buildJsonlFromSheet(): string {
 
   const headerRow = findHeaderRow(worksheet) || 1
   const lastRow = getLastRow(worksheet)
-  const colMap = getColumnMap(worksheet, headerRow)
+  const columnMap = getColumnMap(worksheet, headerRow)
 
-  const urlCol = colMap.get('Bangumi_URL')
+  const urlCol = columnMap.get('Bangumi_URL')
   if (urlCol === undefined) {
     bgmLog(LOG_LEVELS.WARN, '[exportJsonl] 未找到 Bangumi_URL 列，无法导出')
     return ''
@@ -169,14 +169,14 @@ export function buildJsonlFromSheet(): string {
   for (const [, excelField] of EXTENDED_FIELD_MAP) batchKeys.add(excelField)
   let batchMaxCol = urlCol
   for (const key of batchKeys) {
-    const col = colMap.get(key)
-    if (col !== undefined && col > batchMaxCol) batchMaxCol = col
+    const column = columnMap.get(key)
+    if (column !== undefined && column > batchMaxCol) batchMaxCol = column
   }
   const block = readRangeValues(worksheet, startRow, lastRow, 1, batchMaxCol)
   const canBatch = block.length === lastRow - startRow + 1
   // 矩形读不可用时回退逐格读（行为与改造前一致）
-  const cellText = (row: number, col: number): string =>
-    canBatch ? (block[row - startRow]?.[col - 1] ?? '') : getCellValue(worksheet, row, col)
+  const cellText = (row: number, column: number): string =>
+    canBatch ? (block[row - startRow]?.[column - 1] ?? '') : getCellValue(worksheet, row, column)
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(cellText(row, urlCol))
@@ -184,16 +184,16 @@ export function buildJsonlFromSheet(): string {
       const sid = extractSubjectId(url)
       if (sid) {
         const getField = (key: string): string => {
-          const col = colMap.get(key)
-          if (!col) return ''
-          return trim(cellText(row, col))
+          const column = columnMap.get(key)
+          if (!column) return ''
+          return trim(cellText(row, column))
         }
 
         // 日期列优先使用本地格式（Text 属性），保留用户设置的日期格式
         const getDateField = (key: string): string => {
-          const col = colMap.get(key)
-          if (!col) return ''
-          return getCellText(worksheet, row, col)
+          const column = columnMap.get(key)
+          if (!column) return ''
+          return getCellText(worksheet, row, column)
         }
 
         const name = getField('名称')

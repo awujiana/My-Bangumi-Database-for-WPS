@@ -49,8 +49,8 @@ export function getSelectedRowSids(): Set<string> {
     const worksheet = app.ActiveSheet
     if (!worksheet) return sids
     const headerRow = findHeaderRow(worksheet) || 1
-    const colMap = getColumnMap(worksheet, headerRow)
-    const urlCol = colMap.get('Bangumi_URL')
+    const columnMap = getColumnMap(worksheet, headerRow)
+    const urlCol = columnMap.get('Bangumi_URL')
     if (!urlCol) {
       bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 未找到 Bangumi_URL 列')
       return sids

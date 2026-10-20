@@ -85,17 +85,17 @@ let cellGrid: Record<number, Record<number, string>> = {}
 /** 构造虚拟网格：grid[行][列] = 单元格文本（与 cellGrid 合并，rows 优先） */
 function makeGrid(rows: Record<number, Record<number, string>>): void {
   const merged: Record<number, Record<number, string>> = { ...cellGrid }
-  for (const [rowKey, cols] of Object.entries(rows)) {
+  for (const [rowKey, columns] of Object.entries(rows)) {
     const row = Number(rowKey)
-    merged[row] = { ...merged[row], ...cols }
+    merged[row] = { ...merged[row], ...columns }
   }
   mocks.readRangeValues.mockImplementation(
     (_ws: unknown, r1: number, r2: number, c1: number, c2: number) => {
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
-        for (let col = c1; col <= c2; col += 1) {
-          line.push(merged[row]?.[col] ?? '')
+        for (let column = c1; column <= c2; column += 1) {
+          line.push(merged[row]?.[column] ?? '')
         }
         out.push(line)
       }
@@ -108,7 +108,7 @@ function makeGrid(rows: Record<number, Record<number, string>>): void {
 function setCellGrid(rows: Record<number, Record<number, string>>): void {
   cellGrid = rows
   mocks.getCellValue.mockImplementation(
-    (_ws: unknown, row: number, col: number) => rows[row]?.[col] ?? '',
+    (_ws: unknown, row: number, column: number) => rows[row]?.[column] ?? '',
   )
 }
 
@@ -164,7 +164,7 @@ function fakeTarget(key: string, label: string, sheetName = '动画'): CleanTarg
     label,
     headerRow: 1,
     lastRow: 5,
-    colMap: new Map(DEFAULT_COL_MAP),
+    columnMap: new Map(DEFAULT_COL_MAP),
     worksheet: { Name: sheetName } as CleanTargetInfo['worksheet'],
   }
 }
@@ -246,7 +246,7 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(targets[0]?.sheetName).toBe('剧集和小说')
     expect(targets[0]?.lastRow).toBe(30)
     // 名称列缺失，但 URL 类规则仍可用；缺列的行级规则扫描时自行跳过
-    expect(targets[0]?.colMap.has('名称')).toBe(false)
+    expect(targets[0]?.columnMap.has('名称')).toBe(false)
   })
 
   it('既无「名称」也无「Bangumi_URL」的表跳过（非 Bangumi 数据表）', () => {
@@ -279,8 +279,8 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(targets).toHaveLength(1)
     expect(targets[0]?.headerRow).toBe(1)
     expect(targets[0]?.lastRow).toBe(30)
-    // 特征列缺失 → colMap 无「名称」/「Bangumi_URL」，规则扫描时会自行跳过并说明原因
-    expect(targets[0]?.colMap.has('名称')).toBe(false)
+    // 特征列缺失 → columnMap 无「名称」/「Bangumi_URL」，规则扫描时会自行跳过并说明原因
+    expect(targets[0]?.columnMap.has('名称')).toBe(false)
   })
 
   it('用户未勾选该工作表时返回空数组', () => {
@@ -320,11 +320,11 @@ describe('listCleanTargets · 配置过滤', () => {
     makeGrid({ 3: { 3: '新番表 by Hazx.' }, 5: { 3: '淫狱团地' } })
     const targets = listCleanTargets()
     expect(targets).toHaveLength(1)
-    const colMap = targets[0]?.colMap
+    const columnMap = targets[0]?.columnMap
     // 名称列 = C 列
-    expect(colMap?.get('名称')).toBe(3)
+    expect(columnMap?.get('名称')).toBe(3)
     // TAGS 列复用「标签/分级」键
-    expect(colMap?.get('标签/分级')).toBe(14)
+    expect(columnMap?.get('标签/分级')).toBe(14)
   })
 
   it('新番表表头未命中签名时仍按标准「名称」要求跳过', () => {
@@ -462,7 +462,7 @@ describe('scanCleanRules', () => {
     makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
     mocks.planDuplicateRows.mockReturnValue({
       deleteRows: [3],
-      changes: [{ row: 2, col: 3, value: '合并标签' }],
+      changes: [{ row: 2, column: 3, value: '合并标签' }],
       groups: 1,
       mergedGroups: 1,
     })
@@ -480,7 +480,7 @@ describe('scanCleanRules', () => {
     const shared = {
       headerRow: 1,
       lastRow: 4,
-      colMap: new Map(DEFAULT_COL_MAP),
+      columnMap: new Map(DEFAULT_COL_MAP),
       dataStartRow: 2,
     }
     mocks.readSheetLayout.mockReturnValue(shared)
@@ -519,7 +519,7 @@ describe('scanCleanRules', () => {
     mockWorkbookSheet('2026年4月新番表')
     makeGrid({ 3: { 3: '新番表 by Hazx.' }, 5: { 3: '淫狱团地' } })
     // 新番表无标准「名称」表头 → readSheetLayout 标准路径解析失败返回 null。
-    // 共享该结果不会让新番表突然获得行级清理能力（推导 colMap 不进 layout 选项）。
+    // 共享该结果不会让新番表突然获得行级清理能力（推导 columnMap 不进 layout 选项）。
     mocks.readSheetLayout.mockReturnValue(null)
     mocks.planDuplicateRows.mockReturnValue({
       deleteRows: [],
@@ -676,9 +676,9 @@ describe('aggregatePlans', () => {
           targetLabel: target.label,
           deleteRows: [],
           changes: [
-            { row: 2, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'A' },
-            { row: 2, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'B' },
-            { row: 3, col: 3, columnName: '标签/分级', oldValue: 'X', nextValue: 'X' },
+            { row: 2, column: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'A' },
+            { row: 2, column: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'B' },
+            { row: 3, column: 3, columnName: '标签/分级', oldValue: 'X', nextValue: 'X' },
           ],
           estimatedBytes: 0,
         },
@@ -709,7 +709,7 @@ describe('runCleanPlans', () => {
           targetKey: 't1',
           targetLabel: target.label,
           deleteRows: [4],
-          changes: [{ row: 2, col: 3, columnName: '标签/分级', oldValue: 'B站', nextValue: '' }],
+          changes: [{ row: 2, column: 3, columnName: '标签/分级', oldValue: 'B站', nextValue: '' }],
           estimatedBytes: 0,
         },
       ],
@@ -967,8 +967,8 @@ describe('listCleanTargets · 新番表锚点列缺失', () => {
     const targets = listCleanTargets()
     expect(targets).toHaveLength(1)
     // 锚点查找失败 → 名称列无法推导（规则扫描时自行跳过）
-    expect(targets[0]?.colMap.has('名称')).toBe(false)
-    expect(targets[0]?.colMap.get('标签/分级')).toBe(14)
+    expect(targets[0]?.columnMap.has('名称')).toBe(false)
+    expect(targets[0]?.columnMap.get('标签/分级')).toBe(14)
   })
 
   it('锚点左侧列有表头文本时停止名称列回退查找（名称列缺省）', () => {
@@ -984,8 +984,8 @@ describe('listCleanTargets · 新番表锚点列缺失', () => {
 
     const targets = listCleanTargets()
     expect(targets).toHaveLength(1)
-    expect(targets[0]?.colMap.has('名称')).toBe(false)
-    expect(targets[0]?.colMap.get('标签/分级')).toBe(14)
+    expect(targets[0]?.columnMap.has('名称')).toBe(false)
+    expect(targets[0]?.columnMap.get('标签/分级')).toBe(14)
   })
 })
 
@@ -1107,7 +1107,7 @@ describe('scanCleanRules · 目标列解析退化匹配', () => {
 
     const result = await scanCleanRules(['noise-tags'])
     expect(result.plans).toHaveLength(1)
-    expect(result.plans[0]?.changes[0]?.col).toBe(3)
+    expect(result.plans[0]?.changes[0]?.column).toBe(3)
     expect(result.plans[0]?.changes[0]?.columnName).toBe('标签/分级（备注）')
   })
 
@@ -1126,7 +1126,7 @@ describe('scanCleanRules · 目标列解析退化匹配', () => {
     makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
     mocks.planDuplicateRows.mockReturnValue({
       deleteRows: [3],
-      changes: [{ row: 2, col: 99, value: '合并标签' }],
+      changes: [{ row: 2, column: 99, value: '合并标签' }],
       groups: 1,
       mergedGroups: 1,
     })
@@ -1307,8 +1307,8 @@ describe('runCleanPlans · 多行删除排序', () => {
           targetLabel: target.label,
           deleteRows: [],
           changes: [
-            { row: 3, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'B' },
-            { row: 2, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'C' },
+            { row: 3, column: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'B' },
+            { row: 2, column: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'C' },
           ],
           estimatedBytes: 0,
         },

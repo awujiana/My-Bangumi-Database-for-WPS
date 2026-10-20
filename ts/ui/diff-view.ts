@@ -172,7 +172,10 @@ export function renderDiffRow(row: DiffRow, columnCount: number): string {
 /** 渲染区块骨架（表头 + 首页行 + 「显示更多」按钮） */
 function renderSectionShell(section: DiffSection, pageSize: number): string {
   const headCells = section.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('')
-  const firstPage = section.rows.slice(0, pageSize).map((row) => renderDiffRow(row, section.columns.length)).join('')
+  const firstPage = section.rows
+    .slice(0, pageSize)
+    .map((row) => renderDiffRow(row, section.columns.length))
+    .join('')
   const remaining = section.rows.length - Math.min(section.rows.length, pageSize)
   const subtitle = section.subtitle
     ? `<span class="diff-section-subtitle">${escapeHtml(section.subtitle)}</span>`
@@ -185,7 +188,7 @@ function renderSectionShell(section: DiffSection, pageSize: number): string {
   <div class="diff-section-head"><span class="diff-section-title">${escapeHtml(section.title)}</span>${subtitle}</div>
   <div class="diff-table-wrap">
     <table class="diff-table">
-      <thead><tr><th class="diff-marker-col" aria-label="变更类型"></th><th class="diff-num-col">行号</th>${headCells}</tr></thead>
+      <thead><tr><th class="diff-marker-column" aria-label="变更类型"></th><th class="diff-num-column">行号</th>${headCells}</tr></thead>
       <tbody>${firstPage}</tbody>
     </table>
   </div>${moreButton}
@@ -243,7 +246,10 @@ export function appendDiffPage(container: HTMLElement, sectionId: string): numbe
   const tbody = sectionElement?.querySelector('tbody')
   if (!tbody) return 0
   // 行片段必须走 sanitizeTableRows：顶层裸 <tr> 在 DOMPurify 主路径会被剥离
-  tbody.insertAdjacentHTML('beforeend', sanitizeTableRows(nextRows.map((row) => renderDiffRow(row, section.columns.length)).join('')))
+  tbody.insertAdjacentHTML(
+    'beforeend',
+    sanitizeTableRows(nextRows.map((row) => renderDiffRow(row, section.columns.length)).join('')),
+  )
   const nextCount = rendered + nextRows.length
   state.rendered.set(sectionId, nextCount)
 

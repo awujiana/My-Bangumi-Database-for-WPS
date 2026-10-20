@@ -46,41 +46,41 @@ function sheetNameOf(worksheet: unknown): string {
   return (worksheet as { Name?: string } | null | undefined)?.Name ?? 'worksheet'
 }
 
-function cellKey(sheetName: string, row: number, col: number): string {
-  return `${sheetName}_${String(row)}_${String(col)}`
+function cellKey(sheetName: string, row: number, column: number): string {
+  return `${sheetName}_${String(row)}_${String(column)}`
 }
 
-function getCell(sheetName: string, row: number, col: number): string {
-  return store.get(cellKey(sheetName, row, col)) ?? ''
+function getCell(sheetName: string, row: number, column: number): string {
+  return store.get(cellKey(sheetName, row, column)) ?? ''
 }
 
-function setCell(sheetName: string, row: number, col: number, value: string): void {
-  store.set(cellKey(sheetName, row, col), value)
+function setCell(sheetName: string, row: number, column: number, value: string): void {
+  store.set(cellKey(sheetName, row, column), value)
 }
 
 /** 该行在 1..50 列内是否存在非空值 */
 function hasAnyValue(sheetName: string, row: number): boolean {
-  for (let col = 1; col <= 50; col += 1) {
-    if (getCell(sheetName, row, col).trim()) return true
+  for (let column = 1; column <= 50; column += 1) {
+    if (getCell(sheetName, row, column).trim()) return true
   }
   return false
 }
 
 /** 与生产接口同形；`throwOnCol` 用于制造 COM 读取异常 */
-function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
-  if (throwOnCol !== null && col === throwOnCol) throw new Error('COM 读取失败')
-  return getCell(sheetNameOf(worksheet), row, col)
+function mockGetCellValue(worksheet: unknown, row: number, column: number): string {
+  if (throwOnCol !== null && column === throwOnCol) throw new Error('COM 读取失败')
+  return getCell(sheetNameOf(worksheet), row, column)
 }
 
-function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
-  setCell(sheetNameOf(worksheet), row, col, String(value))
+function mockSetCellValue(worksheet: unknown, row: number, column: number, value: unknown): void {
+  setCell(sheetNameOf(worksheet), row, column, String(value))
 }
 
 function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
   const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
-    for (let col = 1; col <= 12; col += 1) {
-      const value = getCell(sheetName, row, col).trim()
+    for (let column = 1; column <= 12; column += 1) {
+      const value = getCell(sheetName, row, column).trim()
       if (value.includes('名称') || value.toLowerCase().includes('name')) return row
     }
   }
@@ -91,9 +91,9 @@ function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, nu
   if (isThrowOnGetColumnMap) throw new Error('COM 读取表头失败')
   const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCell(sheetName, headerRow, col).trim()
-    if (value) map.set(value, col)
+  for (let column = 1; column <= 50; column += 1) {
+    const value = getCell(sheetName, headerRow, column).trim()
+    if (value) map.set(value, column)
   }
   return map
 }
@@ -126,8 +126,8 @@ function mockReadRangeValues(
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let col = startCol; col <= endCol; col += 1) {
-      rowValues.push(getCell(sheetName, row, col))
+    for (let column = startCol; column <= endCol; column += 1) {
+      rowValues.push(getCell(sheetName, row, column))
     }
     result.push(rowValues)
   }
@@ -520,15 +520,15 @@ function runFieldFunction(
     sheet: never,
     row: number,
     incoming: Record<string, string>,
-    colMap: Map<string, number>,
+    columnMap: Map<string, number>,
     enriched: EnrichedField[],
   ) => void,
   incoming: Record<string, string>,
-  colMap: Map<string, number>,
+  columnMap: Map<string, number>,
   row = 2,
 ): EnrichedField[] {
   const enriched: EnrichedField[] = []
-  function_(bangumiSheet, row, incoming, colMap, enriched)
+  function_(bangumiSheet, row, incoming, columnMap, enriched)
   return enriched
 }
 
@@ -1082,7 +1082,7 @@ function seedSearchSheet(): void {
 }
 
 describe('searchSheet 搜索', () => {
-  const colMap = new Map<string, number>([
+  const columnMap = new Map<string, number>([
     ['名称', 1],
     ['别名', 2],
   ])
@@ -1090,8 +1090,8 @@ describe('searchSheet 搜索', () => {
   it('关键词为空（含纯空白）时返回空数组', () => {
     seedSearchSheet()
 
-    expect(searchSheet(bangumiSheet, '', colMap, 2)).toEqual([])
-    expect(searchSheet(bangumiSheet, ' '.repeat(3), colMap, 2)).toEqual([])
+    expect(searchSheet(bangumiSheet, '', columnMap, 2)).toEqual([])
+    expect(searchSheet(bangumiSheet, ' '.repeat(3), columnMap, 2)).toEqual([])
   })
 
   it('缺少名称列时返回空数组', () => {
@@ -1103,13 +1103,13 @@ describe('searchSheet 搜索', () => {
   it('数据起始行大于末行时返回空数组', () => {
     seedSearchSheet()
 
-    expect(searchSheet(bangumiSheet, '芙莉莲', colMap, 10)).toEqual([])
+    expect(searchSheet(bangumiSheet, '芙莉莲', columnMap, 10)).toEqual([])
   })
 
   it('命中名称并附带命中的别名', () => {
     seedSearchSheet()
 
-    const results = searchSheet(bangumiSheet, '芙莉莲', colMap, 2)
+    const results = searchSheet(bangumiSheet, '芙莉莲', columnMap, 2)
 
     expect(results).toHaveLength(1)
     const [first] = results
@@ -1134,6 +1134,6 @@ describe('searchSheet 搜索', () => {
   it('无命中时返回空数组', () => {
     seedSearchSheet()
 
-    expect(searchSheet(bangumiSheet, '不存在的番', colMap, 2)).toEqual([])
+    expect(searchSheet(bangumiSheet, '不存在的番', columnMap, 2)).toEqual([])
   })
 })

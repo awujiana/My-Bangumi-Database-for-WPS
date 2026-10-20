@@ -15,7 +15,7 @@
  *
  * ## 一处刻意不追的不可达分支
  *
- * 第 74 行的 `|| \`第${col}列\`` 兜底**不可达**：进入该表达式的前提是
+ * 第 74 行的 `|| \`第${column}列\`` 兜底**不可达**：进入该表达式的前提是
  * `header || field` 为真，而 header 为空时 `field` 必来自 `fieldByCol`，
  * 其取值只可能是 `COLUMN_MAPPING_FIELDS` 的 key 或 `'platformCol'`，
  * 两者都在 `labelByField` 里 → `?? ''` 永远不会落到最后的 `||`。
@@ -56,14 +56,14 @@ import { resetUtilityMock, utilityMock } from './helpers/utility-mock.js'
 /** `行:列` → 单元格文本 */
 let cells = new Map<string, string>()
 
-function setCell(row: number, col: number, value: string): void {
-  cells.set(`${String(row)}:${String(col)}`, value)
+function setCell(row: number, column: number, value: string): void {
+  cells.set(`${String(row)}:${String(column)}`, value)
 }
 
 /** 让 `getCellValue` 按地址表取值；未设置的地址返回空串（真实 COM 的空白单元格语义） */
 function stubCellReading(): void {
   utilityMock.getCellValue.mockImplementation(
-    (_sheet, row, col) => cells.get(`${String(row)}:${String(col)}`) ?? '',
+    (_sheet, row, column) => cells.get(`${String(row)}:${String(column)}`) ?? '',
   )
 }
 
@@ -81,8 +81,8 @@ function mountModal(): { modal: HTMLElement; body: HTMLElement } {
 
 /** 铺一张只有表头的源表（1..50 列都有表头，便于验证截断） */
 function fillHeaderRow(headerRow: number, count: number): void {
-  for (let col = 1; col <= count; col += 1) {
-    setCell(headerRow, col, `H${String(col)}`)
+  for (let column = 1; column <= count; column += 1) {
+    setCell(headerRow, column, `H${String(column)}`)
   }
 }
 

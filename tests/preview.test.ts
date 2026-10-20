@@ -58,10 +58,10 @@ const mocks = vi.hoisted(() => ({
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
-        for (let col = c1; col <= c2; col += 1) {
+        for (let column = c1; column <= c2; column += 1) {
           // 与真实实现一致：单格读取失败按空串处理，不让整块读失败
           try {
-            line.push(mocks.getCellValue(_ws, row, col))
+            line.push(mocks.getCellValue(_ws, row, column))
           } catch {
             line.push('')
           }
@@ -323,7 +323,7 @@ beforeEach(() => {
   mocks.getApp.mockReturnValue(null)
   mocks.getColumnMap.mockReturnValue(makeColMap())
   mocks.getCellValue.mockImplementation(
-    (_ws: unknown, row: number, col: number) => cells[`${String(row)}:${String(col)}`] ?? '',
+    (_ws: unknown, row: number, column: number) => cells[`${String(row)}:${String(column)}`] ?? '',
   )
   interiorReads.value = 0
   mocks.getCell.mockImplementation((_ws: unknown, row: number) => ({
@@ -436,8 +436,8 @@ describe('preview · previewSyncContent', () => {
     mountDiv('scrollToBottomBtn')
     // 第 3 行拿不到 Interior（宿主返回裸对象）→ 已上传判定走「无 Interior」早退
     const baseGetCell = mocks.getCell.getMockImplementation()
-    mocks.getCell.mockImplementation((worksheet: unknown, row: number, col: number) =>
-      row === 3 ? null : baseGetCell?.(worksheet, row, col),
+    mocks.getCell.mockImplementation((worksheet: unknown, row: number, column: number) =>
+      row === 3 ? null : baseGetCell?.(worksheet, row, column),
     )
 
     await previewSyncContent()
@@ -516,9 +516,9 @@ describe('preview · previewSyncContent', () => {
     // 第 5 行：有 URL 但读取时抛错 → 错误
     cells['5:3'] = 'https://bgm.tv/subject/500'
     const original = mocks.getCellValue.getMockImplementation()
-    mocks.getCellValue.mockImplementation((worksheet: unknown, row: number, col: number) => {
+    mocks.getCellValue.mockImplementation((worksheet: unknown, row: number, column: number) => {
       if (row === 5) throw new Error('读取越界')
-      return original?.(worksheet, row, col) ?? ''
+      return original?.(worksheet, row, column) ?? ''
     })
 
     // 本用例覆盖的是「逐格读抛错 ⇒ 计入错误行」：矩形读可用时整块读成功，

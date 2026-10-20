@@ -23,7 +23,7 @@ import {
   getApp,
   BGM,
   getLastRow,
-  colNumberToLetter,
+  columnNumberToLetter,
   getCellValue,
   setCellValue,
   readRangeValues,
@@ -142,15 +142,15 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     // 已有工作表，检查并补齐表头
     const existingCols = SYNC_RECORD_COLUMNS.length
     for (let index = 0; index < existingCols; index += 1) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = syncSheet.Range(`${colLetter}1`)
+      const columnLetter = columnNumberToLetter(index + 1)
+      const cell = syncSheet.Range(`${columnLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
       const expectedHeader = SYNC_RECORD_COLUMNS[index] ?? ''
       if (currentHeader !== expectedHeader) {
         cell.Value2 = expectedHeader
         bgmLog(
           LOG_LEVELS.INFO,
-          `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
+          `修复表头: ${columnLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
         )
       }
     }
@@ -216,7 +216,7 @@ function invalidateCache(): void {
 function writeSheetRows(sheet: WpsWorksheet, startRow: number, rows: WpsCellValue[][]): void {
   if (rows.length === 0) return
   const endRow = startRow + rows.length - 1
-  const endCol = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
+  const endCol = columnNumberToLetter(SYNC_RECORD_COLUMNS.length)
   const range = sheet.Range(`A${String(startRow)}:${endCol}${String(endRow)}`)
   range.Value2 = rows
 }
@@ -242,7 +242,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
 
   for (const source of allData) {
     /** 按 1-based 列号取该行的原始文本 */
-    const cell = (col: number): string => source[col - 1] ?? ''
+    const cell = (column: number): string => source[column - 1] ?? ''
     const oldSid = cell(isLegacyWithSeq ? 5 : 1).trim()
     const oldUrl = cell(4).trim()
     const oldType = cell(isLegacyWithSeq ? 6 : 5)
@@ -298,7 +298,7 @@ export function writeSheetHeaderRow(
   headers: readonly string[],
   options?: { gray?: boolean },
 ): void {
-  const headerRange = sheet.Range(`A1:${colNumberToLetter(headers.length)}1`)
+  const headerRange = sheet.Range(`A1:${columnNumberToLetter(headers.length)}1`)
   // 展开成可变数组：headers 声明为 readonly string[]（泛化后可接受任意列清单），
   // 而 Range.Value2 需要可变二维数组 —— 不展开会触发 TS 类型错误（readonly 不可赋值）。
   headerRange.Value2 = [[...headers]]
@@ -373,8 +373,8 @@ function setSyncRecordColors(
   status: string,
   count: number,
 ): void {
-  const setColor = (colIndex: number, color: number): void => {
-    const cell = sheet.Range(`${colNumberToLetter(colIndex)}${String(row)}`)
+  const setColor = (columnIndex: number, color: number): void => {
+    const cell = sheet.Range(`${columnNumberToLetter(columnIndex)}${String(row)}`)
     if (cell.Interior) cell.Interior.Color = color
   }
 
@@ -393,7 +393,7 @@ function setSyncRecordColors(
   setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status))
 
   // 类型列（F列）- 根据类型设置颜色
-  const typeCell = sheet.Range(`${colNumberToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
+  const typeCell = sheet.Range(`${columnNumberToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
   if (typeCell.Interior) {
     const typeName = getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || ''
     typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] ?? BGM_COLOR.GRAY
@@ -581,8 +581,8 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
  * 格式化步骤 1-7（自 formatSyncRecordSheet 的 try 块抽离，降低 unicorn/try-complexity 计数）
  */
 function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void {
-  const colCount = SYNC_RECORD_COLUMNS.length
-  const lastColLetter = colNumberToLetter(colCount)
+  const columnCount = SYNC_RECORD_COLUMNS.length
+  const lastColLetter = columnNumberToLetter(columnCount)
   const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
   const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
 
@@ -617,7 +617,7 @@ function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void 
   }
 
   // 5. URL 列（D列）固定宽度，不撑宽也不撑高
-  const urlColLetter = colNumberToLetter(SYNC_RECORD_COL.URL)
+  const urlColLetter = columnNumberToLetter(SYNC_RECORD_COL.URL)
   try {
     const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`)
     urlRange.ColumnWidth = 42
@@ -626,7 +626,7 @@ function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void 
   }
 
   // 6. 名称列边框（C列）
-  const nameColLetter = colNumberToLetter(SYNC_RECORD_COL.NAME)
+  const nameColLetter = columnNumberToLetter(SYNC_RECORD_COL.NAME)
   if (dataRange) {
     try {
       const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
@@ -637,7 +637,7 @@ function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void 
   }
 
   // 7. 收藏状态列边框
-  const collTypeColLetter = colNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
+  const collTypeColLetter = columnNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
   if (dataRange) {
     try {
       const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${String(lastRow)}`)
