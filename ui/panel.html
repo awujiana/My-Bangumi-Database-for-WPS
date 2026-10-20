@@ -678,7 +678,7 @@
             meta / relations / stats / summary / infobox），插件按你的表头只下载需要的片<br />
             <strong>分片格式</strong>：每片是 gzip 压缩的 JSONL，第 1
             行是表头（字段名数组），其后每行是与表头等长的值数组；各片都含
-            <code>sid</code>、行序一致，插件按行号拼接<br />
+            <code>subjectId</code>、行序一致，插件按行号拼接<br />
             <code
               >["sid","name","updatedAt","date","meta_tags","nsfw","话数","导演","动画制作公司","系列构成"]</code
             ><br />
@@ -686,7 +686,7 @@
               >["8","Code Geass
               R2","2026-09-08","2008-04-06",["机战","TV","日本"],false,"25","谷口悟朗","サンライズ","大河内一楼"]</code
             ><br />
-            基础字段：<code>sid</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br />
+            基础字段：<code>subjectId</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br />
             扩展字段：<code>date</code>、<code>meta_tags</code>、<code>nsfw</code>、<code>话数</code>、<code>导演</code>、<code>音乐</code>、<code>动画制作公司</code>、<code
               >系列构成</code
             >
