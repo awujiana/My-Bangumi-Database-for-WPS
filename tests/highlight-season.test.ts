@@ -21,6 +21,7 @@ import {
   rowsToRangeAddresses,
   runRangeGroupsWithSplit,
   chunkRangeAddresses,
+  DEFAULT_MAX_ADDRESS_CHARS,
   splitRangeAddresses,
   selectSeasonRows,
   toSeason,
@@ -308,6 +309,20 @@ describe('splitRangeAddresses：分组（供失败拆分重试）', () => {
 
   it('空输入返回空数组', () => {
     expect(splitRangeAddresses([])).toEqual([])
+  })
+
+  it('最坏密度下（每区域 3 字符）区域数仍远低于实测上限 8188', () => {
+    // 真机实测：字符上限 524287、区域数上限 8188（2026-10-20）。单格地址最短是 `A1`
+    // 加逗号 = 3 字符/区域，所以字符预算天然把区域数压在 2666 以内——这是「不需要
+    // 额外的 Area 数上限」这个结论的可执行证据，改大 DEFAULT 时这条会先红。
+    const worstCaseAreas = Math.floor(DEFAULT_MAX_ADDRESS_CHARS / 3)
+    expect(worstCaseAreas).toBeLessThan(8188)
+
+    // 造 3000 个最短地址（超出预算），确认分组后每组区域数都在上限内
+    const addresses = Array.from({ length: 3000 }, (_, index) => `A${String(index + 1)}`)
+    for (const group of splitRangeAddresses(addresses)) {
+      expect(group.length).toBeLessThan(8188)
+    }
   })
 })
 
