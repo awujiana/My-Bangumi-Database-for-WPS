@@ -215,6 +215,55 @@ export interface WpsRange {
   Insert(): void
   SpecialCells(type: number): WpsRange
   AutoFit(): void
+
+  // 条件格式（该区域上的规则集合；部分宿主版本不提供，用时须探测）
+  FormatConditions?: WpsFormatConditions
+}
+
+// ========== WPS 条件格式 ==========
+
+/** FormatConditions.Add 的入参（对象形式，与 WPS WebOffice 文档一致） */
+export interface WpsFormatConditionAddOptions {
+  /** 条件类型：2=xlExpression（公式）/ 1=xlCellValue（单元格值） */
+  Type: number
+  /** 运算符（xlCellValue 时用；xlExpression 时忽略） */
+  Operator?: number
+  /** 条件公式或值，如 '=$R3="26年10月"' */
+  Formula1?: string
+  /** 第二部分（xlBetween 用） */
+  Formula2?: string
+}
+
+/** 单条条件格式规则 */
+export interface WpsFormatCondition {
+  Type?: number
+  Operator?: number
+  Formula1?: string
+  Formula2?: string
+  Priority?: number
+  /** 规则生效范围 */
+  AppliesTo?: WpsRange
+  Interior?: WpsInterior
+  Font?: WpsFont
+  Delete?: () => void
+  SetFirstPriority?: () => void
+  SetLastPriority?: () => void
+  ModifyAppliesToRange?: (range: string) => void
+  /** 一次性设置格式（WPS WebOffice 对象形式入参） */
+  With?: (options: {
+    Interior?: { Color?: string | number }
+    Font?: { Color?: string | number; Bold?: boolean }
+    Borders?: { LineStyle?: number; Color?: string | number }
+  }) => void
+}
+
+/** 区域上的条件格式集合 */
+export interface WpsFormatConditions {
+  Count?: number
+  Item?: (index: number) => WpsFormatCondition
+  Add?: (options: WpsFormatConditionAddOptions) => WpsFormatCondition
+  /** 清空该区域全部规则（含手工建的——调用前必须读过并确认） */
+  Delete?: () => void
 }
 
 // ========== WPS 区域集合 ==========

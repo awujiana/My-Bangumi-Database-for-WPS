@@ -19,6 +19,29 @@
   不能整条覆盖（会盖掉 hover 的 transform / box-shadow）。已有 `prefers-reduced-motion`
   全局规则自动降级。
 
+### 新增（功能 · 条件格式管理器：规则引擎 + COM 读写层，页面待接）
+
+「条件格式管理」独立页的第一期（引擎 + 宿主读写，UI 页面下一块）。解决 Excel 原生
+条件格式「删除行后规则乱」的问题——**规则存 PluginStorage 为唯一真相，工作表只是投影**：
+
+- **双策略（用户裁定两种都要）**：应用前读工作表既有规则快照——
+  - `clear-all`：清空后按 Store 重建，手工规则进确认框逐条列出（范围+公式）再丢；
+  - `append-after`：公式类手工规则**原样重建在前**（保原优先序），插件规则置后追加；
+    快照含数据条/图标集/单元格值等不可重建类型时**降级清空并在警告里说明**（不静默丢数据）。
+- **应用 = 清空 + 重建**：幂等（重复应用不产生重复规则），删除行把范围搞乱后重应用即自愈；
+  优先级用反序 SetFirstPriority 显式定（entries[0] 最高），不依赖 Add 默认优先序。
+- **默认规则集**（`buildDefaultRules`）：当前季名称填绿（**自维护 TODAY 公式**，跨季度无需
+  改规则）+ 日期格式错误标红（Excel 经典浅红底深红字）+ 四季分色（1/4/7/10 月季各一色）。
+- **WPS 类型声明**：`WpsFormatConditions` / `WpsFormatCondition`（Add 对象形式入参 +
+  With + SetFirstPriority + ModifyAppliesToRange）；`isFormatConditionsSupported` 探测，
+  老版本 WPS 隐藏该功能并提示，不影响其它页。
+- **读写按条 try + 计数**：单条失败不中断整批（与同步写入「批次失败可见」一致）；
+  Count 提循环外（com-in-loop 铁律）。
+- 引擎 `cf-rules.ts` 纯函数，25 个单测覆盖：双策略计划、降级路径、隐藏规则不进计划、
+  Store 坏行跳过、公式行号平移不误伤字符串字面量（"26年10月"/TEXT "00"）。
+  修掉一个真 bug：CfApplyEntry 联合类型两分支字段名不同（rule.appliesTo vs range），
+  收敛出 `entryRange()` 辅助函数。
+
 ### 新增（功能 · 番剧高亮独立页：按季度起点高亮最新番剧）
 
 把 WPS 宏「高亮最新日期」移植成插件独立页（ribbon「番剧高亮」→ 高亮面板），并修正宏的两处问题：
