@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
 const store = new Map<string, string>()
 
 /** 设为非 null 时，`getCellValue` 读到该列即抛错（模拟 COM 异常） */
-let throwOnCol: number | null = null
+let throwOnColumn: number | null = null
 /** 为 true 时 `getColumnMap` 抛错（用于 matchEntries 外层兜底） */
 let isThrowOnGetColumnMap = false
 
@@ -66,9 +66,9 @@ function hasAnyValue(sheetName: string, row: number): boolean {
   return false
 }
 
-/** 与生产接口同形；`throwOnCol` 用于制造 COM 读取异常 */
+/** 与生产接口同形；`throwOnColumn` 用于制造 COM 读取异常 */
 function mockGetCellValue(worksheet: unknown, row: number, column: number): string {
-  if (throwOnCol !== null && column === throwOnCol) throw new Error('COM 读取失败')
+  if (throwOnColumn !== null && column === throwOnColumn) throw new Error('COM 读取失败')
   return getCell(sheetNameOf(worksheet), row, column)
 }
 
@@ -118,15 +118,15 @@ function mockReadRangeValues(
   worksheet: unknown,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
 ): string[][] {
   if (mocks.readBackOverride) return mocks.readBackOverride
   const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let column = startCol; column <= endCol; column += 1) {
+    for (let column = startColumn; column <= endColumn; column += 1) {
       rowValues.push(getCell(sheetName, row, column))
     }
     result.push(rowValues)
@@ -230,10 +230,10 @@ function seedAnimeSheet(): void {
 }
 
 const ANIME_MAPPING: EnrichColumnMapping = {
-  nameCol: 1,
-  tagsCol: 2,
+  nameColumn: 1,
+  tagsColumn: 2,
   premiereCol: 3,
-  episodesCol: 4,
+  episodesColumn: 4,
   weekdayCol: 5,
 }
 
@@ -280,7 +280,7 @@ beforeEach(() => {
   // 本文件多个用例复用同一表名 'anime' 且数据不同，不清会把上一个用例的
   // 布局泄漏到下一个用例
   clearSheetCache(animeSheet)
-  throwOnCol = null
+  throwOnColumn = null
   isThrowOnGetColumnMap = false
   mocks.readBackOverride = null
   vi.clearAllMocks()
@@ -307,8 +307,8 @@ describe('detectColumns 列识别', () => {
 
     const mapping = detectColumns(bangumiSheet, 1)
 
-    expect(mapping.nameCol).toBe(1)
-    expect(mapping.tagsCol).toBe(2)
+    expect(mapping.nameColumn).toBe(1)
+    expect(mapping.tagsColumn).toBe(2)
     expect(mapping.directorCol).toBe(4)
     expect(mapping.screenplayCol).toBe(5)
   })
@@ -343,15 +343,15 @@ describe('detectColumns 列识别', () => {
 
     const mapping = detectColumns(bangumiSheet, 1)
 
-    expect(mapping.nameCol).toBe(1)
-    expect(Object.keys(mapping)).toEqual(['nameCol'])
+    expect(mapping.nameColumn).toBe(1)
+    expect(Object.keys(mapping)).toEqual(['nameColumn'])
   })
 
   it('只有第一个名称类表头作为名称列', () => {
     setCell(BANGUMI, 1, 1, '番组名')
     setCell(BANGUMI, 1, 2, '动漫名称')
 
-    expect(detectColumns(bangumiSheet, 1).nameCol).toBe(1)
+    expect(detectColumns(bangumiSheet, 1).nameColumn).toBe(1)
   })
 })
 
@@ -364,7 +364,7 @@ describe('readPlatformValues 平台聚合', () => {
     setCell(BANGUMI, 2, 4, 'B站|优酷')
 
     const mapping: EnrichColumnMapping = {
-      nameCol: 1,
+      nameColumn: 1,
       platformCol: 2,
       platformExtraCols: [3],
       exclusiveCol: 4,
@@ -374,13 +374,13 @@ describe('readPlatformValues 平台聚合', () => {
   })
 
   it('没有任何平台列时返回空数组', () => {
-    expect(readPlatformValues(bangumiSheet, 2, { nameCol: 1 })).toEqual([])
+    expect(readPlatformValues(bangumiSheet, 2, { nameColumn: 1 })).toEqual([])
   })
 
   it('列值全为空白时返回空数组', () => {
     setCell(BANGUMI, 2, 2, ' '.repeat(3))
 
-    expect(readPlatformValues(bangumiSheet, 2, { nameCol: 1, platformCol: 2 })).toEqual([])
+    expect(readPlatformValues(bangumiSheet, 2, { nameColumn: 1, platformCol: 2 })).toEqual([])
   })
 })
 
@@ -416,7 +416,10 @@ describe('readNewAnimeRow 行读取', () => {
   it('只配名称列时其余字段不出现且平台为空串', () => {
     setCell(ANIME, 2, 1, '芙莉莲')
 
-    expect(readNewAnimeRow(animeSheet, 2, { nameCol: 1 })).toEqual({ 名称: '芙莉莲', 播放平台: '' })
+    expect(readNewAnimeRow(animeSheet, 2, { nameColumn: 1 })).toEqual({
+      名称: '芙莉莲',
+      播放平台: '',
+    })
   })
 })
 
@@ -476,7 +479,7 @@ describe('matchEntries 匹配', () => {
     seedAnimeSheet()
     seedBangumiHeader()
 
-    const results = matchEntries(animeSheet, bangumiSheet, makeConfig({ nameCol: 0 }))
+    const results = matchEntries(animeSheet, bangumiSheet, makeConfig({ nameColumn: 0 }))
 
     expect(results).toEqual([])
     expect(mocks.bgmLog).toHaveBeenCalledWith('ERROR', expect.stringContaining('未找到名称列'))
@@ -689,7 +692,7 @@ describe('enrichEpisodes 集数富化', () => {
 })
 
 describe('enrichFeatures 特点/印象富化', () => {
-  const featureColMap = new Map<string, number>([['特点/印象', 7]])
+  const featureColumnMap = new Map<string, number>([['特点/印象', 7]])
 
   it('目标列不存在时直接返回', () => {
     expect(runFieldFunction(enrichFeatures, { 周更时间: '周五' }, new Map([['导演', 3]]))).toEqual(
@@ -698,14 +701,14 @@ describe('enrichFeatures 特点/印象富化', () => {
   })
 
   it('四个来源字段都为空时不写入', () => {
-    expect(runFieldFunction(enrichFeatures, {}, featureColMap)).toEqual([])
+    expect(runFieldFunction(enrichFeatures, {}, featureColumnMap)).toEqual([])
   })
 
   it('周更/平台/独播/特殊按序拼接后填充', () => {
     const enriched = runFieldFunction(
       enrichFeatures,
       { 周更时间: '周五 23:00', 播放平台: 'B站', 独播: 'B站', 特殊: '跨季' },
-      featureColMap,
+      featureColumnMap,
     )
 
     expect(enriched[0]).toMatchObject({ action: 'fill', oldValue: null })
@@ -713,7 +716,7 @@ describe('enrichFeatures 特点/印象富化', () => {
   })
 
   it('只有部分来源有值时只拼接有值的', () => {
-    runFieldFunction(enrichFeatures, { 特殊: 'OVA' }, featureColMap)
+    runFieldFunction(enrichFeatures, { 特殊: 'OVA' }, featureColumnMap)
 
     expect(getCell(BANGUMI, 2, 7)).toBe('特殊:OVA')
   })
@@ -721,7 +724,7 @@ describe('enrichFeatures 特点/印象富化', () => {
   it('已有内容时追加', () => {
     setCell(BANGUMI, 2, 7, '手绘')
 
-    const enriched = runFieldFunction(enrichFeatures, { 周更时间: '周五' }, featureColMap)
+    const enriched = runFieldFunction(enrichFeatures, { 周更时间: '周五' }, featureColumnMap)
 
     expect(enriched[0]).toMatchObject({ action: 'append', oldValue: '手绘' })
     expect(getCell(BANGUMI, 2, 7)).toBe('手绘 | 周更:周五')
@@ -730,7 +733,7 @@ describe('enrichFeatures 特点/印象富化', () => {
   it('内容完全重复时记录 skip', () => {
     setCell(BANGUMI, 2, 7, '周更:周五')
 
-    const enriched = runFieldFunction(enrichFeatures, { 周更时间: '周五' }, featureColMap)
+    const enriched = runFieldFunction(enrichFeatures, { 周更时间: '周五' }, featureColumnMap)
 
     expect(enriched[0]?.action).toBe('skip')
     expect(getCell(BANGUMI, 2, 7)).toBe('周更:周五')
@@ -822,7 +825,7 @@ describe('enrichEntries 批量富化', () => {
     setCell(BANGUMI, 2, 1, '芙莉莲')
     // Bangumi 侧「特点/印象」（第 7 列）读取抛错 → enrichFeatures 抛错 → enrichIntoRow 兜底为 error
     // （不能用第 3 列：新番表读取在 enrichIntoRow 的 try 之外，会直接冒泡）
-    throwOnCol = 7
+    throwOnColumn = 7
 
     const matches: MatchResult[] = [
       {
@@ -959,7 +962,7 @@ describe('enrichEntries 批量富化', () => {
       },
     } as never
 
-    const introMapping: EnrichColumnMapping = { nameCol: 1, introCol: 2, directorCol: 3 }
+    const introMapping: EnrichColumnMapping = { nameColumn: 1, introCol: 2, directorCol: 3 }
     const matches: MatchResult[] = [
       {
         animeRow: 2,
@@ -1032,7 +1035,7 @@ describe('detectAnimeSourceLayout 新番来源表布局', () => {
     expect(layout).not.toBeNull()
     expect(layout?.headerRow).toBe(2)
     expect(layout?.dataStartRow).toBe(4)
-    expect(layout?.columnMapping.nameCol).toBe(2)
+    expect(layout?.columnMapping.nameColumn).toBe(2)
   })
 
   it('字段行不足 3 个命中时返回 null', () => {

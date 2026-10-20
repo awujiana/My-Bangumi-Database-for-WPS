@@ -141,7 +141,7 @@ describe('closeOpenedSourceWorkbook', () => {
     state.sourceWorkbook = wb
     state.isSourceWorkbookOpenedByUs = true
     state.animeSourceSheet = makeWorksheet()
-    state.columnMapping = { nameCol: 3 }
+    state.columnMapping = { nameColumn: 3 }
     state.headerRow = 2
     state.dataStartRow = 3
     state.hasSourcePreview = true
@@ -168,7 +168,7 @@ describe('closeSourceWorkbookOnly', () => {
     state.sourceWorkbook = wb
     state.isSourceWorkbookOpenedByUs = true
     state.animeSourceSheet = makeWorksheet()
-    state.columnMapping = { nameCol: 3 }
+    state.columnMapping = { nameColumn: 3 }
     state.headerRow = 2
     state.dataStartRow = 3
 
@@ -176,7 +176,7 @@ describe('closeSourceWorkbookOnly', () => {
     expect(wb.Close).toHaveBeenCalledWith(false)
     expect(state.animeSourceSheet).toBeNull()
     // 关键：这四个字段必须保留
-    expect(state.columnMapping).toEqual({ nameCol: 3 })
+    expect(state.columnMapping).toEqual({ nameColumn: 3 })
     expect(state.headerRow).toBe(2)
     expect(state.dataStartRow).toBe(3)
   })
@@ -210,7 +210,7 @@ describe('ensureSourceSheet', () => {
     const wb = makeWorkbookWithSheet('a.xlsx', worksheet)
     state.filePath = 'D:/data/a.xlsx'
     state.headerRow = 2
-    state.columnMapping = { nameCol: 3 }
+    state.columnMapping = { nameColumn: 3 }
     ;(getApp as ReturnType<typeof vi.fn>).mockReturnValue({
       Workbooks: { Open: vi.fn(() => wb) },
     })
@@ -224,7 +224,7 @@ describe('ensureSourceSheet', () => {
   it('重开失败（Open 返回 null）时返回 null 并记录 ERROR', () => {
     state.filePath = 'D:/data/a.xlsx'
     state.headerRow = 2
-    state.columnMapping = { nameCol: 3 }
+    state.columnMapping = { nameColumn: 3 }
     ;(getApp as ReturnType<typeof vi.fn>).mockReturnValue({
       Workbooks: { Open: vi.fn(() => null) },
     })
@@ -237,7 +237,7 @@ describe('ensureSourceSheet', () => {
     const wb = makeWorkbookWithSheet('a.xlsx', null)
     state.filePath = 'D:/data/a.xlsx'
     state.headerRow = 2
-    state.columnMapping = { nameCol: 3 }
+    state.columnMapping = { nameColumn: 3 }
     ;(getApp as ReturnType<typeof vi.fn>).mockReturnValue({
       Workbooks: { Open: vi.fn(() => wb) },
     })

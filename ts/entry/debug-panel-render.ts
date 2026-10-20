@@ -187,38 +187,39 @@ export function buildConsolePanelHTML(): string {
 
 export function buildEnvironmentPanelHTML(): string {
   const g = getDebugGlobals()
-  const environmentItems: { label: string; value: string; cls: string }[] = [
-    { label: '页面 URL', value: window.location.href, cls: '' },
+  const environmentItems: { label: string; value: string; cssClass: string }[] = [
+    { label: '页面 URL', value: window.location.href, cssClass: '' },
     {
       label: 'WpsInvoke',
       value: g.WpsInvoke === undefined ? 'undefined (开发模式)' : 'available',
-      cls: g.WpsInvoke === undefined ? 'bgm-dp-env-value-warn' : 'bgm-dp-env-value-ok',
+      cssClass: g.WpsInvoke === undefined ? 'bgm-dp-env-value-warn' : 'bgm-dp-env-value-ok',
     },
     {
       label: 'Ribbon 就绪 (_ribbonReady)',
       value: String(g._ribbonReady ?? false),
-      cls: g._ribbonReady ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+      cssClass: g._ribbonReady ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
     },
     {
       label: 'OnAddinLoad',
       value: typeof g.OnAddinLoad,
-      cls: typeof g.OnAddinLoad === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+      cssClass:
+        typeof g.OnAddinLoad === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
     },
     {
       label: 'OnAction',
       value: typeof g.OnAction,
-      cls: typeof g.OnAction === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+      cssClass: typeof g.OnAction === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
     },
     {
       label: 'GetBangumiImage',
       value: typeof g.GetBangumiImage,
-      cls:
+      cssClass:
         typeof g.GetBangumiImage === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
     },
     {
       label: 'GetIncrementalSyncPressed',
       value: typeof g.GetIncrementalSyncPressed,
-      cls:
+      cssClass:
         typeof g.GetIncrementalSyncPressed === 'function'
           ? 'bgm-dp-env-value-ok'
           : 'bgm-dp-env-value-err',
@@ -226,12 +227,12 @@ export function buildEnvironmentPanelHTML(): string {
     {
       label: 'DOMPurify (window)',
       value: typeof g.DOMPurify,
-      cls: typeof g.DOMPurify === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
+      cssClass: typeof g.DOMPurify === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
     },
     {
       label: 'Zod (window.z)',
       value: typeof g.z,
-      cls: typeof g.z === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
+      cssClass: typeof g.z === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
     },
   ]
 
@@ -240,7 +241,7 @@ export function buildEnvironmentPanelHTML(): string {
       (item) => `
       <div class="bgm-dp-env-card">
         <div class="bgm-dp-env-label">${item.label}</div>
-        <div class="bgm-dp-env-value ${item.cls}">${item.value}</div>
+        <div class="bgm-dp-env-value ${item.cssClass}">${item.value}</div>
       </div>
     `,
     )

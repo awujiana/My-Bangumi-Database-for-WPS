@@ -34,12 +34,12 @@ describe('panel/enrich-preview-cell', () => {
 
   describe('renderPreviewCell - 通用', () => {
     it('空值/空白值返回空 td', () => {
-      expect(renderPreviewCell('nameCol', '')).toBe('<td></td>')
-      expect(renderPreviewCell('tagsCol', ' '.repeat(3))).toBe('<td></td>')
+      expect(renderPreviewCell('nameColumn', '')).toBe('<td></td>')
+      expect(renderPreviewCell('tagsColumn', ' '.repeat(3))).toBe('<td></td>')
     })
 
     it('名称列加粗渲染', () => {
-      expect(renderPreviewCell('nameCol', 'Hi')).toBe(
+      expect(renderPreviewCell('nameColumn', 'Hi')).toBe(
         '<td class="column-name" title="Hi"><span class="preview-name">Hi</span></td>',
       )
     })
@@ -49,15 +49,15 @@ describe('panel/enrich-preview-cell', () => {
     })
 
     it('HTML 特殊字符被转义', () => {
-      const html = renderPreviewCell('nameCol', '<b>&"')
+      const html = renderPreviewCell('nameColumn', '<b>&"')
       expect(html).toContain('&lt;b&gt;')
       expect(html).not.toContain('<b>')
     })
   })
 
-  describe('renderPreviewCell - tagsCol', () => {
+  describe('renderPreviewCell - tagsColumn', () => {
     it('tagsColor 开启时每项渲染彩色 tag-chip', () => {
-      const html = renderPreviewCell('tagsCol', 'A|B')
+      const html = renderPreviewCell('tagsColumn', 'A|B')
       expect(html).toMatch(/^<td class="column-tags">/)
       expect(html).toContain('class="tag-chip"')
       expect(html).toContain('>A</span>')
@@ -66,11 +66,11 @@ describe('panel/enrich-preview-cell', () => {
 
     it('tagsColor 关闭时退化为纯文本 td', () => {
       setConfig({ tagsColor: false })
-      expect(renderPreviewCell('tagsCol', 'A|B')).toBe('<td title="A|B">A|B</td>')
+      expect(renderPreviewCell('tagsColumn', 'A|B')).toBe('<td title="A|B">A|B</td>')
     })
 
     it('噪声项被过滤', () => {
-      const html = renderPreviewCell('tagsCol', 'A|噪声')
+      const html = renderPreviewCell('tagsColumn', 'A|噪声')
       expect(html).toContain('>A</span>')
       expect(html).not.toContain('噪声')
     })
@@ -118,40 +118,40 @@ describe('panel/enrich-preview-cell', () => {
     })
   })
 
-  describe('renderPreviewCell - episodesCol', () => {
+  describe('renderPreviewCell - episodesColumn', () => {
     it('默认阈值：1=ep-single / 5=ep-short / 12=无 / 13=ep-full', () => {
-      expect(renderPreviewCell('episodesCol', '1')).toBe(
+      expect(renderPreviewCell('episodesColumn', '1')).toBe(
         '<td title="1"><span class="ep-chip ep-single">1</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '5')).toBe(
+      expect(renderPreviewCell('episodesColumn', '5')).toBe(
         '<td title="5"><span class="ep-chip ep-short">5</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '12')).toBe(
+      expect(renderPreviewCell('episodesColumn', '12')).toBe(
         '<td title="12"><span class="">12</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '13')).toBe(
+      expect(renderPreviewCell('episodesColumn', '13')).toBe(
         '<td title="13"><span class="ep-chip ep-full">13</span></td>',
       )
     })
 
     it('无法解析或非正数时无色', () => {
-      expect(renderPreviewCell('episodesCol', 'abc')).toBe(
+      expect(renderPreviewCell('episodesColumn', 'abc')).toBe(
         '<td title="abc"><span class="">abc</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '0')).toBe(
+      expect(renderPreviewCell('episodesColumn', '0')).toBe(
         '<td title="0"><span class="">0</span></td>',
       )
     })
 
     it('配置错误（single >= full）时走兜底分支', () => {
       setConfig({ epSingle: 5, epFull: 3 })
-      expect(renderPreviewCell('episodesCol', '5')).toBe(
+      expect(renderPreviewCell('episodesColumn', '5')).toBe(
         '<td title="5"><span class="ep-chip ep-single">5</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '4')).toBe(
+      expect(renderPreviewCell('episodesColumn', '4')).toBe(
         '<td title="4"><span class="ep-chip ep-full">4</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '2')).toBe(
+      expect(renderPreviewCell('episodesColumn', '2')).toBe(
         '<td title="2"><span class="">2</span></td>',
       )
     })
@@ -162,13 +162,13 @@ describe('panel/enrich-preview-cell', () => {
         throw new Error('配置读取失败')
       })
 
-      expect(renderPreviewCell('episodesCol', '1')).toBe(
+      expect(renderPreviewCell('episodesColumn', '1')).toBe(
         '<td title="1"><span class="ep-chip ep-single">1</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '12')).toBe(
+      expect(renderPreviewCell('episodesColumn', '12')).toBe(
         '<td title="12"><span class="">12</span></td>',
       )
-      expect(renderPreviewCell('episodesCol', '13')).toBe(
+      expect(renderPreviewCell('episodesColumn', '13')).toBe(
         '<td title="13"><span class="ep-chip ep-full">13</span></td>',
       )
     })

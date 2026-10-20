@@ -26,8 +26,8 @@ import { BGM, bgmLog, getApp } from './index.js'
  * @param worksheet 工作表对象
  * @param startRow 起始行
  * @param endRow 结束行
- * @param startCol 起始列
- * @param endCol 结束列
+ * @param startColumn 起始列
+ * @param endColumn 结束列
  * @returns 字符串二维数组
  */
 function isNativeCode(value: unknown): boolean {
@@ -131,7 +131,7 @@ function preserveCellValue(cell: unknown): WpsCellValue {
  *
  * @param raw `Range.Value2` 的返回值
  * @param rowCount 请求的行数（endRow - startRow + 1）
- * @param columnCount 请求的列数（endCol - startCol + 1）
+ * @param columnCount 请求的列数（endColumn - startColumn + 1）
  * @returns 二维数组；形状不可信时返回 `null`
  */
 function normalizeValue2Shape(
@@ -165,21 +165,21 @@ function readRect<T>(
   worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
   convert: (cell: unknown) => T,
 ): T[][] | null {
   if (!worksheet) return null
   try {
     const range = worksheet.Range(
-      `${columnNumberToLetter(startCol)}${String(startRow)}:${columnNumberToLetter(endCol)}${String(endRow)}`,
+      `${columnNumberToLetter(startColumn)}${String(startRow)}:${columnNumberToLetter(endColumn)}${String(endRow)}`,
     )
     // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
     // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
     const raw: unknown = range.Value2
     if (!raw) return null
     const rowCount = endRow - startRow + 1
-    const columnCount = endCol - startCol + 1
+    const columnCount = endColumn - startColumn + 1
     const rows = normalizeValue2Shape(raw, rowCount, columnCount)
     // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
     if (!rows) return null
@@ -201,10 +201,10 @@ export function readRangeValues(
   worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
 ): string[][] {
-  return readRect(worksheet, startRow, endRow, startCol, endCol, safeCellValue) ?? []
+  return readRect(worksheet, startRow, endRow, startColumn, endColumn, safeCellValue) ?? []
 }
 
 /**
@@ -266,20 +266,20 @@ const realCellIo: SheetCellIo = {
  * @param worksheet 工作表
  * @param rows 预计会访问的行号（可离散；循环中动态新增的行不在此列也能用——
  *   未播种的行首次读回落 `getCellValue` 并回填）
- * @param maxCol 预计会访问的最大列号（超出列的访问同样回落逐格读）
+ * @param maxColumn 预计会访问的最大列号（超出列的访问同样回落逐格读）
  * @param io 后备单元格 IO（默认真实 COM 封装；见 {@link SheetCellIo}）
  */
 export function createSheetCellCache(
   worksheet: WpsWorksheet,
   rows: readonly number[],
-  maxCol: number,
+  maxColumn: number,
   io: SheetCellIo = realCellIo,
 ): SheetCellCache {
   const cells = new Map<string, string>()
-  const seeded = readRowsCache(worksheet, rows, maxCol)
+  const seeded = readRowsCache(worksheet, rows, maxColumn)
   if (seeded) {
     for (const [row, line] of seeded) {
-      for (let column = 1; column <= maxCol; column += 1) {
+      for (let column = 1; column <= maxColumn; column += 1) {
         cells.set(`${String(row)}:${String(column)}`, line[column - 1] ?? '')
       }
     }
@@ -301,7 +301,7 @@ export function createSheetCellCache(
 }
 
 /**
- * 为「一批离散行号」做一次矩形读，返回 行号 → 该行 1..maxCol 的文本。
+ * 为「一批离散行号」做一次矩形读，返回 行号 → 该行 1..maxColumn 的文本。
  *
  * 面向「循环里对每个条目逐格读 N 列」的 COM 热点：把 O(条目数 × 列数) 次跨进程往返
  * 压成 1 次。典型用法是循环外先建缓存、循环内命中即用、未命中回退逐格读。
@@ -312,15 +312,15 @@ export function createSheetCellCache(
  *
  * @param worksheet 工作表
  * @param rows 需要的行号（可离散、可无序、允许重复）
- * @param maxCol 需要的最大列号（读取范围恒为 1..maxCol）
+ * @param maxColumn 需要的最大列号（读取范围恒为 1..maxColumn）
  * @returns 行号 → 该行文本数组；`null` 表示批量读不可用，调用方须回退逐格读
  */
 export function readRowsCache(
   worksheet: WpsWorksheet | null | undefined,
   rows: readonly number[],
-  maxCol: number,
+  maxColumn: number,
 ): Map<number, readonly string[]> | null {
-  if (rows.length === 0 || maxCol < 1) return new Map()
+  if (rows.length === 0 || maxColumn < 1) return new Map()
   let minRow = rows[0] ?? 0
   let maxRow = minRow
   for (const row of rows) {
@@ -329,13 +329,13 @@ export function readRowsCache(
   }
   const span = maxRow - minRow + 1
   if (span > ROWS_CACHE_MAX_SPAN) return null
-  const block = readRangeValues(worksheet, minRow, maxRow, 1, maxCol)
+  const block = readRangeValues(worksheet, minRow, maxRow, 1, maxColumn)
   // 行数不足 ⇒ 宿主返回了非预期形状，宁可判为读取失败（回退逐格读），绝不猜形状
   if (block.length !== span) return null
   const cache = new Map<number, readonly string[]>()
   for (const row of rows) {
     const line = block[row - minRow]
-    if (!line || line.length < maxCol) return null
+    if (!line || line.length < maxColumn) return null
     cache.set(row, line)
   }
   return cache
@@ -349,18 +349,18 @@ export function readRowsCache(
  * @param worksheet 工作表对象
  * @param startRow 起始行
  * @param endRow 结束行
- * @param startCol 起始列
- * @param endCol 结束列
+ * @param startColumn 起始列
+ * @param endColumn 结束列
  * @returns `WpsCellValue` 二维数组（失败时为空数组）
  */
 export function readRangeCellValues(
   worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
 ): WpsCellValue[][] {
-  return readRect(worksheet, startRow, endRow, startCol, endCol, preserveCellValue) ?? []
+  return readRect(worksheet, startRow, endRow, startColumn, endColumn, preserveCellValue) ?? []
 }
 
 // 缓存相关（模块级 Map）
@@ -468,20 +468,20 @@ export function getColumnMap(
   const cacheKey = `${sheetName}:columnMap:${String(headerRow)}`
   return cacheGet(cacheKey, () => {
     const columnMap = new Map<string, number>()
-    let firstNonEmptyCol: number | undefined
+    let firstNonEmptyColumn: number | undefined
 
-    const lastCol = 50
+    const lastColumn = 50
     // 快路径：一次矩形读表头行（原先两轮循环共 100 次逐格读）。
-    // 读回为空（宿主/桩未返回该行）时 readColName 自动回退逐格读，行为不变。
-    const headerCells = readRangeValues(worksheet, headerRow, headerRow, 1, lastCol)[0]
-    const readColName = (index: number): string =>
+    // 读回为空（宿主/桩未返回该行）时 readColumnName 自动回退逐格读，行为不变。
+    const headerCells = readRangeValues(worksheet, headerRow, headerRow, 1, lastColumn)[0]
+    const readColumnName = (index: number): string =>
       trim(headerCells ? (headerCells[index - 1] ?? '') : getCellValue(worksheet, headerRow, index))
 
-    for (let index = 1; index <= lastCol; index += 1) {
-      const columnName = readColName(index)
+    for (let index = 1; index <= lastColumn; index += 1) {
+      const columnName = readColumnName(index)
       // 记录第一个非空列作为序列号列候选
-      if (!firstNonEmptyCol && columnName) {
-        firstNonEmptyCol = index
+      if (!firstNonEmptyColumn && columnName) {
+        firstNonEmptyColumn = index
       }
       if (columnName) {
         applyColumnRules(columnMap, columnName, index)
@@ -491,26 +491,26 @@ export function getColumnMap(
     // 如果没有通过规则匹配到序列号列，尝试找一个未被其他 key 占用的列
     // 修复：避免将"序列号"映射到已被"是否看完"等字段占用的列，导致两个字段读取同一列
     if (!columnMap.has('序列号')) {
-      const mappedCols = new Set(columnMap.values())
-      let seqCol: number | undefined
-      if (firstNonEmptyCol && !mappedCols.has(firstNonEmptyCol)) {
+      const mappedColumns = new Set(columnMap.values())
+      let seqColumn: number | undefined
+      if (firstNonEmptyColumn && !mappedColumns.has(firstNonEmptyColumn)) {
         // 第一个非空列未被占用，使用它
-        seqCol = firstNonEmptyCol
+        seqColumn = firstNonEmptyColumn
       } else {
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
-        for (let index = 1; index <= lastCol; index += 1) {
-          const v = mappedCols.has(index) ? '' : readColName(index)
+        for (let index = 1; index <= lastColumn; index += 1) {
+          const v = mappedColumns.has(index) ? '' : readColumnName(index)
           if (v) {
-            seqCol = index
+            seqColumn = index
             break
           }
         }
       }
-      if (seqCol) {
-        columnMap.set('序列号', seqCol)
+      if (seqColumn) {
+        columnMap.set('序列号', seqColumn)
         bgmLog(
           LOG_LEVELS.INFO,
-          `[getColumnMap] 序列号列未匹配到表头，使用列 ${String(seqCol)} 作为序列号列`,
+          `[getColumnMap] 序列号列未匹配到表头，使用列 ${String(seqColumn)} 作为序列号列`,
         )
       }
     }
@@ -561,9 +561,9 @@ function findAnchorColumn(worksheet: WpsWorksheet, headerRow: number): number | 
     'alias',
     'othername',
   ]
-  const maxCols = 50
+  const maxColumns = 50
 
-  for (let c = 1; c <= maxCols; c += 1) {
+  for (let c = 1; c <= maxColumns; c += 1) {
     const value = worksheet.Range(`${columnNumberToLetter(c)}${String(headerRow)}`).Value2
     if (value != null) {
       const text = String(value).trim().toLowerCase()
@@ -784,14 +784,14 @@ export function ensureSheetHeaders(worksheet: WpsWorksheet | null | undefined): 
   // 逐列写入表头
   let writeCount = 0
   let failCount = 0
-  const failCols: number[] = []
+  const failColumns: number[] = []
   for (const [index, header] of STANDARD_HEADERS.entries()) {
     const isOk = setCellValueDirect(worksheet, 1, index + 1, header)
     if (isOk) {
       writeCount += 1
     } else {
       failCount += 1
-      failCols.push(index + 1)
+      failColumns.push(index + 1)
     }
   }
   bgmLog(
@@ -802,11 +802,11 @@ export function ensureSheetHeaders(worksheet: WpsWorksheet | null | undefined): 
   if (failCount > 0) {
     bgmLog(
       LOG_LEVELS.ERROR,
-      `[ensureSheetHeaders] 表头写入失败列：${failCols.join(',')}，前 5 列失败无法继续`,
+      `[ensureSheetHeaders] 表头写入失败列：${failColumns.join(',')}，前 5 列失败无法继续`,
     )
     // 前 5 列（序列号/是否看完/看完时间/开播季度/开播日期）是后续同步的关键字段，
     // 如果这些列写入失败，整个同步流程无法继续，直接返回 false
-    if (failCols.some((c) => c <= 5)) {
+    if (failColumns.some((c) => c <= 5)) {
       bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 关键列写入失败，返回 false')
       return false
     }

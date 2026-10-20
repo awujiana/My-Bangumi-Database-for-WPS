@@ -94,14 +94,14 @@ function mockReadRangeValues(
   worksheet: unknown,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
 ): string[][] {
   const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let column = startCol; column <= endCol; column += 1) {
+    for (let column = startColumn; column <= endColumn; column += 1) {
       rowValues.push(store.get(cellKey(sheetName, row, column)) ?? '')
     }
     result.push(rowValues)
@@ -193,7 +193,7 @@ const animeConfig: EnrichConfig = {
   sheetName: '新番表',
   headerRow: 1,
   dataStartRow: 2,
-  columnMapping: { nameCol: 1, tagsCol: 2, premiereCol: 3, episodesCol: 4 },
+  columnMapping: { nameColumn: 1, tagsColumn: 2, premiereCol: 3, episodesColumn: 4 },
 }
 
 /** 从批量写入的实参中筛出指定匹配类型 + 字段名的记录 */

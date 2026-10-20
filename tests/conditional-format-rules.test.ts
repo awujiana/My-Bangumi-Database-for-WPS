@@ -96,7 +96,7 @@ describe('buildDefaultRules：六条默认规则', () => {
     }
   })()
 
-  const rules = buildDefaultRules({ seasonCol: 'R', nameCol: 'B', firstRow: 3, makeId: ids })
+  const rules = buildDefaultRules({ seasonColumn: 'R', nameColumn: 'B', firstRow: 3, makeId: ids })
 
   it('共 6 条：当前季 / 错误 / 四季各一', () => {
     expect(rules).toHaveLength(6)

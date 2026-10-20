@@ -55,6 +55,13 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
  */
 
 /** @type {GuardCase[]} */
+// 变异锚点**不能硬编码版本号**：dompurify 一升级（3.4.15 → 3.4.17）锚点就漂移，
+// 变异静默不命中 → 这条用例变成「空断言」，正是本脚本要防的事故。
+// 改为从被校验文件自身读出当前版本串。
+const vendoredDomPurifyLabel =
+  /DOMPurify \d+\.\d+\.\d+/.exec(readFileSync(join(projectRoot, 'libs/purify.js'), 'utf8'))?.[0] ??
+  ''
+
 const CASES = [
   {
     id: 'ribbon-buttons',
@@ -78,7 +85,7 @@ const CASES = [
       {
         file: 'libs/purify.js',
         mode: 'literal',
-        from: 'DOMPurify 3.4.15',
+        from: vendoredDomPurifyLabel,
         to: 'DOMPurify 3.0.0',
       },
     ],
@@ -116,6 +123,23 @@ const CASES = [
       },
     ],
     expectInOutput: ['sec-probeGhost'],
+  },
+  {
+    id: 'naming-convention',
+    label: '新写的缩写标识符（`ws` / `col`）溜过门禁 → 前几轮人工排查的坑重现',
+    // 用 probe-naming.mjs（不加载主配置、几秒出结果）而非 eslint（2.5 分钟）：
+    // 两者规则配置同源（scripts/probe-naming.mjs 与 eslint.config.mjs 的四条
+    // naming-convention 配置逐项一致），探针红 = 门禁红。
+    check: 'scripts/probe-naming.mjs',
+    mutations: [
+      {
+        file: 'ts/tools/log-buffer.ts',
+        mode: 'append',
+        from: '',
+        to: '\nexport const __probeReverseVerifyWs = 1\nexport const __probeReverseVerifyCol = 2\n',
+      },
+    ],
+    expectInOutput: ['__probeReverseVerifyWs', '__probeReverseVerifyCol'],
   },
   {
     id: 'cycles',

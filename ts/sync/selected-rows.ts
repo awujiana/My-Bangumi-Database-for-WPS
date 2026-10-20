@@ -50,8 +50,8 @@ export function getSelectedRowSubjectIds(): Set<string> {
     if (!worksheet) return subjectIds
     const headerRow = findHeaderRow(worksheet) || 1
     const columnMap = getColumnMap(worksheet, headerRow)
-    const urlCol = columnMap.get('Bangumi_URL')
-    if (!urlCol) {
+    const urlColumn = columnMap.get('Bangumi_URL')
+    if (!urlColumn) {
       bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSubjectIds] 未找到 Bangumi_URL 列')
       return subjectIds
     }
@@ -61,7 +61,7 @@ export function getSelectedRowSubjectIds(): Set<string> {
       // 跳过表头行：提取条件变量使循环体含多条语句，消除 no-continue 与 prefer-continue 冲突
       const isNotHeaderRow = row !== headerRow
       if (isNotHeaderRow) {
-        const url = trim(getCellValue(worksheet, row, urlCol))
+        const url = trim(getCellValue(worksheet, row, urlColumn))
         if (url) {
           const subjectId = extractSubjectId(url)
           if (subjectId) {

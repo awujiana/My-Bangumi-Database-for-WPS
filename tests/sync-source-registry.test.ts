@@ -10,9 +10,9 @@ const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockReadRowsCache = vi.hoisted(() =>
   vi.fn(
     (
-      _ws: unknown,
+      _worksheet: unknown,
       _rows: readonly number[],
-      _maxCol: number,
+      _maxColumn: number,
     ): Map<number, readonly string[]> | null => null,
   ),
 )
@@ -22,14 +22,14 @@ const mockReadRangeValues = vi.hoisted(() =>
       worksheet: unknown,
       startRow: number,
       endRow: number,
-      startCol: number,
-      endCol: number,
+      startColumn: number,
+      endColumn: number,
     ): string[][] => {
       try {
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let column = startCol; column <= endCol; column += 1) {
+          for (let column = startColumn; column <= endColumn; column += 1) {
             const value = mockGetCellValue(worksheet, row, column) as
               string | number | boolean | null
             line.push(value == null ? '' : String(value))
@@ -916,7 +916,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     // 行 1 (header): 空值 → 被跳过
     // 行 2: 有效 URL
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, _column: number) => {
       // 表头行，无 URL
       if (row === 1) return ''
       if (row === 2) return 'https://bgm.tv/subject/999'
@@ -957,7 +957,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 2 })
 
-    // 因为提取不到 SID，selectedSids 为空，抛出错误
+    // 因为提取不到 SID，selectedSubjectIds 为空，抛出错误
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
   })
 
@@ -1005,7 +1005,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 5 })
 
-    // 选区为空，selectedSids 为空，抛出错误
+    // 选区为空，selectedSubjectIds 为空，抛出错误
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
   })
 
@@ -1125,7 +1125,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // findHeaderRow 返回 0
     mockFindHeaderRow.mockReturnValue(0)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) =>
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, _column: number) =>
       row === 2 ? 'https://bgm.tv/subject/777' : '',
     )
     mockExtractSubjectId.mockImplementation((url: string) => (url.includes('777') ? '777' : null))
@@ -1149,7 +1149,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     })
     mockFindHeaderRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, _column: number) => {
       const urls: Record<number, string> = {
         2: 'https://bgm.tv/subject/100',
         // 空行

@@ -87,7 +87,7 @@ export function detectHeaderOnSheet(
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 表头识别成功: ${label} / 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(mapping.nameCol)}`,
+      `[enrich] 表头识别成功: ${label} / 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(mapping.nameColumn)}`,
     )
     return mapping
   } catch (error: unknown) {
@@ -125,13 +125,13 @@ function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColum
   const mappingList = safeGetElement('mappingList')
   if (!mappingList) return
 
-  const maxCols = 50
+  const maxColumns = 50
   const { headerRow } = state
   const columnOptions: { column: number; header: string }[] = []
 
   // 覆盖全部列（含表头为空的列）：Hazx 模板的名称列 C 没有表头，
   // 若只列有表头的列，自动识别的名称列将无法在下拉中回显
-  for (let column = 1; column <= maxCols; column += 1) {
+  for (let column = 1; column <= maxColumns; column += 1) {
     const header = getCellValue(worksheet, headerRow, column).trim()
     columnOptions.push({ column, header })
   }
@@ -139,8 +139,8 @@ function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColum
   let html = ''
 
   for (const field of COLUMN_MAPPING_FIELDS) {
-    const currentCol = mapping[field.key]
-    const selectedValue = currentCol ? String(currentCol) : ''
+    const currentColumn = mapping[field.key]
+    const selectedValue = currentColumn ? String(currentColumn) : ''
 
     const optionsHtml = `<option value="">-- 未映射 --</option>${columnOptions
       .map((o) => {
@@ -193,15 +193,15 @@ function updateColumnMapping(field: ScalarMappingKey, value: number): void {
 /**
  * 数据预览的「一栏一行」列顺序：按已映射字段渲染，避免 50 列全部挤压成文本流
  */
-const PREVIEW_FIELD_COLS: { key: ScalarMappingKey; label: string }[] = [
-  { key: 'nameCol', label: '名称' },
+const PREVIEW_FIELD_COLUMNS: { key: ScalarMappingKey; label: string }[] = [
+  { key: 'nameColumn', label: '名称' },
   { key: 'weekdayCol', label: '周更时间' },
   { key: 'premiereCol', label: '首播' },
-  { key: 'episodesCol', label: '集数' },
+  { key: 'episodesColumn', label: '集数' },
   { key: 'platformCol', label: '播放平台' },
   { key: 'exclusiveCol', label: '独播' },
   { key: 'specialCol', label: '特殊/备注' },
-  { key: 'tagsCol', label: 'TAGS/标签' },
+  { key: 'tagsColumn', label: 'TAGS/标签' },
 ]
 
 /**
@@ -373,11 +373,11 @@ function switchSourceWorkbook(wb: WpsWorkbook): void {
 const SOURCE_CMP_FIELDS: { key: ScalarMappingKey; label: string }[] = [
   { key: 'weekdayCol', label: '周更' },
   { key: 'premiereCol', label: '首播' },
-  { key: 'episodesCol', label: '集数' },
+  { key: 'episodesColumn', label: '集数' },
   { key: 'platformCol', label: '平台' },
   { key: 'exclusiveCol', label: '独播' },
   { key: 'specialCol', label: '特殊' },
-  { key: 'tagsCol', label: '标签' },
+  { key: 'tagsColumn', label: '标签' },
 ]
 
 /** 匹配结果对比表格：目标表侧展示的字段（按目标表表头动态读取） */
@@ -404,16 +404,16 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
 
   // 只取已映射的字段列，形成「一栏一行」的简洁预览。
   // 平台列聚合：有播放平台列时独播列并入「播放平台」一栏展示（F/G/H/I/J 聚合去重）。
-  const hasPlatformCol = (mapping.platformCol ?? 0) > 0
-  const fieldCols = PREVIEW_FIELD_COLS.filter(
-    (f) => (mapping[f.key] ?? 0) > 0 && (f.key !== 'exclusiveCol' || !hasPlatformCol),
+  const hasPlatformColumn = (mapping.platformCol ?? 0) > 0
+  const fieldColumns = PREVIEW_FIELD_COLUMNS.filter(
+    (f) => (mapping[f.key] ?? 0) > 0 && (f.key !== 'exclusiveCol' || !hasPlatformColumn),
   )
   // 简介表字段列（关联到「新番简介」工作表时展示）
   const introSheet = state.introContext?.sheet ?? null
   const introFields = state.introContext
     ? INTRO_PREVIEW_FIELDS.filter((f) => (state.introContext?.mapping[f.key] ?? 0) > 0)
     : []
-  if (fieldCols.length === 0) {
+  if (fieldColumns.length === 0) {
     const emptyThead = tableContainer.querySelector('thead')
     if (emptyThead) emptyThead.replaceChildren()
     const emptyTbody = tableContainer.querySelector('tbody')
@@ -434,7 +434,7 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
   const thead = tableContainer.querySelector('thead')
   if (thead) {
     thead.innerHTML = sanitizeTableRows(
-      `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}${introFields
+      `<tr><th></th>${fieldColumns.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}${introFields
         .map((f) => `<th class="column-intro">${escapeHtml(f.label)}</th>`)
         .join('')}</tr>`,
     )
@@ -457,12 +457,12 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
     // 简介表按名称关联本行（无关联行时简介列留空）
     const introRow = state.introContext
       ? state.introContext.nameIndex.get(
-          normalizeName(getCellValue(worksheet, row, mapping.nameCol).trim()),
+          normalizeName(getCellValue(worksheet, row, mapping.nameColumn).trim()),
         )
       : undefined
 
-    for (const f of fieldCols) {
-      if (hasPlatformCol && f.key === 'platformCol') {
+    for (const f of fieldColumns) {
+      if (hasPlatformColumn && f.key === 'platformCol') {
         // 播放平台聚合展示：platformCol + platformExtraCols + exclusiveCol 去重
         const platforms = readPlatformValues(worksheet, row, mapping)
         if (platforms.length > 0) hasData = true
@@ -495,7 +495,7 @@ function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMappi
   // 源数据统计：预览只画前 20 行，但用户需要知道表里到底有多少行
   renderStatCards(safeGetElement('sourceStats'), [
     { label: '数据总行', value: Math.max(0, sourceLastRow - dataStartRow + 1) },
-    { label: '已映射字段', value: fieldCols.length + introFields.length },
+    { label: '已映射字段', value: fieldColumns.length + introFields.length },
     { label: '本次预览', value: rowsHtml.length },
     { label: '数据起始行', value: dataStartRow },
   ])
@@ -532,7 +532,7 @@ export function previewMatch(options?: { keepSourceOpen?: boolean }): void {
     BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表')
     return
   }
-  if (!state.columnMapping || state.columnMapping.nameCol === 0) {
+  if (!state.columnMapping || state.columnMapping.nameColumn === 0) {
     BGM.Dialog.alert('提示', '列映射未正确识别，缺少名称列')
     return
   }
@@ -649,15 +649,15 @@ function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult
   const mapping = state.columnMapping
   if (!sourceSheet || !mapping) return renderCmpTags([])
   const items: { label: string; value: string }[] = []
-  const hasPlatformCol = (mapping.platformCol ?? 0) > 0
+  const hasPlatformColumn = (mapping.platformCol ?? 0) > 0
   for (const field of SOURCE_CMP_FIELDS) {
     // 平台聚合时独播已并入平台项，不重复展示
-    const isMergedExclusive = hasPlatformCol && field.key === 'exclusiveCol'
+    const isMergedExclusive = hasPlatformColumn && field.key === 'exclusiveCol'
     if (!isMergedExclusive) {
       const column = mapping[field.key] ?? 0
       if (column > 0) {
         const value =
-          hasPlatformCol && field.key === 'platformCol'
+          hasPlatformColumn && field.key === 'platformCol'
             ? readPlatformValues(sourceSheet, match.animeRow, mapping).join(' | ')
             : getCellValue(sourceSheet, match.animeRow, column).trim()
         if (value) items.push({ label: field.label, value })
@@ -686,17 +686,17 @@ function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult
 /** 读取 Bangumi 目标行对比字段（按目标表表头动态读取） */
 function buildTargetCmpTags(
   targetSheet: WpsWorksheet | null,
-  targetColMap: Map<string, number> | null,
+  targetColumnMap: Map<string, number> | null,
   match: MatchResult,
 ): string {
-  if (!targetSheet || !targetColMap || match.bangumiRow === undefined) {
+  if (!targetSheet || !targetColumnMap || match.bangumiRow === undefined) {
     return '<div class="cmp-empty">未匹配到目标行</div>'
   }
   const items: { label: string; value: string }[] = []
   for (const field of TARGET_CMP_FIELDS) {
     const column =
-      targetColMap.get(field.columnKey) ??
-      (field.fallbackColKey ? targetColMap.get(field.fallbackColKey) : undefined)
+      targetColumnMap.get(field.columnKey) ??
+      (field.fallbackColKey ? targetColumnMap.get(field.fallbackColKey) : undefined)
     if (column && column > 0) {
       const value = getCellValue(targetSheet, match.bangumiRow, column).trim()
       if (value) items.push({ label: field.label, value })
@@ -738,7 +738,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
   const sourceSheet = state.animeSourceSheet
   const targetSheet = state.bangumiSheet
   const targetHeaderRow = targetSheet ? findHeaderRow(targetSheet) : 0
-  const targetColMap =
+  const targetColumnMap =
     targetSheet && targetHeaderRow > 0 ? getColumnMap(targetSheet, targetHeaderRow) : null
 
   const rowsHtml = matches.map((match) => {
@@ -753,7 +753,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
       match.bangumiRow === undefined
         ? ''
         : `<div class="cmp-meta">目标行 ${String(match.bangumiRow)}</div>`
-    const targetTags = buildTargetCmpTags(targetSheet, targetColMap, match)
+    const targetTags = buildTargetCmpTags(targetSheet, targetColumnMap, match)
 
     return `
       <tr class="match-row match-${match.matchType}">
@@ -851,7 +851,7 @@ function showAllMatchesDetail(matches: MatchResult[]): void {
     ['unmatched', '❌ 未匹配', 'status-unmatched'],
   ]
   for (const label of labels) {
-    const [key, title, cls] = label
+    const [key, title, cssClass] = label
     const items = groups[key]
     if (items && items.length > 0) {
       const listHtml = items
@@ -875,7 +875,7 @@ function showAllMatchesDetail(matches: MatchResult[]): void {
         .join('')
       groupHtml.push(`
         <div class="match-all-group">
-          <div class="match-all-title"><span class="match-status ${cls}">${title}</span> <span class="match-all-count">${String(items.length)} 条</span></div>
+          <div class="match-all-title"><span class="match-status ${cssClass}">${title}</span> <span class="match-all-count">${String(items.length)} 条</span></div>
           <div class="match-all-list">${listHtml}</div>
         </div>
       `)
@@ -953,7 +953,7 @@ function renderMatchDetail(match: MatchResult): string {
   const sourceSheet = state.animeSourceSheet
   const targetSheet = state.bangumiSheet
   const targetHeaderRow = targetSheet ? findHeaderRow(targetSheet) : 0
-  const targetColMap =
+  const targetColumnMap =
     targetSheet && targetHeaderRow > 0 ? getColumnMap(targetSheet, targetHeaderRow) : null
   if (sourceSheet && state.columnMapping) {
     items.push({
@@ -961,10 +961,10 @@ function renderMatchDetail(match: MatchResult): string {
       valueHtml: buildSourceCmpTags(sourceSheet, match),
     })
   }
-  if (targetSheet && targetColMap && match.bangumiRow !== undefined) {
+  if (targetSheet && targetColumnMap && match.bangumiRow !== undefined) {
     items.push({
       label: '目标表对比字段',
-      valueHtml: buildTargetCmpTags(targetSheet, targetColMap, match),
+      valueHtml: buildTargetCmpTags(targetSheet, targetColumnMap, match),
     })
   }
 

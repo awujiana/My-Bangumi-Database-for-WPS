@@ -64,7 +64,7 @@ vi.mock('../ts/sync/exceltobangumi/progress-reporter.js', () => ({
   handleStoppedRemainingTasks: mockState.handleStoppedRemainingTasks,
   finalizeSyncResults: mockState.finalizeSyncResults,
   markSyncResultColor: vi.fn(),
-  DEFAULT_SEQ_COL: 4,
+  DEFAULT_SEQ_COLUMN: 4,
   TYPE_NAMES: ['', '想看', '看过', '在看', '搁置', '抛弃'],
 }))
 
@@ -402,9 +402,9 @@ describe('getFilterStatus', () => {
   })
 
   it('无参数时使用 ActiveSheet（AutoFilterMode=false 时返回空结果）', () => {
-    const mockWs = createMockWorksheet({ autoFilterMode: false })
+    const mockWorksheet = createMockWorksheet({ autoFilterMode: false })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const result = getFilterStatus()
     // autoFilterMode=false 且未传 deepCheck → 走快速路径返回空结果
@@ -413,19 +413,19 @@ describe('getFilterStatus', () => {
   })
 
   it('传入工作表参数时使用该工作表（AutoFilterMode=false 返回空）', () => {
-    const mockWs = createMockWorksheet({ name: 'Data', autoFilterMode: false })
+    const mockWorksheet = createMockWorksheet({ name: 'Data', autoFilterMode: false })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
-    const result = getFilterStatus(mockWs, 100, 1, false)
+    const result = getFilterStatus(mockWorksheet, 100, 1, false)
     expect(result.hasFilter).toBe(false)
     expect(result.visibleRows).toEqual([])
   })
 
   it('lastRow 为数字时使用兼容模式（ActiveWorkbook.ActiveSheet）', () => {
-    const mockWs = createMockWorksheet({ autoFilterMode: false })
+    const mockWorksheet = createMockWorksheet({ autoFilterMode: false })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     // worksheetOrLastRow 为数字 → 使用 ActiveSheet；后两参为 headerRow / shouldDeepCheck
     const result = getFilterStatus(100, 1, 1, false)
@@ -448,13 +448,13 @@ describe('SyncToBangumiAsync', () => {
   })
 
   it('应返回包含 success/fail/skip/stopped 字段的结果对象', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       // 无数据行
       rangeValues: {},
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -464,7 +464,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs,
+      mockWorksheet,
       columnMap,
       'test-token',
       // lastRow
@@ -484,20 +484,20 @@ describe('SyncToBangumiAsync', () => {
   })
 
   it('无数据行时返回 success=0/fail=0/skip=0', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       // 无 Bangumi_URL 数据
       rangeValues: {},
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 5, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 5, 1)
 
     expect(result.success).toBe(0)
     expect(result.fail).toBe(0)
@@ -506,49 +506,49 @@ describe('SyncToBangumiAsync', () => {
   })
 
   it('应调用 finalizeSyncResults 进行最终结果处理', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {},
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 3, 1)
+    await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 3, 1)
 
     // finalizeSyncResults 应被调用（在 _finalizeSyncResults 别名下）
     expect(mockState.finalizeSyncResults).toHaveBeenCalled()
   })
 
   it('应调用 getOrCreateSyncRecordSheet 创建同步记录表', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {},
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 3, 1)
+    await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 3, 1)
 
     expect(mockState.getOrCreateSyncRecordSheet).toHaveBeenCalled()
   })
 
   it('进度回调 onProgress 应在测试中被传递（不抛错）', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {},
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -556,7 +556,7 @@ describe('SyncToBangumiAsync', () => {
     ])
     const onProgress = vi.fn()
 
-    await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 3, 1, { onProgress })
+    await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 3, 1, { onProgress })
 
     // 无数据行时 syncTasks 为空，onProgress 可能不会被调用
     // 但函数应正常完成不抛错
@@ -568,7 +568,7 @@ describe('SyncToBangumiAsync', () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 500, message: 'Server Error' })
 
     // 构造一个有 Bangumi_URL 和"看过"状态的数据行
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -577,7 +577,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -586,7 +586,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs,
+      mockWorksheet,
       columnMap,
       'test-token',
       // lastRow
@@ -604,7 +604,7 @@ describe('SyncToBangumiAsync', () => {
   it('成功响应时应计入 success（bgmRequestSync 返回 200）', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -613,7 +613,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -621,7 +621,7 @@ describe('SyncToBangumiAsync', () => {
       ['名称', 1],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
     // 调用参数应包含正确的 endpoint、method 和 token
@@ -640,7 +640,7 @@ describe('SyncToBangumiAsync', () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
     mockState.markEpisodesComplete.mockResolvedValue({ success: true, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -652,7 +652,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -661,7 +661,7 @@ describe('SyncToBangumiAsync', () => {
       ['集数', 9],
     ])
 
-    await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     // markEpisodesComplete 应被调用（type=2 且 epCount>0）
     // 注意：可能由于 mock 设置导致 batchSyncRequests 未实际执行，
@@ -676,7 +676,7 @@ describe('SyncToBangumiAsync', () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
     mockState.markEpisodesComplete.mockResolvedValue({ success: true, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -687,7 +687,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -696,7 +696,7 @@ describe('SyncToBangumiAsync', () => {
       ['集数', 9],
     ])
 
-    await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     // type=3（在看）与 type=2（看过）口径统一：均应标记章节
     // （历史上批量路径只标 type=2，与选中行路径分歧，属被锁定的旧行为，现统一）
@@ -708,7 +708,7 @@ describe('SyncToBangumiAsync', () => {
   it('URL 为空的行应被跳过（不计入 success 或 fail）', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         // URL 为空 → 跳过
@@ -717,14 +717,14 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     // bgmRequestSync 不应被调用（URL 为空 → 跳过）
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
@@ -735,7 +735,7 @@ describe('SyncToBangumiAsync', () => {
   it('观看状态为空的行默认设为 type=1 并同步', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -744,14 +744,14 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     // 状态为空时默认设为 type=1，应发起同步请求
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -762,7 +762,7 @@ describe('SyncToBangumiAsync', () => {
   it('观看状态为"忽略"的行应被跳过（mapWatchStatus 返回 0）', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -771,14 +771,14 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
     expect(result.skip).toBeGreaterThanOrEqual(1)
@@ -787,7 +787,7 @@ describe('SyncToBangumiAsync', () => {
   it('非 BGM URL 应被跳过（extractSubjectId 返回 null）', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         // 非 BGM URL
@@ -796,14 +796,14 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1)
 
     // extractSubjectId 无法从非 BGM URL 提取 ID → 跳过
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
@@ -811,7 +811,7 @@ describe('SyncToBangumiAsync', () => {
   })
 
   it('增量同步模式应正常完成（incremental=true）', async () => {
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
@@ -819,7 +819,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -827,7 +827,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     // 增量同步模式应正常完成不抛错
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1, {
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1, {
       incremental: true,
     })
 
@@ -839,7 +839,7 @@ describe('SyncToBangumiAsync', () => {
   it('skipSubjectIds 集合中的 SID 应被跳过', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
-    const mockWs = createMockWorksheet({
+    const mockWorksheet = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         // SID=12345 在跳过集合中
@@ -848,7 +848,7 @@ describe('SyncToBangumiAsync', () => {
       },
     })
     setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
+      ActiveWorkbook: { ActiveSheet: mockWorksheet },
     })
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
@@ -856,7 +856,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const skipSubjectIds = new Set<string>(['12345'])
-    const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1, {
+    const result = await SyncToBangumiAsync(mockWorksheet, columnMap, 'test-token', 2, 1, {
       skipSubjectIds,
     })
 

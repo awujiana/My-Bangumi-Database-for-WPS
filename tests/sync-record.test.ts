@@ -5,7 +5,7 @@ const {
   SYNC_RECORD_COLUMNS,
   SYNC_RECORD_SHEET_NAME,
   SYNC_STATUS,
-  SYNC_RECORD_COL,
+  SYNC_RECORD_COLUMN,
   BGM_COLOR,
   SYNC_RECORD_TYPE_COLOR,
 } = vi.hoisted(() => {
@@ -25,7 +25,7 @@ const {
   ]
   const syncRecordSheetName = 'Bangumi 同步记录'
   const syncStatus = { SUCCESS: 'success', FAIL: 'fail', SKIP: 'skip' }
-  const syncRecordCol = {
+  const syncRecordColumn = {
     SID: 1,
     TIME: 2,
     NAME: 3,
@@ -53,7 +53,7 @@ const {
     SYNC_RECORD_COLUMNS: syncRecordColumns,
     SYNC_RECORD_SHEET_NAME: syncRecordSheetName,
     SYNC_STATUS: syncStatus,
-    SYNC_RECORD_COL: syncRecordCol,
+    SYNC_RECORD_COLUMN: syncRecordColumn,
     BGM_COLOR: bgmColor,
     SYNC_RECORD_TYPE_COLOR: syncRecordTypeColor,
   }
@@ -65,7 +65,7 @@ vi.mock('../ts/core/constants.js', () => ({
   BGM_COLOR,
   SYNC_RECORD_COLUMNS,
   SYNC_RECORD_SHEET_NAME,
-  SYNC_RECORD_COL,
+  SYNC_RECORD_COLUMN,
   SYNC_RECORD_TYPE_COLOR,
 }))
 
@@ -79,7 +79,7 @@ vi.mock('../ts/tools/config.js', () => ({
 const mockBgmLogn = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(10))
-const mockColNumberToLetter = vi.hoisted(() =>
+const mockColumnNumberToLetter = vi.hoisted(() =>
   vi.fn((column: number) => {
     let result = ''
     let n = column
@@ -100,7 +100,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
   getApp: mockGetApp,
   getLastRow: mockGetLastRow,
-  columnNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColumnNumberToLetter,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
@@ -493,7 +493,7 @@ describe('syncRecord', () => {
     it('批量添加中某个记录失败应继续处理其他', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockSetCellValue.mockImplementation(
-        (_ws: unknown, _r: unknown, _c: unknown, _v: unknown) => true,
+        (_worksheet: unknown, _r: unknown, _c: unknown, _v: unknown) => true,
       )
       const isResult = addSyncRecords([
         { subjectId: '1', name: 'one', url: 'http://a.com' },
@@ -605,7 +605,7 @@ describe('syncRecord', () => {
         count: 1,
       })
       // Verify that Range was called for color cells
-      expect(mockColNumberToLetter).toHaveBeenCalled()
+      expect(mockColumnNumberToLetter).toHaveBeenCalled()
     })
 
     it('失败状态应设置 FAIL 颜色', () => {
@@ -618,7 +618,7 @@ describe('syncRecord', () => {
         status: 'fail',
         count: 1,
       })
-      expect(mockColNumberToLetter).toHaveBeenCalled()
+      expect(mockColumnNumberToLetter).toHaveBeenCalled()
     })
 
     it('跳过状态应设置 SKIP 颜色', () => {
@@ -631,7 +631,7 @@ describe('syncRecord', () => {
         status: 'skip',
         count: 1,
       })
-      expect(mockColNumberToLetter).toHaveBeenCalled()
+      expect(mockColumnNumberToLetter).toHaveBeenCalled()
     })
 
     it('多次同步应设置更深颜色', () => {
@@ -644,7 +644,7 @@ describe('syncRecord', () => {
         status: 'success',
         count: 3,
       })
-      expect(mockColNumberToLetter).toHaveBeenCalled()
+      expect(mockColumnNumberToLetter).toHaveBeenCalled()
     })
 
     it('类型颜色应根据类型名设置', () => {
@@ -656,7 +656,7 @@ describe('syncRecord', () => {
         type: '想',
         status: 'success',
       })
-      expect(mockColNumberToLetter).toHaveBeenCalled()
+      expect(mockColumnNumberToLetter).toHaveBeenCalled()
     })
   })
 
@@ -1211,7 +1211,7 @@ describe('syncRecord', () => {
         bgmLog: mockBgmLogn,
         getApp: mockGetApp,
         getLastRow: mockGetLastRow,
-        columnNumberToLetter: mockColNumberToLetter,
+        columnNumberToLetter: mockColumnNumberToLetter,
         getCellValue: mockGetCellValue,
         setCellValue: mockSetCellValue,
         readRangeValues: mockReadRangeValues,
@@ -1609,7 +1609,7 @@ describe('syncRecord', () => {
 // ========== 补充测试：getStatusColor 默认分支 (line 93) ==========
 describe('getStatusColor 默认分支 (line 93)', () => {
   it('未知状态应返回 SUCCESS 颜色 (line 93)', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1627,7 +1627,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('SUCCESS 状态应返回 SUCCESS 颜色', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1643,7 +1643,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('FAIL 状态应返回 FAIL 颜色', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1659,7 +1659,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('SKIP 状态应返回 SKIP 颜色', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1678,7 +1678,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
 // ========== 补充测试：buildCache 异常路径 (line 343) ==========
 describe('buildCache 异常路径 (line 343)', () => {
   it('readRangeValues 抛出异常时 buildCache 应捕获', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
 
@@ -1859,7 +1859,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
 // ========== 补充测试：addSyncRecord 新建路径 (lines 442-487) ==========
 describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   it('新 SID 应走新建路径', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -1896,7 +1896,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   })
 
   it('新建路径 fingerprint 不为 undefined 时应写入', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -1913,7 +1913,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   })
 
   it('新建路径 collType 不为空时应写入', () => {
-    const _mockWs = createMockSheet()
+    const _mockWorksheet = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -2171,7 +2171,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
       // 故意传入非数组元素触发异常（mock 已放宽类型，无需 ts-expect-error）
       null,
       undefined,
-      // 非数组，访问 [SYNC_RECORD_COL.SID - 1] 会出错
+      // 非数组，访问 [SYNC_RECORD_COLUMN.SID - 1] 会出错
       'invalid-string',
     ])
 
@@ -2397,9 +2397,15 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
       ['', '', '', '', '', '', '', '', '', '', '', ''],
     ]
     mockReadRangeValues.mockImplementation(
-      (_ws: unknown, _startRow: number, _endRow: number, startCol: number, endCol: number) => {
+      (
+        _worksheet: unknown,
+        _startRow: number,
+        _endRow: number,
+        startColumn: number,
+        endColumn: number,
+      ) => {
         // 仅响应整片读取（迁移 / 缓存重建）；SID 单列读取（去重分组）返回空
-        if (startCol === 1 && endCol === SYNC_RECORD_COLUMNS.length) return legacyRows
+        if (startColumn === 1 && endColumn === SYNC_RECORD_COLUMNS.length) return legacyRows
         return []
       },
     )
@@ -3190,10 +3196,10 @@ describe('addSyncRecordSummary 行为', () => {
 // ========== 补充测试：deduplicateSyncRecords 重复 SID 合并路径（第十三轮） ==========
 //
 // ⚠️ 注意这里必须用 mockReadRangeValues（不是 mockGetCellValue）造重复：
-// `groupRowsBySid()` 是**整列批量读**（readRangeValues），既不逐行读 SID、也不看 getCellValue。
+// `groupRowsBySubjectId()` 是**整列批量读**（readRangeValues），既不逐行读 SID、也不看 getCellValue。
 // 上面 `deduplicateSyncRecords 详细测试 > 有重复 SID 时应合并并删除` 那条只 mock 了
 // getCellValue，所以它其实**从未进入合并分支**（断言只验证了返回值是 true）——
-// 这正是 mergeDuplicateSidGroups 的 489-503 一直未覆盖的原因。
+// 这正是 mergeDuplicateSubjectIdGroups 的 489-503 一直未覆盖的原因。
 describe('deduplicateSyncRecords 重复 SID 合并 (lines 489-503)', () => {
   // 本 describe 在文件作用域，不在 `describe('syncRecord')` 的 beforeEach 覆盖范围内，
   // 必须自己清一次调用记录，否则断言会看到前面用例遗留的调用。

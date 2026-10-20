@@ -124,10 +124,10 @@ vi.mock('../ts/tools/locked-sheet.js', () => ({ getOpenWorkbooks: m.getOpenWorkb
 
 vi.mock('../ts/panel/enrich-page-state.js', () => ({
   COLUMN_MAPPING_FIELDS: [
-    { key: 'nameCol', label: '名称', required: true },
-    { key: 'tagsCol', label: 'TAGS/标签', required: false },
+    { key: 'nameColumn', label: '名称', required: true },
+    { key: 'tagsColumn', label: 'TAGS/标签', required: false },
     { key: 'premiereCol', label: '首播', required: false },
-    { key: 'episodesCol', label: '集数', required: false },
+    { key: 'episodesColumn', label: '集数', required: false },
     { key: 'weekdayCol', label: '周更时间', required: false },
     { key: 'platformCol', label: '播放平台', required: false },
     { key: 'exclusiveCol', label: '独播', required: false },
@@ -250,9 +250,9 @@ function makeWorkbook(spec: FakeWorkbookSpec = {}): WpsWorkbook {
   return workbook as unknown as WpsWorkbook
 }
 
-/** 列映射：`nameCol` 是唯一必填项 */
+/** 列映射：`nameColumn` 是唯一必填项 */
 function makeMapping(overrides: Partial<EnrichColumnMapping> = {}): EnrichColumnMapping {
-  const mapping: EnrichColumnMapping = { nameCol: 3 }
+  const mapping: EnrichColumnMapping = { nameColumn: 3 }
   for (const [key, value] of Object.entries(overrides)) {
     Reflect.set(mapping, key, value)
   }
@@ -408,7 +408,7 @@ function anchorDefaults(): void {
   m.sanitizeTableRows.mockImplementation((html) => html)
   m.renderStatCards.mockReturnValue(undefined)
   m.escapeHtml.mockImplementation((value) => value)
-  m.getCellValue.mockImplementation((_ws, row, column) => {
+  m.getCellValue.mockImplementation((_worksheet, row, column) => {
     if (row === undefined || column === undefined) return ''
     return cellMap.get(`${String(row)}:${String(column)}`) ?? ''
   })
@@ -446,7 +446,7 @@ function detectWithMapping(mapping: EnrichColumnMapping): void {
 }
 
 /** 让 `previewMatch` 拿到完整可用的上下文 */
-function primeReadyState(mapping: EnrichColumnMapping = makeMapping({ nameCol: 3 })): void {
+function primeReadyState(mapping: EnrichColumnMapping = makeMapping({ nameColumn: 3 })): void {
   state.animeSourceSheet = makeSheet({ name: '新番表' })
   state.bangumiSheet = makeSheet({ name: 'BGM' })
   state.columnMapping = mapping
@@ -459,7 +459,7 @@ function primeReadyState(mapping: EnrichColumnMapping = makeMapping({ nameCol: 3
 /** 直接跑一次匹配预览渲染（匹配结果表 / 详情弹窗相关用例的入口） */
 function runMatchPreview(
   matches: MatchResult[],
-  mapping: EnrichColumnMapping = makeMapping({ nameCol: 3 }),
+  mapping: EnrichColumnMapping = makeMapping({ nameColumn: 3 }),
 ): void {
   primeReadyState(mapping)
   m.matchEntries.mockReturnValue(matches)
@@ -489,7 +489,7 @@ beforeEach(() => {
 describe('detectHeaderOnSheet', () => {
   it('命中源表布局时写入状态并渲染识别结果、映射编辑与源数据预览', () => {
     const sheet = makeSheet({ name: '新番表' })
-    const mapping = makeMapping({ nameCol: 3, weekdayCol: 4 })
+    const mapping = makeMapping({ nameColumn: 3, weekdayCol: 4 })
     m.detectAnimeSourceLayout.mockReturnValue({
       headerRow: 1,
       dataStartRow: 2,
@@ -514,7 +514,7 @@ describe('detectHeaderOnSheet', () => {
 
   it('没有源表布局时回退到 findHeaderRow 与 detectColumns', () => {
     const sheet = makeSheet({ name: '普通表' })
-    const mapping = makeMapping({ nameCol: 7 })
+    const mapping = makeMapping({ nameColumn: 7 })
     m.findHeaderRow.mockReturnValue(3)
     m.detectColumns.mockReturnValue(mapping)
 
@@ -619,7 +619,7 @@ describe('列映射下拉与 updateColumnMapping', () => {
   it('为每个映射字段渲染 50 个列选项、必填星号与当前列选中态', () => {
     setCell(1, 3, '名称')
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     const selects = mappingList().querySelectorAll<HTMLSelectElement>(':scope .mapping-select')
     expect(selects).toHaveLength(8)
@@ -633,52 +633,54 @@ describe('列映射下拉与 updateColumnMapping', () => {
   it('表头为空的列在选项里标注「无表头」', () => {
     detectWithMapping(makeMapping())
 
-    const options = mappingSelect('nameCol').querySelectorAll(':scope > option')
+    const options = mappingSelect('nameColumn').querySelectorAll(':scope > option')
     expect(options[1]?.textContent).toBe('(列1，无表头)')
   })
 
   it('改选新列时写入列映射并记录日志', () => {
-    const mapping = makeMapping({ nameCol: 3 })
+    const mapping = makeMapping({ nameColumn: 3 })
 
     detectWithMapping(mapping)
-    const select = mappingSelect('nameCol')
+    const select = mappingSelect('nameColumn')
     select.value = '8'
     select.dispatchEvent(new Event('change'))
 
-    expect(mapping.nameCol).toBe(8)
-    expect(loggedMessages().some((text) => text.includes('列映射更新: nameCol → 列8'))).toBe(true)
+    expect(mapping.nameColumn).toBe(8)
+    expect(loggedMessages().some((text) => text.includes('列映射更新: nameColumn → 列8'))).toBe(
+      true,
+    )
   })
 
   it('选到「未映射」时把该字段置为 undefined', () => {
-    const mapping = makeMapping({ nameCol: 3 })
+    const mapping = makeMapping({ nameColumn: 3 })
 
     detectWithMapping(mapping)
-    const select = mappingSelect('nameCol')
+    const select = mappingSelect('nameColumn')
     select.value = ''
     select.dispatchEvent(new Event('change'))
 
-    expect(mapping.nameCol).toBeUndefined()
-    expect(loggedMessages().some((text) => text.includes('列映射更新: nameCol → 未映射'))).toBe(
+    expect(mapping.nameColumn).toBeUndefined()
+    expect(loggedMessages().some((text) => text.includes('列映射更新: nameColumn → 未映射'))).toBe(
       true,
     )
   })
 
   it('选项值为非数字时按 0 处理', () => {
-    const mapping = makeMapping({ nameCol: 3 })
+    const mapping = makeMapping({ nameColumn: 3 })
 
     detectWithMapping(mapping)
-    const select = mappingSelect('nameCol')
+    const select = mappingSelect('nameColumn')
     Object.defineProperty(select, 'value', { configurable: true, get: () => '不是数字' })
     select.dispatchEvent(new Event('change'))
 
-    expect(mapping.nameCol).toBeUndefined()
+    expect(mapping.nameColumn).toBeUndefined()
   })
 
   it('列映射已被清空时改选不写入', () => {
     detectWithMapping(makeMapping())
 
     state.columnMapping = null
-    const select = mappingSelect('nameCol')
+    const select = mappingSelect('nameColumn')
     select.value = '8'
     select.dispatchEvent(new Event('change'))
 
@@ -698,7 +700,7 @@ describe('源数据预览', () => {
   })
 
   it('没有任何映射列时清空表头表体、关掉预览标记并重置匹配结果', () => {
-    detectWithMapping({ nameCol: 0 })
+    detectWithMapping({ nameColumn: 0 })
 
     const table = elementById('sourceTable')
     expect(table.querySelector(':scope > thead')?.childElementCount).toBe(0)
@@ -716,7 +718,7 @@ describe('源数据预览', () => {
     table.querySelector(':scope > tbody')?.remove()
 
     expect(() => {
-      detectWithMapping({ nameCol: 0 })
+      detectWithMapping({ nameColumn: 0 })
     }).not.toThrow()
     expect(state.hasSourcePreview).toBe(false)
   })
@@ -728,7 +730,9 @@ describe('源数据预览', () => {
     setCell(2, 6, '独播')
     m.readPlatformValues.mockReturnValue(['B站', '爱奇艺'])
 
-    detectWithMapping(makeMapping({ nameCol: 3, weekdayCol: 4, platformCol: 5, exclusiveCol: 6 }))
+    detectWithMapping(
+      makeMapping({ nameColumn: 3, weekdayCol: 4, platformCol: 5, exclusiveCol: 6 }),
+    )
 
     expect(sourceHeaderLabels()).toEqual(['', '名称', '周更时间', '播放平台'])
     expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain(
@@ -742,7 +746,7 @@ describe('源数据预览', () => {
     setCell(2, 3, '番剧甲')
     setCell(2, 6, '独播')
 
-    detectWithMapping(makeMapping({ nameCol: 3, exclusiveCol: 6 }))
+    detectWithMapping(makeMapping({ nameColumn: 3, exclusiveCol: 6 }))
 
     expect(sourceHeaderLabels()).toEqual(['', '名称', '独播'])
     expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain('独播')
@@ -750,7 +754,7 @@ describe('源数据预览', () => {
 
   it('关联简介表时按名称补出简介列', () => {
     const introSheet = makeSheet({ name: '简介' })
-    const introMapping = makeMapping({ nameCol: 2, directorCol: 4, screenplayCol: 5 })
+    const introMapping = makeMapping({ nameColumn: 2, directorCol: 4, screenplayCol: 5 })
     m.findIntroSheetInWorkbook.mockReturnValue(introSheet)
     m.buildIntroSheetContext.mockReturnValue(
       makeIntroContext(introSheet, introMapping, [['番剧甲', 7]]),
@@ -761,7 +765,7 @@ describe('源数据预览', () => {
     setCell(7, 5, '某编剧')
     state.sourceWorkbook = makeWorkbook({ name: '源工作簿' })
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     expect(sourceHeaderLabels()).toEqual(['', '名称', '导演', '编剧'])
     expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain(
@@ -773,13 +777,13 @@ describe('源数据预览', () => {
     const introSheet = makeSheet({ name: '简介' })
     m.findIntroSheetInWorkbook.mockReturnValue(introSheet)
     m.buildIntroSheetContext.mockReturnValue(
-      makeIntroContext(introSheet, makeMapping({ nameCol: 2, directorCol: 4 }), [['别的番', 9]]),
+      makeIntroContext(introSheet, makeMapping({ nameColumn: 2, directorCol: 4 }), [['别的番', 9]]),
     )
     m.getLastRow.mockReturnValue(2)
     setCell(2, 3, '番剧甲')
     state.sourceWorkbook = makeWorkbook({ name: '源工作簿' })
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     const rows = elementById('sourceTable').querySelectorAll(':scope > tbody > tr')
     expect(rows).toHaveLength(1)
@@ -790,7 +794,7 @@ describe('源数据预览', () => {
     m.getLastRow.mockReturnValue(4)
     setCell(3, 3, '只有这一行有数据')
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     const rows =
       elementById('sourceTable').querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr')
@@ -801,7 +805,7 @@ describe('源数据预览', () => {
   it('表体缺失时渲染完表头即返回，不写统计卡', () => {
     elementById('sourceTable').querySelector(':scope > tbody')?.remove()
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     expect(m.renderStatCards).not.toHaveBeenCalled()
   })
@@ -810,7 +814,7 @@ describe('源数据预览', () => {
     m.getLastRow.mockReturnValue(100)
     fillRows(rowNumbers(2, 20), 3, '番剧')
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     expect(elementById('sourceTable').querySelectorAll(':scope > tbody > tr')).toHaveLength(20)
     expect(elementById('sourcePreviewHint').textContent).toBe(
@@ -822,7 +826,7 @@ describe('源数据预览', () => {
     m.getLastRow.mockReturnValue(3)
     fillRows([2, 3], 3, '番剧')
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     expect(elementById('sourcePreviewHint').textContent).toBe('')
   })
@@ -831,7 +835,7 @@ describe('源数据预览', () => {
     m.getLastRow.mockReturnValue(2)
     fillRows([2, 3, 4], 3, '番剧')
 
-    detectWithMapping(makeMapping({ nameCol: 3 }))
+    detectWithMapping(makeMapping({ nameColumn: 3 }))
 
     expect(elementById('sourceTable').querySelectorAll(':scope > tbody > tr')).toHaveLength(1)
   })
@@ -840,7 +844,7 @@ describe('源数据预览', () => {
     m.getLastRow.mockReturnValue(11)
     fillRows([2, 3, 4], 3, '番剧')
 
-    detectWithMapping(makeMapping({ nameCol: 3, weekdayCol: 4 }))
+    detectWithMapping(makeMapping({ nameColumn: 3, weekdayCol: 4 }))
 
     const cards = m.renderStatCards.mock.calls[0]?.[1]
     expect(cards).toEqual([
@@ -860,7 +864,7 @@ describe('简介表发现', () => {
   it('优先在源工作簿内查找简介表，命中即返回', () => {
     const workbook = makeWorkbook({ name: '源工作簿' })
     const introSheet = makeSheet({ name: '简介' })
-    const context = makeIntroContext(introSheet, makeMapping({ nameCol: 2 }), [])
+    const context = makeIntroContext(introSheet, makeMapping({ nameColumn: 2 }), [])
     state.sourceWorkbook = workbook
     m.findIntroSheetInWorkbook.mockReturnValue(introSheet)
     m.buildIntroSheetContext.mockReturnValue(context)
@@ -875,7 +879,11 @@ describe('简介表发现', () => {
   it('源工作簿未知时退回工作表的 Parent 工作簿', () => {
     const workbook = makeWorkbook({ name: '父工作簿' })
     const sheet = makeSheet({ name: '新番表', parent: workbook })
-    const context = makeIntroContext(makeSheet({ name: '简介' }), makeMapping({ nameCol: 2 }), [])
+    const context = makeIntroContext(
+      makeSheet({ name: '简介' }),
+      makeMapping({ nameColumn: 2 }),
+      [],
+    )
     m.detectAnimeSourceLayout.mockReturnValue({
       headerRow: 1,
       dataStartRow: 2,
@@ -894,7 +902,7 @@ describe('简介表发现', () => {
     const sourceWorkbook = makeWorkbook({ name: '源工作簿' })
     const otherWorkbook = makeWorkbook({ name: '2026年4月新番简介' })
     const introSheet = makeSheet({ name: '简介' })
-    const context = makeIntroContext(introSheet, makeMapping({ nameCol: 2 }), [])
+    const context = makeIntroContext(introSheet, makeMapping({ nameColumn: 2 }), [])
     state.sourceWorkbook = sourceWorkbook
     m.getOpenWorkbooks.mockReturnValue([sourceWorkbook, otherWorkbook])
     m.findIntroSheetInWorkbook.mockImplementation((workbook) =>
@@ -1020,7 +1028,7 @@ describe('工作簿切换按钮条', () => {
     renderWorkbookTabButtons([target, makeWorkbook({ name: '乙' })])
     m.findAnimeSourceSheetInWorkbook.mockReturnValue(makeSheet({ name: '甲表' }))
     state.bangumiSheet = makeSheet({ name: 'BGM' })
-    state.columnMapping = makeMapping({ nameCol: 3 })
+    state.columnMapping = makeMapping({ nameColumn: 3 })
 
     workbookTabButtons()[0]?.click()
 
@@ -1117,7 +1125,7 @@ describe('previewMatch', () => {
   })
 
   it('名称列缺失时同样提示映射未识别', () => {
-    primeReadyState(makeMapping({ nameCol: 0 }))
+    primeReadyState(makeMapping({ nameColumn: 0 }))
 
     previewMatch()
 
@@ -1321,7 +1329,7 @@ describe('匹配结果表与详情弹窗', () => {
 
     runMatchPreview(
       [makeMatch()],
-      makeMapping({ nameCol: 3, weekdayCol: 4, platformCol: 5, exclusiveCol: 6 }),
+      makeMapping({ nameColumn: 3, weekdayCol: 4, platformCol: 5, exclusiveCol: 6 }),
     )
 
     expect(m.readPlatformValues).toHaveBeenCalled()
@@ -1334,7 +1342,7 @@ describe('匹配结果表与详情弹窗', () => {
   it('源工作表缺失时源侧渲染为空占位', () => {
     state.animeSourceSheet = null
     state.bangumiSheet = makeSheet({ name: 'BGM' })
-    state.columnMapping = makeMapping({ nameCol: 3 })
+    state.columnMapping = makeMapping({ nameColumn: 3 })
     m.ensureSourceSheet.mockReturnValue(makeSheet({ name: '新番表' }))
     m.matchEntries.mockReturnValue([makeMatch()])
 
@@ -1345,9 +1353,11 @@ describe('匹配结果表与详情弹窗', () => {
 
   it('关联简介表时源侧补出导演等字段', () => {
     const introSheet = makeSheet({ name: '简介' })
-    state.introContext = makeIntroContext(introSheet, makeMapping({ nameCol: 2, directorCol: 4 }), [
-      ['某番', 7],
-    ])
+    state.introContext = makeIntroContext(
+      introSheet,
+      makeMapping({ nameColumn: 2, directorCol: 4 }),
+      [['某番', 7]],
+    )
     setCell(7, 4, '名导演')
 
     runMatchPreview([makeMatch()])

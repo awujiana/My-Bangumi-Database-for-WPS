@@ -122,10 +122,10 @@ function createConflictModal(
   const thead = document.createElement('thead')
   const headTr = document.createElement('tr')
 
-  const thSid = document.createElement('th')
-  thSid.scope = 'col'
-  thSid.textContent = 'SID'
-  headTr.appendChild(thSid)
+  const thSubjectId = document.createElement('th')
+  thSubjectId.scope = 'col'
+  thSubjectId.textContent = 'SID'
+  headTr.appendChild(thSubjectId)
 
   const thField = document.createElement('th')
   thField.scope = 'col'

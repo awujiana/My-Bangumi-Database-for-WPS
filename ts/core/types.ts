@@ -50,7 +50,7 @@ export interface BGMSync {
   /** 当前正在处理的工作表（用于暂停时定位） */
   currentSheet: WpsWorksheet | null
   /** 当前正在处理的列号（用于暂停时定位） */
-  currentCol: number
+  currentColumn: number
   /** 进入运行状态（统一入口） */
   enterRunningState: () => boolean
   /** 退出运行状态（统一入口） */

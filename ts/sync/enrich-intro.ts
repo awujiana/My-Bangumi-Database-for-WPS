@@ -86,50 +86,50 @@ export function enrichIntroData(
   matchedAnimeName: string,
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = columnMap.get('特点/印象')
+  const bangumiFeatureColumn = columnMap.get('特点/印象')
 
-  for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
+  for (const [sourceKey, targetColumnName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
     const rawValue = incomingData[sourceKey] ?? ''
     if (!isEmptyValue(rawValue)) {
-      const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
-      const targetCol = columnMap.get(targetColName)
-      if (targetCol !== undefined) {
-        const oldValue = readTargetCell(sheet, cache, row, targetCol)
+      const annotatedValue = getAnnotatedValue(sourceKey, targetColumnName, rawValue)
+      const targetColumn = columnMap.get(targetColumnName)
+      if (targetColumn !== undefined) {
+        const oldValue = readTargetCell(sheet, cache, row, targetColumn)
         if (isEmptyValue(oldValue)) {
-          writeTargetCell(sheet, cache, row, targetCol, annotatedValue)
+          writeTargetCell(sheet, cache, row, targetColumn, annotatedValue)
           enriched.push({
-            fieldName: targetColName,
-            bangumiColumn: targetCol,
+            fieldName: targetColumnName,
+            bangumiColumn: targetColumn,
             oldValue: null,
             updatedValue: annotatedValue,
             action: 'fill',
-            ...(sourceKey !== targetColName && {
-              note: `字段名差异: ${sourceKey} → ${targetColName}`,
+            ...(sourceKey !== targetColumnName && {
+              note: `字段名差异: ${sourceKey} → ${targetColumnName}`,
             }),
           })
         } else {
           conflicts.push({
-            fieldName: targetColName,
-            bangumiColumn: targetCol,
+            fieldName: targetColumnName,
+            bangumiColumn: targetColumn,
             bangumiRow: row,
             oldValue,
             updatedValue: annotatedValue,
             animeRow,
             matchedAnimeName,
             resolution: 'append',
-            ...(sourceKey !== targetColName && {
-              note: `字段名差异: ${sourceKey} → ${targetColName}`,
+            ...(sourceKey !== targetColumnName && {
+              note: `字段名差异: ${sourceKey} → ${targetColumnName}`,
             }),
           })
         }
-      } else if (bangumiFeatureCol !== undefined) {
-        const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureCol)
+      } else if (bangumiFeatureColumn !== undefined) {
+        const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureColumn)
         const featureEntry = `${sourceKey}:${annotatedValue}`
         if (isEmptyValue(oldFeature)) {
-          writeTargetCell(sheet, cache, row, bangumiFeatureCol, featureEntry)
+          writeTargetCell(sheet, cache, row, bangumiFeatureColumn, featureEntry)
           enriched.push({
             fieldName: `特点/印象(${sourceKey})`,
-            bangumiColumn: bangumiFeatureCol,
+            bangumiColumn: bangumiFeatureColumn,
             oldValue: null,
             updatedValue: featureEntry,
             action: 'fill',
@@ -139,16 +139,16 @@ export function enrichIntroData(
           if (merged === oldFeature) {
             enriched.push({
               fieldName: `特点/印象(${sourceKey})`,
-              bangumiColumn: bangumiFeatureCol,
+              bangumiColumn: bangumiFeatureColumn,
               oldValue: oldFeature,
               updatedValue: merged,
               action: 'skip',
             })
           } else {
-            writeTargetCell(sheet, cache, row, bangumiFeatureCol, merged)
+            writeTargetCell(sheet, cache, row, bangumiFeatureColumn, merged)
             enriched.push({
               fieldName: `特点/印象(${sourceKey})`,
-              bangumiColumn: bangumiFeatureCol,
+              bangumiColumn: bangumiFeatureColumn,
               oldValue: oldFeature,
               updatedValue: merged,
               action: 'append',
@@ -159,7 +159,7 @@ export function enrichIntroData(
     }
   }
 
-  if (bangumiFeatureCol !== undefined) {
+  if (bangumiFeatureColumn !== undefined) {
     const featureParts: string[] = []
     for (const key of INTRO_FEATURE_FIELDS) {
       const value = incomingData[key] ?? ''
@@ -169,13 +169,13 @@ export function enrichIntroData(
       }
     }
     if (featureParts.length > 0) {
-      const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureCol)
+      const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureColumn)
       const merged = featureParts.join(FEATURE_SEPARATOR)
       if (isEmptyValue(oldFeature)) {
-        writeTargetCell(sheet, cache, row, bangumiFeatureCol, merged)
+        writeTargetCell(sheet, cache, row, bangumiFeatureColumn, merged)
         enriched.push({
           fieldName: '特点/印象(简介补充)',
-          bangumiColumn: bangumiFeatureCol,
+          bangumiColumn: bangumiFeatureColumn,
           oldValue: null,
           updatedValue: merged,
           action: 'fill',
@@ -183,10 +183,10 @@ export function enrichIntroData(
       } else {
         const combined = appendFeatures(oldFeature, merged)
         if (combined !== oldFeature) {
-          writeTargetCell(sheet, cache, row, bangumiFeatureCol, combined)
+          writeTargetCell(sheet, cache, row, bangumiFeatureColumn, combined)
           enriched.push({
             fieldName: '特点/印象(简介补充)',
-            bangumiColumn: bangumiFeatureCol,
+            bangumiColumn: bangumiFeatureColumn,
             oldValue: oldFeature,
             updatedValue: combined,
             action: 'append',
@@ -209,8 +209,8 @@ export function enrichOpEdPv(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = columnMap.get('特点/印象')
-  if (!bangumiFeatureCol) return
+  const bangumiFeatureColumn = columnMap.get('特点/印象')
+  if (!bangumiFeatureColumn) return
 
   const parts: string[] = []
 
@@ -232,13 +232,13 @@ export function enrichOpEdPv(
   if (parts.length === 0) return
 
   const featureText = parts.join(FEATURE_SEPARATOR)
-  const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureCol)
+  const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureColumn)
 
   if (isEmptyValue(oldFeature)) {
-    writeTargetCell(sheet, cache, row, bangumiFeatureCol, featureText)
+    writeTargetCell(sheet, cache, row, bangumiFeatureColumn, featureText)
     enriched.push({
       fieldName: '特点/印象',
-      bangumiColumn: bangumiFeatureCol,
+      bangumiColumn: bangumiFeatureColumn,
       oldValue: null,
       updatedValue: featureText,
       action: 'fill',
@@ -248,16 +248,16 @@ export function enrichOpEdPv(
     if (merged === oldFeature) {
       enriched.push({
         fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
+        bangumiColumn: bangumiFeatureColumn,
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'skip',
       })
     } else {
-      writeTargetCell(sheet, cache, row, bangumiFeatureCol, merged)
+      writeTargetCell(sheet, cache, row, bangumiFeatureColumn, merged)
       enriched.push({
         fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
+        bangumiColumn: bangumiFeatureColumn,
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'append',
@@ -278,7 +278,7 @@ export function readIntroSheetRow(
 ): Record<string, string> {
   const cell = (column: number): string =>
     rowCells?.[column - 1] ?? getCellValue(sheet, row, column)
-  const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
+  const data: Record<string, string> = { 名称: cell(mapping.nameColumn) || '' }
   if (mapping.introCol) data['简介'] = cell(mapping.introCol) || ''
   if (mapping.studioCol) data['动画制作'] = cell(mapping.studioCol) || ''
   if (mapping.directorCol) data['导演'] = cell(mapping.directorCol) || ''
@@ -416,13 +416,13 @@ export function buildIntroSheetContext(sheet: WpsWorksheet): IntroSheetContext |
   if (headerRow === 0) return null
 
   const mapping = detectColumns(sheet, headerRow)
-  if (mapping.nameCol === 0) return null
+  if (mapping.nameColumn === 0) return null
 
   const dataStartRow = headerRow + 1
   const lastRow = getLastRow(sheet)
   const nameIndex = new Map<string, number>()
   for (let row = dataStartRow; row <= lastRow; row += 1) {
-    const name = getCellValue(sheet, row, mapping.nameCol).trim()
+    const name = getCellValue(sheet, row, mapping.nameColumn).trim()
     if (name) nameIndex.set(normalizeName(name), row)
   }
 
@@ -442,7 +442,7 @@ export function enrichIntroFromContext(
   bangumiRow: number,
   intro: IntroSheetContext,
   matchedAnimeName: string,
-  bangumiColMap: Map<string, number>,
+  bangumiColumnMap: Map<string, number>,
   enriched: EnrichedField[],
   conflicts: ConflictInfo[],
   cache?: SheetCellCache,
@@ -454,7 +454,7 @@ export function enrichIntroFromContext(
     bangumiSheet,
     bangumiRow,
     incomingData,
-    bangumiColMap,
+    bangumiColumnMap,
     enriched,
     conflicts,
     introRow,

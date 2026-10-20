@@ -717,10 +717,10 @@ describe('refreshEnrichSheets', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     wbSelect.replaceChildren()
-    const opt = document.createElement('option')
-    opt.value = 'wb1.xlsx'
-    opt.textContent = 'wb1.xlsx'
-    wbSelect.appendChild(opt)
+    const option = document.createElement('option')
+    option.value = 'wb1.xlsx'
+    option.textContent = 'wb1.xlsx'
+    wbSelect.appendChild(option)
     wbSelect.value = 'wb1.xlsx'
     setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
@@ -775,18 +775,18 @@ function prepareToggle(): {
   setupBasicDom()
   const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
   wbSelect.replaceChildren()
-  const wbOpt = document.createElement('option')
-  wbOpt.value = 'wb1.xlsx'
-  wbOpt.textContent = 'wb1.xlsx'
-  wbSelect.appendChild(wbOpt)
+  const workbookOption = document.createElement('option')
+  workbookOption.value = 'wb1.xlsx'
+  workbookOption.textContent = 'wb1.xlsx'
+  wbSelect.appendChild(workbookOption)
   wbSelect.value = 'wb1.xlsx'
 
   const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
   sheetSelect.replaceChildren()
-  const sheetOpt = document.createElement('option')
-  sheetOpt.value = '2'
-  sheetOpt.textContent = 'TargetSheet'
-  sheetSelect.appendChild(sheetOpt)
+  const sheetOption = document.createElement('option')
+  sheetOption.value = '2'
+  sheetOption.textContent = 'TargetSheet'
+  sheetSelect.appendChild(sheetOption)
   sheetSelect.value = '2'
 
   const storage = createMockPluginStorage()

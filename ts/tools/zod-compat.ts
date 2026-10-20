@@ -237,7 +237,7 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
 
-  /** @internal */ readonly _def: D
+  /** @internal */ readonly _definition: D
 
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -245,7 +245,7 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
     definition: D,
   ) {
     this._inner = inner
-    this._def = definition
+    this._definition = definition
   }
 
   optional(): ZodSchema<(T | D) | undefined> {
@@ -258,7 +258,7 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   }
 
   safeParse(input: unknown): ParseResult<T | D> {
-    if (input === undefined) return ok<T | D>(this._def)
+    if (input === undefined) return ok<T | D>(this._definition)
     const r = this._inner.safeParse(input)
     if (!r.success) return fail(r.error.issues[0]?.message ?? 'invalid')
     return r
@@ -436,10 +436,10 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
 
   readonly __isZodLite = true as const
 
-  /** @internal */ readonly _val: V
+  /** @internal */ readonly _value: V
 
   constructor(value: V) {
-    this._val = value
+    this._value = value
   }
 
   optional(): ZodSchema<V | undefined> {
@@ -452,8 +452,8 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
   }
 
   safeParse(input: unknown): ParseResult<V> {
-    if (input === this._val) return ok(this._val)
-    return fail<V>(`expected literal ${String(this._val)}`)
+    if (input === this._value) return ok(this._value)
+    return fail<V>(`expected literal ${String(this._value)}`)
   }
 
   parse(input: unknown): V {
@@ -469,10 +469,10 @@ class LiteEnum<V extends string> implements ZodSchema<V> {
 
   readonly __isZodLite = true as const
 
-  /** @internal */ readonly _vals: readonly string[]
+  /** @internal */ readonly _values: readonly string[]
 
-  constructor(vals: readonly string[]) {
-    this._vals = vals
+  constructor(values: readonly string[]) {
+    this._values = values
   }
 
   optional(): ZodSchema<V | undefined> {
@@ -486,7 +486,7 @@ class LiteEnum<V extends string> implements ZodSchema<V> {
 
   safeParse(input: unknown): ParseResult<V> {
     if (typeof input !== 'string') return fail<V>('enum value must be string')
-    if (!this._vals.includes(input)) return fail<V>(`not in enum: ${input}`)
+    if (!this._values.includes(input)) return fail<V>(`not in enum: ${input}`)
     return ok(input as V)
   }
 
@@ -632,7 +632,7 @@ interface LiteZod {
   array<T>(item: ZodSchema<T>): LiteArray<T>
 }
 
-const LiteZodImpl: LiteZod = {
+const LiteZodImplementation: LiteZod = {
   string: (): LiteString => flu(new LiteString()),
   number: (): LiteNumber => flu(new LiteNumber()),
   boolean: (): LiteBoolean => flu(new LiteBoolean()),
@@ -667,7 +667,7 @@ function resolveZod(): LiteZod {
   ) {
     return cand as LiteZod
   }
-  return LiteZodImpl
+  return LiteZodImplementation
 }
 
 export const z = resolveZod()

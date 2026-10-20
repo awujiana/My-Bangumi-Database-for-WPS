@@ -26,18 +26,18 @@ import {
 import type { ModuleStatus } from '../ts/entry/debug-panel-render.js'
 
 /** 单点写/删 window 上的调试全局（避免 casts 散布到每个用例） */
-const setWin = (key: string, value: unknown): void => {
+const setWindowProperty = (key: string, value: unknown): void => {
   Reflect.set(window, key, value)
 }
 /** 用作「存在且为函数」的宿主全局占位值 */
 const noop = (): void => {}
-const delWin = (key: string): void => {
+const deleteWindowProperty = (key: string): void => {
   Reflect.deleteProperty(window, key)
 }
 
 /** 环境面板单项：值单元格的 class 与文本 */
 interface EnvironmentCell {
-  cls: string
+  cssClass: string
   text: string
 }
 
@@ -55,7 +55,7 @@ function environmentCell(html: string, label: string): EnvironmentCell {
   if (value === null || value === undefined) {
     throw new Error(`环境面板缺少「${label}」卡片`)
   }
-  return { cls: value.className, text: value.textContent }
+  return { cssClass: value.className, text: value.textContent }
 }
 
 const CLEARED = [
@@ -72,11 +72,11 @@ const CLEARED = [
 ]
 
 beforeEach(() => {
-  for (const key of CLEARED) delWin(key)
+  for (const key of CLEARED) deleteWindowProperty(key)
 })
 
 afterEach(() => {
-  for (const key of CLEARED) delWin(key)
+  for (const key of CLEARED) deleteWindowProperty(key)
 })
 
 describe('debug-panel-render / 常量', () => {
@@ -98,14 +98,14 @@ describe('debug-panel-render / 常量', () => {
 describe('debug-panel-render / 宿主全局读取', () => {
   it('无 WpsInvoke 视为调试环境；有则不是', () => {
     expect(isDebugEnvironment()).toBe(true)
-    setWin('WpsInvoke', noop)
+    setWindowProperty('WpsInvoke', noop)
     expect(isDebugEnvironment()).toBe(false)
   })
 
   it('WpsInvoke 存在但为 undefined 仍算调试环境（判据是 === undefined，不是 in）', () => {
     // 宿主脚本可能先 `window.WpsInvoke = undefined` 占位；若判据写成 `'WpsInvoke' in window`
     // 或 `!window.WpsInvoke`，真机上的调试面板就会**该出不出 / 不该出却出**
-    setWin('WpsInvoke', undefined)
+    setWindowProperty('WpsInvoke', undefined)
     expect(isDebugEnvironment()).toBe(true)
   })
 
@@ -116,7 +116,7 @@ describe('debug-panel-render / 宿主全局读取', () => {
   it('getModuleStatuses 缺失时返回空数组，存在时原样返回', () => {
     expect(getModuleStatuses()).toEqual([])
     const mods: ModuleStatus[] = [{ src: 'a.ts', loaded: true, critical: false }]
-    setWin('__BGM_MODULE_STATUS__', mods)
+    setWindowProperty('__BGM_MODULE_STATUS__', mods)
     expect(getModuleStatuses()).toBe(mods)
   })
 })
@@ -156,7 +156,7 @@ describe('debug-panel-render / 模板构建', () => {
   })
 
   it('buildStatusBarHTML：Ribbon 就绪 + 关键模块失败用 err 徽标', () => {
-    setWin('_bgmRibbonReady', noop)
+    setWindowProperty('_bgmRibbonReady', noop)
     const mods: ModuleStatus[] = [{ src: 'a', loaded: false, critical: true }]
     const html = buildStatusBarHTML(mods)
     expect(html).toContain('● Ribbon 就绪')
@@ -173,14 +173,14 @@ describe('debug-panel-render / 模板构建', () => {
   it('buildStatusBarHTML：_bgmRibbonReady 非函数时一律算未就绪（typeof 判据，不是真值判据）', () => {
     // 宿主可能先塞 `true` 占位再替换成真函数；若这里写成 `!!_bgmRibbonReady`，
     // 占位期间会谎报「Ribbon 就绪」，把「按钮全点了没反应」的问题掩盖掉
-    setWin('_bgmRibbonReady', true)
+    setWindowProperty('_bgmRibbonReady', true)
     const html = buildStatusBarHTML([{ src: 'a', loaded: true, critical: false }])
     expect(html).toContain('○ Ribbon 未就绪')
     expect(html).toContain('bgm-dp-badge-err')
   })
 
   it('buildTabsHTML 写入日志数与模块数', () => {
-    setWin('__BGM_MODULE_STATUS__', [
+    setWindowProperty('__BGM_MODULE_STATUS__', [
       { src: 'a', loaded: true, critical: false },
     ] satisfies ModuleStatus[])
     const html = buildTabsHTML(42)
@@ -196,7 +196,7 @@ describe('debug-panel-render / 模板构建', () => {
   })
 
   it('buildModulesPanelHTML：渲染 src / error / critical 标记', () => {
-    setWin('__BGM_MODULE_STATUS__', [
+    setWindowProperty('__BGM_MODULE_STATUS__', [
       { src: 'ok.ts', loaded: true, critical: false },
       { src: 'bad.ts', loaded: false, critical: true, error: 'boom' },
     ] satisfies ModuleStatus[])
@@ -249,12 +249,12 @@ describe('debug-panel-render / 模板构建', () => {
     const warn = (label: string, text: string): void => {
       const cell = environmentCell(html, label)
       expect(cell.text).toBe(text)
-      expect(cell.cls).toContain('bgm-dp-env-value-warn')
+      expect(cell.cssClass).toContain('bgm-dp-env-value-warn')
     }
     const expectError = (label: string, text: string): void => {
       const cell = environmentCell(html, label)
       expect(cell.text).toBe(text)
-      expect(cell.cls).toContain('bgm-dp-env-value-err')
+      expect(cell.cssClass).toContain('bgm-dp-env-value-err')
     }
 
     // 4 个宿主回调缺失 → 红
@@ -272,14 +272,14 @@ describe('debug-panel-render / 模板构建', () => {
   })
 
   it('buildEnvironmentPanelHTML：宿主可用时 9 项全部为就绪色', () => {
-    setWin('WpsInvoke', noop)
-    setWin('_ribbonReady', true)
-    setWin('OnAddinLoad', noop)
-    setWin('OnAction', () => true)
-    setWin('GetBangumiImage', () => 'x')
-    setWin('GetIncrementalSyncPressed', noop)
-    setWin('DOMPurify', {})
-    setWin('z', {})
+    setWindowProperty('WpsInvoke', noop)
+    setWindowProperty('_ribbonReady', true)
+    setWindowProperty('OnAddinLoad', noop)
+    setWindowProperty('OnAction', () => true)
+    setWindowProperty('GetBangumiImage', () => 'x')
+    setWindowProperty('GetIncrementalSyncPressed', noop)
+    setWindowProperty('DOMPurify', {})
+    setWindowProperty('z', {})
     const html = buildEnvironmentPanelHTML()
 
     for (const label of [
@@ -292,7 +292,7 @@ describe('debug-panel-render / 模板构建', () => {
       'DOMPurify (window)',
       'Zod (window.z)',
     ]) {
-      expect(environmentCell(html, label).cls).toContain('bgm-dp-env-value-ok')
+      expect(environmentCell(html, label).cssClass).toContain('bgm-dp-env-value-ok')
     }
     expect(environmentCell(html, 'WpsInvoke').text).toBe('available')
     // 值一律走 `typeof` 输出，不是真值转换

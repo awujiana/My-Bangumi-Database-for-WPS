@@ -5,11 +5,7 @@
  * 以及「分组 → 条目 → 字段」三级 HTML 渲染。全部无 DOM 副作用，便于单测。
  */
 
-import type {
-  EnrichedField,
-  EnrichResultItem,
-  MatchResult,
-} from '../sync/enrich-types.js'
+import type { EnrichedField, EnrichResultItem, MatchResult } from '../sync/enrich-types.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 
@@ -41,16 +37,19 @@ export function matchTypeLabel(matchType: MatchResult['matchType']): {
 }
 
 /** 把富化操作枚举映射为中文标记 */
-export function fieldActionLabel(action: EnrichedField['action']): { text: string; cls: string } {
+export function fieldActionLabel(action: EnrichedField['action']): {
+  text: string
+  cssClass: string
+} {
   switch (action) {
     case 'fill': {
-      return { text: '填充', cls: 'fill' }
+      return { text: '填充', cssClass: 'fill' }
     }
     case 'append': {
-      return { text: '追加', cls: 'append' }
+      return { text: '追加', cssClass: 'append' }
     }
     default: {
-      return { text: '跳过', cls: 'skip' }
+      return { text: '跳过', cssClass: 'skip' }
     }
   }
 }
@@ -195,7 +194,7 @@ function renderEnrichDetailField(field: EnrichedField): string {
       <td class="field-old">${oldValue}</td>
       <td class="field-arrow">→</td>
       <td class="field-new">${updatedValue}</td>
-      <td class="field-action ${action.cls}">${action.text}</td>
+      <td class="field-action ${action.cssClass}">${action.text}</td>
     </tr>
   `
 }

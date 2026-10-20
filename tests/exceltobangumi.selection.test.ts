@@ -154,7 +154,7 @@ vi.mock('../ts/sync/exceltobangumi/chapter-marker.js', () => ({
 
 vi.mock('../ts/sync/exceltobangumi/progress-reporter.js', () => ({
   finalizeSyncResults: mockFinalize,
-  DEFAULT_SEQ_COL: 4,
+  DEFAULT_SEQ_COLUMN: 4,
 }))
 
 vi.mock('../ts/sync/sync-record.js', () => ({
@@ -346,7 +346,7 @@ function setupExecution(
   mockGetColumnMap.mockReturnValue(options.columnMap ?? new Map([['Bangumi_URL', 5]]))
   const { cellValue } = options
   if (cellValue) {
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) =>
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) =>
       cellValue(row, column),
     )
   }
@@ -377,7 +377,7 @@ function fullCellValue(options: { status?: string; ep?: string; url?: string } =
 /** 批量同步用例的标准取值：URL 固定为 subject/1，只关心状态与集数 */
 function batchCellValue(options: { status?: string; ep?: string } = {}) {
   const { status = '2', ep = '12' } = options
-  return (_ws: unknown, _row: number, column: number): string => {
+  return (_worksheet: unknown, _row: number, column: number): string => {
     if (column === 5) return 'https://bgm.tv/subject/1'
     if (column === 3) return status
     if (column === 7) return ep
@@ -884,7 +884,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
   describe('executeSelectedSync 执行链路', () => {
     /** 标准列映射：URL + 名称 + 观看状态 + 集数 */
-    const FULL_COL_MAP = new Map<string, number>([
+    const FULL_COLUMN_MAP = new Map<string, number>([
       ['Bangumi_URL', 5],
       ['名称', 2],
       ['是否看完', 3],
@@ -894,7 +894,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     /** 标准取值：URL / 名称 / 状态 / 集数，其余为空（实现见模块作用域 fullCellValue） */
 
     it('成功同步一条：POST 请求体、进度更新、按 type=2 标记章节并输出汇总', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue() })
 
       await syncSelectedRows()
 
@@ -961,7 +961,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('请求体为空（状态无法识别）→ 提示并计入跳过', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '???' }) })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue({ status: '???' }) })
 
       await syncSelectedRows()
 
@@ -971,7 +971,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('服务端非 2xx → 计入失败并记录状态码', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue() })
       mockBgmRequestSync.mockResolvedValue({ code: 400, message: 'Bad Request' })
 
       await syncSelectedRows()
@@ -981,7 +981,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('观看状态非「看过/在看」但有集数 → 跳过章节标记', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '1' }) })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue({ status: '1' }) })
 
       await syncSelectedRows()
 
@@ -990,7 +990,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('章节标记失败 → 仅记录结果，不影响主流程', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue() })
       mockMarkEpisodes.mockResolvedValue({ success: false, message: '章节接口 500' })
 
       await syncSelectedRows()
@@ -1000,7 +1000,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('URL 非 Bangumi 链接 → 提示并跳过', async () => {
       setupExecution({
-        columnMap: FULL_COL_MAP,
+        columnMap: FULL_COLUMN_MAP,
         cellValue: fullCellValue({ url: 'https://example.com/anime' }),
       })
 
@@ -1011,7 +1011,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('URL 为空 → 提示并跳过', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '' }) })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue({ url: '' }) })
 
       await syncSelectedRows()
 
@@ -1019,7 +1019,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('单行处理抛错 → 计入失败并写进度，不中断后续行', async () => {
-      setupExecution({ rows: [2, 3], columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ rows: [2, 3], columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue() })
       mockGetCellValue.mockImplementation(() => {
         throw new Error('读取单元格失败')
       })
@@ -1049,7 +1049,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('请求体 JSON 解析失败 → 记 WARN 且不标记章节', async () => {
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue() })
       // buildJsonPayload 产出的始终是合法 JSON，故直接让解析器抛错以覆盖防御分支
       const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation(() => {
         throw new SyntaxError('请求体损坏')
@@ -1068,7 +1068,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('形似 Bangumi 但 ID 超长 → 提示无法提取 Subject ID 并跳过', async () => {
       // 纯数字被 isBangumiUrl 接受，但 9 位超出 extractSubjectId 的 1-8 位校验
-      setupExecution({ columnMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '123456789' }) })
+      setupExecution({ columnMap: FULL_COLUMN_MAP, cellValue: fullCellValue({ url: '123456789' }) })
 
       await syncSelectedRows()
 
@@ -1081,7 +1081,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
   // ========== 第 17 批（P2-1）：批量链路补测 ==========
 
   describe('批量链路补测', () => {
-    const FULL_COL_MAP = new Map<string, number>([
+    const FULL_COLUMN_MAP = new Map<string, number>([
       ['Bangumi_URL', 5],
       ['是否看完', 3],
       ['集数', 7],
@@ -1095,7 +1095,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetCell.mockReturnValue({ Interior: { Color: 0xccffcc } })
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('2 条跳过'))).toBe(true)
       expect(mockBgmRequestSync).not.toHaveBeenCalled()
@@ -1107,7 +1107,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetCell.mockReturnValue({ Interior: { Color: 0 } })
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
@@ -1122,7 +1122,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         },
       })
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
@@ -1138,7 +1138,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         },
       } as unknown as Set<string>
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { skipSubjectIds })
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1, { skipSubjectIds })
 
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
@@ -1153,7 +1153,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetCellValue.mockImplementation(batchCellValue())
       mockMarkEpisodes.mockRejectedValue(new Error('章节接口不可用'))
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('章节标记异常: 章节接口不可用'))).toBe(true)
     })
@@ -1163,7 +1163,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue({ status: '1' }))
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('跳过章节标记'))).toBe(true)
       expect(mockMarkEpisodes).not.toHaveBeenCalled()
@@ -1177,7 +1177,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         throw new Error('记录表创建失败')
       })
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
@@ -1192,7 +1192,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetCellValue.mockImplementation(batchCellValue())
       const onProgress = vi.fn()
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1, { onProgress })
 
       // finalizeSyncResults 被 mock，用例手动取出其 reportProgress 参数并调用
       const reportProgress = mockFinalize.mock.calls[0]?.[8] as (c: number, m: string) => void
@@ -1209,7 +1209,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         throw new Error('进度回调炸了')
       })
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1, { onProgress })
 
       expect(loggedMessages().some((m) => m.includes('onProgress 回调异常: 进度回调炸了'))).toBe(
         true,
@@ -1239,7 +1239,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 第一次检查放行，之后立即报告停止
       flags.stopAfterChecks = 1
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('检测到停止请求，正在停止'))).toBe(true)
     })
@@ -1265,7 +1265,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       flags.pauseAfterChecks = 1
       flags.stopAfterResume = true
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('暂停期间收到停止请求，正在停止'))).toBe(true)
     })
@@ -1276,7 +1276,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetCellValue.mockImplementation(batchCellValue())
       flags.paused = true
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('同步已恢复，继续处理'))).toBe(true)
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
@@ -1292,7 +1292,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 逐格回退一律返回空值 → 只有命中缓存才可能产生同步任务
       mockGetCellValue.mockReturnValue('')
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 2, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 2, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledWith(
         'POST',
@@ -1310,7 +1310,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetAllSyncRecords.mockReturnValue([{ subjectId: '1', fingerprint: 'fp-1' }])
       mockCalcFingerprint.mockReturnValue('fp-1')
 
-      const result = await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, {
+      const result = await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 3, 1, {
         incremental: true,
       })
 
@@ -1327,7 +1327,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 固定 Date.now：首批 lastRequestTime=0 不等待，第二批 elapsed=0 必然等待
       const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5_000_000)
       try {
-        await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 7, 1)
+        await SyncToBangumiAsync(worksheet, FULL_COLUMN_MAP, 'token', 7, 1)
       } finally {
         nowSpy.mockRestore()
       }

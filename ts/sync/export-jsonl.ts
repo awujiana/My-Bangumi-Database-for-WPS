@@ -153,8 +153,8 @@ export function buildJsonlFromSheet(): string {
   const lastRow = getLastRow(worksheet)
   const columnMap = getColumnMap(worksheet, headerRow)
 
-  const urlCol = columnMap.get('Bangumi_URL')
-  if (urlCol === undefined) {
+  const urlColumn = columnMap.get('Bangumi_URL')
+  if (urlColumn === undefined) {
     bgmLog(LOG_LEVELS.WARN, '[exportJsonl] 未找到 Bangumi_URL 列，无法导出')
     return ''
   }
@@ -167,19 +167,19 @@ export function buildJsonlFromSheet(): string {
   // 用户日期格式），无法并入本批，仍是每行 2 次。
   const batchKeys = new Set(['名称', '标签/分级', '集数'])
   for (const [, excelField] of EXTENDED_FIELD_MAP) batchKeys.add(excelField)
-  let batchMaxCol = urlCol
+  let batchMaxColumn = urlColumn
   for (const key of batchKeys) {
     const column = columnMap.get(key)
-    if (column !== undefined && column > batchMaxCol) batchMaxCol = column
+    if (column !== undefined && column > batchMaxColumn) batchMaxColumn = column
   }
-  const block = readRangeValues(worksheet, startRow, lastRow, 1, batchMaxCol)
+  const block = readRangeValues(worksheet, startRow, lastRow, 1, batchMaxColumn)
   const canBatch = block.length === lastRow - startRow + 1
   // 矩形读不可用时回退逐格读（行为与改造前一致）
   const cellText = (row: number, column: number): string =>
     canBatch ? (block[row - startRow]?.[column - 1] ?? '') : getCellValue(worksheet, row, column)
 
   for (let row = startRow; row <= lastRow; row += 1) {
-    const url = trim(cellText(row, urlCol))
+    const url = trim(cellText(row, urlColumn))
     if (url) {
       const subjectId = extractSubjectId(url)
       if (subjectId) {

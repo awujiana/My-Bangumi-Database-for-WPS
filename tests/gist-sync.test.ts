@@ -682,7 +682,7 @@ describe('fetchGistJson', () => {
   it('catch 分支中非 Error 异常应使用 String(e) 格式化 (line 256)', async () => {
     mockedGetGistId.mockReturnValue('non-error')
     // Mock JSON.parse 抛出非 Error 值（字符串），覆盖 e instanceof Error 的 false 分支
-    const origParse = JSON.parse
+    const originalParse = JSON.parse
     const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation((_text: string) => {
       throw 'a string error is not an Error instance'
     })
@@ -692,7 +692,7 @@ describe('fetchGistJson', () => {
       await expect(promise).rejects.toThrow(/a string error is not an Error instance/)
     } finally {
       parseSpy.mockRestore()
-      expect(JSON.parse).toBe(origParse)
+      expect(JSON.parse).toBe(originalParse)
     }
   })
 

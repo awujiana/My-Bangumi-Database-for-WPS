@@ -197,19 +197,21 @@ export async function runRemoteSync(
     // 3.6 仅同步选中行：从 WPS Selection 提取 SID 集合，过滤远程条目
     let effectiveRemoteEntries = remoteEntries
     if (shouldUseSelectedRowsOnly) {
-      const selectedSids = getSelectedRowSubjectIds()
-      if (selectedSids.size === 0) {
+      const selectedSubjectIds = getSelectedRowSubjectIds()
+      if (selectedSubjectIds.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
       }
-      effectiveRemoteEntries = remoteEntries.filter((entry) => selectedSids.has(entry.subjectId))
+      effectiveRemoteEntries = remoteEntries.filter((entry) =>
+        selectedSubjectIds.has(entry.subjectId),
+      )
       bgmLog(
         LOG_LEVELS.INFO,
-        `[${logTag}] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
+        `[${logTag}] 仅同步选中行：选中 ${String(selectedSubjectIds.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
       onProgress?.(
         1,
         3,
-        `选中 ${String(selectedSids.size)} 行，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
+        `选中 ${String(selectedSubjectIds.size)} 行，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -294,10 +296,10 @@ export async function runRemoteSync(
       const remapSheet = getDataSheet()
       if (remapSheet) {
         const remapHeaderRow = findHeaderRow(remapSheet) || 1
-        const remapColMap = getColumnMap(remapSheet, remapHeaderRow)
+        const remapColumnMap = getColumnMap(remapSheet, remapHeaderRow)
         columnRemap = new Map<string, number>()
         for (const [from, to] of Object.entries(mapping.columnOverrides)) {
-          const targetIndex = remapColMap.get(to)
+          const targetIndex = remapColumnMap.get(to)
           if (targetIndex !== undefined) columnRemap.set(from, targetIndex)
         }
       }

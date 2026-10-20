@@ -25,15 +25,15 @@ import {
   clearUndoStack,
 } from '../ts/sync/undo-stack.js'
 
-interface MockWsRange {
+interface MockWorksheetRange {
   Insert: ReturnType<typeof vi.fn>
 }
-interface MockWs {
-  Range: (addr: string) => MockWsRange | Record<string, never>
+interface MockWorksheet {
+  Range: (addr: string) => MockWorksheetRange | Record<string, never>
 }
 
-function createMockWs(): MockWs {
-  const worksheet: MockWs = {
+function createMockWorksheet(): MockWorksheet {
+  const worksheet: MockWorksheet = {
     Range: vi.fn((addr: string) => {
       if (addr.includes(':')) {
         return { Insert: vi.fn() }
@@ -50,7 +50,7 @@ describe('UndoStack', () => {
     mockSetCellValue.mockClear()
     mockGetDataSheet.mockClear()
     mockBgmLog.mockClear()
-    mockGetDataSheet.mockReturnValue(createMockWs())
+    mockGetDataSheet.mockReturnValue(createMockWorksheet())
   })
 
   describe('基础会话管理', () => {
@@ -131,7 +131,7 @@ describe('UndoStack', () => {
 
   describe('undoLastSync - 行删除恢复', () => {
     it('恢复被删除的行', (): void => {
-      const worksheet = createMockWs()
+      const worksheet = createMockWorksheet()
       mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 5, values: { '1': 'name', '2': 'value' } })
@@ -142,7 +142,7 @@ describe('UndoStack', () => {
     })
 
     it('按行号从大到小恢复多行删除', (): void => {
-      const worksheet = createMockWs()
+      const worksheet = createMockWorksheet()
       mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 3, values: { '1': 'a' } })
@@ -157,7 +157,7 @@ describe('UndoStack', () => {
     })
 
     it('行恢复时设置单元格值', (): void => {
-      const worksheet = createMockWs()
+      const worksheet = createMockWorksheet()
       mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 1, values: { '1': 'name', '3': 'value' } })
@@ -169,7 +169,7 @@ describe('UndoStack', () => {
     })
 
     it('行恢复时跳过 NaN 列索引', (): void => {
-      const worksheet = createMockWs()
+      const worksheet = createMockWorksheet()
       mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       // 使用非数字字符串作为 key
@@ -228,7 +228,7 @@ describe('UndoStack', () => {
     })
 
     it('混合单元格变更和行删除的会话', (): void => {
-      const worksheet = createMockWs()
+      const worksheet = createMockWorksheet()
       mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('mixed')
       recordUndoEntry({ row: 10, column: 1, oldValue: 'old', updatedValue: 'new' })

@@ -86,7 +86,7 @@ const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
 ])
 
 /**
- * 同步预览的批量读取列名表：决定矩形读宽度（`1..maxCol`）。
+ * 同步预览的批量读取列名表：决定矩形读宽度（`1..maxColumn`）。
  * 与上传同步的 `BATCH_READ_COLUMNS` 是两套列集（预览不需要完播日/类别等列），
  * 故不共用同一张表；访问器对表外列（如「状态」）自动走逐格回退。
  */
@@ -251,8 +251,8 @@ export function getSyncPreview(
       valid += 1
 
       // 检查是否已上传（序列号列颜色）
-      const seqCol = columnMap.get('序列号') ?? 4
-      const seqCell = getCell(worksheet, rowNumber, seqCol)
+      const seqColumn = columnMap.get('序列号') ?? 4
+      const seqCell = getCell(worksheet, rowNumber, seqColumn)
       const isUploaded =
         seqCell?.Interior &&
         [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(
@@ -427,12 +427,12 @@ export async function detectConflicts(
   // 性能：一次矩形读覆盖全部行 × 取数列（原先每行 3 次逐格读，1000 行 ≈ 3000 次 IPC）。
   // 只读到 min..max 列包围盒；读回行数不足时 getField 自动回退逐格读。
   const conflictKeys = ['Bangumi_URL', '是否看完', '名称'] as const
-  let conflictMaxCol = 1
+  let conflictMaxColumn = 1
   for (const key of conflictKeys) {
     const column = columnMap.get(key)
-    if (column !== undefined) conflictMaxCol = Math.max(conflictMaxCol, column)
+    if (column !== undefined) conflictMaxColumn = Math.max(conflictMaxColumn, column)
   }
-  const allData = readRangeValues(worksheet, startRow, lastRow, 1, conflictMaxCol)
+  const allData = readRangeValues(worksheet, startRow, lastRow, 1, conflictMaxColumn)
 
   const getField = (row: number, key: string): string => {
     const column = columnMap.get(key)

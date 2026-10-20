@@ -49,7 +49,7 @@ import {
   isBangumiUrl,
   extractSubjectId,
   mapWatchStatus,
-  getSeqColIndex,
+  getSeqColumnIndex,
   addTagsFromString,
 } from '../pure-utilities.js'
 import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../sync-record.js'
@@ -61,7 +61,7 @@ import { bgmRequestSync as _bgmRequestSync } from './api.js'
 import { markEpisodesComplete as _markEpisodesComplete } from './chapter-marker.js'
 import {
   finalizeSyncResults as _finalizeSyncResults,
-  DEFAULT_SEQ_COL as _DEFAULT_SEQ_COL,
+  DEFAULT_SEQ_COLUMN as _DEFAULT_SEQ_COL,
 } from './progress-reporter.js'
 import type {
   SyncTask as _SyncTask,
@@ -73,7 +73,7 @@ export {
   isBangumiUrl,
   extractSubjectId,
   mapWatchStatus,
-  getSeqColIndex,
+  getSeqColumnIndex,
   addTagsFromString,
   buildTagsArray,
 } from '../pure-utilities.js'
@@ -96,7 +96,7 @@ export {
   type SyncTask,
   type SyncResultStats,
   TYPE_NAMES,
-  DEFAULT_SEQ_COL,
+  DEFAULT_SEQ_COLUMN,
   markSyncResultColor,
   applySyncSuccessResults,
   applySyncFailResults,
@@ -134,11 +134,11 @@ const MIN_REQUEST_INTERVAL = 100
  * 检查单元格是否已标记为同步成功（颜色判断）
  * @param worksheet 工作表
  * @param row 行号
- * @param seqCol 序列号列索引（可选，默认4）
+ * @param seqColumn 序列号列索引（可选，默认4）
  */
-function isCellMarkedSuccess(worksheet: WpsWorksheet, row: number, seqCol?: number): boolean {
+function isCellMarkedSuccess(worksheet: WpsWorksheet, row: number, seqColumn?: number): boolean {
   try {
-    const column = seqCol ?? _DEFAULT_SEQ_COL
+    const column = seqColumn ?? _DEFAULT_SEQ_COL
     const cell = getCell(worksheet, row, column)
     if (!cell?.Interior) return false
     const color = cell.Interior.Color
@@ -298,7 +298,7 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  * @param getField 字段访问器（基于批量缓存）
  * @param skipSubjectIds 需跳过的 SID 集合（冲突处理）
  * @param fingerprintMap 历史指纹映射（增量同步用）
- * @param seqCol 序列号列索引（用于颜色检查）
+ * @param seqColumn 序列号列索引（用于颜色检查）
  * @returns 处理结果：task 有值表示需要同步
  */
 function processRowToSyncTask(
@@ -307,7 +307,7 @@ function processRowToSyncTask(
   getField: (row: number, key: string) => string,
   skipSubjectIds: Set<string> | undefined,
   fingerprintMap: Map<string, string> | undefined,
-  seqCol: number,
+  seqColumn: number,
 ): RowProcessOutcome {
   try {
     return processRowToSyncTaskInner(
@@ -316,7 +316,7 @@ function processRowToSyncTask(
       getField,
       skipSubjectIds,
       fingerprintMap,
-      seqCol,
+      seqColumn,
     )
   } catch (error: unknown) {
     BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' })
@@ -333,7 +333,7 @@ function processRowToSyncTaskInner(
   getField: (row: number, key: string) => string,
   skipSubjectIds: Set<string> | undefined,
   fingerprintMap: Map<string, string> | undefined,
-  seqCol: number,
+  seqColumn: number,
 ): RowProcessOutcome {
   const bgmUrl = getField(rowNumber, 'Bangumi_URL')
   if (!bgmUrl) return { task: null, skipped: true, failed: false }
@@ -370,7 +370,7 @@ function processRowToSyncTaskInner(
   }
 
   // 检查已上传颜色（非增量模式）
-  if (!fingerprintMap && isCellMarkedSuccess(worksheet, rowNumber, seqCol)) {
+  if (!fingerprintMap && isCellMarkedSuccess(worksheet, rowNumber, seqColumn)) {
     return { task: null, skipped: true, failed: false }
   }
 
@@ -403,7 +403,7 @@ function processRowToSyncTaskInner(
  * @param options 同步选项
  * @param startRow 起始数据行（headerRow + 1）
  * @param lastRow 最后一行
- * @param seqCol 序列号列索引
+ * @param seqColumn 序列号列索引
  * @returns 待同步任务列表及预处理阶段的跳过/失败计数
  */
 function prepareSyncTasks(
@@ -412,7 +412,7 @@ function prepareSyncTasks(
   options: SyncOptions | undefined,
   startRow: number,
   lastRow: number,
-  seqCol: number,
+  seqColumn: number,
 ): { syncTasks: _SyncTask[]; skip: number; fail: number } {
   let skip = 0
   let fail = 0
@@ -445,7 +445,7 @@ function prepareSyncTasks(
       getField,
       skipSubjectIds,
       fingerprintMap,
-      seqCol,
+      seqColumn,
     )
     if (outcome.failed) {
       fail += 1
@@ -635,7 +635,7 @@ async function batchSyncRequests(
  * @param options 同步选项
  * @param worksheet 工作表
  * @param headerRow 表头行
- * @param seqCol 序列号列索引
+ * @param seqColumn 序列号列索引
  * @returns 成功/失败任务列表及是否被停止
  */
 async function executeBatchSync(
@@ -645,7 +645,7 @@ async function executeBatchSync(
   options: SyncOptions | undefined,
   worksheet: WpsWorksheet,
   headerRow: number,
-  seqCol: number,
+  seqColumn: number,
 ): Promise<{ successTasks: _SyncTask[]; failTasks: _SyncTask[]; stopped: boolean }> {
   // 尝试创建同步记录表
   try {
@@ -659,7 +659,7 @@ async function executeBatchSync(
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求')
   // 设置同步状态机的当前位置（工作表 + 序列号列），供暂停时定位
-  BGM.sync.updatePosition(worksheet, headerRow, seqCol)
+  BGM.sync.updatePosition(worksheet, headerRow, seqColumn)
   const {
     success: successTasks,
     fail: failTasks,
@@ -685,7 +685,7 @@ export async function SyncToBangumiAsync(
   const result: _SyncResultStats = { success: 0, fail: 0, skip: 0, stopped: false }
   const startRow = headerRow + 1
   const startTime = Date.now()
-  const seqCol = getSeqColIndex(columnMap)
+  const seqColumn = getSeqColumnIndex(columnMap)
   const userIdPath = _getUserApiPath()
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========')
@@ -702,7 +702,7 @@ export async function SyncToBangumiAsync(
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${String(lastRow)}`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync]   - 序列号列: ${String(seqCol)} (列${columnNumberToLetter(seqCol)})`,
+    `[SyncToBangumiAsync]   - 序列号列: ${String(seqColumn)} (列${columnNumberToLetter(seqColumn)})`,
   )
 
   // 步骤 1-4: 预处理（筛选可见行 + 数据缓存 + 指纹映射 + 任务收集）
@@ -712,7 +712,7 @@ export async function SyncToBangumiAsync(
     options,
     startRow,
     lastRow,
-    seqCol,
+    seqColumn,
   )
   result.skip = skip
   result.fail = fail
@@ -725,7 +725,7 @@ export async function SyncToBangumiAsync(
     options,
     worksheet,
     headerRow,
-    seqCol,
+    seqColumn,
   )
 
   // 失败行留档（含所属表名）：供「重试失败行」只重发这几行，而不是整表重跑
@@ -740,7 +740,7 @@ export async function SyncToBangumiAsync(
   }
   _finalizeSyncResults(
     worksheet,
-    seqCol,
+    seqColumn,
     successTasks,
     failTasks,
     syncTasks,
@@ -914,8 +914,8 @@ async function executeSelectedSync(
   // 用对象包裹运行态标志，避免闭包内赋值不被类型收窄识别（ESLint no-unnecessary-condition 误报恒为 false）
   const runState: { entered: boolean } = { entered: false }
   // 上游 prepareSelectedSync 已校验列存在；?? 0 仅为类型层兜底（列号 1-based，0 不合法）
-  const urlCol = columnMap.get('Bangumi_URL') ?? 0
-  const nameCol = columnMap.get('名称')
+  const urlColumn = columnMap.get('Bangumi_URL') ?? 0
+  const nameColumn = columnMap.get('名称')
   const runSelectedRowsLoop = async (): Promise<void> => {
     // P2：进入运行状态（防重入 + 重置标志 + 置位）
     if (!BGM.sync.enterRunningState()) return
@@ -950,7 +950,7 @@ async function executeSelectedSync(
       selectedRowsConfig,
     )
     // 设置同步状态机位置（用于暂停时定位到单元格）
-    BGM.sync.updatePosition(worksheet, 0, urlCol)
+    BGM.sync.updatePosition(worksheet, 0, urlColumn)
 
     // 性能：复用 tools/util 的 createBatchFieldGetter 做一次矩形读（原先每行要
     // URL / 名称 / 完播日 / 集数 + buildJsonPayload 的十余个字段，全是逐格读）。
@@ -995,7 +995,7 @@ async function executeSelectedSync(
 
       const syncSingleRowTask = async (): Promise<void> => {
         const bgmUrl = trim(readField(rowNumber, 'Bangumi_URL') || '')
-        const name = nameCol ? trim(readField(rowNumber, '名称') || '') : ''
+        const name = nameColumn ? trim(readField(rowNumber, '名称') || '') : ''
 
         if (bgmUrl)
           if (isBangumiUrl(bgmUrl)) {
@@ -1012,9 +1012,9 @@ async function executeSelectedSync(
                 `⏳️ ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" SID=${subjectId} 开始同步`,
               )
 
-              const finishCol = columnMap.get('完播日')
+              const finishColumn = columnMap.get('完播日')
               const finishedDate =
-                finishCol === undefined ? '' : trim(readField(rowNumber, '完播日') || '')
+                finishColumn === undefined ? '' : trim(readField(rowNumber, '完播日') || '')
               const jsonBody = buildJsonPayload((key) => readField(rowNumber, key), finishedDate)
 
               if (jsonBody === '{}') {
@@ -1499,15 +1499,15 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
     // eslint-disable-next-line no-control-regex, unicorn/prefer-unicode-code-point-escapes -- 有意匹配控制字符以清洗文本；\u{...} 码点转义会被 security/detect-unsafe-regex 误报为 unsafe（safe-regex 不识别），必须用 \x 转义，故同时豁免 unicorn 码点转义规则
     const cleaned = commentValue.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/gu, '')
     // Bangumi API comment 字段长度限制约 1000 字符，超出截断
-    const MAX_COMMENT_LEN = 1000
+    const MAX_COMMENT_LENGTH = 1000
     const finalComment =
-      cleaned.length > MAX_COMMENT_LEN ? cleaned.slice(0, MAX_COMMENT_LEN) : cleaned
+      cleaned.length > MAX_COMMENT_LENGTH ? cleaned.slice(0, MAX_COMMENT_LENGTH) : cleaned
     if (finalComment) {
       payload.comment = finalComment
-      if (cleaned.length > MAX_COMMENT_LEN) {
+      if (cleaned.length > MAX_COMMENT_LENGTH) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[buildJsonPayload] 感言长度 ${String(cleaned.length)} 超过 ${String(MAX_COMMENT_LEN)}，已截断`,
+          `[buildJsonPayload] 感言长度 ${String(cleaned.length)} 超过 ${String(MAX_COMMENT_LENGTH)}，已截断`,
         )
       }
     }

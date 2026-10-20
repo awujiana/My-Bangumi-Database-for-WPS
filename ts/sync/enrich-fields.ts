@@ -29,18 +29,18 @@ export function enrichTags(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiTagsCol = columnMap.get('标签/分级') ?? columnMap.get('标签')
-  if (!bangumiTagsCol) return
+  const bangumiTagsColumn = columnMap.get('标签/分级') ?? columnMap.get('标签')
+  if (!bangumiTagsColumn) return
 
   const incomingTags = incomingData.TAGS ?? ''
   if (isEmptyValue(incomingTags)) return
 
-  const oldTags = readTargetCell(sheet, cache, row, bangumiTagsCol)
+  const oldTags = readTargetCell(sheet, cache, row, bangumiTagsColumn)
   if (isEmptyValue(oldTags)) {
-    writeTargetCell(sheet, cache, row, bangumiTagsCol, incomingTags)
+    writeTargetCell(sheet, cache, row, bangumiTagsColumn, incomingTags)
     enriched.push({
       fieldName: '标签/分级',
-      bangumiColumn: bangumiTagsCol,
+      bangumiColumn: bangumiTagsColumn,
       oldValue: null,
       updatedValue: incomingTags,
       action: 'fill',
@@ -50,16 +50,16 @@ export function enrichTags(
     if (merged === oldTags) {
       enriched.push({
         fieldName: '标签/分级',
-        bangumiColumn: bangumiTagsCol,
+        bangumiColumn: bangumiTagsColumn,
         oldValue: oldTags,
         updatedValue: merged,
         action: 'skip',
       })
     } else {
-      writeTargetCell(sheet, cache, row, bangumiTagsCol, merged)
+      writeTargetCell(sheet, cache, row, bangumiTagsColumn, merged)
       enriched.push({
         fieldName: '标签/分级',
-        bangumiColumn: bangumiTagsCol,
+        bangumiColumn: bangumiTagsColumn,
         oldValue: oldTags,
         updatedValue: merged,
         action: 'append',
@@ -80,18 +80,18 @@ export function enrichPlatform(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const targetCol = columnMap.get('在线播放平台') ?? columnMap.get('播放平台')
-  if (!targetCol) return
+  const targetColumn = columnMap.get('在线播放平台') ?? columnMap.get('播放平台')
+  if (!targetColumn) return
 
   const incomingPlatforms = incomingData['播放平台'] ?? ''
   if (isEmptyValue(incomingPlatforms)) return
 
-  const oldPlatforms = readTargetCell(sheet, cache, row, targetCol)
+  const oldPlatforms = readTargetCell(sheet, cache, row, targetColumn)
   if (isEmptyValue(oldPlatforms)) {
-    writeTargetCell(sheet, cache, row, targetCol, incomingPlatforms)
+    writeTargetCell(sheet, cache, row, targetColumn, incomingPlatforms)
     enriched.push({
       fieldName: '在线播放平台',
-      bangumiColumn: targetCol,
+      bangumiColumn: targetColumn,
       oldValue: null,
       updatedValue: incomingPlatforms,
       action: 'fill',
@@ -101,16 +101,16 @@ export function enrichPlatform(
     if (merged === oldPlatforms) {
       enriched.push({
         fieldName: '在线播放平台',
-        bangumiColumn: targetCol,
+        bangumiColumn: targetColumn,
         oldValue: oldPlatforms,
         updatedValue: merged,
         action: 'skip',
       })
     } else {
-      writeTargetCell(sheet, cache, row, targetCol, merged)
+      writeTargetCell(sheet, cache, row, targetColumn, merged)
       enriched.push({
         fieldName: '在线播放平台',
-        bangumiColumn: targetCol,
+        bangumiColumn: targetColumn,
         oldValue: oldPlatforms,
         updatedValue: merged,
         action: 'append',
@@ -131,18 +131,18 @@ export function enrichDate(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiDateCol = columnMap.get('开播日期')
-  if (!bangumiDateCol) return
+  const bangumiDateColumn = columnMap.get('开播日期')
+  if (!bangumiDateColumn) return
 
   const date = incomingData['首播'] ?? ''
   if (isEmptyValue(date)) return
 
-  const oldDate = readTargetCell(sheet, cache, row, bangumiDateCol)
+  const oldDate = readTargetCell(sheet, cache, row, bangumiDateColumn)
   if (isEmptyValue(oldDate)) {
-    writeTargetCell(sheet, cache, row, bangumiDateCol, date)
+    writeTargetCell(sheet, cache, row, bangumiDateColumn, date)
     enriched.push({
       fieldName: '开播日期',
-      bangumiColumn: bangumiDateCol,
+      bangumiColumn: bangumiDateColumn,
       oldValue: null,
       updatedValue: date,
       action: 'fill',
@@ -150,7 +150,7 @@ export function enrichDate(
   } else {
     enriched.push({
       fieldName: '开播日期',
-      bangumiColumn: bangumiDateCol,
+      bangumiColumn: bangumiDateColumn,
       oldValue: oldDate,
       updatedValue: date,
       action: 'skip',
@@ -170,18 +170,18 @@ export function enrichEpisodes(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiEpisodesCol = columnMap.get('集数')
-  if (!bangumiEpisodesCol) return
+  const bangumiEpisodesColumn = columnMap.get('集数')
+  if (!bangumiEpisodesColumn) return
 
   const incomingEpisodes = incomingData['集数'] ?? ''
   if (isEmptyValue(incomingEpisodes)) return
 
-  const oldEpisodes = readTargetCell(sheet, cache, row, bangumiEpisodesCol)
+  const oldEpisodes = readTargetCell(sheet, cache, row, bangumiEpisodesColumn)
   if (isEmptyValue(oldEpisodes)) {
-    writeTargetCell(sheet, cache, row, bangumiEpisodesCol, incomingEpisodes)
+    writeTargetCell(sheet, cache, row, bangumiEpisodesColumn, incomingEpisodes)
     enriched.push({
       fieldName: '集数',
-      bangumiColumn: bangumiEpisodesCol,
+      bangumiColumn: bangumiEpisodesColumn,
       oldValue: null,
       updatedValue: incomingEpisodes,
       action: 'fill',
@@ -189,7 +189,7 @@ export function enrichEpisodes(
   } else {
     enriched.push({
       fieldName: '集数',
-      bangumiColumn: bangumiEpisodesCol,
+      bangumiColumn: bangumiEpisodesColumn,
       oldValue: oldEpisodes,
       updatedValue: incomingEpisodes,
       action: 'skip',
@@ -209,8 +209,8 @@ export function enrichFeatures(
   enriched: EnrichedField[],
   cache?: SheetCellCache,
 ): void {
-  const bangumiFeatureCol = columnMap.get('特点/印象')
-  if (!bangumiFeatureCol) return
+  const bangumiFeatureColumn = columnMap.get('特点/印象')
+  if (!bangumiFeatureColumn) return
 
   const featureParts: string[] = []
 
@@ -237,13 +237,13 @@ export function enrichFeatures(
   if (featureParts.length === 0) return
 
   const features = featureParts.join(FEATURE_SEPARATOR)
-  const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureCol)
+  const oldFeature = readTargetCell(sheet, cache, row, bangumiFeatureColumn)
 
   if (isEmptyValue(oldFeature)) {
-    writeTargetCell(sheet, cache, row, bangumiFeatureCol, features)
+    writeTargetCell(sheet, cache, row, bangumiFeatureColumn, features)
     enriched.push({
       fieldName: '特点/印象',
-      bangumiColumn: bangumiFeatureCol,
+      bangumiColumn: bangumiFeatureColumn,
       oldValue: null,
       updatedValue: features,
       action: 'fill',
@@ -253,16 +253,16 @@ export function enrichFeatures(
     if (merged === oldFeature) {
       enriched.push({
         fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
+        bangumiColumn: bangumiFeatureColumn,
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'skip',
       })
     } else {
-      writeTargetCell(sheet, cache, row, bangumiFeatureCol, merged)
+      writeTargetCell(sheet, cache, row, bangumiFeatureColumn, merged)
       enriched.push({
         fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
+        bangumiColumn: bangumiFeatureColumn,
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'append',

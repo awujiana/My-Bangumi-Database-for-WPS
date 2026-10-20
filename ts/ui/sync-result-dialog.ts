@@ -115,9 +115,9 @@ export function computeDateStatsFromSheet(): DateStats {
   const lastRow = getLastRow(worksheet)
   const columnMap = getColumnMap(worksheet, headerRow)
 
-  const dateCol = columnMap.get('开播日期')
-  const urlCol = columnMap.get('Bangumi_URL')
-  if (dateCol === undefined || urlCol === undefined) {
+  const dateColumn = columnMap.get('开播日期')
+  const urlColumn = columnMap.get('Bangumi_URL')
+  if (dateColumn === undefined || urlColumn === undefined) {
     return stats
   }
   const startRow = headerRow + 1
@@ -130,14 +130,15 @@ export function computeDateStatsFromSheet(): DateStats {
   // 性能：按列整列读（2 次 IPC），替代 2N 次逐格读（5000 行 ≈ 1 万次）。
   // 只读这两列本身，不扩到列包围盒（避免把无关列一起拉回来）。
   const rowCount = lastRow - startRow + 1
-  const urlColumn = readRangeValues(worksheet, startRow, lastRow, urlCol, urlCol)
-  const dateColumn = readRangeValues(worksheet, startRow, lastRow, dateCol, dateCol)
-  const canBatch = urlColumn.length === rowCount && dateColumn.length === rowCount
+  // 批量读出来的是**逐行值**（不是列号），故命名 ColumnValues 与上面的 Column（列号）区分
+  const urlColumnValues = readRangeValues(worksheet, startRow, lastRow, urlColumn, urlColumn)
+  const dateColumnValues = readRangeValues(worksheet, startRow, lastRow, dateColumn, dateColumn)
+  const canBatch = urlColumnValues.length === rowCount && dateColumnValues.length === rowCount
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const index = row - startRow
     const url = trim(
-      canBatch ? (urlColumn[index]?.[0] ?? '') : getCellValue(worksheet, row, urlCol),
+      canBatch ? (urlColumnValues[index]?.[0] ?? '') : getCellValue(worksheet, row, urlColumn),
     )
     if (url) {
       const subjectId = extractSubjectId(url)
@@ -145,7 +146,9 @@ export function computeDateStatsFromSheet(): DateStats {
         totalCount += 1
 
         const dateString = trim(
-          canBatch ? (dateColumn[index]?.[0] ?? '') : getCellValue(worksheet, row, dateCol),
+          canBatch
+            ? (dateColumnValues[index]?.[0] ?? '')
+            : getCellValue(worksheet, row, dateColumn),
         )
         if (dateString) {
           datedCount += 1

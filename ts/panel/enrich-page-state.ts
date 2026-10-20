@@ -22,10 +22,10 @@ export const COLUMN_MAPPING_FIELDS: {
   label: string
   required: boolean
 }[] = [
-  { key: 'nameCol', label: '名称', required: true },
-  { key: 'tagsCol', label: 'TAGS/标签', required: false },
+  { key: 'nameColumn', label: '名称', required: true },
+  { key: 'tagsColumn', label: 'TAGS/标签', required: false },
   { key: 'premiereCol', label: '首播', required: false },
-  { key: 'episodesCol', label: '集数', required: false },
+  { key: 'episodesColumn', label: '集数', required: false },
   { key: 'weekdayCol', label: '周更时间', required: false },
   { key: 'platformCol', label: '播放平台', required: false },
   { key: 'exclusiveCol', label: '独播', required: false },

@@ -16,7 +16,7 @@
  * ## 一处刻意不追的不可达分支
  *
  * 第 74 行的 `|| \`第${column}列\`` 兜底**不可达**：进入该表达式的前提是
- * `header || field` 为真，而 header 为空时 `field` 必来自 `fieldByCol`，
+ * `header || field` 为真，而 header 为空时 `field` 必来自 `fieldByColumn`，
  * 其取值只可能是 `COLUMN_MAPPING_FIELDS` 的 key 或 `'platformCol'`，
  * 两者都在 `labelByField` 里 → `?? ''` 永远不会落到最后的 `||`。
  * 造人工输入去点亮它等于给生产代码加一条假前提，故不追。
@@ -68,7 +68,7 @@ function stubCellReading(): void {
 }
 
 function makeMapping(overrides: Partial<EnrichColumnMapping> = {}): EnrichColumnMapping {
-  return { nameCol: 0, ...overrides }
+  return { nameColumn: 0, ...overrides }
 }
 
 /** 建好弹窗骨架 */
@@ -209,8 +209,8 @@ describe('列集构成', () => {
       animeSourceSheet: {} as never,
       headerRow: 1,
       dataStartRow: 2,
-      // nameCol 指向第 3 列：该列表头为空，只能靠字段标签出现
-      columnMapping: makeMapping({ nameCol: 3 }),
+      // nameColumn 指向第 3 列：该列表头为空，只能靠字段标签出现
+      columnMapping: makeMapping({ nameColumn: 3 }),
     })
     fillHeaderRow(1, 1)
     setCell(2, 3, '葬送的芙莉莲')
@@ -219,7 +219,7 @@ describe('列集构成', () => {
     showSourceDetail()
 
     expect(body.innerHTML).toContain('名称')
-    expect(previewCellMock.renderPreviewCell).toHaveBeenCalledWith('nameCol', '葬送的芙莉莲')
+    expect(previewCellMock.renderPreviewCell).toHaveBeenCalledWith('nameColumn', '葬送的芙莉莲')
   })
 
   it('一列表头与映射都没有 → 整列不出现', () => {
@@ -259,7 +259,7 @@ describe('列集构成', () => {
       animeSourceSheet: {} as never,
       headerRow: 1,
       dataStartRow: 2,
-      columnMapping: makeMapping({ nameCol: 1, platformExtraCols: [5] }),
+      columnMapping: makeMapping({ nameColumn: 1, platformExtraCols: [5] }),
     })
     fillHeaderRow(1, 1)
     setCell(2, 5, 'B站')
@@ -277,7 +277,7 @@ describe('列集构成', () => {
       animeSourceSheet: {} as never,
       headerRow: 1,
       dataStartRow: 2,
-      columnMapping: makeMapping({ nameCol: 1 }),
+      columnMapping: makeMapping({ nameColumn: 1 }),
     })
     fillHeaderRow(1, 2)
     setCell(2, 1, '葬送的芙莉莲')
@@ -286,7 +286,7 @@ describe('列集构成', () => {
 
     showSourceDetail()
 
-    expect(body.innerHTML).toContain('class="preview-cell" data-field="nameCol"')
+    expect(body.innerHTML).toContain('class="preview-cell" data-field="nameColumn"')
     expect(body.innerHTML).toContain('<td title="未映射值">未映射值</td>')
   })
 })

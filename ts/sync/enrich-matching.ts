@@ -37,10 +37,10 @@ export function readNewAnimeRow(
 ): Record<string, string> {
   const cell = (column: number): string =>
     rowCells?.[column - 1] ?? getCellValue(sheet, row, column)
-  const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
-  if (mapping.tagsCol) data.TAGS = cell(mapping.tagsCol) || ''
+  const data: Record<string, string> = { 名称: cell(mapping.nameColumn) || '' }
+  if (mapping.tagsColumn) data.TAGS = cell(mapping.tagsColumn) || ''
   if (mapping.premiereCol) data['首播'] = cell(mapping.premiereCol) || ''
-  if (mapping.episodesCol) data['集数'] = cell(mapping.episodesCol) || ''
+  if (mapping.episodesColumn) data['集数'] = cell(mapping.episodesColumn) || ''
   if (mapping.weekdayCol) data['周更时间'] = cell(mapping.weekdayCol) || ''
   // 播放平台聚合：platformCol + platformExtraCols + exclusiveCol 去空去重（富化与预览共用口径）
   data['播放平台'] = readPlatformValues(sheet, row, mapping, rowCells).join(TAG_SEPARATOR)
@@ -64,29 +64,31 @@ function buildBangumiIndexes(
   // 否则 matchEntriesInner 每命中一条都要遍历整个 aliasIndex 做 rows.includes(row) —— O(n²)。
   const aliasByRow = new Map<number, string[]>()
 
-  const nameCol = columnMap.get('名称') ?? 0
-  if (nameCol === 0) {
+  const nameColumn = columnMap.get('名称') ?? 0
+  if (nameColumn === 0) {
     bgmLog(LOG_LEVELS.WARN, '[buildBangumiIndexes] Bangumi表中未找到名称列')
     return [nameIndex, aliasIndex, rowNames, aliasByRow]
   }
 
-  const aliasCol = findAliasColumn(bangumiSheet)
+  const aliasColumn = findAliasColumn(bangumiSheet)
   const lastRow = getLastRow(bangumiSheet)
 
   // 性能（P1-C）：一次矩形读取覆盖名称列与别名列，替代逐行 1~2 次 getCellValue
   const allData =
-    lastRow >= 2 ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameCol, aliasCol)) : []
+    lastRow >= 2
+      ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameColumn, aliasColumn))
+      : []
 
   for (const [index, rowData] of allData.entries()) {
     const row = index + 2
-    const name = (rowData[nameCol - 1] ?? '').trim()
+    const name = (rowData[nameColumn - 1] ?? '').trim()
     if (name) {
       const normalizedName = normalizeName(name)
       nameIndex.set(normalizedName, row)
       rowNames.set(row, name)
 
-      if (aliasCol > 0) {
-        const aliasString = (rowData[aliasCol - 1] ?? '').trim()
+      if (aliasColumn > 0) {
+        const aliasString = (rowData[aliasColumn - 1] ?? '').trim()
         if (aliasString) {
           const aliases = splitAliases(aliasString)
           for (const alias of aliases) {
@@ -158,23 +160,23 @@ function matchEntriesInner(
   config: EnrichConfig,
   results: MatchResult[],
 ): void {
-  const bangumiColMap = getBangumiColumnMap(bangumiSheet)
+  const bangumiColumnMap = getBangumiColumnMap(bangumiSheet)
   const [nameIndex, aliasIndex, rowNames, aliasByRow] = buildBangumiIndexes(
     bangumiSheet,
-    bangumiColMap,
+    bangumiColumnMap,
   )
 
   const lastRow = getLastRow(animeSheet)
   const { dataStartRow } = config
 
-  const { nameCol } = config.columnMapping
-  if (nameCol === 0) {
+  const { nameColumn } = config.columnMapping
+  if (nameColumn === 0) {
     bgmLog(LOG_LEVELS.ERROR, '[matchEntries] 新番表未找到名称列，无法匹配')
     return
   }
 
   for (let row = dataStartRow; row <= lastRow; row += 1) {
-    const rawName = getCellValue(animeSheet, row, nameCol).trim()
+    const rawName = getCellValue(animeSheet, row, nameColumn).trim()
     if (rawName) {
       const normalizedName = normalizeName(rawName)
       let matchResult: MatchResult = {

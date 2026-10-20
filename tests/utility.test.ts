@@ -270,18 +270,20 @@ describe('findHeaderRow', () => {
   it('识别含 3+ 个表头关键字的行', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-FHR-1' })
     // 表头行（row 1）含：序列号、名称、Bangumi URL、是否看完 4 个关键字
-    mockState.getCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
-      if (row === 1) {
-        const headers: Record<number, string> = {
-          1: '序列号',
-          2: '名称',
-          3: 'Bangumi URL',
-          4: '是否看完',
+    mockState.getCellValue.mockImplementation(
+      (_worksheet: unknown, row: number, column: number) => {
+        if (row === 1) {
+          const headers: Record<number, string> = {
+            1: '序列号',
+            2: '名称',
+            3: 'Bangumi URL',
+            4: '是否看完',
+          }
+          return headers[column] ?? ''
         }
-        return headers[column] ?? ''
-      }
-      return ''
-    })
+        return ''
+      },
+    )
     const headerRow = findHeaderRow(worksheet as never, 1)
     expect(headerRow).toBe(1)
   })
@@ -324,16 +326,18 @@ describe('findHeaderRow', () => {
 describe('getColumnMap', () => {
   it('通过表头规则映射列', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
-      const headers: Record<number, string> = {
-        1: '序列号',
-        2: '名称',
-        3: 'Bangumi URL',
-        4: '是否看完',
-        5: '评分',
-      }
-      return headers[column] ?? ''
-    })
+    mockState.getCellValue.mockImplementation(
+      (_worksheet: unknown, _row: number, column: number) => {
+        const headers: Record<number, string> = {
+          1: '序列号',
+          2: '名称',
+          3: 'Bangumi URL',
+          4: '是否看完',
+          5: '评分',
+        }
+        return headers[column] ?? ''
+      },
+    )
     const columnMap = getColumnMap(worksheet as never, 1)
     expect(columnMap.has('序列号')).toBe(true)
     expect(columnMap.has('名称')).toBe(true)
@@ -349,14 +353,16 @@ describe('getColumnMap', () => {
 
   it('「打分」与「评分」是相互独立的两个 key，互不抢占', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1b' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
-      const headers: Record<number, string> = {
-        1: '打分',
-        2: '评分',
-        3: '排名',
-      }
-      return headers[column] ?? ''
-    })
+    mockState.getCellValue.mockImplementation(
+      (_worksheet: unknown, _row: number, column: number) => {
+        const headers: Record<number, string> = {
+          1: '打分',
+          2: '评分',
+          3: '排名',
+        }
+        return headers[column] ?? ''
+      },
+    )
     const columnMap = getColumnMap(worksheet as never, 1)
 
     expect(columnMap.get('打分')).toBe(1)
@@ -366,19 +372,21 @@ describe('getColumnMap', () => {
 
   it('未匹配到序列号列时使用第一个非空列作为回退', () => {
     const worksheet = createMockWorksheet({ name: 'Sheet-GCM-2' })
-    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, column: number) => {
-      // 第一列是 "名称"，没有显式的序列号
-      const headers: Record<number, string> = {
-        1: '名称',
-        2: 'Bangumi URL',
-      }
-      return headers[column] ?? ''
-    })
+    mockState.getCellValue.mockImplementation(
+      (_worksheet: unknown, _row: number, column: number) => {
+        // 第一列是 "名称"，没有显式的序列号
+        const headers: Record<number, string> = {
+          1: '名称',
+          2: 'Bangumi URL',
+        }
+        return headers[column] ?? ''
+      },
+    )
     const columnMap = getColumnMap(worksheet as never, 1)
     // 名称映射到列 1，Bangumi URL 映射到列 2
     expect(columnMap.has('名称')).toBe(true)
     expect(columnMap.has('Bangumi_URL')).toBe(true)
-    // 回退逻辑：firstNonEmptyCol=1 已被 "名称" 占用，向后查找非空列，
+    // 回退逻辑：firstNonEmptyColumn=1 已被 "名称" 占用，向后查找非空列，
     // 但列 3 之后均为空，因此不会设置 "序列号"
     expect(columnMap.has('序列号')).toBe(false)
   })
@@ -572,19 +580,19 @@ describe('readRangeValues', () => {
 // ========== clearSheetCache ==========
 describe('clearSheetCache', () => {
   it('清除指定工作表名的缓存条目', () => {
-    const ws1 = createMockWorksheet({ name: 'Sheet-CC-1' })
-    const _ws2 = createMockWorksheet({ name: 'Sheet-CC-2' })
+    const worksheet1 = createMockWorksheet({ name: 'Sheet-CC-1' })
+    const _worksheet2 = createMockWorksheet({ name: 'Sheet-CC-2' })
     // 写入缓存
     cacheGet('Sheet-CC-1:headerRow:1', () => 5)
     cacheGet('Sheet-CC-2:headerRow:1', () => 10)
-    // 清除 ws1 的缓存
-    clearSheetCache(ws1 as never)
-    // ws2 缓存应仍存在（通过重新调用 cacheGet 验证 factory 不被调用）
+    // 清除 worksheet1 的缓存
+    clearSheetCache(worksheet1 as never)
+    // worksheet2 缓存应仍存在（通过重新调用 cacheGet 验证 factory 不被调用）
     const factory2 = vi.fn(() => 999)
     const result2 = cacheGet('Sheet-CC-2:headerRow:1', factory2)
     expect(result2).toBe(10)
     expect(factory2).not.toHaveBeenCalled()
-    // ws1 缓存应已清除（factory 被调用）
+    // worksheet1 缓存应已清除（factory 被调用）
     const factory1 = vi.fn(() => 999)
     const result1 = cacheGet('Sheet-CC-1:headerRow:1', factory1)
     expect(result1).toBe(999)

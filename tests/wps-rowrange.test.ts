@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { getRowRange, getRowRangeSafe } from '../ts/tools/wps.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 
-const makeWs = (rangeFunction: unknown): WpsWorksheet =>
+const makeWorksheet = (rangeFunction: unknown): WpsWorksheet =>
   ({
     Name: 'Sheet1',
     Range: rangeFunction,
@@ -11,12 +11,12 @@ const makeWs = (rangeFunction: unknown): WpsWorksheet =>
 
 describe('getRowRange / getRowRangeSafe', () => {
   it('getRowRange 用 Range 返回行区间地址', () => {
-    const worksheet = makeWs((addr: string) => ({ address: addr }))
+    const worksheet = makeWorksheet((addr: string) => ({ address: addr }))
     expect(getRowRange(worksheet, 3)).toEqual({ address: '3:3' })
   })
 
   it('getRowRange 非法行号抛错', () => {
-    const worksheet = makeWs((addr: string) => ({ address: addr }))
+    const worksheet = makeWorksheet((addr: string) => ({ address: addr }))
     expect(() => getRowRange(worksheet, 0)).toThrow(/positive integer/)
     expect(() => getRowRange(worksheet, NaN)).toThrow()
   })
@@ -27,19 +27,19 @@ describe('getRowRange / getRowRangeSafe', () => {
   })
 
   it('getRowRangeSafe 主路径复用 Range', () => {
-    const worksheet = makeWs((addr: string) => ({ address: addr }))
+    const worksheet = makeWorksheet((addr: string) => ({ address: addr }))
     expect(getRowRangeSafe(worksheet, 2)).toEqual({ address: '2:2' })
   })
 
   it('getRowRangeSafe Range 失败时回退 Rows.Item', () => {
-    const worksheet = makeWs(() => {
+    const worksheet = makeWorksheet(() => {
       throw new Error('no Range')
     })
     expect(getRowRangeSafe(worksheet, 5)).toEqual({ fallbackRow: 5 })
   })
 
   it('getRowRangeSafe 双失败抛错', () => {
-    const worksheet = makeWs(() => {
+    const worksheet = makeWorksheet(() => {
       throw new Error('no Range')
     })
     ;(worksheet as { Rows: { Item: (row: number) => unknown } }).Rows.Item = () => {

@@ -17,6 +17,73 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+// =====================================================================
+// 命名规范：@typescript-eslint/naming-convention（**禁止缩写**）
+// =====================================================================
+// 背景：unicorn/name-replacements 只认「字母形态」不认「语义缩写」，且它自带
+// 的 110 条替换表里**没有** ws / col / sid / hl / cf —— 这正是此前「lint 全绿
+// 但代码里全是缩写」的根因（cf→conditionalFormat 那一轮靠人工排查才发现）。
+// naming-convention 补上这一层：用 custom 正则把「缩写词段」判为违规，
+// 让新写的缩写**在 lint 阶段就被拦下**，而不是等人眼在 review 里发现。
+//
+// 缩写表来源（两级）：
+//   ① UNICORN_ABBREVIATIONS —— 与 unicorn/name-replacements 同源（110 条，
+//      剔除单字母项，避免 `theme` 的 e 被误判），保证两套规则口径一致；
+//   ② PROJECT_ABBREVIATIONS —— unicorn 表不管、但本项目实际踩过的缩写
+//      （ws=worksheet / col=column / sid=subjectId / hl=highlight / cf=conditional-format …）。
+//
+// 词段匹配（两个分支互补，缺一不可）：
+//   a) 名字开头或 `_` 之后：大小写任意 → 覆盖 UPPER_CASE 的 `LEN` / `COL`
+//   b) camelCase 边界（前一小写字母 + 本词段首字母大写）→ 覆盖 `setWin` 的 `Win`
+//   只用 a) 会漏掉 b)（`setWin` 的 Win 前接小写 t），只用 b) 会误伤 `protocol`
+//   里的 col —— 两个分支合起来才既不漏也不误伤。
+// 词尾锚定：`$` / 非字母 / 「大写+小写」（下一个 camel 词段起点）。
+//   `DEFAULT` 的 DEF 后接 A+U 不成新词 → 不误判；`MAX_COMMENT_LEN` 末尾
+//   LEN 后接 `$` → 判中（它确实是 length 的缩写）。
+const UNICORN_ABBREVIATIONS = `acc application applications arg args arr attr attrs btn buf cb cfg
+cmd conf configuration ctx cur curr db decl decls def dep deps dest dev dir dirs dist doc docs dst
+el elem elems env envs err ev evt expr exprs ext exts fn func ident idents idx len lib mod msg num
+obj opts param params perf pkg prev prod prop props proto ref refs rel repository req res ret retval
+sep src stmt stmts str tbl temp tit tmp util utils val var vars ver`
+  .split(/\s+/u)
+  .filter(Boolean)
+const PROJECT_ABBREVIATIONS = [
+  // 历史遗留（前几轮命名规范化已清掉的家族，防止回潮）
+  'ws', 'col', 'cols', 'sid', 'sids', 'hl', 'cf',
+  // 本项目实际出现过 / 极易再犯
+  'del', 'orig', 'impl', 'opt', 'vals', 'cnt', 'misc', 'tmpl', 'proc', 'fnc',
+  'win', 'cls', 'dbg', 'hdr', 'lbl', 'txt', 'img', 'amt', 'qty',
+]
+const ABBREVIATIONS = [...new Set([...UNICORN_ABBREVIATIONS, ...PROJECT_ABBREVIATIONS])]
+
+const NAMING_SEGMENT_TAIL = String.raw`(?:$|[^a-zA-Z]|[A-Z][a-z])`
+const toCaseInsensitive = (word) =>
+  [...word].map((ch) => `[${ch.toLowerCase()}${ch.toUpperCase()}]`).join('')
+const abbreviationSegment = (word) => {
+  const lower = word.toLowerCase()
+  const capitalized = `${lower[0].toUpperCase()}${lower.slice(1)}`
+  return `(?:(?<![a-zA-Z])${toCaseInsensitive(lower)}|(?<=[a-z])${capitalized})`
+}
+// 正向判定「名字里含缩写词段」：用作 filter，把含缩写的名字挑出来送进报错配置。
+// 注意：@typescript-eslint 8.72 的 `failureMessage` 只在 schema 里、规则体未实现（已实测），
+// 报错信息只能由 `custom.regex` 的**文本**决定 —— 若把上面这条巨型 alternation 直接放进
+// custom，每条报错都会把 ~5KB 正则原样打印出来，完全不可读。
+// 因此拆分：filter 负责「是否含缩写」的判定（不进报错文本），custom 用一条**永不匹配**
+// 的正则负责报错（`(?!)` 恒失败），其正则文本即给开发者的提示 —— 报错变成：
+//   Variable name `ws` must match the RegExp: /(?!)缩写禁用：请改全拼（对照表见 文档/NAMING.md）/u
+const HAS_ABBREVIATION_REGEX = `(?:${ABBREVIATIONS.map(abbreviationSegment).join('|')})${NAMING_SEGMENT_TAIL}`
+const ABBREVIATION_FORBIDDEN_REGEX = '(?!)缩写禁用：请改全拼（对照表见 文档/NAMING.md）'
+
+// 受约束的标识符位置。**不含** objectLiteralProperty / typeProperty：
+// 属性名大量来自外部契约（线上 dump 的 `sid`、WPS COM 的 `Interior`/`Color`、
+// DOM 的 `className`），项目无权改名 —— 见文档/NAMING.md「豁免清单」。
+const NAMING_SELECTORS = [
+  'variable', 'function', 'parameter', 'parameterProperty',
+  'class', 'interface', 'typeAlias', 'enum', 'typeParameter',
+  'classMethod', 'objectLiteralMethod', 'typeMethod',
+  'classicAccessor', 'enumMember', 'classProperty', 'import',
+]
+
 // 类型不安全的「重写型」自动修复规则：这些规则一旦开启 --fix 会把**可编译代码**
 // 自动改成**不可编译代码**或**行为破坏**（实测反复触发 TS2339 / TS7009 / TS2367，
 // 以及把构造型 mock 的 function(){} 改成箭头函数后无法 new）。更糟的是 ESLint 10
@@ -298,6 +365,48 @@ export default tseslint.config(
       ...allRulesAsError(securityPlugin, 'security'),
       ...allRulesAsError(nodePlugin, 'n'),
       ...allRulesAsError(stylistic, '@stylistic'),
+
+      // ===== 命名规范：禁止缩写 + 字母形态 =====
+      // 说明见文件顶部 HAS_ABBREVIATION_REGEX 的推导注释。四条配置**顺序敏感**
+      // （同 selector 时按数组序，带 modifiers 的优先级更高，会排到前面）：
+      //   ①② 未使用参数：靠 modifiers:['unused'] 排在最前，先按「是否含缩写」分流 ——
+      //      含缩写 → ① 报错；不含 → ② 豁免格式（`_` 本身不是 camelCase）。
+      //      **不能让未使用参数整体豁免缩写检查**，否则 `_ws` 会借「未使用」永久躲过门禁。
+      //   ③ 其余位置含缩写 → 报错。
+      //   ④ 字母形态兜底（camelCase / PascalCase / UPPER_CASE）。
+      // `format: null` = 不做格式要求；`custom` 用永不匹配的正则 = 走到这里必报错。
+      '@typescript-eslint/naming-convention': [
+        'error',
+        // ① 未使用参数 **且** 含缩写 → 报错
+        {
+          selector: 'parameter',
+          modifiers: ['unused'],
+          format: null,
+          filter: { regex: HAS_ABBREVIATION_REGEX, match: true },
+          custom: { regex: ABBREVIATION_FORBIDDEN_REGEX, match: true },
+        },
+        // ② 未使用参数 **且** 不含缩写 → 放行（`_` / `_worksheet` / `__resetXxx` 合法）
+        {
+          selector: 'parameter',
+          modifiers: ['unused'],
+          format: null,
+          filter: { regex: HAS_ABBREVIATION_REGEX, match: false },
+        },
+        // ③ 其余受约束位置含缩写 → 报错
+        {
+          selector: NAMING_SELECTORS,
+          format: null,
+          filter: { regex: HAS_ABBREVIATION_REGEX, match: true },
+          custom: { regex: ABBREVIATION_FORBIDDEN_REGEX, match: true },
+        },
+        // ④ 字母形态
+        {
+          selector: NAMING_SELECTORS,
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+          leadingUnderscore: 'allowSingleOrDouble',
+          trailingUnderscore: 'allow',
+        },
+      ],
 
       // 额外严格规则
       'no-console': 'error',

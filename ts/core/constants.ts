@@ -488,7 +488,7 @@ export const STANDARD_HEADERS: readonly string[] = [
  * @constant
  * @type {Record<string, boolean>}
  */
-export const IMPORTANT_COLS: Record<string, boolean> = {
+export const IMPORTANT_COLUMNS: Record<string, boolean> = {
   名称: true,
   'bangumi url': true,
   条目id: true,
@@ -735,7 +735,7 @@ export const SYNC_RECORD_COLUMNS = [
  * @property {number} MESSAGE - 备注信息或错误详情
  * @property {number} FINGERPRINT - 数据指纹，用于增量同步检测变更
  */
-export const SYNC_RECORD_COL = {
+export const SYNC_RECORD_COLUMN = {
   SID: 1,
   TIME: 2,
   NAME: 3,

@@ -123,21 +123,21 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       value: stats.remoteTotal,
       sub: `本地 ${String(totalAll)} 条`,
       icon: '📥',
-      cls: 'bgm-overview-card-primary',
+      cssClass: 'bgm-overview-card-primary',
     },
     {
       label: '本次处理',
       value: totalProcessed,
       sub: '新增+更新+删除',
       icon: '🔧',
-      cls: 'bgm-overview-card-success',
+      cssClass: 'bgm-overview-card-success',
     },
     {
       label: '失败',
       value: stats.failed,
       sub: stats.failed > 0 ? '需关注' : '无异常',
       icon: stats.failed > 0 ? '⚠️' : '✅',
-      cls: stats.failed > 0 ? 'bgm-overview-card-warning' : 'bgm-overview-card-muted',
+      cssClass: stats.failed > 0 ? 'bgm-overview-card-warning' : 'bgm-overview-card-muted',
     },
   ]
 
@@ -148,7 +148,7 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
         ${overviewCards
           .map(
             (c) => `
-          <div class="bgm-overview-card ${c.cls}">
+          <div class="bgm-overview-card ${c.cssClass}">
             <div class="bgm-overview-card-header">
               <span class="bgm-overview-icon">${c.icon}</span>
               <span class="bgm-overview-label">${c.label}</span>

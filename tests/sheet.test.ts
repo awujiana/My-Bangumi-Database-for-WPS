@@ -349,7 +349,7 @@ describe('readRangeValues', () => {
 })
 
 /** 造一个按请求范围返回二维 Value2 的工作表桩（readRowsCache 用例共用） */
-function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> {
+function createGridWorksheet(grid: string[][]): ReturnType<typeof createMockWorksheet> {
   const worksheet = createMockWorksheet()
   worksheet.Range = createRangeMock((address: string) => {
     const parts = address.split(':', 2)
@@ -367,14 +367,14 @@ function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> 
 }
 
 describe('readRowsCache', () => {
-  it('行号为空 / maxCol < 1 时返回空 Map（不发起 COM 读）', () => {
+  it('行号为空 / maxColumn < 1 时返回空 Map（不发起 COM 读）', () => {
     const worksheet = createMockWorksheet()
     expect(readRowsCache(worksheet, [], 3)).toEqual(new Map())
     expect(readRowsCache(worksheet, [2], 0)).toEqual(new Map())
   })
 
-  it('应为离散行号建缓存：一次矩形读覆盖 1..maxCol', () => {
-    const worksheet = createGridWs([
+  it('应为离散行号建缓存：一次矩形读覆盖 1..maxColumn', () => {
+    const worksheet = createGridWorksheet([
       ['r1c1', 'r1c2'],
       ['r2c1', 'r2c2'],
       ['r3c1', 'r3c2'],
@@ -388,17 +388,17 @@ describe('readRowsCache', () => {
   })
 
   it('读回行数不足时返回 null（形状不可信，调用方须回退逐格读）', () => {
-    const worksheet = createGridWs([['r1c1', 'r1c2']])
+    const worksheet = createGridWorksheet([['r1c1', 'r1c2']])
     expect(readRowsCache(worksheet, [1, 2], 2)).toBeNull()
   })
 
   it('读回列宽不足时返回 null', () => {
-    const worksheet = createGridWs([['r1c1'], ['r2c1']])
+    const worksheet = createGridWorksheet([['r1c1'], ['r2c1']])
     expect(readRowsCache(worksheet, [1, 2], 2)).toBeNull()
   })
 
   it('首行缺失（minRow 起点偏移）时返回 null', () => {
-    const worksheet = createGridWs([['r1c1', 'r1c2']])
+    const worksheet = createGridWorksheet([['r1c1', 'r1c2']])
     // 请求 2..3 行，只有 1 行数据 → block[1] 为 undefined
     expect(readRowsCache(worksheet, [3], 2)).toBeNull()
   })
@@ -416,11 +416,11 @@ function makeIo(seed: Record<string, string> = {}) {
   return {
     stats,
     io: {
-      read: (_ws: unknown, row: number, column: number): string => {
+      read: (_worksheet: unknown, row: number, column: number): string => {
         stats.reads += 1
         return store.get(`${String(row)}:${String(column)}`) ?? ''
       },
-      write: (_ws: unknown, row: number, column: number, value: string): void => {
+      write: (_worksheet: unknown, row: number, column: number, value: string): void => {
         stats.writes += 1
         store.set(`${String(row)}:${String(column)}`, value)
       },
@@ -464,7 +464,7 @@ describe('createSheetCellCache', () => {
   })
 
   it('矩形读播种成功：读命中缓存，零次后备 IO；未播种的行列才回落', () => {
-    const worksheet = createGridWs([
+    const worksheet = createGridWorksheet([
       ['a1', 'b1'],
       ['a2', 'b2'],
     ])
@@ -475,7 +475,7 @@ describe('createSheetCellCache', () => {
     expect(cache.read(2, 2)).toBe('b2')
     // 全部命中播种，没有一次逐格读
     expect(stats.reads).toBe(0)
-    // 未播种的行 / 超出 maxCol 的列：回落后备 IO 并回填
+    // 未播种的行 / 超出 maxColumn 的列：回落后备 IO 并回填
     expect(cache.read(9, 9)).toBe('')
     expect(stats.reads).toBe(1)
     // 第二次命中回填
@@ -485,7 +485,7 @@ describe('createSheetCellCache', () => {
 
   it('播种失败（形状不符）时读写全部回落，行为与不建缓存一致', () => {
     // 列宽不足 → readRowsCache 返回 null
-    const worksheet = createGridWs([['only-one-column']])
+    const worksheet = createGridWorksheet([['only-one-column']])
     const { io, stats } = makeIo({ '1:1': 'fallback' })
     const cache = createSheetCellCache(worksheet, [1], 2, io)
 
@@ -600,7 +600,7 @@ describe('getDataSheet', () => {
     BGM.sheet.isLocked = true
     // will fail
     BGM.sheet.lockedIndex = 10
-    const _mockErrorWs = {
+    const _mockErrorWorksheet = {
       ...createMockWorksheet(),
       Worksheets: {
         Count: 1,
@@ -782,8 +782,8 @@ describe('getLastRow', () => {
       End: vi.fn().mockReturnValue({ Row: 40 }),
     }
     worksheet.Range = createRangeMock(() => anchorCell)
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) =>
-      column === 1 ? '序列号' : '',
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, _row: unknown, column: unknown) => (column === 1 ? '序列号' : ''),
     )
     const result = getLastRow(worksheet, false, 1)
     expect(result).toBeDefined()
@@ -804,17 +804,19 @@ describe('findHeaderRow', () => {
   })
 
   it('应在找到多个关键字时返回行号', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 1) {
-        if (c === 1) return '名称'
-        if (c === 2) return '标题'
-        if (c === 3) return 'Bangumi URL'
-        if (c === 4) return '类型'
-      }
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 1) {
+          if (c === 1) return '名称'
+          if (c === 2) return '标题'
+          if (c === 3) return 'Bangumi URL'
+          if (c === 4) return '类型'
+        }
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'Found' })
     const result = findHeaderRow(worksheet)
     expect(result).toBe(1)
@@ -834,16 +836,18 @@ describe('findHeaderRow', () => {
   })
 
   it('startRow 参数应从指定行开始扫描', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 3) {
-        if (c === 1) return '名称'
-        if (c === 2) return '标题'
-        if (c === 3) return 'URL'
-      }
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 3) {
+          if (c === 1) return '名称'
+          if (c === 2) return '标题'
+          if (c === 3) return 'URL'
+        }
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'StartRow' })
     const result = findHeaderRow(worksheet, 3)
     expect(result).toBe(3)
@@ -861,14 +865,16 @@ describe('getColumnMap', () => {
   })
 
   it('应建立列映射', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
-      const c = column as number
-      if (c === 1) return '序列号'
-      if (c === 2) return '名称'
-      if (c === 3) return 'Bangumi URL'
-      if (c === 4) return '类型'
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, _row: unknown, column: unknown) => {
+        const c = column as number
+        if (c === 1) return '序列号'
+        if (c === 2) return '名称'
+        if (c === 3) return 'Bangumi URL'
+        if (c === 4) return '类型'
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'MapTest' })
     const map = getColumnMap(worksheet, 1)
     expect(map.get('序列号')).toBe(1)
@@ -878,14 +884,16 @@ describe('getColumnMap', () => {
   })
 
   it('序列号列回退：第一个非空列未被占用时使用', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
-      const c = column as number
-      // 非标准序列号名，但非空
-      if (c === 1) return '自定义ID'
-      if (c === 2) return '名称'
-      if (c === 3) return 'Bangumi URL'
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, _row: unknown, column: unknown) => {
+        const c = column as number
+        // 非标准序列号名，但非空
+        if (c === 1) return '自定义ID'
+        if (c === 2) return '名称'
+        if (c === 3) return 'Bangumi URL'
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'FallbackTest' })
     const map = getColumnMap(worksheet, 1)
     // 序列号应回退到第一个非空列（列1）
@@ -893,16 +901,18 @@ describe('getColumnMap', () => {
   })
 
   it('序列号列回退：第一个非空列被占用时使用下一个未被占用的列', () => {
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, column: unknown) => {
-      const c = column as number
-      // 第一个非空列已被'名称'映射占用
-      if (c === 1) return '名称'
-      // 不匹配任何规则，成为序列号回退候选
-      if (c === 2) return '标题'
-      if (c === 3) return 'Bangumi URL'
-      if (c === 4) return '自定义字段'
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, _row: unknown, column: unknown) => {
+        const c = column as number
+        // 第一个非空列已被'名称'映射占用
+        if (c === 1) return '名称'
+        // 不匹配任何规则，成为序列号回退候选
+        if (c === 2) return '标题'
+        if (c === 3) return 'Bangumi URL'
+        if (c === 4) return '自定义字段'
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'Fallback2' })
     const map = getColumnMap(worksheet, 1)
     // 序列号应回退到第一个未被占用的非空列（列2 - "标题"不匹配任何规则）
@@ -1029,12 +1039,14 @@ describe('ensureSheetHeaders', () => {
 
   it('已有表头时应返回 false', () => {
     // Mock findHeaderRow to return 1 (found)
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 1 && c <= 3) return ['名称', '标题', 'bangumi'][c - 1] ?? ''
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 1 && c <= 3) return ['名称', '标题', 'bangumi'][c - 1] ?? ''
+        return ''
+      },
+    )
     const worksheet = createMockWorksheet({ name: 'HasHeader' })
     const isResult = ensureSheetHeaders(worksheet)
     expect(isResult).toBe(false)
@@ -1288,17 +1300,19 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('找到序号列时应返回正确列号', () => {
     const worksheet = createMockWorksheet({ name: 'AnchorCol' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 1) {
-        if (c === 1) return '序号'
-        if (c === 2) return '名称'
-        if (c === 3) return 'Bangumi URL'
-        if (c === 4) return '类型'
-      }
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 1) {
+          if (c === 1) return '序号'
+          if (c === 2) return '名称'
+          if (c === 3) return 'Bangumi URL'
+          if (c === 4) return '类型'
+        }
+        return ''
+      },
+    )
     // Set up End mock
     const anchorCell = {
       Value2: 'data',
@@ -1313,16 +1327,18 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('找到 Bangumi URL 列时应返回该列', () => {
     const worksheet = createMockWorksheet({ name: 'UrlCol' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 1) {
-        if (c === 1) return 'ID'
-        if (c === 2) return '标题'
-        if (c === 3) return '链接'
-      }
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 1) {
+          if (c === 1) return 'ID'
+          if (c === 2) return '标题'
+          if (c === 3) return '链接'
+        }
+        return ''
+      },
+    )
     const anchorCell = {
       Value2: 'data',
       Value: 'data',
@@ -1351,12 +1367,14 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('锚定列定位异常时应回退', () => {
     const worksheet = createMockWorksheet({ name: 'AnchorFail' })
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, column: unknown) => {
-      const r = row as number
-      const c = column as number
-      if (r === 1 && c === 1) return '序号'
-      return ''
-    })
+    vi.mocked(getCellValue).mockImplementation(
+      (_worksheet: unknown, row: unknown, column: unknown) => {
+        const r = row as number
+        const c = column as number
+        if (r === 1 && c === 1) return '序号'
+        return ''
+      },
+    )
     const failCell = {
       Value2: '',
       Value: '',

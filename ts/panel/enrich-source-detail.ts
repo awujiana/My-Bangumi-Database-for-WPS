@@ -43,20 +43,20 @@ export function hideSourceDetail(): void {
  * 保证弹窗与预览样式一致。
  */
 function renderSourceDetailTable(worksheet: WpsWorksheet): string {
-  const maxCols = 50
+  const maxColumns = 50
   const { headerRow, dataStartRow } = state
   const mapping = state.columnMapping
 
   // 列映射：列号 → 字段键（含 platformExtraCols 聚合列，也按平台徽章渲染）
-  const fieldByCol = new Map<number, ScalarMappingKey>()
+  const fieldByColumn = new Map<number, ScalarMappingKey>()
   if (mapping) {
     for (const f of COLUMN_MAPPING_FIELDS) {
       const column = mapping[f.key]
-      if (column && column > 0) fieldByCol.set(column, f.key)
+      if (column && column > 0) fieldByColumn.set(column, f.key)
     }
-    const extraPlatformCols = mapping.platformExtraCols ?? []
-    for (const column of extraPlatformCols) {
-      fieldByCol.set(column, 'platformCol')
+    const extraPlatformColumns = mapping.platformExtraCols ?? []
+    for (const column of extraPlatformColumns) {
+      fieldByColumn.set(column, 'platformCol')
     }
   }
   const labelByField = new Map(COLUMN_MAPPING_FIELDS.map((f) => [f.key, f.label]))
@@ -67,9 +67,9 @@ function renderSourceDetailTable(worksheet: WpsWorksheet): string {
     field?: ScalarMappingKey | undefined
   }
   const columns: DetailColumn[] = []
-  for (let column = 1; column <= maxCols; column += 1) {
+  for (let column = 1; column <= maxColumns; column += 1) {
     const header = getCellValue(worksheet, headerRow, column).trim()
-    const field = fieldByCol.get(column)
+    const field = fieldByColumn.get(column)
     if (header || field) {
       const label =
         header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(column)}列`

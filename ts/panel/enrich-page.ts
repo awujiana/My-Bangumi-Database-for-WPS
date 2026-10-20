@@ -1019,7 +1019,7 @@ export function startEnrichment(): void {
     BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表')
     return
   }
-  if (!state.columnMapping || state.columnMapping.nameCol === 0) {
+  if (!state.columnMapping || state.columnMapping.nameColumn === 0) {
     BGM.Dialog.alert('提示', '列映射未正确识别')
     return
   }
@@ -1306,7 +1306,7 @@ function enrichSingleBatchSource(
 
   const dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
   const columnMapping = sourceLayout?.columnMapping ?? detectColumns(worksheet, headerRow)
-  if (columnMapping.nameCol === 0) {
+  if (columnMapping.nameColumn === 0) {
     result.error = '已找到字段行，但未找到名称列'
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName}: 表头识别失败 - 未找到名称列`)
     return
@@ -1315,7 +1315,7 @@ function enrichSingleBatchSource(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
+    `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameColumn)}`,
   )
 
   const config: EnrichConfig = {

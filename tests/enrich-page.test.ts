@@ -245,7 +245,7 @@ function mountSelect(id: string, optionValues: string[]): HTMLSelectElement {
   return select
 }
 
-function makeWs(name: string): WpsWorksheet {
+function makeWorksheet(name: string): WpsWorksheet {
   return { Name: name } as unknown as WpsWorksheet
 }
 
@@ -365,7 +365,7 @@ beforeEach(() => {
   m.getLockedEnrichSheet.mockReturnValue(null)
   m.collectDetectedWorkbookPaths.mockReturnValue([])
   m.autoSelectEnrichTarget.mockReturnValue('none')
-  m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+  m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
   m.ensureSourceSheet.mockReturnValue(null)
   m.enrichEntries.mockReturnValue([])
   m.matchEntries.mockReturnValue([])
@@ -422,8 +422,8 @@ describe('enrich-page · initEnrichPage', () => {
     mountEnrichControls()
     sheetState.isLocked = true
     sheetState.lockedIndex = 2
-    const lockedSheet = makeWs('追踪')
-    m.getLockedEnrichSheet.mockReturnValue([makeWs('BGM.xlsx'), lockedSheet])
+    const lockedSheet = makeWorksheet('追踪')
+    m.getLockedEnrichSheet.mockReturnValue([makeWorksheet('BGM.xlsx'), lockedSheet])
 
     initEnrichPage()
 
@@ -467,7 +467,7 @@ describe('enrich-page · 绑定路由', () => {
     mountEnrichControls()
     initEnrichPage()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
@@ -495,12 +495,15 @@ describe('enrich-page · 绑定路由', () => {
   })
 
   it('sheetSelect change → selectTargetSheet 写入 state.bangumiSheet 并清空旧匹配结果', () => {
-    const ws2 = makeWs('追踪')
+    const worksheet2 = makeWorksheet('追踪')
     stubApp({
       Workbooks: { Count: 1 },
       ActiveWorkbook: {
         Name: 'BGM.xlsx',
-        Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) },
+        Worksheets: {
+          Count: 2,
+          Item: (index: number) => (index === 2 ? worksheet2 : makeWorksheet('动画')),
+        },
       },
     })
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
@@ -508,7 +511,7 @@ describe('enrich-page · 绑定路由', () => {
 
     sheetSelect.dispatchEvent(new Event('change'))
 
-    expect(state.bangumiSheet).toBe(ws2)
+    expect(state.bangumiSheet).toBe(worksheet2)
     expect(m.resetMatchResults).toHaveBeenCalled()
     expect(m.updateEnrichLockButton).toHaveBeenCalledWith('lockSheetBtn', 'lockStatus')
   })
@@ -538,12 +541,15 @@ describe('enrich-page · 绑定路由', () => {
       sheetState.isLocked = true
       sheetState.lockedIndex = 2
     })
-    const ws2 = makeWs('追踪')
+    const worksheet2 = makeWorksheet('追踪')
     stubApp({
       Workbooks: { Count: 1 },
       ActiveWorkbook: {
         Name: 'BGM.xlsx',
-        Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) },
+        Worksheets: {
+          Count: 2,
+          Item: (index: number) => (index === 2 ? worksheet2 : makeWorksheet('动画')),
+        },
       },
     })
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
@@ -558,14 +564,14 @@ describe('enrich-page · 绑定路由', () => {
       'lockStatus',
     )
     expect(sheetSelect.disabled).toBe(true)
-    expect(state.bangumiSheet).toBe(ws2)
+    expect(state.bangumiSheet).toBe(worksheet2)
   })
 
   it('lockSheetBtn → 解锁后清空目标表、恢复下拉框并取消兜底重试', () => {
     // toggleEnrichWorkbookLock 是 mock：必须让它真的把 isLocked 翻成 false，
     // 否则点完按钮 isLocked 仍为 true，走的其实是「锁定」分支而非「解锁」分支。
     sheetState.isLocked = true
-    state.bangumiSheet = makeWs('追踪')
+    state.bangumiSheet = makeWorksheet('追踪')
     m.toggleEnrichWorkbookLock.mockImplementation(() => {
       sheetState.isLocked = false
     })
@@ -648,7 +654,7 @@ describe('enrich-page · selectNewAnimeFile', () => {
   beforeEach(() => {
     mountEnrichControls()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
@@ -692,7 +698,7 @@ describe('enrich-page · selectNewAnimeFile', () => {
   it('单文件选择成功 → 自动识别表头并接管源工作簿', () => {
     const dialog = makeDialog(-1, ['D:/动画A.xlsx'])
     stubApp({ FileDialog: () => dialog })
-    const wb = { Worksheets: { Count: 1, Item: () => makeWs('动画') } }
+    const wb = { Worksheets: { Count: 1, Item: () => makeWorksheet('动画') } }
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: true })
 
     selectNewAnimeFile()
@@ -764,7 +770,7 @@ describe('enrich-page · autoDetectHeader', () => {
   beforeEach(() => {
     mountEnrichControls()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
@@ -785,7 +791,7 @@ describe('enrich-page · autoDetectHeader', () => {
 
   it('识别失败且工作簿是本插件打开的 → 立即回收', () => {
     state.filePath = 'D:/动画A.xlsx'
-    const wb = { Worksheets: { Count: 1, Item: () => makeWs('动画') } }
+    const wb = { Worksheets: { Count: 1, Item: () => makeWorksheet('动画') } }
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: true })
     m.detectHeaderOnSheet.mockReturnValue(null)
 
@@ -798,7 +804,7 @@ describe('enrich-page · autoDetectHeader', () => {
   it('closeSourceAfterDetect 开关打开 → 识别成功后关闭源工作簿', () => {
     state.filePath = 'D:/动画A.xlsx'
     state.closeSourceAfterDetect = true
-    const wb = { Worksheets: { Count: 1, Item: () => makeWs('动画') } }
+    const wb = { Worksheets: { Count: 1, Item: () => makeWorksheet('动画') } }
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: true })
 
     autoDetectHeader()
@@ -808,7 +814,7 @@ describe('enrich-page · autoDetectHeader', () => {
   })
 
   it('未选文件 → 回落到当前活动工作表识别', () => {
-    const worksheet = makeWs('动画')
+    const worksheet = makeWorksheet('动画')
     stubApp({
       Workbooks: { Count: 1 },
       ActiveWorkbook: { Name: 'BGM.xlsx', ActiveSheet: worksheet },
@@ -834,13 +840,13 @@ describe('enrich-page · autoDetectHeader', () => {
 // ========== startEnrichment ==========
 
 describe('enrich-page · startEnrichment', () => {
-  const animeSheet = makeWs('动画')
-  const targetSheet = makeWs('追踪')
+  const animeSheet = makeWorksheet('动画')
+  const targetSheet = makeWorksheet('追踪')
 
   function primeHappyPath(): void {
     mountEnrichControls()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
     m.getLockedEnrichSheet.mockReturnValue(null)
@@ -848,7 +854,7 @@ describe('enrich-page · startEnrichment', () => {
     m.ensureSourceSheet.mockReturnValue(animeSheet)
     state.animeSourceSheet = animeSheet
     state.bangumiSheet = targetSheet
-    state.columnMapping = { nameCol: 1 }
+    state.columnMapping = { nameColumn: 1 }
     state.matches = [{ matchType: 'exact' }] as unknown as typeof state.matches
     state.filePath = 'D:/动画A.xlsx'
     m.enrichEntries.mockReturnValue([
@@ -861,7 +867,7 @@ describe('enrich-page · startEnrichment', () => {
     primeHappyPath()
     m.enrichEntries.mockImplementation(
       (
-        _ws: unknown,
+        _worksheet: unknown,
         _target: unknown,
         _matches: unknown,
         _config: unknown,
@@ -899,7 +905,7 @@ describe('enrich-page · startEnrichment', () => {
     let isCancelRequested = false
     m.enrichEntries.mockImplementation(
       (
-        _ws: unknown,
+        _worksheet: unknown,
         _target: unknown,
         _matches: unknown,
         _config: unknown,
@@ -982,7 +988,7 @@ describe('enrich-page · startEnrichment', () => {
   it('state 无目标表时 → 从锁定状态恢复', () => {
     primeHappyPath()
     state.bangumiSheet = null
-    m.getLockedEnrichSheet.mockReturnValue([makeWs('BGM.xlsx'), targetSheet])
+    m.getLockedEnrichSheet.mockReturnValue([makeWorksheet('BGM.xlsx'), targetSheet])
 
     startEnrichment()
 
@@ -990,14 +996,14 @@ describe('enrich-page · startEnrichment', () => {
     expect(m.enrichEntries).toHaveBeenCalled()
   })
 
-  it('列映射缺失或 nameCol 为 0 → 提示列映射未识别', () => {
+  it('列映射缺失或 nameColumn 为 0 → 提示列映射未识别', () => {
     primeHappyPath()
     state.columnMapping = null
     startEnrichment()
     expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('列映射'))
 
     primeHappyPath()
-    state.columnMapping = { nameCol: 0 }
+    state.columnMapping = { nameColumn: 0 }
     startEnrichment()
     expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('列映射'))
   })
@@ -1040,12 +1046,12 @@ describe('enrich-page · startEnrichment', () => {
 // ========== 批量富化 ==========
 
 describe('enrich-page · batchStartEnrichment', () => {
-  const targetSheet = makeWs('追踪')
+  const targetSheet = makeWorksheet('追踪')
 
   function primeBatch(files: string[]): void {
     mountEnrichControls()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
     m.getLockedEnrichSheet.mockReturnValue(null)
@@ -1056,7 +1062,7 @@ describe('enrich-page · batchStartEnrichment', () => {
       Workbooks: {
         Count: 0,
         Open: vi.fn(() => {
-          const worksheet = makeWs('动画')
+          const worksheet = makeWorksheet('动画')
           const wb = {
             Name: '源.xlsx',
             Worksheets: { Count: 1, Item: () => worksheet },
@@ -1070,7 +1076,7 @@ describe('enrich-page · batchStartEnrichment', () => {
     m.detectAnimeSourceLayout.mockReturnValue({
       headerRow: 1,
       dataStartRow: 2,
-      columnMapping: { nameCol: 1 },
+      columnMapping: { nameColumn: 1 },
     })
     m.matchEntries.mockReturnValue([{ matchType: 'exact' }, { matchType: 'unmatched' }])
     m.enrichEntries.mockReturnValue([{ kind: 'matched', enrichedFields: ['名称'] }])
@@ -1150,7 +1156,7 @@ describe('enrich-page · batchStartEnrichment', () => {
   it('目标表未锁定 → 从锁定状态恢复后再执行', async () => {
     primeBatch(['D:/动画A.xlsx'])
     state.bangumiSheet = null
-    m.getLockedEnrichSheet.mockReturnValue([makeWs('BGM.xlsx'), targetSheet])
+    m.getLockedEnrichSheet.mockReturnValue([makeWorksheet('BGM.xlsx'), targetSheet])
 
     batchStartEnrichment()
 
@@ -1210,7 +1216,7 @@ describe('enrich-page · batchStartEnrichment', () => {
     m.detectAnimeSourceLayout.mockReturnValue({
       headerRow: 1,
       dataStartRow: 2,
-      columnMapping: { nameCol: 0 },
+      columnMapping: { nameColumn: 0 },
     })
 
     batchStartEnrichment()
@@ -1232,7 +1238,7 @@ describe('enrich-page · batchStartEnrichment', () => {
         Open: () => {
           const wb = {
             Name: '源.xlsx',
-            Worksheets: { Count: 1, Item: () => makeWs('动画') },
+            Worksheets: { Count: 1, Item: () => makeWorksheet('动画') },
             Close: () => {
               throw new Error('文件被占用')
             },
@@ -1259,7 +1265,7 @@ describe('enrich-page · batchStartEnrichment', () => {
     primeBatch(['D:/a.xlsx'])
     m.enrichEntries.mockImplementation(
       (
-        _ws: unknown,
+        _worksheet: unknown,
         _target: unknown,
         _matches: unknown,
         _config: unknown,
@@ -1320,7 +1326,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     mountEnrichControls()
     initEnrichPage()
     vi.clearAllMocks()
-    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
     m.autoSelectEnrichTarget.mockReturnValue('none')
     m.collectDetectedWorkbookPaths.mockReturnValue([])
@@ -1343,7 +1349,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
   it('refreshSheets 且源表/目标表/列映射齐备 → 微任务里自动跑一次预览匹配', async () => {
     // 刷新按钮会先跑 selectTargetSheet()：它读「工作簿下拉 + 活动工作簿」，
     // 两者都拿不到时会把 state.bangumiSheet 清空，后面的守卫就不成立了。
-    const targetSheet = makeWs('追踪')
+    const targetSheet = makeWorksheet('追踪')
     stubApp({
       Workbooks: { Count: 1 },
       ActiveWorkbook: {
@@ -1351,9 +1357,9 @@ describe('enrich-page · 兜底分支与边界补测', () => {
         Worksheets: { Count: 1, Item: () => targetSheet },
       },
     })
-    state.animeSourceSheet = makeWs('动画')
+    state.animeSourceSheet = makeWorksheet('动画')
     state.bangumiSheet = targetSheet
-    state.columnMapping = { nameCol: 1 }
+    state.columnMapping = { nameColumn: 1 }
 
     click(document.querySelector('[data-action="refreshSheets"]')!)
 
@@ -1376,7 +1382,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     emptyOption.value = ''
     sheetSelect.append(emptyOption)
     sheetSelect.value = ''
-    state.bangumiSheet = makeWs('追踪')
+    state.bangumiSheet = makeWorksheet('追踪')
 
     sheetSelect.dispatchEvent(new Event('change'))
 
@@ -1430,7 +1436,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     state.sourceWorkbook = { Name: '旧.xlsx' } as unknown as WpsWorkbook
     const wb = {
       Name: '新.xlsx',
-      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+      Worksheets: { Count: 1, Item: () => makeWorksheet('动画') },
     } as unknown as WpsWorkbook
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
 
@@ -1484,9 +1490,9 @@ describe('enrich-page · 兜底分支与边界补测', () => {
   })
 
   it('富化摘要刷新记录表失败 → 记 INFO 级错误但不影响富化结果', () => {
-    m.ensureSourceSheet.mockReturnValue(makeWs('动画'))
-    state.bangumiSheet = makeWs('追踪')
-    state.columnMapping = { nameCol: 1 }
+    m.ensureSourceSheet.mockReturnValue(makeWorksheet('动画'))
+    state.bangumiSheet = makeWorksheet('追踪')
+    state.columnMapping = { nameColumn: 1 }
     state.matches = [{ matchType: 'exact' }] as unknown as typeof state.matches
     state.filePath = 'D:/动画A.xlsx'
     m.enrichEntries.mockReturnValue([{ kind: 'matched', enrichedFields: [] }])
@@ -1512,7 +1518,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     )
     const wb = {
       Name: '动画A.xlsx',
-      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+      Worksheets: { Count: 1, Item: () => makeWorksheet('动画') },
     } as unknown as WpsWorkbook
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
 
@@ -1581,7 +1587,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
 
     const wb = {
       Name: 'a.xlsx',
-      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+      Worksheets: { Count: 1, Item: () => makeWorksheet('动画') },
     } as unknown as WpsWorkbook
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
 

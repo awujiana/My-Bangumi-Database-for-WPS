@@ -48,22 +48,22 @@ export interface SyncResultStats {
 export { COLLECTION_TYPE_NAMES as TYPE_NAMES } from '../../core/constants.js'
 
 /** 序列号列默认索引 */
-export const DEFAULT_SEQ_COL = 4
+export const DEFAULT_SEQ_COLUMN = 4
 
 /**
  * 标记单元格同步结果颜色
  * @param worksheet 工作表
  * @param row 行号
  * @param isSuccess 是否成功
- * @param seqCol 序列号列索引（可选，默认4）
+ * @param seqColumn 序列号列索引（可选，默认4）
  */
 export function markSyncResultColor(
   worksheet: WpsWorksheet,
   row: number,
   isSuccess: boolean,
-  seqCol?: number,
+  seqColumn?: number,
 ): void {
-  const column = seqCol ?? DEFAULT_SEQ_COL
+  const column = seqColumn ?? DEFAULT_SEQ_COLUMN
   const cell = getCell(worksheet, row, column)
   if (cell?.Interior) {
     cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL
@@ -74,20 +74,20 @@ export function markSyncResultColor(
  * 应用成功任务结果到 UI 和记录（UI 更新层）
  * 标记单元格成功颜色 + 写入同步记录 + 累加成功计数。
  * @param worksheet 工作表
- * @param seqCol 序列号列索引
+ * @param seqColumn 序列号列索引
  * @param successTasks 成功任务列表
  * @param result 结果统计对象（会被修改：累加 success）
  */
 export function applySyncSuccessResults(
   worksheet: WpsWorksheet,
-  seqCol: number,
+  seqColumn: number,
   successTasks: SyncTask[],
   result: SyncResultStats,
 ): void {
   const records: UpdateRecordParameters[] = []
   for (const task of successTasks) {
     // 标记颜色
-    markSyncResultColor(worksheet, task.rowNum, true, seqCol)
+    markSyncResultColor(worksheet, task.rowNum, true, seqColumn)
 
     // 记录同步日志（先累积，循环外一次性写入）
     records.push({
@@ -120,19 +120,19 @@ export function applySyncSuccessResults(
  * 应用失败任务结果到 UI 和记录（UI 更新层）
  * 标记单元格失败颜色 + 写入同步记录 + 累加失败计数。
  * @param worksheet 工作表
- * @param seqCol 序列号列索引
+ * @param seqColumn 序列号列索引
  * @param failTasks 失败任务列表
  * @param result 结果统计对象（会被修改：累加 fail）
  */
 export function applySyncFailResults(
   worksheet: WpsWorksheet,
-  seqCol: number,
+  seqColumn: number,
   failTasks: SyncTask[],
   result: SyncResultStats,
 ): void {
   const records: UpdateRecordParameters[] = []
   for (const task of failTasks) {
-    markSyncResultColor(worksheet, task.rowNum, false, seqCol)
+    markSyncResultColor(worksheet, task.rowNum, false, seqColumn)
 
     records.push({
       name: task.name || `SID:${task.subjectId}`,
@@ -189,7 +189,7 @@ export function handleStoppedRemainingTasks(
  * 协调 applySyncSuccessResults → applySyncFailResults → handleStoppedRemainingTasks，
  * 完成标记颜色、写同步记录、统计剩余任务、reportProgress、BGM.setSyncComplete。
  * @param worksheet 工作表
- * @param seqCol 序列号列索引
+ * @param seqColumn 序列号列索引
  * @param successTasks 成功任务列表
  * @param failTasks 失败任务列表
  * @param syncTasks 全部待同步任务列表
@@ -200,7 +200,7 @@ export function handleStoppedRemainingTasks(
  */
 export function finalizeSyncResults(
   worksheet: WpsWorksheet,
-  seqCol: number,
+  seqColumn: number,
   successTasks: SyncTask[],
   failTasks: SyncTask[],
   syncTasks: SyncTask[],
@@ -212,10 +212,10 @@ export function finalizeSyncResults(
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤6: 批量更新 UI 和记录')
 
   // 应用成功结果到 UI 和记录
-  applySyncSuccessResults(worksheet, seqCol, successTasks, result)
+  applySyncSuccessResults(worksheet, seqColumn, successTasks, result)
 
   // 应用失败结果到 UI 和记录
-  applySyncFailResults(worksheet, seqCol, failTasks, result)
+  applySyncFailResults(worksheet, seqColumn, failTasks, result)
 
   // 处理被停止时的剩余任务
   if (isStopped) {

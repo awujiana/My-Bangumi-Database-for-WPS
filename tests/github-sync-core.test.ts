@@ -13,9 +13,9 @@ const mockGetCellValue = vi.hoisted(() => vi.fn())
 const mockReadRowsCache = vi.hoisted(() =>
   vi.fn(
     (
-      _ws: unknown,
+      _worksheet: unknown,
       _rows: readonly number[],
-      _maxCol: number,
+      _maxColumn: number,
     ): Map<number, readonly string[]> | null => null,
   ),
 )
@@ -25,14 +25,14 @@ const mockReadRangeValues = vi.hoisted(() =>
       worksheet: unknown,
       startRow: number,
       endRow: number,
-      startCol: number,
-      endCol: number,
+      startColumn: number,
+      endColumn: number,
     ): string[][] => {
       try {
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let column = startCol; column <= endCol; column += 1) {
+          for (let column = startColumn; column <= endColumn; column += 1) {
             const value = mockGetCellValue(worksheet, row, column) as
               string | number | boolean | null
             line.push(value == null ? '' : String(value))
@@ -52,8 +52,8 @@ const mockReadRangeCellValues = vi.hoisted(() =>
       worksheet: unknown,
       startRow: number,
       endRow: number,
-      startCol: number,
-      endCol: number,
+      startColumn: number,
+      endColumn: number,
     ): (string | number | boolean | Date | null)[][] => {
       // 默认实现从 mockGetCellValue 构建并保留原始类型（与真实宿主一致），
       // 宽度自动等于请求列数；「读失败」用例用 mockReturnValueOnce([]) 覆盖。
@@ -61,7 +61,7 @@ const mockReadRangeCellValues = vi.hoisted(() =>
         const rows: (string | number | boolean | Date | null)[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
-          for (let column = startCol; column <= endCol; column += 1) {
+          for (let column = startColumn; column <= endColumn; column += 1) {
             const value = mockGetCellValue(worksheet, row, column) as
               string | number | boolean | null
             line.push(value ?? null)
@@ -76,7 +76,7 @@ const mockReadRangeCellValues = vi.hoisted(() =>
   ),
 )
 const mockSetCellValue = vi.hoisted(() => vi.fn())
-const mockColNumberToLetter = vi.hoisted(() => vi.fn())
+const mockColumnNumberToLetter = vi.hoisted(() => vi.fn())
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockBuildRawUrl = vi.hoisted(() => vi.fn())
@@ -157,7 +157,7 @@ vi.mock('../ts/core/constants.js', () => ({
     '备注',
     '数据指纹',
   ],
-  SYNC_RECORD_COL: {
+  SYNC_RECORD_COLUMN: {
     SID: 1,
     TIME: 2,
     NAME: 3,
@@ -187,7 +187,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
-  columnNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColumnNumberToLetter,
   trim: vi.fn((v: string) => v.trim()),
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,

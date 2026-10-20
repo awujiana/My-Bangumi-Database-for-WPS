@@ -573,17 +573,17 @@ function saveEditor(): void {
 
 // ===== 默认规则集 =====
 
-function detectColumns(): { seasonCol: string; nameCol: string; firstRow: number } | null {
+function detectColumns(): { seasonColumn: string; nameColumn: string; firstRow: number } | null {
   const entry = selectedSheet()
   if (!entry) return null
   const headerRow = findHeaderRow(entry.worksheet)
   const columnMap = getColumnMap(entry.worksheet, headerRow)
-  const seasonColNumber = columnMap.get('开播季度')
-  const nameColNumber = columnMap.get('名称')
-  if (seasonColNumber === undefined || nameColNumber === undefined) return null
+  const seasonColumnNumber = columnMap.get('开播季度')
+  const nameColumnNumber = columnMap.get('名称')
+  if (seasonColumnNumber === undefined || nameColumnNumber === undefined) return null
   return {
-    seasonCol: columnNumberToLetter(seasonColNumber),
-    nameCol: columnNumberToLetter(nameColNumber),
+    seasonColumn: columnNumberToLetter(seasonColumnNumber),
+    nameColumn: columnNumberToLetter(nameColumnNumber),
     firstRow: headerRow + 1,
   }
 }
@@ -599,7 +599,7 @@ function generateDefaults(): void {
   persistRules()
   renderRuleList()
   showToast(
-    `已追加 ${String(defaults.length)} 条默认规则（季列 ${detected.seasonCol} · 名称列 ${detected.nameCol}）`,
+    `已追加 ${String(defaults.length)} 条默认规则（季列 ${detected.seasonColumn} · 名称列 ${detected.nameColumn}）`,
     'success',
   )
 }

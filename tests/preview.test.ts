@@ -50,18 +50,18 @@ const mocks = vi.hoisted(() => ({
   showAlert: vi.fn<(message: string, title?: string) => void>(),
   wpsMessageBox: vi.fn(() => Promise.resolve()),
   getApp: vi.fn((): unknown => null),
-  getCellValue: vi.fn((_ws: unknown, _row: number, _col: number): string => ''),
+  getCellValue: vi.fn((_worksheet: unknown, _row: number, _column: number): string => ''),
   // 矩形读必须与逐格读来自同一份数据源：矩形读只是逐格读的批量形态，
   // 两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
   readRangeValues: vi.fn(
-    (_ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+    (_worksheet: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
         for (let column = c1; column <= c2; column += 1) {
           // 与真实实现一致：单格读取失败按空串处理，不让整块读失败
           try {
-            line.push(mocks.getCellValue(_ws, row, column))
+            line.push(mocks.getCellValue(_worksheet, row, column))
           } catch {
             line.push('')
           }
@@ -72,7 +72,7 @@ const mocks = vi.hoisted(() => ({
     },
   ),
   trim: vi.fn((value: unknown) => (typeof value === 'string' ? value : '').trim()),
-  getCell: vi.fn((_ws: unknown, _row: number, _col: number): unknown => null),
+  getCell: vi.fn((_worksheet: unknown, _row: number, _column: number): unknown => null),
   escapeHtml: vi.fn((text: unknown) => {
     const raw = typeof text === 'string' ? text : ''
     return raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -95,8 +95,8 @@ const mocks = vi.hoisted(() => ({
   }),
   syncToBangumi: vi.fn(
     async (
-      _ws: unknown,
-      _colMap: unknown,
+      _worksheet: unknown,
+      _columnMap: unknown,
       _token: string,
       _lastRow: number,
       _headerRow: number,
@@ -213,7 +213,7 @@ import {
 /** 单元格内容：键为 `"行:列"`（1-based） */
 let cells: Record<string, string> = {}
 
-function makeColMap(): Map<string, number> {
+function makeColumnMap(): Map<string, number> {
   return new Map([
     ['序列号', 1],
     ['名称', 2],
@@ -321,12 +321,13 @@ beforeEach(() => {
   mocks.sync.checkPaused.mockReturnValue(false)
   mocks.sync.waitForResume.mockResolvedValue(undefined)
   mocks.getApp.mockReturnValue(null)
-  mocks.getColumnMap.mockReturnValue(makeColMap())
+  mocks.getColumnMap.mockReturnValue(makeColumnMap())
   mocks.getCellValue.mockImplementation(
-    (_ws: unknown, row: number, column: number) => cells[`${String(row)}:${String(column)}`] ?? '',
+    (_worksheet: unknown, row: number, column: number) =>
+      cells[`${String(row)}:${String(column)}`] ?? '',
   )
   interiorReads.value = 0
-  mocks.getCell.mockImplementation((_ws: unknown, row: number) => ({
+  mocks.getCell.mockImplementation((_worksheet: unknown, row: number) => ({
     get Interior() {
       interiorReads.value += 1
       return { Color: uploadedRows.has(row) ? BGM_COLOR.SUCCESS : BGM_COLOR.WHITE }
@@ -1215,8 +1216,8 @@ describe('preview · syncAllRows', () => {
     mocks.loadBgToken.mockReturnValue('token-abc')
     mocks.syncToBangumi.mockImplementation(
       async (
-        _ws: unknown,
-        _colMap: unknown,
+        _worksheet: unknown,
+        _columnMap: unknown,
         _token: string,
         _lastRow: number,
         _headerRow: number,

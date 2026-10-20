@@ -142,11 +142,11 @@ describe('enrich-page-state', () => {
   })
 
   describe('COLUMN_MAPPING_FIELDS 形状', () => {
-    it('为 8 个字段的数组，首字段为必填 nameCol，且不含 platformExtraCols', () => {
+    it('为 8 个字段的数组，首字段为必填 nameColumn，且不含 platformExtraCols', () => {
       expect(Array.isArray(COLUMN_MAPPING_FIELDS)).toBe(true)
       expect(COLUMN_MAPPING_FIELDS).toHaveLength(8)
       const first = COLUMN_MAPPING_FIELDS[0]
-      expect(first?.key).toBe('nameCol')
+      expect(first?.key).toBe('nameColumn')
       expect(first?.required).toBe(true)
       const keys = COLUMN_MAPPING_FIELDS.map((f) => f.key)
       expect(keys).not.toContain('platformExtraCols')

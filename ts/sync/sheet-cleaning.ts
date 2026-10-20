@@ -283,20 +283,20 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
 
-  const nameCol = layout.columnMap.get('名称')
-  if (!nameCol) return emptyPlan('未找到「名称」列')
-  const urlCol = layout.columnMap.get('Bangumi_URL')
-  if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
-  const tagsCol = layout.columnMap.get('标签/分级')
-  const dateCol = layout.columnMap.get('开播日期')
-  const episodesCol = layout.columnMap.get('集数')
+  const nameColumn = layout.columnMap.get('名称')
+  if (!nameColumn) return emptyPlan('未找到「名称」列')
+  const urlColumn = layout.columnMap.get('Bangumi_URL')
+  if (!urlColumn) return emptyPlan('未找到「Bangumi_URL」列')
+  const tagsColumn = layout.columnMap.get('标签/分级')
+  const dateColumn = layout.columnMap.get('开播日期')
+  const episodesColumn = layout.columnMap.get('集数')
 
   const excluded = options?.excludedRows
-  const names = readColumn(worksheet, layout, nameCol)
-  const urls = readColumn(worksheet, layout, urlCol)
-  const tags = tagsCol ? readColumn(worksheet, layout, tagsCol) : null
-  const dates = dateCol ? readColumn(worksheet, layout, dateCol) : null
-  const episodes = episodesCol ? readColumn(worksheet, layout, episodesCol) : null
+  const names = readColumn(worksheet, layout, nameColumn)
+  const urls = readColumn(worksheet, layout, urlColumn)
+  const tags = tagsColumn ? readColumn(worksheet, layout, tagsColumn) : null
+  const dates = dateColumn ? readColumn(worksheet, layout, dateColumn) : null
+  const episodes = episodesColumn ? readColumn(worksheet, layout, episodesColumn) : null
 
   // 1. 按名称分组（空名称与排除行不参与）
   const groups = new Map<string, number[]>()
@@ -325,10 +325,10 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
     if (outcome) {
       groupCount += 1
       rowsToDelete.push(...outcome.victims)
-      if (tagsCol && outcome.mergedTags !== null) {
+      if (tagsColumn && outcome.mergedTags !== null) {
         changes.push({
           row: outcome.keepRow,
-          column: tagsCol,
+          column: tagsColumn,
           value: outcome.mergedTags,
           oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
         })
@@ -385,16 +385,16 @@ function resolveUrlGroup(
 export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
-  const urlCol = layout.columnMap.get('Bangumi_URL')
-  if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
-  const tagsCol = layout.columnMap.get('标签/分级')
+  const urlColumn = layout.columnMap.get('Bangumi_URL')
+  if (!urlColumn) return emptyPlan('未找到「Bangumi_URL」列')
+  const tagsColumn = layout.columnMap.get('标签/分级')
 
   const excluded = options?.excludedRows
-  const urls = readColumn(worksheet, layout, urlCol)
-  const tags = tagsCol ? readColumn(worksheet, layout, tagsCol) : null
+  const urls = readColumn(worksheet, layout, urlColumn)
+  const tags = tagsColumn ? readColumn(worksheet, layout, tagsColumn) : null
   // 同 URL 组内各行名称不同，diff 对比视图需要名称列（一次矩形读）
-  const nameCol = layout.columnMap.get('名称')
-  const names = nameCol ? readColumn(worksheet, layout, nameCol) : null
+  const nameColumn = layout.columnMap.get('名称')
+  const names = nameColumn ? readColumn(worksheet, layout, nameColumn) : null
 
   const groups = new Map<string, number[]>()
   for (const [index, rawUrl] of urls.entries()) {
@@ -421,10 +421,10 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
     if (outcome) {
       groupCount += 1
       rowsToDelete.push(...outcome.victims)
-      if (tagsCol && outcome.mergedTags !== null) {
+      if (tagsColumn && outcome.mergedTags !== null) {
         changes.push({
           row: outcome.keepRow,
-          column: tagsCol,
+          column: tagsColumn,
           value: outcome.mergedTags,
           oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
         })
@@ -463,22 +463,22 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
 export function planEmptyNameRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
-  const nameCol = layout.columnMap.get('名称')
-  if (!nameCol) return emptyPlan('未找到「名称」列')
+  const nameColumn = layout.columnMap.get('名称')
+  if (!nameColumn) return emptyPlan('未找到「名称」列')
 
   const excluded = options?.excludedRows
   // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
   // 语义不变——仍只检查 columnMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
-  const maxCol = Math.max(...layout.columnMap.values())
-  const block = readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, 1, maxCol)
-  const otherCols = [...layout.columnMap.values()].filter((column) => column !== nameCol)
+  const maxColumn = Math.max(...layout.columnMap.values())
+  const block = readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, 1, maxColumn)
+  const otherColumns = [...layout.columnMap.values()].filter((column) => column !== nameColumn)
 
   const rowsToDelete: number[] = []
   for (const [index, cells] of block.entries()) {
     const row = toRow(layout, index)
     const isBlank =
-      (cells[nameCol - 1] ?? '').trim() === '' &&
-      otherCols.every((column) => (cells[column - 1] ?? '').trim() === '')
+      (cells[nameColumn - 1] ?? '').trim() === '' &&
+      otherColumns.every((column) => (cells[column - 1] ?? '').trim() === '')
     if (isBlank && !excluded?.has(row)) rowsToDelete.push(row)
   }
 

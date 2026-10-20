@@ -97,13 +97,13 @@ export function renderPreviewCell(fieldKey: ScalarMappingKey, rawValue: string):
   const value = rawValue.trim()
   if (!value) return '<td></td>'
   const escaped = escapeHtml(value)
-  if (fieldKey === 'nameCol') {
+  if (fieldKey === 'nameColumn') {
     return `<td class="column-name" title="${escaped}"><span class="preview-name">${escaped}</span></td>`
   }
   if (fieldKey === 'platformCol' || fieldKey === 'exclusiveCol') {
     return renderPlatformChipsCell(splitListValues(value))
   }
-  if (fieldKey === 'tagsCol') {
+  if (fieldKey === 'tagsColumn') {
     return renderTagChipsCell(value)
   }
   if (fieldKey === 'premiereCol') {
@@ -113,7 +113,7 @@ export function renderPreviewCell(fieldKey: ScalarMappingKey, rawValue: string):
     const weekdayClass = weekdayChipClass(value)
     return `<td title="${escaped}"><span class="weekday-chip ${weekdayClass}">${escaped}</span></td>`
   }
-  if (fieldKey === 'episodesCol') {
+  if (fieldKey === 'episodesColumn') {
     const epClass = episodeChipClass(value)
     const chipClass = epClass ? `ep-chip ${epClass}` : ''
     return `<td title="${escaped}"><span class="${chipClass}">${escaped}</span></td>`

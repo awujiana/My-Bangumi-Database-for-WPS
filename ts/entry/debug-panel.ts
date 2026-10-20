@@ -399,7 +399,7 @@ function bindRibbonCards(root: HTMLElement): void {
       )
       if (!resultElement) return
 
-      const imgUrlElement = root.querySelector<HTMLElement>(
+      const imageUrlElement = root.querySelector<HTMLElement>(
         `[data-imgurl="${CSS.escape(buttonId)}"]`,
       )
 
@@ -410,10 +410,10 @@ function bindRibbonCards(root: HTMLElement): void {
       try {
         const w = getDebugGlobals()
         if (typeof w.GetBangumiImage === 'function') {
-          const imgUrl = w.GetBangumiImage({ Id: buttonId })
-          if (imgUrlElement) {
-            imgUrlElement.textContent = imgUrl
-            imgUrlElement.title = imgUrl
+          const imageUrl = w.GetBangumiImage({ Id: buttonId })
+          if (imageUrlElement) {
+            imageUrlElement.textContent = imageUrl
+            imageUrlElement.title = imageUrl
           }
         }
       } catch {

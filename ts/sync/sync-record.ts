@@ -14,7 +14,7 @@ import {
   BGM_COLOR,
   SYNC_RECORD_COLUMNS,
   SYNC_RECORD_SHEET_NAME,
-  SYNC_RECORD_COL,
+  SYNC_RECORD_COLUMN,
   SYNC_RECORD_TYPE_COLOR,
 } from '../core/constants.js'
 import { isSyncRecordEnabled } from '../tools/config.js'
@@ -65,7 +65,7 @@ export interface UpdateRecordParameters {
 }
 
 // ========== 内存缓存 ==========
-const _syncRecordSidCache = new Map<string, number>()
+const _syncRecordSubjectIdCache = new Map<string, number>()
 let _syncRecordListCache: SyncRecord[] = []
 let _isSyncRecordCacheValid = false
 let _isFormattingInProgress = false
@@ -140,8 +140,8 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     }
 
     // 已有工作表，检查并补齐表头
-    const existingCols = SYNC_RECORD_COLUMNS.length
-    for (let index = 0; index < existingCols; index += 1) {
+    const existingColumns = SYNC_RECORD_COLUMNS.length
+    for (let index = 0; index < existingColumns; index += 1) {
       const columnLetter = columnNumberToLetter(index + 1)
       const cell = syncSheet.Range(`${columnLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
@@ -216,8 +216,8 @@ function invalidateCache(): void {
 function writeSheetRows(sheet: WpsWorksheet, startRow: number, rows: WpsCellValue[][]): void {
   if (rows.length === 0) return
   const endRow = startRow + rows.length - 1
-  const endCol = columnNumberToLetter(SYNC_RECORD_COLUMNS.length)
-  const range = sheet.Range(`A${String(startRow)}:${endCol}${String(endRow)}`)
+  const endColumn = columnNumberToLetter(SYNC_RECORD_COLUMNS.length)
+  const range = sheet.Range(`A${String(startRow)}:${endColumn}${String(endRow)}`)
   range.Value2 = rows
 }
 
@@ -243,7 +243,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   for (const source of allData) {
     /** 按 1-based 列号取该行的原始文本 */
     const cell = (column: number): string => source[column - 1] ?? ''
-    const oldSid = cell(isLegacyWithSeq ? 5 : 1).trim()
+    const oldSubjectId = cell(isLegacyWithSeq ? 5 : 1).trim()
     const oldUrl = cell(4).trim()
     const oldType = cell(isLegacyWithSeq ? 6 : 5)
     const oldCount = cell(isLegacyWithSeq ? 7 : 6)
@@ -251,9 +251,9 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     const oldStatus = cell(isLegacyWithSeq ? 9 : 8)
     const oldCollType = cell(isLegacyWithSeq ? 12 : 9)
 
-    if (oldUrl || oldSid) {
+    if (oldUrl || oldSubjectId) {
       rows.push([
-        oldSid,
+        oldSubjectId,
         cell(2),
         cell(3),
         oldUrl,
@@ -309,7 +309,7 @@ export function writeSheetHeaderRow(
 
 function buildCache(sheet: WpsWorksheet): void {
   if (_isSyncRecordCacheValid) return
-  _syncRecordSidCache.clear()
+  _syncRecordSubjectIdCache.clear()
   _syncRecordListCache.length = 0
 
   const lastRow = getLastRow(sheet)
@@ -345,23 +345,23 @@ function buildCache(sheet: WpsWorksheet): void {
  * 缓存单行同步记录（自 buildCache 的 try 块抽离，降低 unicorn/try-complexity 计数）
  */
 function cacheRecordRow(rowData: string[], row: number): void {
-  const subjectId = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
-  const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
+  const subjectId = (rowData[SYNC_RECORD_COLUMN.SID - 1] ?? '').trim()
+  const url = (rowData[SYNC_RECORD_COLUMN.URL - 1] ?? '').trim()
   if (url || subjectId) {
-    _syncRecordSidCache.set(subjectId, row)
+    _syncRecordSubjectIdCache.set(subjectId, row)
     _syncRecordListCache.push({
-      time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
-      name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
+      time: rowData[SYNC_RECORD_COLUMN.TIME - 1] ?? '',
+      name: rowData[SYNC_RECORD_COLUMN.NAME - 1] ?? '',
       url,
       subjectId,
-      type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
-      source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
-      count: Math.trunc(Number(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1,
-      content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
-      status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
-      message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
-      fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
-      collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
+      type: rowData[SYNC_RECORD_COLUMN.TYPE - 1] ?? '',
+      source: rowData[SYNC_RECORD_COLUMN.SOURCE - 1] ?? '',
+      count: Math.trunc(Number(rowData[SYNC_RECORD_COLUMN.COUNT - 1] ?? '')) || 1,
+      content: rowData[SYNC_RECORD_COLUMN.CONTENT - 1] ?? '',
+      status: (rowData[SYNC_RECORD_COLUMN.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
+      message: rowData[SYNC_RECORD_COLUMN.MESSAGE - 1] ?? '',
+      fingerprint: rowData[SYNC_RECORD_COLUMN.FINGERPRINT - 1] ?? '',
+      collType: rowData[SYNC_RECORD_COLUMN.COLL_TYPE - 1] ?? '',
       row,
     })
   }
@@ -387,15 +387,15 @@ function setSyncRecordColors(
   } else {
     subjectIdColor = getCountColor(count)
   }
-  setColor(SYNC_RECORD_COL.SID, subjectIdColor)
+  setColor(SYNC_RECORD_COLUMN.SID, subjectIdColor)
 
   // 状态列（I列）- 根据状态设置颜色
-  setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status))
+  setColor(SYNC_RECORD_COLUMN.STATUS, getStatusColor(status))
 
   // 类型列（F列）- 根据类型设置颜色
-  const typeCell = sheet.Range(`${columnNumberToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
+  const typeCell = sheet.Range(`${columnNumberToLetter(SYNC_RECORD_COLUMN.TYPE)}${String(row)}`)
   if (typeCell.Interior) {
-    const typeName = getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || ''
+    const typeName = getCellValue(sheet, row, SYNC_RECORD_COLUMN.TYPE) || ''
     typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] ?? BGM_COLOR.GRAY
   }
 }
@@ -478,14 +478,14 @@ export function getAllSyncRecords(): SyncRecord[] {
  * O(n²) 次跨进程 COM 调用。读取失败时的降级口径与 `buildCache` 一致：
  * 返回空分组（本次不做去重，下次写入时重试）。
  */
-function groupRowsBySid(sheet: WpsWorksheet, lastRow: number): Map<string, number[]> {
+function groupRowsBySubjectId(sheet: WpsWorksheet, lastRow: number): Map<string, number[]> {
   const subjectIdRows = new Map<string, number[]>()
   const subjectIdColumn = readRangeValues(
     sheet,
     2,
     lastRow,
-    SYNC_RECORD_COL.SID,
-    SYNC_RECORD_COL.SID,
+    SYNC_RECORD_COLUMN.SID,
+    SYNC_RECORD_COLUMN.SID,
   )
 
   for (const [index, rowData] of subjectIdColumn.entries()) {
@@ -501,7 +501,7 @@ function groupRowsBySid(sheet: WpsWorksheet, lastRow: number): Map<string, numbe
 }
 
 /** 合并重复 SID 组：COUNT 求和写入首行，其余行逆序删除；返回删除行数与是否发生重复 */
-function mergeDuplicateSidGroups(
+function mergeDuplicateSubjectIdGroups(
   sheet: WpsWorksheet,
   subjectIdRows: Map<string, number[]>,
 ): { removedCount: number; hasDuplicates: boolean } {
@@ -515,18 +515,18 @@ function mergeDuplicateSidGroups(
       const keepRow = rows[0]
       if (keepRow !== undefined) {
         let totalCount =
-          Math.trunc(Number(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT))) || 1
+          Math.trunc(Number(getCellValue(sheet, keepRow, SYNC_RECORD_COLUMN.COUNT))) || 1
 
         const rowsToDelete = rows.slice(1).sort((a, b) => b - a)
-        for (const delRow of rowsToDelete) {
-          const delCount =
-            Math.trunc(Number(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT))) || 1
-          totalCount += delCount
-          sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
+        for (const rowToDelete of rowsToDelete) {
+          const countToDelete =
+            Math.trunc(Number(getCellValue(sheet, rowToDelete, SYNC_RECORD_COLUMN.COUNT))) || 1
+          totalCount += countToDelete
+          sheet.Range(`${String(rowToDelete)}:${String(rowToDelete)}`).Delete()
           removedCount += 1
         }
 
-        setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)
+        setCellValue(sheet, keepRow, SYNC_RECORD_COLUMN.COUNT, totalCount)
       }
     }
   }
@@ -544,8 +544,8 @@ export function deduplicateSyncRecords(): boolean {
     if (lastRow <= 1) return true
 
     // 按 SID 分组，找出并合并重复 SID
-    const subjectIdRows = groupRowsBySid(sheet, lastRow)
-    const { removedCount, hasDuplicates } = mergeDuplicateSidGroups(sheet, subjectIdRows)
+    const subjectIdRows = groupRowsBySubjectId(sheet, lastRow)
+    const { removedCount, hasDuplicates } = mergeDuplicateSubjectIdGroups(sheet, subjectIdRows)
 
     if (hasDuplicates) {
       bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${String(removedCount)} 条重复记录`)
@@ -588,9 +588,9 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
  */
 function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void {
   const columnCount = SYNC_RECORD_COLUMNS.length
-  const lastColLetter = columnNumberToLetter(columnCount)
-  const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
-  const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
+  const lastColumnLetter = columnNumberToLetter(columnCount)
+  const fullRange = target.Range(`A1:${lastColumnLetter}${String(lastRow)}`)
+  const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColumnLetter}${String(lastRow)}`) : null
 
   // 1. 字体
   try {
@@ -623,19 +623,19 @@ function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void 
   }
 
   // 5. URL 列（D列）固定宽度，不撑宽也不撑高
-  const urlColLetter = columnNumberToLetter(SYNC_RECORD_COL.URL)
+  const urlColumnLetter = columnNumberToLetter(SYNC_RECORD_COLUMN.URL)
   try {
-    const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`)
+    const urlRange = target.Range(`${urlColumnLetter}:${urlColumnLetter}`)
     urlRange.ColumnWidth = 42
   } catch {
     // 忽略：此处无需处理错误
   }
 
   // 6. 名称列边框（C列）
-  const nameColLetter = columnNumberToLetter(SYNC_RECORD_COL.NAME)
+  const nameColumnLetter = columnNumberToLetter(SYNC_RECORD_COLUMN.NAME)
   if (dataRange) {
     try {
-      const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
+      const nameRange = target.Range(`${nameColumnLetter}2:${nameColumnLetter}${String(lastRow)}`)
       nameRange.Borders.LineStyle = 1
     } catch {
       // 忽略：此处无需处理错误
@@ -643,10 +643,12 @@ function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void 
   }
 
   // 7. 收藏状态列边框
-  const collTypeColLetter = columnNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
+  const collTypeColumnLetter = columnNumberToLetter(SYNC_RECORD_COLUMN.COLL_TYPE)
   if (dataRange) {
     try {
-      const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${String(lastRow)}`)
+      const collRange = target.Range(
+        `${collTypeColumnLetter}2:${collTypeColumnLetter}${String(lastRow)}`,
+      )
       collRange.Borders.LineStyle = 1
     } catch {
       // 忽略：此处无需处理错误
@@ -670,7 +672,7 @@ export function clearSyncRecords(): boolean {
     if (lastRow > 1) {
       sheet.Range(`2:${String(lastRow)}`).Delete()
     }
-    _syncRecordSidCache.clear()
+    _syncRecordSubjectIdCache.clear()
     _syncRecordListCache = []
     _isSyncRecordCacheValid = true
     bgmLog(LOG_LEVELS.INFO, '已清除所有同步记录')
@@ -710,7 +712,7 @@ export function openSyncRecordSheet(scrollToRow?: number): void {
 
 // For testing only: reset internal cache state
 export function __resetSyncRecordCache(): void {
-  _syncRecordSidCache.clear()
+  _syncRecordSubjectIdCache.clear()
   _syncRecordListCache = []
   _isSyncRecordCacheValid = false
   _isFormattingInProgress = false
@@ -736,18 +738,18 @@ function buildUpdatedSyncRow(
     { length: SYNC_RECORD_COLUMNS.length },
     (_, index) => existing[index] ?? '',
   )
-  rowValues[SYNC_RECORD_COL.TIME - 1] = now
-  rowValues[SYNC_RECORD_COL.COUNT - 1] = updatedCount
-  if (statusOverride !== undefined) rowValues[SYNC_RECORD_COL.STATUS - 1] = statusOverride
-  if (parameters.message) rowValues[SYNC_RECORD_COL.MESSAGE - 1] = parameters.message
+  rowValues[SYNC_RECORD_COLUMN.TIME - 1] = now
+  rowValues[SYNC_RECORD_COLUMN.COUNT - 1] = updatedCount
+  if (statusOverride !== undefined) rowValues[SYNC_RECORD_COLUMN.STATUS - 1] = statusOverride
+  if (parameters.message) rowValues[SYNC_RECORD_COLUMN.MESSAGE - 1] = parameters.message
   if (parameters.fingerprint !== undefined)
-    rowValues[SYNC_RECORD_COL.FINGERPRINT - 1] = parameters.fingerprint
-  if (parameters.name) rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name
-  if (parameters.url) rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url
-  if (parameters.type) rowValues[SYNC_RECORD_COL.TYPE - 1] = parameters.type
-  if (parameters.source) rowValues[SYNC_RECORD_COL.SOURCE - 1] = parameters.source
-  if (parameters.content) rowValues[SYNC_RECORD_COL.CONTENT - 1] = parameters.content
-  if (parameters.collType) rowValues[SYNC_RECORD_COL.COLL_TYPE - 1] = parameters.collType
+    rowValues[SYNC_RECORD_COLUMN.FINGERPRINT - 1] = parameters.fingerprint
+  if (parameters.name) rowValues[SYNC_RECORD_COLUMN.NAME - 1] = parameters.name
+  if (parameters.url) rowValues[SYNC_RECORD_COLUMN.URL - 1] = parameters.url
+  if (parameters.type) rowValues[SYNC_RECORD_COLUMN.TYPE - 1] = parameters.type
+  if (parameters.source) rowValues[SYNC_RECORD_COLUMN.SOURCE - 1] = parameters.source
+  if (parameters.content) rowValues[SYNC_RECORD_COLUMN.CONTENT - 1] = parameters.content
+  if (parameters.collType) rowValues[SYNC_RECORD_COLUMN.COLL_TYPE - 1] = parameters.collType
   return rowValues
 }
 
@@ -765,7 +767,7 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
   const subjectId = parameters.subjectId ?? ''
   const now = new Date().toLocaleString('zh-CN')
 
-  const existingRow = subjectId ? _syncRecordSidCache.get(subjectId) : undefined
+  const existingRow = subjectId ? _syncRecordSubjectIdCache.get(subjectId) : undefined
   if (existingRow === undefined) {
     // 两个分支均会赋值 nextRow，无需初始化为 1（消除 no-useless-assignment）
     let nextRow: number
@@ -782,25 +784,25 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
 
     // 性能（P1-C）：一次 Range.Value2 写入整行，替代 12 次 setCellValue（跨进程 COM 调用）
     const rowValues: WpsCellValue[] = Array.from({ length: SYNC_RECORD_COLUMNS.length }, () => '')
-    rowValues[SYNC_RECORD_COL.TIME - 1] = now
-    rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name ?? ''
-    rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url ?? ''
-    rowValues[SYNC_RECORD_COL.SID - 1] = subjectId
-    rowValues[SYNC_RECORD_COL.TYPE - 1] = parameters.type ?? ''
-    rowValues[SYNC_RECORD_COL.SOURCE - 1] = parameters.source ?? ''
-    rowValues[SYNC_RECORD_COL.COUNT - 1] = finalCount
-    rowValues[SYNC_RECORD_COL.CONTENT - 1] = parameters.content ?? ''
-    rowValues[SYNC_RECORD_COL.STATUS - 1] = finalStatus
-    rowValues[SYNC_RECORD_COL.MESSAGE - 1] = parameters.message ?? ''
+    rowValues[SYNC_RECORD_COLUMN.TIME - 1] = now
+    rowValues[SYNC_RECORD_COLUMN.NAME - 1] = parameters.name ?? ''
+    rowValues[SYNC_RECORD_COLUMN.URL - 1] = parameters.url ?? ''
+    rowValues[SYNC_RECORD_COLUMN.SID - 1] = subjectId
+    rowValues[SYNC_RECORD_COLUMN.TYPE - 1] = parameters.type ?? ''
+    rowValues[SYNC_RECORD_COLUMN.SOURCE - 1] = parameters.source ?? ''
+    rowValues[SYNC_RECORD_COLUMN.COUNT - 1] = finalCount
+    rowValues[SYNC_RECORD_COLUMN.CONTENT - 1] = parameters.content ?? ''
+    rowValues[SYNC_RECORD_COLUMN.STATUS - 1] = finalStatus
+    rowValues[SYNC_RECORD_COLUMN.MESSAGE - 1] = parameters.message ?? ''
     if (parameters.fingerprint !== undefined)
-      rowValues[SYNC_RECORD_COL.FINGERPRINT - 1] = parameters.fingerprint
-    if (parameters.collType) rowValues[SYNC_RECORD_COL.COLL_TYPE - 1] = parameters.collType
+      rowValues[SYNC_RECORD_COLUMN.FINGERPRINT - 1] = parameters.fingerprint
+    if (parameters.collType) rowValues[SYNC_RECORD_COLUMN.COLL_TYPE - 1] = parameters.collType
 
     writeSheetRows(sheet, nextRow, [rowValues])
 
     setSyncRecordColors(sheet, nextRow, finalStatus, finalCount)
 
-    _syncRecordSidCache.set(subjectId, nextRow)
+    _syncRecordSubjectIdCache.set(subjectId, nextRow)
     _syncRecordListCache.push({
       id: nextRow,
       time: now,
@@ -829,7 +831,7 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
     )
     const existing = existingRows[0]
     if (!existing) return false
-    const existingCount = Math.trunc(Number(existing[SYNC_RECORD_COL.COUNT - 1])) || 0
+    const existingCount = Math.trunc(Number(existing[SYNC_RECORD_COLUMN.COUNT - 1])) || 0
     const updatedCount = existingCount + (parameters.count ?? 1)
     const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
 
@@ -880,7 +882,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
 
   for (const parameters of records) {
     const subjectId = parameters.subjectId ?? ''
-    const existingRow = subjectId ? _syncRecordSidCache.get(subjectId) : undefined
+    const existingRow = subjectId ? _syncRecordSubjectIdCache.get(subjectId) : undefined
     if (existingRow === undefined) {
       pendingRows.push([
         subjectId,
@@ -898,7 +900,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
       ])
     } else {
       const existingCount =
-        Math.trunc(Number(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT))) || 0
+        Math.trunc(Number(getCellValue(sheet, existingRow, SYNC_RECORD_COLUMN.COUNT))) || 0
       const existing = subjectIdsToUpdate.get(subjectId)
       const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count ?? 1)
       subjectIdsToUpdate.set(subjectId, {
@@ -919,8 +921,8 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
     // 设置新增行的颜色
     for (const [index, data] of pendingRows.entries()) {
       const row = startRow + index
-      const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
-      const count = Math.trunc(Number(data[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1
+      const status = data[SYNC_RECORD_COLUMN.STATUS - 1] ?? SYNC_STATUS.SUCCESS
+      const count = Math.trunc(Number(data[SYNC_RECORD_COLUMN.COUNT - 1] ?? '')) || 1
       setSyncRecordColors(sheet, row, status, count)
     }
   }
@@ -941,7 +943,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
       const rowValues = buildUpdatedSyncRow(existing, parameters, now, updatedCount, status)
       writeSheetRows(sheet, row, [rowValues])
       setSyncRecordColors(sheet, row, status, updatedCount)
-      _syncRecordSidCache.set(subjectId, row)
+      _syncRecordSubjectIdCache.set(subjectId, row)
     }
   }
 

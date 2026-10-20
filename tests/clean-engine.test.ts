@@ -90,7 +90,7 @@ function makeGrid(rows: Record<number, Record<number, string>>): void {
     merged[row] = { ...merged[row], ...columns }
   }
   mocks.readRangeValues.mockImplementation(
-    (_ws: unknown, r1: number, r2: number, c1: number, c2: number) => {
+    (_worksheet: unknown, r1: number, r2: number, c1: number, c2: number) => {
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
@@ -108,11 +108,11 @@ function makeGrid(rows: Record<number, Record<number, string>>): void {
 function setCellGrid(rows: Record<number, Record<number, string>>): void {
   cellGrid = rows
   mocks.getCellValue.mockImplementation(
-    (_ws: unknown, row: number, column: number) => rows[row]?.[column] ?? '',
+    (_worksheet: unknown, row: number, column: number) => rows[row]?.[column] ?? '',
   )
 }
 
-const DEFAULT_COL_MAP = new Map<string, number>([
+const DEFAULT_COLUMN_MAP = new Map<string, number>([
   ['名称', 1],
   ['Bangumi_URL', 2],
   ['标签/分级', 3],
@@ -140,7 +140,7 @@ function mockWorkbookSheet(
   }
   mocks.getOpenWorkbooks.mockReturnValue([wb])
   mocks.findHeaderRow.mockReturnValue(1)
-  mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
+  mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COLUMN_MAP))
   mocks.getLastRow.mockReturnValue(4)
   return worksheet
 }
@@ -164,7 +164,7 @@ function fakeTarget(key: string, label: string, sheetName = '动画'): CleanTarg
     label,
     headerRow: 1,
     lastRow: 5,
-    columnMap: new Map(DEFAULT_COL_MAP),
+    columnMap: new Map(DEFAULT_COLUMN_MAP),
     worksheet: { Name: sheetName } as CleanTargetInfo['worksheet'],
   }
 }
@@ -480,7 +480,7 @@ describe('scanCleanRules', () => {
     const shared = {
       headerRow: 1,
       lastRow: 4,
-      columnMap: new Map(DEFAULT_COL_MAP),
+      columnMap: new Map(DEFAULT_COLUMN_MAP),
       dataStartRow: 2,
     }
     mocks.readSheetLayout.mockReturnValue(shared)
@@ -843,7 +843,7 @@ describe('listCleanTargets · COM 读取异常兜底', () => {
       },
     ])
     mocks.findHeaderRow.mockReturnValue(1)
-    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
+    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COLUMN_MAP))
     mocks.getLastRow.mockReturnValue(4)
 
     const targets = listCleanTargets()
@@ -868,21 +868,24 @@ describe('listCleanTargets · COM 读取异常兜底', () => {
   })
 
   it('工作表名读取抛错时该表被跳过（不误伤其他表）', () => {
-    const badWs = {
+    const badWorksheet = {
       get Name(): never {
         throw new Error('COM 失败')
       },
     }
-    const goodWs = { Name: '动画' }
+    const goodWorksheet = { Name: '动画' }
     mocks.getOpenWorkbooks.mockReturnValue([
       {
         Name: '数据表.xlsx',
         FullName: 'D:/books/数据表.xlsx',
-        Worksheets: { Count: 2, Item: (index: number) => (index === 1 ? badWs : goodWs) },
+        Worksheets: {
+          Count: 2,
+          Item: (index: number) => (index === 1 ? badWorksheet : goodWorksheet),
+        },
       },
     ])
     mocks.findHeaderRow.mockReturnValue(1)
-    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
+    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COLUMN_MAP))
     mocks.getLastRow.mockReturnValue(4)
 
     const targets = listCleanTargets()

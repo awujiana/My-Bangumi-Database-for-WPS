@@ -34,7 +34,7 @@ export const ENRICH_RECORD_COLUMNS = [
   '备注',
 ] as const
 
-export const ENRICH_RECORD_COL = {
+export const ENRICH_RECORD_COLUMN = {
   TIMESTAMP: 1,
   MATCH_TYPE: 2,
   NAME: 3,
@@ -137,8 +137,8 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
       BGM.handleError(moveError, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
     }
 
-    const lastColLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
-    const fullRange = enrichSheet.Range(`A1:${lastColLetter}1`)
+    const lastColumnLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
+    const fullRange = enrichSheet.Range(`A1:${lastColumnLetter}1`)
     try {
       if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
     } catch {
@@ -177,21 +177,21 @@ export function addEnrichRecord(parameters: AddEnrichRecordParameters): boolean 
       nextRow = sheet.Rows.Count > 1 ? 2 : 1
     }
 
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.TIMESTAMP, parameters.timestamp)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.MATCH_TYPE, parameters.matchType)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NAME, parameters.name)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ROW, parameters.row)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ENRICHED_FIELD, parameters.enrichedField)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.OLD_VALUE, parameters.oldValue)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NEW_VALUE, parameters.updatedValue)
-    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ACTION, parameters.action)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.TIMESTAMP, parameters.timestamp)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.MATCH_TYPE, parameters.matchType)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.NAME, parameters.name)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.ROW, parameters.row)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.ENRICHED_FIELD, parameters.enrichedField)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.OLD_VALUE, parameters.oldValue)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.NEW_VALUE, parameters.updatedValue)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.ACTION, parameters.action)
     if (parameters.note !== undefined) {
-      setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NOTE, parameters.note)
+      setCellValue(sheet, nextRow, ENRICH_RECORD_COLUMN.NOTE, parameters.note)
     }
 
     const actionColor = getActionColor(parameters.action)
-    const actionColLetter = columnNumberToLetter(ENRICH_RECORD_COL.ACTION)
-    const actionCell = sheet.Range(`${actionColLetter}${String(nextRow)}`)
+    const actionColumnLetter = columnNumberToLetter(ENRICH_RECORD_COLUMN.ACTION)
+    const actionCell = sheet.Range(`${actionColumnLetter}${String(nextRow)}`)
     if (actionCell.Interior) {
       actionCell.Interior.Color = actionColor
     }
@@ -239,19 +239,19 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): boolean 
     ])
 
     const endRow = startRow + rows.length - 1
-    const startColLetter = columnNumberToLetter(1)
-    const endColLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
+    const startColumnLetter = columnNumberToLetter(1)
+    const endColumnLetter = columnNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const range = sheet.Range(
-      `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
+      `${startColumnLetter}${String(startRow)}:${endColumnLetter}${String(endRow)}`,
     )
     range.Value2 = rows
 
     for (const [index, rowValues] of rows.entries()) {
       const row = startRow + index
-      const action = rowValues[ENRICH_RECORD_COL.ACTION - 1] ?? ''
+      const action = rowValues[ENRICH_RECORD_COLUMN.ACTION - 1] ?? ''
       const color = getActionColor(action)
-      const actionColLetter = columnNumberToLetter(ENRICH_RECORD_COL.ACTION)
-      const cell = sheet.Range(`${actionColLetter}${String(row)}`)
+      const actionColumnLetter = columnNumberToLetter(ENRICH_RECORD_COLUMN.ACTION)
+      const cell = sheet.Range(`${actionColumnLetter}${String(row)}`)
       if (cell.Interior) {
         cell.Interior.Color = color
       }
@@ -331,7 +331,7 @@ export function formatEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
 
-    const lastCol = ENRICH_RECORD_COLUMNS.length
+    const lastColumn = ENRICH_RECORD_COLUMNS.length
     const lastRow = getLastRow(sheet)
 
     writeSheetHeaderRow(sheet, ENRICH_RECORD_COLUMNS)
@@ -347,25 +347,25 @@ export function formatEnrichRecordSheet(): void {
 
     if (lastRow >= 2) {
       const dataRange = sheet.Range(
-        `A${String(2)}:${columnNumberToLetter(lastCol)}${String(lastRow)}`,
+        `A${String(2)}:${columnNumberToLetter(lastColumn)}${String(lastRow)}`,
       )
       dataRange.Borders.LineStyle = 1
     }
 
-    for (let c = 1; c <= lastCol; c += 1) {
+    for (let c = 1; c <= lastColumn; c += 1) {
       const columnLetter = columnNumberToLetter(c)
       const columnRange = sheet.Range(`${columnLetter}:${columnLetter}`)
       columnRange.ColumnWidth = 15
     }
 
-    const nameCol = sheet.Range('C:C')
-    nameCol.ColumnWidth = 25
-    const oldValueCol = sheet.Range('F:F')
-    oldValueCol.ColumnWidth = 20
-    const valueCol = sheet.Range('G:G')
-    valueCol.ColumnWidth = 40
-    const noteCol = sheet.Range('I:I')
-    noteCol.ColumnWidth = 20
+    const nameColumn = sheet.Range('C:C')
+    nameColumn.ColumnWidth = 25
+    const oldValueColumn = sheet.Range('F:F')
+    oldValueColumn.ColumnWidth = 20
+    const valueColumn = sheet.Range('G:G')
+    valueColumn.ColumnWidth = 40
+    const noteColumn = sheet.Range('I:I')
+    noteColumn.ColumnWidth = 20
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'formatEnrichRecordSheet', showAlert: false })
   }
@@ -408,16 +408,16 @@ function getAllEnrichRecordsInner() {
   const records: EnrichRecord[] = []
   for (const rowData of allData) {
     const record: EnrichRecord = {
-      timestamp: rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? '',
-      matchType: (rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ??
+      timestamp: rowData[ENRICH_RECORD_COLUMN.TIMESTAMP - 1] ?? '',
+      matchType: (rowData[ENRICH_RECORD_COLUMN.MATCH_TYPE - 1] ??
         '未匹配') as EnrichRecord['matchType'],
-      name: rowData[ENRICH_RECORD_COL.NAME - 1] ?? '',
-      row: Math.trunc(Number(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0')) || 0,
-      enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
-      oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
-      updatedValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
-      action: (rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
-      note: rowData[ENRICH_RECORD_COL.NOTE - 1] ?? '',
+      name: rowData[ENRICH_RECORD_COLUMN.NAME - 1] ?? '',
+      row: Math.trunc(Number(rowData[ENRICH_RECORD_COLUMN.ROW - 1] ?? '0')) || 0,
+      enrichedField: rowData[ENRICH_RECORD_COLUMN.ENRICHED_FIELD - 1] ?? '',
+      oldValue: rowData[ENRICH_RECORD_COLUMN.OLD_VALUE - 1] ?? '',
+      updatedValue: rowData[ENRICH_RECORD_COLUMN.NEW_VALUE - 1] ?? '',
+      action: (rowData[ENRICH_RECORD_COLUMN.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
+      note: rowData[ENRICH_RECORD_COLUMN.NOTE - 1] ?? '',
     }
     records.push(record)
   }

@@ -156,18 +156,18 @@ export function firstRowOfRange(range: string): number {
 }
 
 /** 「日期格式错误」标红公式（数据页公式列的报错文本） */
-export function buildErrorFormula(seasonCol: string, anchorRow: number): string {
-  return `=$${seasonCol}${String(anchorRow)}="日期格式错误"`
+export function buildErrorFormula(seasonColumn: string, anchorRow: number): string {
+  return `=$${seasonColumn}${String(anchorRow)}="日期格式错误"`
 }
 
 /** 四季分色公式：取季列「年」之后的月令牌与目标比 */
 export function buildSeasonFormula(
-  seasonCol: string,
+  seasonColumn: string,
   anchorRow: number,
   monthToken: string,
 ): string {
   return (
-    `=IFERROR(MID($${seasonCol}${String(anchorRow)},FIND("年",$${seasonCol}${String(anchorRow)})+1,10),"")` +
+    `=IFERROR(MID($${seasonColumn}${String(anchorRow)},FIND("年",$${seasonColumn}${String(anchorRow)})+1,10),"")` +
     `="${monthToken}"`
   )
 }
@@ -177,9 +177,9 @@ export function buildSeasonFormula(
 /** 默认规则的构建参数（页面按当前工作表探测后传入） */
 export interface DefaultRulesOptions {
   /** 季列字母（数据页公式列，如 'R'） */
-  seasonCol: string
+  seasonColumn: string
   /** 名称列字母（如 'B'） */
-  nameCol: string
+  nameColumn: string
   /** 应用范围首行（公式锚点行，通常 = 表头行 + 1） */
   firstRow: number
   /** id 生成器（页面注入；测试传计数器） */
@@ -193,7 +193,7 @@ export interface DefaultRulesOptions {
  * 数组顺序即优先级：当前季最靠前（压过四季色），错误标红次之。
  */
 export function buildDefaultRules(options: DefaultRulesOptions): ConditionalFormatRule[] {
-  const { seasonCol, nameCol, firstRow, makeId } = options
+  const { seasonColumn, nameColumn, firstRow, makeId } = options
   const seasonExpression = buildCurrentSeasonExpression()
 
   return [
@@ -201,16 +201,16 @@ export function buildDefaultRules(options: DefaultRulesOptions): ConditionalForm
       id: makeId(),
       name: '当前季高亮',
       group: CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
-      appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
-      formula: `=$${seasonCol}${String(firstRow)}=${seasonExpression}`,
+      appliesTo: `${nameColumn}${String(firstRow)}:${nameColumn}1048576`,
+      formula: `=$${seasonColumn}${String(firstRow)}=${seasonExpression}`,
       interior: COLOR_CURRENT_SEASON,
     },
     {
       id: makeId(),
       name: '日期格式错误',
       group: CONDITIONAL_FORMAT_GROUP_QUALITY,
-      appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
-      formula: buildErrorFormula(seasonCol, firstRow),
+      appliesTo: `${nameColumn}${String(firstRow)}:${nameColumn}1048576`,
+      formula: buildErrorFormula(seasonColumn, firstRow),
       interior: COLOR_ERROR_FILL,
       fontColor: COLOR_ERROR_FONT,
     },
@@ -218,8 +218,8 @@ export function buildDefaultRules(options: DefaultRulesOptions): ConditionalForm
       id: makeId(),
       name: `${monthToken}季`,
       group: CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
-      appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
-      formula: buildSeasonFormula(seasonCol, firstRow, monthToken),
+      appliesTo: `${nameColumn}${String(firstRow)}:${nameColumn}1048576`,
+      formula: buildSeasonFormula(seasonColumn, firstRow, monthToken),
       interior: fill,
       fontColor: font,
     })),

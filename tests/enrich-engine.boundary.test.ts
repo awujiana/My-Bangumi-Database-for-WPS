@@ -166,18 +166,18 @@ describe('appendFeatures 边界情况', () => {
 // ========== getAnnotatedValue 白名单机制 ==========
 /**
  * 注意：getAnnotatedValue 是私有函数，这里通过间接测试验证其行为：
- * - 当 sourceKey === targetColName 时，不添加标注
- * - 当 sourceKey → targetColName 在白名单中时，添加 (sourceKey) 后缀
+ * - 当 sourceKey === targetColumnName 时，不添加标注
+ * - 当 sourceKey → targetColumnName 在白名单中时，添加 (sourceKey) 后缀
  * - 其他情况不添加标注
  */
 describe('标注白名单机制', () => {
   // 白名单定义（与代码保持同步）
   const ANNOTATED_FIELD_MAPPINGS = new Set<string>(['编剧→脚本', '人设→人物设定', 'CG导演→演出'])
 
-  function getAnnotatedValue(sourceKey: string, targetColName: string, value: string): string {
+  function getAnnotatedValue(sourceKey: string, targetColumnName: string, value: string): string {
     if (!value) return value
-    if (sourceKey === targetColName) return value
-    const mappingKey = `${sourceKey}→${targetColName}`
+    if (sourceKey === targetColumnName) return value
+    const mappingKey = `${sourceKey}→${targetColumnName}`
     if (!ANNOTATED_FIELD_MAPPINGS.has(mappingKey)) return value
     return `${value}(${sourceKey})`
   }

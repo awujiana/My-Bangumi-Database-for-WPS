@@ -43,7 +43,7 @@ const mockState = vi.hoisted(() => ({
   getColumnMap: vi.fn(() => new Map<string, number>()),
   getCellValue: vi.fn<(worksheet: unknown, row: number, column: number) => string>(() => ''),
   setCellValue: vi.fn(() => true),
-  // 生产签名为 (worksheet, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
+  // 生产签名为 (worksheet, startRow, endRow, startColumn, endColumn)；测试只 mock 返回值，故用可变参数收
   readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
   // 保留原始类型的矩形读：「读-改-写整行」基底。默认 []（读不到旧值），
   // 需要旧值基底的用例显式 mockReturnValue 二维数组
@@ -90,7 +90,7 @@ vi.mock('../../ts/sync/exceltobangumi/progress-reporter.js', () => ({
   handleStoppedRemainingTasks: mockState.handleStoppedRemainingTasks,
   finalizeSyncResults: mockState.finalizeSyncResults,
   markSyncResultColor: vi.fn(),
-  DEFAULT_SEQ_COL: 4,
+  DEFAULT_SEQ_COLUMN: 4,
   TYPE_NAMES: ['', '想看', '看过', '在看', '搁置', '抛弃'],
 }))
 
@@ -301,7 +301,7 @@ function createMockSyncSource(entries: GithubRemoteEntry[]): SyncSource {
         isOk: () => true,
         isFail: () => false,
         map: () => ({ isOk: () => true, isFail: () => false }),
-        mapErr: () => ({ isOk: () => true, isFail: () => false }),
+        mapError: () => ({ isOk: () => true, isFail: () => false }),
         unwrap: () => {},
         unwrapOr: () => {},
         unwrapOrElse: () => {},
@@ -366,7 +366,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
       ['测试条目', 'https://bgm.tv/subject/12345', '看过', '12'],
     ])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
@@ -376,7 +376,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs as never,
+      mockWorksheet as never,
       columnMap,
       'test-token',
       // lastRow
@@ -419,7 +419,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
       ['测试条目', 'https://bgm.tv/subject/67890', '在看', '5'],
     ])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
@@ -427,7 +427,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
       ['集数', 4],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWorksheet as never, columnMap, 'test-token', 2, 1)
 
     // API 被调用
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -467,7 +467,7 @@ describe('5xx 重试场景', () => {
       ['测试条目', 'https://bgm.tv/subject/11111', '看过', '10'],
     ])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
@@ -475,7 +475,7 @@ describe('5xx 重试场景', () => {
       ['集数', 4],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet as never, columnMap, 'test-token', 2, 1)
 
     // bgmRequestSync 应被调用至少一次
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -492,7 +492,7 @@ describe('5xx 重试场景', () => {
       ['测试条目', 'https://bgm.tv/subject/22222', '看过', '10'],
     ])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['名称', 1],
@@ -500,7 +500,7 @@ describe('5xx 重试场景', () => {
       ['集数', 4],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet as never, columnMap, 'test-token', 2, 1)
 
     // 流程应正常完成（不抛异常），失败计入 result
     expect(result.stopped).toBe(false)
@@ -582,14 +582,14 @@ describe('空 Excel 数据场景', () => {
     mockState.readRangeValues.mockReturnValue([])
     mockState.readRangeCellValues.mockReturnValue([])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs as never,
+      mockWorksheet as never,
       columnMap,
       'test-token',
       // lastRow=1（只有表头，无数据行）
@@ -612,13 +612,13 @@ describe('空 Excel 数据场景', () => {
     // 行2 存在但 Bangumi_URL 为空
     mockState.readRangeValues.mockReturnValue([['', '', '']])
 
-    const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
+    const mockWorksheet = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 2],
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, columnMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWorksheet as never, columnMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
     expect(result.success).toBe(0)
@@ -776,10 +776,12 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
     // applyDiffToSheet 处理 delete
     // 配置 getCellValue 返回值（用于 delete 时记录 undo）
-    mockState.getCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
-      if (row === 3) return '旧值'
-      return ''
-    })
+    mockState.getCellValue.mockImplementation(
+      (_worksheet: unknown, row: number, _column: number) => {
+        if (row === 3) return '旧值'
+        return ''
+      },
+    )
 
     const result = await applyDiffToSheet(diffs, 'mirror')
     expect(result.deleted).toBeGreaterThanOrEqual(0)

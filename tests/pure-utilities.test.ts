@@ -2,18 +2,18 @@
 import { describe, it, expect } from 'vitest'
 
 // 直接从 pure-utilities.ts 导入（避免副作用链）
-import { getSeqColIndex, addTagsFromString, buildTagsArray } from '../ts/sync/pure-utilities.js'
+import { getSeqColumnIndex, addTagsFromString, buildTagsArray } from '../ts/sync/pure-utilities.js'
 
 describe('pure-utilities', () => {
-  // ========== getSeqColIndex 测试 ==========
-  describe('getSeqColIndex', () => {
+  // ========== getSeqColumnIndex 测试 ==========
+  describe('getSeqColumnIndex', () => {
     it('无 columnMap 时返回默认值 4', () => {
-      expect(getSeqColIndex(undefined)).toBe(4)
+      expect(getSeqColumnIndex(undefined)).toBe(4)
     })
 
     it('columnMap 中有"序列号"键时返回对应索引', () => {
       const columnMap = new Map<string, number>([['序列号', 5]])
-      expect(getSeqColIndex(columnMap)).toBe(5)
+      expect(getSeqColumnIndex(columnMap)).toBe(5)
     })
 
     it('columnMap 中无"序列号"键时返回默认值 4', () => {
@@ -21,18 +21,18 @@ describe('pure-utilities', () => {
         ['名称', 2],
         ['集数', 3],
       ])
-      expect(getSeqColIndex(columnMap)).toBe(4)
+      expect(getSeqColumnIndex(columnMap)).toBe(4)
     })
 
     it('空 columnMap 时返回默认值 4', () => {
       const columnMap = new Map<string, number>()
-      expect(getSeqColIndex(columnMap)).toBe(4)
+      expect(getSeqColumnIndex(columnMap)).toBe(4)
     })
 
     it('columnMap 中"序列号"值为 0 时返回默认值（|| 运算符特性）', () => {
       // 注意：JavaScript 的 || 运算符对 0 返回右侧值
       const columnMap = new Map<string, number>([['序列号', 0]])
-      expect(getSeqColIndex(columnMap)).toBe(4)
+      expect(getSeqColumnIndex(columnMap)).toBe(4)
     })
   })
 

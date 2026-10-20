@@ -85,11 +85,11 @@ export interface InlineDiffParts {
 const DEFAULT_PAGE_SIZE = 50
 
 /** 行类型 → 变更标记与 class */
-const ROW_META: Record<DiffRowKind, { marker: string; cls: string }> = {
-  keep: { marker: '=', cls: 'diff-row-keep' },
-  delete: { marker: '-', cls: 'diff-row-delete' },
-  insert: { marker: '+', cls: 'diff-row-insert' },
-  context: { marker: '·', cls: 'diff-row-context' },
+const ROW_META: Record<DiffRowKind, { marker: string; cssClass: string }> = {
+  keep: { marker: '=', cssClass: 'diff-row-keep' },
+  delete: { marker: '-', cssClass: 'diff-row-delete' },
+  insert: { marker: '+', cssClass: 'diff-row-insert' },
+  context: { marker: '·', cssClass: 'diff-row-context' },
 }
 
 // ========== 容器状态（分页进度 + 监听去重） ==========
@@ -160,13 +160,13 @@ export function renderDiffRow(row: DiffRow, columnCount: number): string {
   if (row.kind === 'context') {
     // 标记列 + 行号列 + 数据列
     const span = columnCount + 2
-    return `<tr class="diff-row ${meta.cls}"><td class="diff-marker">${meta.marker}</td><td class="diff-context" colspan="${String(
+    return `<tr class="diff-row ${meta.cssClass}"><td class="diff-marker">${meta.marker}</td><td class="diff-context" colspan="${String(
       span,
     )}">${escapeHtml(row.cells[0] ?? '')}</td></tr>`
   }
   const cells = row.cells.map((_, index) => renderCell(row, index, row.cells.length)).join('')
   const rowNumber = row.rowNumber === undefined ? '' : escapeHtml(String(row.rowNumber))
-  return `<tr class="diff-row ${meta.cls}"><td class="diff-marker">${meta.marker}</td><td class="diff-row-num">${rowNumber}</td>${cells}</tr>`
+  return `<tr class="diff-row ${meta.cssClass}"><td class="diff-marker">${meta.marker}</td><td class="diff-row-num">${rowNumber}</td>${cells}</tr>`
 }
 
 /** 渲染区块骨架（表头 + 首页行 + 「显示更多」按钮） */

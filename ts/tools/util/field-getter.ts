@@ -6,7 +6,7 @@
  * `createFieldGetter` 与 `services/ribbon-service` 的 `getField` 各存一份
  * 逐字相同的实现；增量同步行指纹数组也有三份逐字重复（ribbon-service 两处 +
  * exceltobangumi 一处）。本模块收敛为一份：
- *   - {@link createBatchFieldGetter}：矩形读 `startRow..lastRow × 1..maxCol`，
+ *   - {@link createBatchFieldGetter}：矩形读 `startRow..lastRow × 1..maxColumn`，
  *     访问器优先取批量结果，行/列越界或宿主返回形状异常时回退 `getCellValue`；
  *   - {@link calcSyncRowFingerprint}：按 `buildJsonPayload` 的字段口径算行指纹。
  *
@@ -38,12 +38,12 @@ export function createBatchFieldGetter(
   columns: readonly string[],
 ): FieldGetter {
   // 批量读取所有需要的数据列
-  let maxCol = 1
+  let maxColumn = 1
   for (const key of columns) {
     const column = columnMap.get(key)
-    if (column !== undefined) maxCol = Math.max(maxCol, column)
+    if (column !== undefined) maxColumn = Math.max(maxColumn, column)
   }
-  const allData = readRangeValues(worksheet, startRow, lastRow, 1, maxCol)
+  const allData = readRangeValues(worksheet, startRow, lastRow, 1, maxColumn)
 
   return (row: number, key: string): string => {
     const column = columnMap.get(key)
@@ -56,8 +56,8 @@ export function createBatchFieldGetter(
       }
     }
     // 回退到逐单元格读取
-    const fallbackCol = columnMap.get(key)
-    return fallbackCol === undefined ? '' : trim(getCellValue(worksheet, row, fallbackCol))
+    const fallbackColumn = columnMap.get(key)
+    return fallbackColumn === undefined ? '' : trim(getCellValue(worksheet, row, fallbackColumn))
   }
 }
 

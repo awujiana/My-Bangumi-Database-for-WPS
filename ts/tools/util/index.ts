@@ -105,8 +105,8 @@ export const BGM: {
     visibleRows: number[]
     headerRow: number
     dataStartRow: number
-    previewColStart: number
-    previewColEnd: number
+    previewColumnStart: number
+    previewColumnEnd: number
     columnCount: number
     headerNames: string[]
     isImportant: boolean[]
@@ -170,7 +170,7 @@ export const BGM: {
     lastSyncTime: null,
     currentRow: 0,
     currentSheet: null as WpsWorksheet | null,
-    currentCol: 0,
+    currentColumn: 0,
 
     /** 进入运行状态：防重复 + 重置标志 + 置位 */
     enterRunningState(): boolean {
@@ -276,7 +276,7 @@ export const BGM: {
       if (!this.currentRow || this.currentRow < 1 || !this.currentSheet) return false
       try {
         const worksheet = this.currentSheet
-        const column = this.currentCol > 0 ? this.currentCol : 1
+        const column = this.currentColumn > 0 ? this.currentColumn : 1
         const cellAddr = `${columnNumberToLetter(column)}${String(this.currentRow)}`
         const cell = worksheet.Range(cellAddr)
         cell.Select()
@@ -296,7 +296,7 @@ export const BGM: {
       if (!Number.isSafeInteger(row) || row < 0) return
       if (worksheet !== undefined) this.currentSheet = worksheet
       this.currentRow = row
-      if (column !== undefined && column > 0) this.currentCol = column
+      if (column !== undefined && column > 0) this.currentColumn = column
     },
 
     resetStopFlag(): void {
@@ -305,7 +305,7 @@ export const BGM: {
       this.currentRow = 0
       this.currentSheet = null
       // 同步清理列号，避免遗留状态
-      this.currentCol = 0
+      this.currentColumn = 0
     },
   },
   // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
@@ -327,13 +327,13 @@ export const BGM: {
   Dialog: {
     alert(title: string, message: string): void {
       if (typeof window !== 'undefined') {
-        const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined) {
-          win.BGMDialog.alert(title, message)
+        const windowGlobals = window as unknown as BgmWindowGlobals
+        if (windowGlobals.BGMDialog !== undefined) {
+          windowGlobals.BGMDialog.alert(title, message)
           return
         }
-        if (typeof win.BGMAlert === 'function') {
-          win.BGMAlert(message, title)
+        if (typeof windowGlobals.BGMAlert === 'function') {
+          windowGlobals.BGMAlert(message, title)
           return
         }
       }
@@ -345,15 +345,15 @@ export const BGM: {
     },
     error(title: string, message: string): void {
       if (typeof window !== 'undefined') {
-        const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined) {
-          win.BGMDialog.error(title, message)
+        const windowGlobals = window as unknown as BgmWindowGlobals
+        if (windowGlobals.BGMDialog !== undefined) {
+          windowGlobals.BGMDialog.error(title, message)
           return
         }
-        if (typeof win.BGMError === 'function') {
+        if (typeof windowGlobals.BGMError === 'function') {
           // BGMError 是宿主注入的展示函数，非构造函数，勿用 new
 
-          win.BGMError(message, title)
+          windowGlobals.BGMError(message, title)
           return
         }
       }
@@ -368,13 +368,13 @@ export const BGM: {
       onCancel?: () => void,
     ): void {
       if (typeof window !== 'undefined') {
-        const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined) {
-          win.BGMDialog.input(title, prompt, defaultValue ?? '', onOk, onCancel)
+        const windowGlobals = window as unknown as BgmWindowGlobals
+        if (windowGlobals.BGMDialog !== undefined) {
+          windowGlobals.BGMDialog.input(title, prompt, defaultValue ?? '', onOk, onCancel)
           return
         }
-        if (typeof win.BGMInput === 'function') {
-          win.BGMInput(title, prompt, defaultValue ?? '', onOk, onCancel)
+        if (typeof windowGlobals.BGMInput === 'function') {
+          windowGlobals.BGMInput(title, prompt, defaultValue ?? '', onOk, onCancel)
           return
         }
       }
@@ -396,9 +396,9 @@ export const BGM: {
       options?: DialogOptions,
     ): void {
       if (typeof window !== 'undefined') {
-        const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined) {
-          win.BGMDialog.show(type, title, message, options)
+        const windowGlobals = window as unknown as BgmWindowGlobals
+        if (windowGlobals.BGMDialog !== undefined) {
+          windowGlobals.BGMDialog.show(type, title, message, options)
           return
         }
       }
@@ -585,9 +585,9 @@ export function bgmLog(level: number, message_ = ''): void {
  */
 export function getApp(): WpsApp | null {
   if (typeof window !== 'undefined') {
-    const winApp = (window as unknown as BgmWindowGlobals).Application
-    if (isWpsApp(winApp)) return winApp
-    if (winApp && typeof winApp === 'object') return winApp
+    const windowApp = (window as unknown as BgmWindowGlobals).Application
+    if (isWpsApp(windowApp)) return windowApp
+    if (windowApp && typeof windowApp === 'object') return windowApp
   }
   return null
 }
@@ -1244,11 +1244,12 @@ export function showBangumiPanel(): void {
     GetTaskPane?: (id: string) => { Visible: boolean }
   } | null
   if (!app) {
-    const win = typeof window === 'undefined' ? null : (window as unknown as BgmWindowGlobals)
-    if (win?.BGMError) {
+    const windowGlobals =
+      typeof window === 'undefined' ? null : (window as unknown as BgmWindowGlobals)
+    if (windowGlobals?.BGMError) {
       // BGMError 是宿主注入的展示函数，非构造函数，勿用 new
 
-      win.BGMError('无法获取 WPS Application 对象！', '错误')
+      windowGlobals.BGMError('无法获取 WPS Application 对象！', '错误')
     } else {
       // 使用自定义错误对话框
       getNotifyApi().error('无法获取 WPS Application 对象！', '错误')

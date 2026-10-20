@@ -1011,11 +1011,11 @@ describe('token · showUserProfile', () => {
     mountElement('userProfile')
     mountElement('userAvatar', 'img')
     mountElement('topbarAvatar')
-    mountElement('topbarAvatarImg', 'img')
+    mountElement('topbarAvatarImage', 'img')
     mountElement('tokenStatusRight')
     mountElement('tokenUserName')
     mountElement('tokenUserId')
-    mountElement('tokenAvatarImg', 'img')
+    mountElement('tokenAvatarImage', 'img')
     mountElement('userNameDisplay')
     mountElement('userIdDisplay')
     mountElement('userIdStatus')
@@ -1046,7 +1046,7 @@ describe('token · showUserProfile', () => {
     mountElement('userProfile')
     mountElement('userAvatar', 'img')
     mountElement('tokenStatusRight')
-    mountElement('tokenAvatarImg', 'img')
+    mountElement('tokenAvatarImage', 'img')
     mountElement('userIdStatus')
     bgmCache.username = 'momo'
     bgmCache.avatarUrl = ''
@@ -1055,7 +1055,7 @@ describe('token · showUserProfile', () => {
 
     expect(getElement('userProfile').style.display).toBe('flex')
     expect(getElement('userAvatar').style.display).toBe('none')
-    expect(getElement('tokenAvatarImg').style.display).toBe('none')
+    expect(getElement('tokenAvatarImage').style.display).toBe('none')
   })
 
   it('用户名与头像都空 → 隐藏资料区、顶栏头像与 Token 区右侧', () => {
@@ -1075,21 +1075,21 @@ describe('token · showUserProfile', () => {
     mountElement('userProfile')
     mountElement('userAvatar', 'img')
     mountElement('topbarAvatar')
-    mountElement('topbarAvatarImg', 'img')
+    mountElement('topbarAvatarImage', 'img')
     mountElement('tokenStatusRight')
-    mountElement('tokenAvatarImg', 'img')
+    mountElement('tokenAvatarImage', 'img')
     mountElement('userIdStatus')
     bgmCache.avatarUrl = 'https://img.example/broken.png'
     bgmCache.username = 'momo'
 
     token.showUserProfile()
-    for (const id of ['userAvatar', 'topbarAvatarImg', 'tokenAvatarImg']) {
+    for (const id of ['userAvatar', 'topbarAvatarImage', 'tokenAvatarImage']) {
       getElement(id).dispatchEvent(new Event('error'))
     }
 
     expect(getElement('userAvatar').style.display).toBe('none')
     expect(getElement('topbarAvatar').style.display).toBe('none')
-    expect(getElement('tokenAvatarImg').style.display).toBe('none')
+    expect(getElement('tokenAvatarImage').style.display).toBe('none')
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining('头像加载失败'),

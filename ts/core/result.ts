@@ -331,16 +331,16 @@ export class Result<T> {
    * 转换失败时的错误信息
    * 如果操作成功则保持原样返回成功的Result
    *
-   * @method mapErr
+   * @method mapError
    * @param {(error: BgmError) => BgmError} function_ - 错误转换函数
    * @returns {Result<T>} 转换后的Result
    *
    * @example
-   * const result = apiResult.mapErr(error => {
+   * const result = apiResult.mapError(error => {
    *     return new BgmError(error.message, 'WRAPPED_' + err.code);
    * });
    */
-  mapErr(function_: (error: BgmError) => BgmError): Result<T> {
+  mapError(function_: (error: BgmError) => BgmError): Result<T> {
     const { error } = this
     if (error !== null && !this.success) {
       return Result.fail(function_(error))

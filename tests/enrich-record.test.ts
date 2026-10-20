@@ -6,7 +6,7 @@ const mockBgmLog = vi.hoisted(() => vi.fn<(level: string, message: string) => vo
 const mockHandleError = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn<() => number>())
-const mockColNumberToLetter = vi.hoisted(() =>
+const mockColumnNumberToLetter = vi.hoisted(() =>
   vi.fn((column: number) => {
     let result = ''
     let n = column
@@ -24,7 +24,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: mockGetApp,
   getLastRow: mockGetLastRow,
-  columnNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColumnNumberToLetter,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
   BGM: { handleError: mockHandleError },
@@ -32,7 +32,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
 
 import {
   ENRICH_RECORD_COLUMNS,
-  ENRICH_RECORD_COL,
+  ENRICH_RECORD_COLUMN,
   ENRICH_RECORD_SHEET_NAME,
   getActionColor,
   getOrCreateEnrichRecordSheet,
@@ -363,11 +363,16 @@ describe('enrich-record', () => {
       expect(mockSetCellValue).toHaveBeenCalledWith(
         sheet,
         11,
-        ENRICH_RECORD_COL.TIMESTAMP,
+        ENRICH_RECORD_COLUMN.TIMESTAMP,
         '2026-09-14 20:00:00',
       )
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COL.ROW, 12)
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COL.NOTE, '备注内容')
+      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 11, ENRICH_RECORD_COLUMN.ROW, 12)
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        sheet,
+        11,
+        ENRICH_RECORD_COLUMN.NOTE,
+        '备注内容',
+      )
       expect(getInteriorColor('H11')).toBe(BGM_COLOR.SUCCESS)
     })
 
@@ -394,7 +399,7 @@ describe('enrich-record', () => {
       expect(mockSetCellValue).toHaveBeenCalledWith(
         sheet,
         2,
-        ENRICH_RECORD_COL.NAME,
+        ENRICH_RECORD_COLUMN.NAME,
         '葬送的芙莉莲',
       )
     })
@@ -412,7 +417,7 @@ describe('enrich-record', () => {
       expect(mockSetCellValue).toHaveBeenCalledWith(
         sheet,
         1,
-        ENRICH_RECORD_COL.NAME,
+        ENRICH_RECORD_COLUMN.NAME,
         '葬送的芙莉莲',
       )
     })
@@ -845,10 +850,10 @@ describe('enrich-record', () => {
   describe('常量一致性', () => {
     it('列名与列号常量一一对应', () => {
       expect(ENRICH_RECORD_COLUMNS).toHaveLength(9)
-      expect(ENRICH_RECORD_COL.TIMESTAMP).toBe(1)
-      expect(ENRICH_RECORD_COL.NOTE).toBe(9)
-      expect(ENRICH_RECORD_COLUMNS[ENRICH_RECORD_COL.NAME - 1]).toBe('动漫名称')
-      expect(ENRICH_RECORD_COLUMNS[ENRICH_RECORD_COL.ACTION - 1]).toBe('操作类型')
+      expect(ENRICH_RECORD_COLUMN.TIMESTAMP).toBe(1)
+      expect(ENRICH_RECORD_COLUMN.NOTE).toBe(9)
+      expect(ENRICH_RECORD_COLUMNS[ENRICH_RECORD_COLUMN.NAME - 1]).toBe('动漫名称')
+      expect(ENRICH_RECORD_COLUMNS[ENRICH_RECORD_COLUMN.ACTION - 1]).toBe('操作类型')
     })
 
     it('表名常量为「富化记录」', () => {

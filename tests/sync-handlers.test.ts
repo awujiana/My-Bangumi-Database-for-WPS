@@ -45,7 +45,7 @@ const m = vi.hoisted(() => ({
   handleError: vi.fn(),
   getApp: vi.fn((): unknown => null),
   getCell: vi.fn(
-    (_ws: unknown, row: number, column: number): unknown =>
+    (_worksheet: unknown, row: number, column: number): unknown =>
       cells.get(`${String(row)}:${String(column)}`) ?? null,
   ),
   loadBgToken: vi.fn((): string | null => null),
@@ -53,7 +53,9 @@ const m = vi.hoisted(() => ({
   findHeaderRow: vi.fn((): number => 1),
   getColumnMap: vi.fn((): Map<string, number> => new Map()),
   getLastRow: vi.fn((): number => 1),
-  setCellValue: vi.fn((_ws: unknown, _row: number, _col: number, _value: unknown): boolean => true),
+  setCellValue: vi.fn(
+    (_worksheet: unknown, _row: number, _column: number, _value: unknown): boolean => true,
+  ),
   clearSheetCache: vi.fn(),
   _setBgmUserId: vi.fn(),
 
@@ -247,7 +249,7 @@ function makeApp(): FakeApp {
 }
 
 /** 标准列映射 */
-function makeColMap(): Map<string, number> {
+function makeColumnMap(): Map<string, number> {
   return new Map([
     ['Bangumi_URL', 1],
     ['名称', 2],
@@ -265,12 +267,12 @@ function makeColMap(): Map<string, number> {
  */
 function setEmptySheet(firstHeaderRow = 0, filledLastRow = 3): void {
   m.findHeaderRow.mockReturnValueOnce(firstHeaderRow).mockReturnValue(1)
-  m.getColumnMap.mockReturnValueOnce(new Map()).mockReturnValue(makeColMap())
+  m.getColumnMap.mockReturnValueOnce(new Map()).mockReturnValue(makeColumnMap())
   m.getLastRow.mockReturnValueOnce(0).mockReturnValue(filledLastRow)
 }
 
 /** 覆盖 别名 / 类别 / 打分 / 标签 / 剧透 五个可选列的列映射 */
-function richColMap(): Map<string, number> {
+function richColumnMap(): Map<string, number> {
   return new Map([
     ['Bangumi_URL', 1],
     ['名称', 2],
@@ -338,7 +340,7 @@ beforeEach(() => {
   m.getDataSheet.mockReturnValue(dataSheet)
   m.findHeaderRow.mockReturnValue(1)
   m.getLastRow.mockReturnValue(2)
-  m.getColumnMap.mockReturnValue(makeColMap())
+  m.getColumnMap.mockReturnValue(makeColumnMap())
   m.setCellValue.mockReturnValue(true)
   m.getOrCreateSyncRecordSheet.mockReturnValue(null)
   m.getAllSyncRecords.mockReturnValue([])
@@ -508,8 +510,8 @@ describe('sync · syncFromPanel > 确认与执行', () => {
     let statusBarDuringCallback: unknown
     m.SyncToBangumiAsync.mockImplementation(
       async (
-        _ws: unknown,
-        _colMap: unknown,
+        _worksheet: unknown,
+        _columnMap: unknown,
         _token: unknown,
         _lastRow: unknown,
         _headerRow: unknown,
@@ -1206,7 +1208,7 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
 describe('sync · 补充分支', () => {
   it('空表填充会把别名/类别/打分/标签/剧透五个可选列一并写入', async () => {
     m.findHeaderRow.mockReturnValueOnce(0).mockReturnValue(1)
-    m.getColumnMap.mockReturnValueOnce(new Map()).mockReturnValue(richColMap())
+    m.getColumnMap.mockReturnValueOnce(new Map()).mockReturnValue(richColumnMap())
     m.getLastRow.mockReturnValueOnce(0).mockReturnValue(3)
     m.fetchAllUserCollections.mockResolvedValue([
       collection({

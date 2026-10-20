@@ -44,7 +44,7 @@ export {
   SYNC_STATUS,
   COLUMN_RULES,
   HEADER_KEYWORDS,
-  IMPORTANT_COLS,
+  IMPORTANT_COLUMNS,
   FIELD_NAME_MAP,
   URL_PATTERNS,
   TOKEN_CONFIG,
@@ -52,7 +52,7 @@ export {
   COLUMNS,
   SYNC_RECORD_SHEET_NAME,
   SYNC_RECORD_COLUMNS,
-  SYNC_RECORD_COL,
+  SYNC_RECORD_COLUMN,
   SYNC_RECORD_TYPE_COLOR,
 } from './core/constants.js'
 
@@ -698,7 +698,7 @@ export {
   // 富化记录表常量
   ENRICH_RECORD_SHEET_NAME,
   ENRICH_RECORD_COLUMNS,
-  ENRICH_RECORD_COL,
+  ENRICH_RECORD_COLUMN,
 } from './sync/enrich-record.js'
 
 // ============================================================================

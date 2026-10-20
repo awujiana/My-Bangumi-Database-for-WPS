@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const {
   mockBgmLog,
   mockGetCellValue,
-  mockColNumToLetter,
+  mockColumnNumberToLetter,
   mockGetLastRow,
   mockFindHeaderRow,
   mockGetColumnMap,
@@ -14,8 +14,8 @@ const {
   mockReadRangeValues,
 } = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
-  mockGetCellValue: vi.fn((_ws: unknown, _row: number, _col: number): string => ''),
-  mockColNumToLetter: vi.fn((column: number) => {
+  mockGetCellValue: vi.fn((_worksheet: unknown, _row: number, _column: number): string => ''),
+  mockColumnNumberToLetter: vi.fn((column: number) => {
     let result = ''
     let n = column
     while (n > 0) {
@@ -34,14 +34,14 @@ const {
   // 矩形读必须与逐格读来自同一份数据源：矩形读只是逐格读的批量形态，
   // 两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
   mockReadRangeValues: vi.fn(
-    (_ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+    (_worksheet: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
         for (let column = c1; column <= c2; column += 1) {
           // 与真实实现一致：单格读取失败按空串处理，不让整块读失败
           try {
-            line.push(mockGetCellValue(_ws, row, column))
+            line.push(mockGetCellValue(_worksheet, row, column))
           } catch {
             line.push('')
           }
@@ -64,7 +64,7 @@ vi.mock('../ts/core/constants.js', () => ({
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: vi.fn(),
-  columnNumberToLetter: mockColNumToLetter,
+  columnNumberToLetter: mockColumnNumberToLetter,
   getCellValue: mockGetCellValue,
   readRangeValues: mockReadRangeValues,
   getLastRow: mockGetLastRow,
@@ -173,7 +173,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row !== 2) return ''
       if (column === 1) return 'https://bgm.tv/subject/12345'
       if (column === 2) return '葬送のフリーレン'
@@ -209,7 +209,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/12345'
       if (row === 2 && column === 2) return 'Test Anime'
       return ''
@@ -253,7 +253,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2) {
         switch (column) {
           case 1: {
@@ -318,7 +318,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/1'
       if (row === 2 && column === 2) return '第一部'
       if (row === 3 && column === 1) return 'https://bgm.tv/subject/2'
@@ -361,7 +361,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
       if (row === 2 && column === 2) return '热血| |奇幻'
       return ''
@@ -386,7 +386,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/222'
       if (row === 2 && column === 2) return ''
       return ''
@@ -411,7 +411,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/333'
       if (row === 2 && column === 2) return ''
       return ''
@@ -441,7 +441,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/444'
       return ''
     })
@@ -467,7 +467,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/555'
       if (row === 2 && column === 2) return '2024/06/15'
       return ''
@@ -482,7 +482,7 @@ describe('buildJsonlFromSheet', () => {
 
   it('getCellText 在 Range 抛异常时应回退到 getCellValue', () => {
     // 让 Range 调用抛异常
-    const mockWs = {
+    const mockWorksheet = {
       Name: 'Sheet1',
       Rows: { Count: 100 },
       UsedRange: { Row: 1, Rows: { Count: 5 } },
@@ -491,7 +491,7 @@ describe('buildJsonlFromSheet', () => {
       }),
       Activate: vi.fn(),
     }
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -501,7 +501,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/666'
       if (row === 2 && column === 2) return '回退日期'
       return ''
@@ -516,7 +516,7 @@ describe('buildJsonlFromSheet', () => {
 
   it('getCellText 在 Range 返回 null 时应返回空字符串', () => {
     // Line 40: if (!cell) return ''
-    const mockWs = {
+    const mockWorksheet = {
       Name: 'Sheet1',
       Rows: { Count: 100 },
       UsedRange: { Row: 1, Rows: { Count: 5 } },
@@ -524,7 +524,7 @@ describe('buildJsonlFromSheet', () => {
       Range: vi.fn(() => null as unknown as ReturnType<typeof createMockWorksheet>),
       Activate: vi.fn(),
     }
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -534,7 +534,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/777'
       if (row === 2 && column === 2) return '回退值'
       return ''
@@ -562,7 +562,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/888'
       if (row === 2 && column === 2) return '默认表头行'
       return ''
@@ -590,7 +590,7 @@ describe('buildJsonlFromSheet', () => {
     ])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/invalid'
       if (row === 2 && column === 2) return '无效SID'
       return ''
@@ -625,7 +625,7 @@ describe('exportSheetToJsonlFile', () => {
     const columnMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/12345'
       return ''
     })
@@ -668,7 +668,7 @@ describe('exportSheetToJsonlFile', () => {
     const columnMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/12345'
       return ''
     })
@@ -692,7 +692,7 @@ describe('exportSheetToJsonlFile', () => {
     const columnMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/12345'
       return ''
     })
@@ -730,7 +730,7 @@ describe('exportSheetToJsonlFile', () => {
     const columnMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(columnMap)
 
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/12345'
       return ''
     })
@@ -766,7 +766,7 @@ describe('exportSheetToJsonlFile', () => {
       mockFindHeaderRow.mockReturnValue(1)
       mockGetLastRow.mockReturnValue(3)
       mockGetColumnMap.mockReturnValue(new Map<string, number>([['Bangumi_URL', 1]]))
-      mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) =>
+      mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) =>
         row === 2 && column === 1 ? 'https://bgm.tv/subject/12345' : '',
       )
       mockExtractSubjectId.mockReturnValue('12345')

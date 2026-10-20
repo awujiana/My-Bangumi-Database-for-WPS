@@ -206,7 +206,7 @@ function hasIdentityColumn(columnMap: ReadonlyMap<string, number>): boolean {
 
 /** 新番表表头扫描区：前 30 行 × 前 50 列 */
 const XINFAN_SCAN_ROWS = 30
-const XINFAN_SCAN_COLS = 50
+const XINFAN_SCAN_COLUMNS = 50
 
 /** 一行单元格命中了多少个新番表表头关键字 */
 function countXinFanHeaderHits(cells: string[], keywords: string[]): number {
@@ -222,7 +222,7 @@ function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
   const keywords = XINFAN_HEADER.headerKeywords.map((keyword) => keyword.toLowerCase())
   // 快路径：一次矩形读扫描区（原先 30 行 × 50 列 = 1500 次逐格 COM 往返）。
   // 读回行数不足（宿主/桩未返回完整矩形）时回退逐格读，行为与改造前完全一致。
-  const block = readRangeValues(worksheet, 1, XINFAN_SCAN_ROWS, 1, XINFAN_SCAN_COLS)
+  const block = readRangeValues(worksheet, 1, XINFAN_SCAN_ROWS, 1, XINFAN_SCAN_COLUMNS)
   if (block.length === XINFAN_SCAN_ROWS) {
     for (const [index, cells] of block.entries()) {
       if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) {
@@ -233,7 +233,7 @@ function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
   }
   for (let row = 1; row <= XINFAN_SCAN_ROWS; row += 1) {
     const cells: string[] = []
-    for (let column = 1; column <= XINFAN_SCAN_COLS; column += 1) {
+    for (let column = 1; column <= XINFAN_SCAN_COLUMNS; column += 1) {
       cells.push(getCellValue(worksheet, row, column))
     }
     if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) return row
@@ -242,7 +242,7 @@ function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
 }
 
 /** 查找锚点列（表头含 nameAnchorKeyword，默认「周更时间」）；找不到返回 0 */
-function findXinFanAnchorCol(worksheet: WpsWorksheet, headerRow: number): number {
+function findXinFanAnchorColumn(worksheet: WpsWorksheet, headerRow: number): number {
   const anchor = XINFAN_HEADER.nameAnchorKeyword.toLowerCase()
   for (let column = 1; column <= 50; column += 1) {
     const value = getCellValue(worksheet, headerRow, column).toLowerCase()
@@ -272,18 +272,18 @@ function hasNameProbeValue(worksheet: WpsWorksheet, headerRow: number, column: n
 function buildXinFanColumnMap(worksheet: WpsWorksheet, headerRow: number): Map<string, number> {
   const columnMap = new Map<string, number>()
 
-  const anchorCol = findXinFanAnchorCol(worksheet, headerRow)
-  let nameCol: number | undefined
-  if (anchorCol > 1) {
-    for (let column = anchorCol - 1; column >= 1; column -= 1) {
+  const anchorColumn = findXinFanAnchorColumn(worksheet, headerRow)
+  let nameColumn: number | undefined
+  if (anchorColumn > 1) {
+    for (let column = anchorColumn - 1; column >= 1; column -= 1) {
       if (getCellValue(worksheet, headerRow, column).trim() !== '') break
       if (hasNameProbeValue(worksheet, headerRow, column)) {
-        nameCol = column
+        nameColumn = column
         break
       }
     }
   }
-  if (nameCol) columnMap.set('名称', nameCol)
+  if (nameColumn) columnMap.set('名称', nameColumn)
 
   for (let column = 1; column <= 50; column += 1) {
     const value = getCellValue(worksheet, headerRow, column).trim()
@@ -562,10 +562,10 @@ export function collectExcludedRows(
 ): Set<number> {
   const excluded = new Set<number>()
   if (CLEAN_EXCLUDES.rowText.length === 0) return excluded
-  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   // block 为调用方（scanTarget）已读入的数据区整块；未提供时按原行为自行读取
   const rows =
-    block ?? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxCol)
+    block ?? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxColumn)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (CLEAN_EXCLUDES.rowText.some((keyword) => joined.includes(keyword))) {
@@ -586,7 +586,7 @@ export function estimateRowBytes(target: CleanTargetInfo, block?: readonly strin
   if (dataRows <= 0) return 0
   const sampleCount = Math.min(ROW_BYTES_SAMPLE_LIMIT, dataRows)
   const step = Math.max(1, Math.floor(dataRows / sampleCount))
-  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
 
   let total = 0
   let sampled = 0
@@ -601,7 +601,7 @@ export function estimateRowBytes(target: CleanTargetInfo, block?: readonly strin
           target.headerRow + 1 + index,
           target.headerRow + 1 + index,
           1,
-          maxCol,
+          maxColumn,
         )[0] ?? [])
     total += estimateUtf8Bytes(values.join(''))
     sampled += 1
@@ -655,7 +655,7 @@ function scanCellTransform(
 
   // 需要「名称」参照列的变换（别名去重）额外读取名称列
   const isNameRequired = rule.transform === 'dedupAliasAgainstName'
-  const nameCol = isNameRequired ? target.columnMap.get('名称') : undefined
+  const nameColumn = isNameRequired ? target.columnMap.get('名称') : undefined
   const values = readRangeValues(
     target.worksheet,
     target.headerRow + 1,
@@ -663,8 +663,14 @@ function scanCellTransform(
     column,
     column,
   )
-  const names = nameCol
-    ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, nameCol, nameCol)
+  const names = nameColumn
+    ? readRangeValues(
+        target.worksheet,
+        target.headerRow + 1,
+        target.lastRow,
+        nameColumn,
+        nameColumn,
+      )
     : null
 
   const changes: CellChange[] = []
@@ -721,11 +727,11 @@ function planNoiseRows(
       skippedReason: '未配置噪声行词表',
     }
   }
-  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   const rowsToDelete: number[] = []
   const rowPreviews: DeletedRowPreview[] = []
   // block 为调用方（scanTarget）已读入的数据区整块（列跨度一致）；未提供时自行读取
-  const rows = block ?? readRangeValues(worksheet, headerRow + 1, lastRow, 1, maxCol)
+  const rows = block ?? readRangeValues(worksheet, headerRow + 1, lastRow, 1, maxColumn)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (keywords.some((keyword) => joined.includes(keyword))) {
@@ -854,10 +860,10 @@ function scanTarget(
 ): RulePlan[] {
   // 数据区整块只读一次，排除行判定与行字节估算共用：
   // 原为 collectExcludedRows 1 次 + estimateRowBytes 至多 ROW_BYTES_SAMPLE_LIMIT 次 COM 往返
-  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   const block =
     target.lastRow > target.headerRow
-      ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxCol)
+      ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxColumn)
       : undefined
   const excludedRows = collectExcludedRows(target, block)
   if (excludedRows.size > 0) {

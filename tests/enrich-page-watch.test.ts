@@ -180,7 +180,7 @@ vi.mock('../ts/panel/enrich-preview-tab.js', () => ({
 
 // ========== helpers ==========
 
-function makeWs(name: string): WpsWorksheet {
+function makeWorksheet(name: string): WpsWorksheet {
   return { Name: name } as unknown as WpsWorksheet
 }
 
@@ -290,7 +290,7 @@ async function bootWatch(app: unknown): Promise<WatchSession> {
   const page = await import('../ts/panel/enrich-page.js')
 
   vi.clearAllMocks()
-  m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+  m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
   m.ensureSourceSheet.mockReturnValue(null)
   m.autoSelectEnrichTarget.mockReturnValue('none')
   m.collectDetectedWorkbookPaths.mockReturnValue([])
@@ -460,7 +460,7 @@ describe('enrich-page · 工作簿变化监听', () => {
 
   it('未识别到目标表时不会把锁定的目标表冲掉（锁定后重试计数清零）', async () => {
     const session = await bootWatch({ Workbooks: { Count: 1 }, ActiveWorkbook: null })
-    const targetSheet = makeWs('追踪')
+    const targetSheet = makeWorksheet('追踪')
     session.state.bangumiSheet = targetSheet
     vi.clearAllMocks()
 

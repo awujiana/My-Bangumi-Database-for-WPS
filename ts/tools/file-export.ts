@@ -21,13 +21,13 @@
 export type ExportFormat = 'csv' | 'txt'
 
 const CSV_MIME = 'text/csv;charset=utf-8'
-const TXT_MIME = 'text/plain;charset=utf-8'
+const TEXT_MIME = 'text/plain;charset=utf-8'
 
 /** CSV 的 UTF-8 BOM —— Excel 靠它识别编码，缺了中文就乱码 */
 const UTF8_BOM = '﻿'
 
 /** TXT 的列分隔符 */
-const TXT_SEPARATOR = ' | '
+const TEXT_SEPARATOR = ' | '
 
 /** 单元格原始值（导出前统一转成字符串） */
 export type ExportCell = string | number | boolean | null | undefined
@@ -75,9 +75,9 @@ export function toText(
   headers: readonly string[],
   rows: readonly (readonly ExportCell[])[],
 ): string {
-  const lines: string[] = [headers.join(TXT_SEPARATOR)]
+  const lines: string[] = [headers.join(TEXT_SEPARATOR)]
   for (const row of rows) {
-    lines.push(row.map((cell) => stringifyCell(cell)).join(TXT_SEPARATOR))
+    lines.push(row.map((cell) => stringifyCell(cell)).join(TEXT_SEPARATOR))
   }
   return lines.join('\n')
 }
@@ -136,6 +136,6 @@ export function exportRows(
 ): number {
   const isCsv = format === 'csv'
   const text = isCsv ? toCsv(headers, rows) : toText(headers, rows)
-  downloadTextFile(buildFileName(baseName, format), text, isCsv ? CSV_MIME : TXT_MIME)
+  downloadTextFile(buildFileName(baseName, format), text, isCsv ? CSV_MIME : TEXT_MIME)
   return rows.length
 }

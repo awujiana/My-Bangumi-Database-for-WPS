@@ -648,8 +648,8 @@ export function checkTokenExpiryWarning(expires: number): void {
  * 内联闭包每次都是新函数引用，addEventListener 无法去重 → 监听器无限累积。
  */
 const handleAvatarError = (event: Event): void => {
-  const img = event.currentTarget as HTMLImageElement | null
-  if (img) img.style.display = 'none'
+  const image = event.currentTarget as HTMLImageElement | null
+  if (image) image.style.display = 'none'
   bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
 }
 
@@ -660,17 +660,17 @@ const handleAvatarError = (event: Event): void => {
  * 单测平铺挂载时同样生效。
  */
 const handleTopbarAvatarError = (event: Event): void => {
-  const img = event.currentTarget as HTMLImageElement | null
-  if (img) img.style.display = 'none'
+  const image = event.currentTarget as HTMLImageElement | null
+  if (image) image.style.display = 'none'
   const container = document.getElementById('topbarAvatar')
   if (container) container.style.display = 'none'
   bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
 }
 
 /** 绑定头像 error 监听：先去重再绑定，保证每个元素至多一个监听器 */
-function bindAvatarError(img: HTMLImageElement, handler: (event: Event) => void): void {
-  img.removeEventListener('error', handler)
-  img.addEventListener('error', handler)
+function bindAvatarError(image: HTMLImageElement, handler: (event: Event) => void): void {
+  image.removeEventListener('error', handler)
+  image.addEventListener('error', handler)
 }
 
 /**
@@ -690,30 +690,32 @@ export function showUserProfile(): void {
     }
 
     // 主头像
-    const avatarImg = document.getElementById('userAvatar') as HTMLImageElement | null
-    if (avatarImg) {
+    const avatarImage = document.getElementById('userAvatar') as HTMLImageElement | null
+    if (avatarImage) {
       if (avatarUrl) {
-        avatarImg.src = avatarUrl
-        avatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        bindAvatarError(avatarImg, handleAvatarError)
-        avatarImg.style.display = ''
+        avatarImage.src = avatarUrl
+        avatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        bindAvatarError(avatarImage, handleAvatarError)
+        avatarImage.style.display = ''
       } else {
-        avatarImg.style.display = 'none'
+        avatarImage.style.display = 'none'
       }
     }
 
     // 同步更新顶栏头像（窄页面时显示）
     const topbarAvatarElement = document.getElementById('topbarAvatar')
-    const topbarAvatarImg = document.getElementById('topbarAvatarImg') as HTMLImageElement | null
+    const topbarAvatarImage = document.getElementById(
+      'topbarAvatarImage',
+    ) as HTMLImageElement | null
     if (topbarAvatarElement) {
       // 让 CSS 媒体查询控制显示/隐藏
       topbarAvatarElement.style.display = ''
       topbarAvatarElement.title = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
       topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-      if (topbarAvatarImg && avatarUrl) {
-        topbarAvatarImg.src = avatarUrl
-        topbarAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        bindAvatarError(topbarAvatarImg, handleTopbarAvatarError)
+      if (topbarAvatarImage && avatarUrl) {
+        topbarAvatarImage.src = avatarUrl
+        topbarAvatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        bindAvatarError(topbarAvatarImage, handleTopbarAvatarError)
       }
     }
 
@@ -721,7 +723,7 @@ export function showUserProfile(): void {
     const tokenStatusRight = document.getElementById('tokenStatusRight')
     const tokenUsernameElement = document.getElementById('tokenUserName')
     const tokenUserIdElement = document.getElementById('tokenUserId')
-    const tokenAvatarImg = document.getElementById('tokenAvatarImg') as HTMLImageElement | null
+    const tokenAvatarImage = document.getElementById('tokenAvatarImage') as HTMLImageElement | null
     if (tokenStatusRight) {
       if (username || userId || avatarUrl) {
         tokenStatusRight.style.display = 'flex'
@@ -731,14 +733,14 @@ export function showUserProfile(): void {
         if (tokenUserIdElement && userId) {
           tokenUserIdElement.textContent = `ID: ${userId}`
         }
-        if (tokenAvatarImg) {
+        if (tokenAvatarImage) {
           if (avatarUrl) {
-            tokenAvatarImg.src = avatarUrl
-            tokenAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-            bindAvatarError(tokenAvatarImg, handleAvatarError)
-            tokenAvatarImg.style.display = ''
+            tokenAvatarImage.src = avatarUrl
+            tokenAvatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+            bindAvatarError(tokenAvatarImage, handleAvatarError)
+            tokenAvatarImage.style.display = ''
           } else {
-            tokenAvatarImg.style.display = 'none'
+            tokenAvatarImage.style.display = 'none'
           }
         }
       } else {

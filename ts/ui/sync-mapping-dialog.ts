@@ -320,17 +320,17 @@ function addHeaderColumns(
   columnMap: Map<string, number>,
   names: readonly string[],
 ): { added: string[]; failed: string[] } {
-  let maxCol = 0
+  let maxColumn = 0
   for (const column of columnMap.values()) {
-    if (column > maxCol) maxCol = column
+    if (column > maxColumn) maxColumn = column
   }
 
   const written: { name: string; column: number }[] = []
-  let nextCol = maxCol
+  let nextColumn = maxColumn
   for (const name of names) {
-    nextCol += 1
-    if (setCellValue(worksheet, headerRow, nextCol, name)) {
-      written.push({ name, column: nextCol })
+    nextColumn += 1
+    if (setCellValue(worksheet, headerRow, nextColumn, name)) {
+      written.push({ name, column: nextColumn })
     }
   }
 

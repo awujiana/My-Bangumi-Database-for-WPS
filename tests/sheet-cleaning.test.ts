@@ -112,7 +112,7 @@ function installModel(next: SheetModel): WpsWorksheet {
   m.getLastRow.mockImplementation(() => model.lastRow)
   m.getColumnMap.mockImplementation(() => new Map(Object.entries(model.columns)))
   m.readRangeValues.mockImplementation(
-    (_ws: unknown, r1: number, r2: number, c1: number, c2: number) => {
+    (_worksheet: unknown, r1: number, r2: number, c1: number, c2: number) => {
       const out: string[][] = []
       const rowLimit = c1 === c2 ? model.truncatedColumns[c1] : undefined
       for (let rowNumber = r1; rowNumber <= r2; rowNumber += 1) {
@@ -133,7 +133,7 @@ function installModel(next: SheetModel): WpsWorksheet {
     },
   )
   m.setCellValue.mockImplementation(
-    (_ws: unknown, rowNumber: number, column: number, value: string) => {
+    (_worksheet: unknown, rowNumber: number, column: number, value: string) => {
       model.writes.push({ row: rowNumber, column, value })
     },
   )

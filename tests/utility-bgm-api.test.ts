@@ -101,7 +101,7 @@ function resetSyncState(): void {
   BGM.sync.isPaused = false
   BGM.sync.lastSyncTime = null
   BGM.sync.currentRow = 0
-  BGM.sync.currentCol = 0
+  BGM.sync.currentColumn = 0
   BGM.sync.currentSheet = null
 }
 
@@ -605,7 +605,7 @@ describe('BGM.sync · 停止与暂停', () => {
     const select = vi.fn()
     BGM.sync.isRunning = true
     BGM.sync.currentRow = 4
-    BGM.sync.currentCol = 2
+    BGM.sync.currentColumn = 2
     BGM.sync.currentSheet = createFakeSheet(select)
 
     BGM.sync.pause()
@@ -638,7 +638,7 @@ describe('BGM.sync · 停止与暂停', () => {
     BGM.sync.shouldStop = true
     BGM.sync.isPaused = true
     BGM.sync.currentRow = 9
-    BGM.sync.currentCol = 3
+    BGM.sync.currentColumn = 3
     BGM.sync.currentSheet = createFakeSheet(vi.fn())
 
     BGM.sync.resetStopFlag()
@@ -646,7 +646,7 @@ describe('BGM.sync · 停止与暂停', () => {
     expect(BGM.sync.shouldStop).toBe(false)
     expect(BGM.sync.isPaused).toBe(false)
     expect(BGM.sync.currentRow).toBe(0)
-    expect(BGM.sync.currentCol).toBe(0)
+    expect(BGM.sync.currentColumn).toBe(0)
     expect(BGM.sync.currentSheet).toBeNull()
   })
 })
@@ -695,7 +695,7 @@ describe('BGM.sync · 等待恢复与定位', () => {
       },
     } as unknown as WpsWorksheet
     BGM.sync.currentRow = 12
-    BGM.sync.currentCol = 0
+    BGM.sync.currentColumn = 0
 
     expect(BGM.sync.locateCurrentCell()).toBe(true)
     expect(rangeAddresses).toEqual([`${columnNumberToLetter(1)}12`])
@@ -737,9 +737,9 @@ describe('BGM.sync · 等待恢复与定位', () => {
     expect(BGM.sync.currentSheet).toBe(sheet)
 
     BGM.sync.updatePosition(undefined, 6, 0)
-    expect(BGM.sync.currentCol).toBe(0)
+    expect(BGM.sync.currentColumn).toBe(0)
 
     BGM.sync.updatePosition(undefined, 6, 4)
-    expect(BGM.sync.currentCol).toBe(4)
+    expect(BGM.sync.currentColumn).toBe(4)
   })
 })

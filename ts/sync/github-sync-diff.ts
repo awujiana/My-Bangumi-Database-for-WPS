@@ -454,8 +454,9 @@ export function isWireRemoteEntry(value: unknown): value is WireRemoteEntry {
 
 /** 线上条目 → 模型条目：`sid` 归一成 `subjectId`，其余字段原样带过去 */
 export function toRemoteEntry(wire: WireRemoteEntry): GithubRemoteEntry {
-  const { sid, ...fields } = wire
-  return { ...fields, subjectId: sid }
+  // 解构重命名：`sid` 是线上键（不可改），落地到模型即规范名 `subjectId`
+  const { sid: subjectId, ...fields } = wire
+  return { ...fields, subjectId }
 }
 
 /**
@@ -783,12 +784,12 @@ export function computeDiff(
   timeFilter?: SyncTimeFilter,
 ): GithubSyncDiff[] {
   const diffs: GithubSyncDiff[] = []
-  const remoteSids = new Set<string>()
+  const remoteSubjectIds = new Set<string>()
 
   for (const remote of remoteEntries) {
     const hasRemoteSubjectId = Boolean(remote.subjectId)
     if (hasRemoteSubjectId) {
-      remoteSids.add(remote.subjectId)
+      remoteSubjectIds.add(remote.subjectId)
       const local = localEntries.get(remote.subjectId)
 
       // 新增：本地无对应 SID
@@ -882,7 +883,7 @@ export function computeDiff(
   // mirror 策略：本地存在但远程不存在的 SID 标记为 delete
   if (strategy === 'mirror') {
     for (const [subjectId, local] of localEntries) {
-      const isMissingRemote = !remoteSids.has(subjectId)
+      const isMissingRemote = !remoteSubjectIds.has(subjectId)
       if (isMissingRemote) {
         // 时间筛选启用时：本地条目的开播日期不在筛选范围内的，跳过 delete
         // 避免因时间筛选过滤了远程数据，导致本地其他时间段的数据被误删

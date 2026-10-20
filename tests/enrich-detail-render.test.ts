@@ -60,9 +60,9 @@ describe('panel/enrich-detail-render', () => {
 
   describe('fieldActionLabel', () => {
     it('fill/append 映射为填充/追加，其余回落为跳过', () => {
-      expect(fieldActionLabel('fill')).toEqual({ text: '填充', cls: 'fill' })
-      expect(fieldActionLabel('append')).toEqual({ text: '追加', cls: 'append' })
-      expect(fieldActionLabel('skip')).toEqual({ text: '跳过', cls: 'skip' })
+      expect(fieldActionLabel('fill')).toEqual({ text: '填充', cssClass: 'fill' })
+      expect(fieldActionLabel('append')).toEqual({ text: '追加', cssClass: 'append' })
+      expect(fieldActionLabel('skip')).toEqual({ text: '跳过', cssClass: 'skip' })
     })
   })
 

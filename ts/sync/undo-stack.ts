@@ -137,7 +137,7 @@ export function undoLastSync(): number {
   // 2. 按行号从大到小恢复被删除的行
   rowDeleteEntries.sort((a, b) => b.row - a.row)
   for (const snapshot of rowDeleteEntries) {
-    restoreDeletedRowWithWs(worksheet, snapshot)
+    restoreDeletedRowWithWorksheet(worksheet, snapshot)
   }
 
   return session.entries.length
@@ -173,7 +173,7 @@ export function clearUndoStack(): void {
  * @param worksheet 数据工作表引用
  * @param snapshot 删除前保存的行快照
  */
-function restoreDeletedRowWithWs(worksheet: WpsWorksheet, snapshot: RowSnapshot): void {
+function restoreDeletedRowWithWorksheet(worksheet: WpsWorksheet, snapshot: RowSnapshot): void {
   try {
     // 在删除位置插入新行
     worksheet.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()

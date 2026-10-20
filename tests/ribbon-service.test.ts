@@ -167,14 +167,14 @@ class FakeSheet {
   Range(address: string): { Value2?: unknown; Interior?: { Color: number } } {
     const rangeMatch = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(address)
     if (rangeMatch) {
-      const startCol = columnToNumber(rangeMatch[1] ?? 'A')
+      const startColumn = columnToNumber(rangeMatch[1] ?? 'A')
       const startRow = Number(rangeMatch[2])
-      const endCol = columnToNumber(rangeMatch[3] ?? 'A')
+      const endColumn = columnToNumber(rangeMatch[3] ?? 'A')
       const endRow = Number(rangeMatch[4])
       const matrix: string[][] = []
       for (let row = startRow; row <= endRow; row += 1) {
         const rowValues: string[] = []
-        for (let column = startCol; column <= endCol; column += 1) {
+        for (let column = startColumn; column <= endColumn; column += 1) {
           rowValues.push(this.cells.get(`${String(row)}:${String(column)}`) ?? '')
         }
         matrix.push(rowValues)
@@ -206,22 +206,22 @@ const asSheet = (sheet: FakeSheet): WpsWorksheet => sheet as unknown as WpsWorks
 
 // ========== 常用列映射 ==========
 
-const COL_NAME = 2
-const COL_STATUS = 3
-const COL_RATE = 4
-const COL_TAGS = 5
-const COL_EPISODES = 6
-const COL_SEQ = 7
+const COLUMN_NAME = 2
+const COLUMN_STATUS = 3
+const COLUMN_RATE = 4
+const COLUMN_TAGS = 5
+const COLUMN_EPISODES = 6
+const COLUMN_SEQ = 7
 
-function buildColMap(): Map<string, number> {
+function buildColumnMap(): Map<string, number> {
   return new Map([
     ['Bangumi_URL', 1],
-    ['名称', COL_NAME],
-    ['是否看完', COL_STATUS],
-    ['打分', COL_RATE],
-    ['标签/分级', COL_TAGS],
-    ['集数', COL_EPISODES],
-    ['序列号', COL_SEQ],
+    ['名称', COLUMN_NAME],
+    ['是否看完', COLUMN_STATUS],
+    ['打分', COLUMN_RATE],
+    ['标签/分级', COLUMN_TAGS],
+    ['集数', COLUMN_EPISODES],
+    ['序列号', COLUMN_SEQ],
   ])
 }
 
@@ -234,9 +234,9 @@ function fillRow(
   values: { url?: string; name?: string; status?: string; rate?: string },
 ): void {
   if (values.url !== undefined) sheet.set(row, 1, values.url)
-  if (values.name !== undefined) sheet.set(row, COL_NAME, values.name)
-  if (values.status !== undefined) sheet.set(row, COL_STATUS, values.status)
-  if (values.rate !== undefined) sheet.set(row, COL_RATE, values.rate)
+  if (values.name !== undefined) sheet.set(row, COLUMN_NAME, values.name)
+  if (values.status !== undefined) sheet.set(row, COLUMN_STATUS, values.status)
+  if (values.rate !== undefined) sheet.set(row, COLUMN_RATE, values.rate)
 }
 
 /** 单个已上传行的标准指纹（与实现相同的字段拼装顺序） */
@@ -252,7 +252,7 @@ beforeEach(() => {
   m.getDataSheet.mockReturnValue(null)
   m.findHeaderRow.mockReturnValue(1)
   m.getLastRow.mockReturnValue(1)
-  m.getColumnMap.mockReturnValue(buildColMap())
+  m.getColumnMap.mockReturnValue(buildColumnMap())
   m.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [] })
   m.enterRunningState.mockReturnValue(true)
   m.wpsMessageBox.mockResolvedValue(6)
@@ -412,7 +412,7 @@ describe('ribbon-service · getSyncPreview', () => {
     fillRow(sheet, 3, { url: '不是网址', name: '动画B', status: '看过' })
     m.getLastRow.mockReturnValue(3)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 3, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 3, HEADER_ROW)
 
     expect(preview).toMatchObject({ total: 2, valid: 0, noUrl: 2 })
   })
@@ -422,7 +422,7 @@ describe('ribbon-service · getSyncPreview', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({ total: 1, valid: 1, plannedSyncCount: 1, noUrl: 0 })
   })
@@ -433,7 +433,7 @@ describe('ribbon-service · getSyncPreview', () => {
     sheet.markUploaded(2)
     m.getLastRow.mockReturnValue(2)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({
       valid: 1,
@@ -449,7 +449,7 @@ describe('ribbon-service · getSyncPreview', () => {
     sheet.markUploaded(2, 0x00_00_00)
     m.getLastRow.mockReturnValue(2)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({ alreadyUploaded: 0, plannedSyncCount: 1 })
   })
@@ -459,7 +459,7 @@ describe('ribbon-service · getSyncPreview', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '' })
     m.getLastRow.mockReturnValue(2)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({ valid: 1, emptyStatus: 1, plannedSyncCount: 0 })
   })
@@ -469,7 +469,7 @@ describe('ribbon-service · getSyncPreview', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '忽略' })
     m.getLastRow.mockReturnValue(2)
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({ plannedSkipCount: 1, plannedSyncCount: 0 })
   })
@@ -486,7 +486,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(2)
     const fingerprintMap = new Map([['100', fingerprintOf('动画A', 2, '8')]])
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW, {
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, {
       incremental: true,
       fingerprintMap,
     })
@@ -510,7 +510,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(2)
     const fingerprintMap = new Map([['100', 'stale']])
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW, {
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, {
       incremental: true,
       fingerprintMap,
     })
@@ -533,7 +533,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(2)
     const fingerprintMap = new Map([['100', fingerprintOf('动画A', 2, '8')]])
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW, {
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, {
       incremental: true,
       fingerprintMap,
     })
@@ -548,7 +548,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(3)
     m.getFilterStatus.mockReturnValue({ hasFilter: true, visibleRows: [1, 2] })
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 3, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 3, HEADER_ROW)
 
     expect(preview.total).toBe(1)
     expect(preview.plannedSyncCount).toBe(1)
@@ -560,7 +560,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(2)
     m.getFilterStatus.mockReturnValue({ hasFilter: true, visibleRows: [] })
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview.total).toBe(1)
   })
@@ -569,7 +569,7 @@ describe('ribbon-service · getSyncPreview', () => {
     const sheet = new FakeSheet()
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
-    const columnMap = buildColMap()
+    const columnMap = buildColumnMap()
     columnMap.delete('序列号')
 
     expect(() => getSyncPreview(asSheet(sheet), columnMap, 2, HEADER_ROW)).not.toThrow()
@@ -578,10 +578,10 @@ describe('ribbon-service · getSyncPreview', () => {
   it('状态列缺失时按「状态 → 观看状态」链路回退取值', () => {
     const sheet = new FakeSheet()
     sheet.set(2, 1, 'https://bgm.tv/subject/100')
-    sheet.set(2, COL_NAME, '动画A')
-    sheet.set(2, COL_EPISODES, '12')
+    sheet.set(2, COLUMN_NAME, '动画A')
+    sheet.set(2, COLUMN_EPISODES, '12')
     m.getLastRow.mockReturnValue(2)
-    const columnMap = buildColMap()
+    const columnMap = buildColumnMap()
     columnMap.delete('是否看完')
 
     const preview = getSyncPreview(asSheet(sheet), columnMap, 2, HEADER_ROW)
@@ -598,7 +598,7 @@ describe('ribbon-service · getSyncPreview', () => {
     m.getLastRow.mockReturnValue(2)
     m.getFilterStatus.mockReturnValue({ hasFilter: true, visibleRows: [2, 3] })
 
-    const preview = getSyncPreview(asSheet(sheet), buildColMap(), 2, HEADER_ROW)
+    const preview = getSyncPreview(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW)
 
     expect(preview).toMatchObject({ total: 2, valid: 2, plannedSyncCount: 2 })
   })
@@ -611,7 +611,7 @@ describe('ribbon-service · detectConflicts', () => {
     m.fetchAllUserCollections.mockRejectedValue(new Error('网络不可用'))
     const sheet = new FakeSheet()
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, 't0ken')
 
     expect(result).toEqual({ conflicts: [], conflictCount: 0, bgmCollectionReady: false })
     expect(m.handleError).toHaveBeenCalledWith(expect.anything(), {
@@ -628,7 +628,7 @@ describe('ribbon-service · detectConflicts', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, 't0ken')
 
     expect(result.bgmCollectionReady).toBe(true)
     expect(result.conflictCount).toBe(1)
@@ -647,7 +647,7 @@ describe('ribbon-service · detectConflicts', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, 't0ken')
 
     expect(result.conflictCount).toBe(0)
   })
@@ -658,7 +658,7 @@ describe('ribbon-service · detectConflicts', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '忽略' })
     m.getLastRow.mockReturnValue(2)
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, 't0ken')
 
     expect(result.conflictCount).toBe(0)
   })
@@ -669,7 +669,7 @@ describe('ribbon-service · detectConflicts', () => {
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', name: '动画A', status: '看过' })
     m.getLastRow.mockReturnValue(2)
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 2, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 2, HEADER_ROW, 't0ken')
 
     expect(result.conflictCount).toBe(0)
   })
@@ -681,7 +681,7 @@ describe('ribbon-service · detectConflicts', () => {
     fillRow(sheet, 3, { url: '无编号', name: '坏行', status: '看过' })
     m.getLastRow.mockReturnValue(3)
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 3, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 3, HEADER_ROW, 't0ken')
 
     expect(result.conflictCount).toBe(0)
   })
@@ -694,7 +694,7 @@ describe('ribbon-service · detectConflicts', () => {
     m.getLastRow.mockReturnValue(3)
     m.getFilterStatus.mockReturnValue({ hasFilter: true, visibleRows: [3] })
 
-    const result = await detectConflicts(asSheet(sheet), buildColMap(), 3, HEADER_ROW, 't0ken')
+    const result = await detectConflicts(asSheet(sheet), buildColumnMap(), 3, HEADER_ROW, 't0ken')
 
     expect(result.conflicts.map((c) => c.row)).toEqual([3])
   })
@@ -704,7 +704,7 @@ describe('ribbon-service · detectConflicts', () => {
     const sheet = new FakeSheet()
     fillRow(sheet, 2, { url: 'https://bgm.tv/subject/100', status: '看过' })
     m.getLastRow.mockReturnValue(2)
-    const columnMap = buildColMap()
+    const columnMap = buildColumnMap()
     columnMap.delete('名称')
 
     const result = await detectConflicts(asSheet(sheet), columnMap, 2, HEADER_ROW, 't0ken')
@@ -748,7 +748,7 @@ describe('ribbon-service · syncWithConfirmation', () => {
   it('缺少 Bangumi_URL 列 → 提示并返回', async () => {
     m.getDataSheet.mockReturnValue(asSheet(goodSheet()))
     m.loadBgToken.mockReturnValue('t0ken')
-    const columnMap = buildColMap()
+    const columnMap = buildColumnMap()
     columnMap.delete('Bangumi_URL')
     m.getColumnMap.mockReturnValue(columnMap)
 
@@ -790,8 +790,8 @@ describe('ribbon-service · syncWithConfirmation', () => {
     ])
     m.syncToBangumiAsync.mockImplementation(
       (
-        _ws: unknown,
-        _colMap: unknown,
+        _worksheet: unknown,
+        _columnMap: unknown,
         _token: unknown,
         _lastRow: unknown,
         _headerRow: unknown,

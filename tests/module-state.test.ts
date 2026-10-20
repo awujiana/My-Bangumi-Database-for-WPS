@@ -20,8 +20,10 @@ import { registerNotifyApi } from '../ts/core/ui-bridge.js'
  * `bgmLog` 与 `showSettingsPanel` 都来自 `tools/util` 这个巨型 barrel：
  * 前者只是日志，后者要用断言验「点占位块里的按钮真的去开设置页」，故整体替换为 spy。
  */
-const { utilMock } = vi.hoisted(() => ({ utilMock: { bgmLog: vi.fn(), showSettingsPanel: vi.fn() } }))
-vi.mock('../ts/tools/util/index.js', () => utilMock)
+const { utilityMock } = vi.hoisted(() => ({
+  utilityMock: { bgmLog: vi.fn(), showSettingsPanel: vi.fn() },
+}))
+vi.mock('../ts/tools/util/index.js', () => utilityMock)
 
 /** 全隐藏提示的 toast（其余方法只需满足接口形状） */
 const toastSpy = vi.fn()
@@ -150,7 +152,7 @@ beforeEach(() => {
   // 复位「本页已提示过全隐藏」的内部标记：此时无模块被隐藏，套用一次即清除该页记录
   applyModuleState('panel')
   toastSpy.mockClear()
-  utilMock.showSettingsPanel.mockClear()
+  utilityMock.showSettingsPanel.mockClear()
 })
 
 afterEach(() => {
@@ -347,7 +349,8 @@ describe('applyModuleState', () => {
   })
 
   it('模块 / 锚点 / 按钮缺失时都安全跳过（页面结构差异不该抛错）', () => {
-    document.body.innerHTML = '<main class="main"><section class="section" id="sec-account"><h3>a</h3></section></main>'
+    document.body.innerHTML =
+      '<main class="main"><section class="section" id="sec-account"><h3>a</h3></section></main>'
     setHiddenModules('panel', ['sec-account'])
     setCollapsedModules('panel', ['sec-account'])
     expect(() => {
@@ -445,9 +448,10 @@ describe('点击折叠按钮', () => {
   it('点到非按钮元素不触发', () => {
     buildPanelDom()
     bindCollapseToggles()
-    document.getElementById('sec-account')?.querySelector('.body')?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
-    )
+    document
+      .getElementById('sec-account')
+      ?.querySelector('.body')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(getCollapsedModules('panel')).toEqual([])
   })
 
@@ -605,7 +609,7 @@ describe('全隐藏兜底', () => {
     const button = emptyHint()?.querySelector<HTMLElement>('.module-empty-hint-btn')
     expect(button).not.toBeNull()
     button?.click()
-    expect(utilMock.showSettingsPanel).toHaveBeenCalledTimes(1)
+    expect(utilityMock.showSettingsPanel).toHaveBeenCalledTimes(1)
   })
 
   it('设置页不会触发兜底：排序编辑器永远可见（它不可隐藏）', () => {

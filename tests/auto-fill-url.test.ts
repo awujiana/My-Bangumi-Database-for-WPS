@@ -41,7 +41,7 @@ import {
 const SHEET = {} as never
 
 /** 名称 / URL / 别名三列的标准列映射 */
-const COL_MAP = new Map<string, number>([
+const COLUMN_MAP = new Map<string, number>([
   ['名称', 1],
   ['Bangumi_URL', 2],
   ['别名', 3],
@@ -51,11 +51,12 @@ const COL_MAP = new Map<string, number>([
 function stubSheet(cells: Record<string, string>, lastRow: number): void {
   vi.mocked(getDataSheet).mockReturnValue(SHEET)
   vi.mocked(findHeaderRow).mockReturnValue(1)
-  vi.mocked(getColumnMap).mockReturnValue(COL_MAP)
+  vi.mocked(getColumnMap).mockReturnValue(COLUMN_MAP)
   vi.mocked(getLastRow).mockReturnValue(lastRow)
   vi.mocked(trim).mockImplementation((value) => (value ?? '').trim())
   vi.mocked(getCellValue).mockImplementation(
-    (_ws: unknown, row: number, column: number) => cells[`${String(row)}:${String(column)}`] ?? '',
+    (_worksheet: unknown, row: number, column: number) =>
+      cells[`${String(row)}:${String(column)}`] ?? '',
   )
 }
 
@@ -100,7 +101,7 @@ describe('tools/auto-fill-url', () => {
 
     beforeEach(() => {
       vi.mocked(getCellValue).mockImplementation(
-        (_ws: unknown, row: number, column: number) => data[row]?.[column] ?? '',
+        (_worksheet: unknown, row: number, column: number) => data[row]?.[column] ?? '',
       )
       vi.mocked(trim).mockImplementation((value) => (value ?? '').trim())
     })
@@ -132,7 +133,7 @@ describe('tools/auto-fill-url', () => {
         3: { 1: 'X', 2: 'u2' },
       }
       vi.mocked(getCellValue).mockImplementation(
-        (_ws: unknown, row: number, column: number) => dup[row]?.[column] ?? '',
+        (_worksheet: unknown, row: number, column: number) => dup[row]?.[column] ?? '',
       )
       const columnMap = new Map<string, number>([
         ['名称', 1],
@@ -247,7 +248,7 @@ describe('tools/auto-fill-url', () => {
         },
         2,
       )
-      expect(_buildNameUrlMap(SHEET, 1, 2, COL_MAP)).toEqual({
+      expect(_buildNameUrlMap(SHEET, 1, 2, COLUMN_MAP)).toEqual({
         NameA: 'http://first',
         AliasX: 'http://first',
       })

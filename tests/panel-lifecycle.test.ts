@@ -124,7 +124,7 @@ vi.mock('../ts/index.js', async () => {
   return {
     PANEL_CONFIG: constants.PANEL_CONFIG,
     HEADER_KEYWORDS: constants.HEADER_KEYWORDS,
-    IMPORTANT_COLS: constants.IMPORTANT_COLS,
+    IMPORTANT_COLUMNS: constants.IMPORTANT_COLUMNS,
     LOG_LEVELS: { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 },
     BGM: bgmMock,
     getApp: mocks.getApp,
@@ -185,7 +185,7 @@ import {
  * 生产签名要求完整 WpsWorksheet（Rows/Columns/Cells 等宿主属性），此处集中断言放宽。
  * 泛型 T 由调用处的参数类型推断，兼容可选/必选两种宿主签名。
  */
-function asWs(worksheet: FakeWorksheet | null | undefined): WpsWorksheet {
+function asWorksheet(worksheet: FakeWorksheet | null | undefined): WpsWorksheet {
   return worksheet as WpsWorksheet
 }
 
@@ -604,7 +604,7 @@ describe('panel-lifecycle · refreshWorkbooks', () => {
 
 describe('panel-lifecycle · activateSheetIfNeeded', () => {
   it('无活动工作簿 → false', () => {
-    expect(activateSheetIfNeeded(asWs(makeSheet('动画')))).toBe(false)
+    expect(activateSheetIfNeeded(asWorksheet(makeSheet('动画')))).toBe(false)
   })
 
   it('目标就是当前活动表 → 不做切换', () => {
@@ -613,7 +613,7 @@ describe('panel-lifecycle · activateSheetIfNeeded', () => {
     workbook.ActiveSheet = sheet
     mocks.getApp.mockReturnValue({ ActiveWorkbook: workbook })
 
-    expect(activateSheetIfNeeded(asWs(sheet))).toBe(false)
+    expect(activateSheetIfNeeded(asWorksheet(sheet))).toBe(false)
     expect(sheet.Activate).not.toHaveBeenCalled()
   })
 
@@ -624,7 +624,7 @@ describe('panel-lifecycle · activateSheetIfNeeded', () => {
     workbook.ActiveSheet = active
     mocks.getApp.mockReturnValue({ ActiveWorkbook: workbook })
 
-    const restore = activateSheetIfNeeded(asWs(target))
+    const restore = activateSheetIfNeeded(asWorksheet(target))
 
     expect(target.Activate).toHaveBeenCalledTimes(1)
     expect(typeof restore).toBe('function')
@@ -642,7 +642,7 @@ describe('panel-lifecycle · activateSheetIfNeeded', () => {
     workbook.ActiveSheet = active
     mocks.getApp.mockReturnValue({ ActiveWorkbook: workbook })
 
-    const restore = activateSheetIfNeeded(asWs(target))
+    const restore = activateSheetIfNeeded(asWorksheet(target))
     expect(() => {
       if (restore) restore()
     }).not.toThrow()
@@ -661,7 +661,7 @@ describe('panel-lifecycle · activateSheetIfNeeded', () => {
     })
     mocks.getApp.mockReturnValue({ ActiveWorkbook: workbook })
 
-    expect(activateSheetIfNeeded(asWs(makeSheet('动画')))).toBe(false)
+    expect(activateSheetIfNeeded(asWorksheet(makeSheet('动画')))).toBe(false)
     expect(mocks.handleError).toHaveBeenCalled()
   })
 })
@@ -670,26 +670,26 @@ describe('panel-lifecycle · activateSheetIfNeeded', () => {
 
 describe('panel-lifecycle · detectHeaderAndColumns', () => {
   it('空表 → 返回全 0 的元信息', () => {
-    const meta = detectHeaderAndColumns(asWs(makeSheet('空表')))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('空表')))
     expect(meta.headerRow).toBe(0)
     expect(meta.headerNames).toEqual([])
-    expect(meta.lastCol).toBe(0)
+    expect(meta.lastColumn).toBe(0)
     expect(meta.headerMatchCount).toBe(0)
   })
 
   it('识别出表头行、列名与数据起始行', () => {
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', makeTrackedSheetCells())))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', makeTrackedSheetCells())))
 
     expect(meta.headerRow).toBe(1)
     expect(meta.headerMatchCount).toBe(4)
     expect(meta.dataStartRow).toBe(2)
-    expect(meta.firstDataCol).toBe(1)
-    expect(meta.lastCol).toBe(4)
+    expect(meta.firstDataColumn).toBe(1)
+    expect(meta.lastColumn).toBe(4)
   })
 
   it('关键字少于 3 个的行不算表头', () => {
     const meta = detectHeaderAndColumns(
-      asWs(makeSheet('动画', { '1:1': '序列号', '1:2': '名称', '2:1': 'x' })),
+      asWorksheet(makeSheet('动画', { '1:1': '序列号', '1:2': '名称', '2:1': 'x' })),
     )
     expect(meta.headerRow).toBe(0)
   })
@@ -706,7 +706,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '3:4': '是否看完',
       '4:1': '1',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
     expect(meta.headerRow).toBe(3)
   })
 
@@ -729,7 +729,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     const originalRect = mocks.readRangeValues.getMockImplementation()
     mocks.readRangeValues.mockReturnValue([])
 
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', makeTrackedSheetCells())))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', makeTrackedSheetCells())))
 
     if (originalRect) mocks.readRangeValues.mockImplementation(originalRect)
 
@@ -743,7 +743,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('筛选模式下只扫描可见行（表头行永远可见）', () => {
     const cells = makeTrackedSheetCells()
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)), {
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)), {
       isFiltered: true,
       visibleRowSet: new Set([1, 2]),
     })
@@ -753,7 +753,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('重要列被标记（名称 / bangumi url 等）', () => {
     const meta = detectHeaderAndColumns(
-      asWs(
+      asWorksheet(
         makeSheet('动画', {
           '1:1': '名称',
           '1:2': '序列号',
@@ -776,19 +776,19 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '2:3': '9',
       '2:5': '表头没这一列',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
-    expect(meta.firstDataCol).toBe(1)
-    expect(meta.lastCol).toBe(5)
-    expect(meta.previewColEnd).toBe(3)
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
+    expect(meta.firstDataColumn).toBe(1)
+    expect(meta.lastColumn).toBe(5)
+    expect(meta.previewColumnEnd).toBe(3)
   })
 
   it('预览列范围按真实表头宽度收敛，不是 MAX_SCAN_COLUMNS', () => {
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', makeTrackedSheetCells())))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', makeTrackedSheetCells())))
 
     expect(meta.headerNames).toEqual(['序列号', '名称', '是否看完', '打分'])
-    expect(meta.lastCol).toBe(4)
-    expect(meta.previewColEnd).toBe(4)
-    expect(meta.previewColEnd - meta.previewColStart).toBe(4)
+    expect(meta.lastColumn).toBe(4)
+    expect(meta.previewColumnEnd).toBe(4)
+    expect(meta.previewColumnEnd - meta.previewColumnStart).toBe(4)
   })
 
   it('两行表头：续行补齐空列时合并列名，数据起始行后移一行', () => {
@@ -807,12 +807,12 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '3:5': '12',
       '3:6': '恋爱',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
 
     expect(meta.headerRow).toBe(1)
     expect(meta.dataStartRow).toBe(3)
     expect(meta.headerNames).toEqual(['序列号', '名称', '打分', '开播日期', '集数', '标签'])
-    expect(meta.lastCol).toBe(6)
+    expect(meta.lastColumn).toBe(6)
   })
 
   it('补齐行比主表头行更宽时，表头行仍取上一行（不丢主列名）', () => {
@@ -829,7 +829,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '3:1': '1',
       '3:2': '动画A',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
 
     expect(meta.headerRow).toBe(1)
     expect(meta.dataStartRow).toBe(3)
@@ -845,18 +845,18 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '2:12': '1',
       '2:13': '动画A',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
 
-    expect(meta.firstDataCol).toBe(12)
+    expect(meta.firstDataColumn).toBe(12)
     expect(meta.previewColStartAbsolute).toBe(12)
-    expect(meta.lastCol).toBe(15)
-    expect(meta.previewColEnd).toBe(4)
+    expect(meta.lastColumn).toBe(15)
+    expect(meta.previewColumnEnd).toBe(4)
   })
   it('数据区全空时首个数据列回退到第 1 列', () => {
     // 表头行有 3 个关键字（够成为候选），但数据区一格值都没有：
-    // firstDataCol 扫描不到任何非空单元格，必须回退成 1，否则列范围算不出来。
+    // firstDataColumn 扫描不到任何非空单元格，必须回退成 1，否则列范围算不出来。
     const meta = detectHeaderAndColumns(
-      asWs(
+      asWorksheet(
         makeSheet('动画', {
           '1:1': '序列号',
           '1:2': '名称',
@@ -866,7 +866,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     )
 
     expect(meta.headerRow).toBe(1)
-    expect(meta.firstDataCol).toBe(1)
+    expect(meta.firstDataColumn).toBe(1)
   })
 
   it('续行只补上不到 3 列时不算多行表头，避免吞掉首行数据', () => {
@@ -881,7 +881,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '2:5': '备注乙',
       '3:1': '2',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
 
     // 第 2 行只有 2 列落在「表头为空」的列上 → 低于阈值，按数据行处理
     expect(meta.headerRow).toBe(1)
@@ -908,7 +908,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       '3:1': '2',
       '3:2': '动画B',
     }
-    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+    const meta = detectHeaderAndColumns(asWorksheet(makeSheet('动画', cells)))
 
     expect(meta.headerRow).toBe(1)
     // 关键：第 2 行是数据，不能被当成多行表头吃掉
@@ -958,7 +958,7 @@ describe('panel-lifecycle · autoDetectSheet', () => {
   })
 })
 
-// ========== collectActiveFilterCols / updateFilterStatus ==========
+// ========== collectActiveFilterColumns / updateFilterStatus ==========
 
 describe('panel-lifecycle · updateFilterStatus', () => {
   it('状态元素缺失或取不到工作表 → 直接返回', () => {
@@ -975,7 +975,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     const element = mountDiv('filterStatus')
     element.setAttribute('title', '旧提示')
 
-    updateFilterStatus(asWs(makeSheet('动画', {})))
+    updateFilterStatus(asWorksheet(makeSheet('动画', {})))
 
     expect(element.textContent).toBe('未开启筛选，同步全部数据')
     expect(element.hasAttribute('title')).toBe(false)
@@ -990,7 +990,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
       },
     })
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(mocks.handleError).toHaveBeenCalled()
     expect(element.textContent).toBe('未开启筛选，同步全部数据')
@@ -1006,7 +1006,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     })
 
     expect(() => {
-      updateFilterStatus(asWs(sheet))
+      updateFilterStatus(asWorksheet(sheet))
     }).not.toThrow()
     expect(mocks.handleError).toHaveBeenCalled()
   })
@@ -1016,7 +1016,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     const sheet = makeSheet('动画', {})
     sheet.AutoFilterMode = true
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
     expect(element.textContent).toBe('筛选已开启但无活动筛选')
   })
 
@@ -1026,7 +1026,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     sheet.AutoFilterMode = true
     sheet.AutoFilter = { Filters: { Count: 0, Item: () => ({ On: false }) } }
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(element.textContent).toBe('筛选已开启但无活动筛选，同步全部数据')
   })
@@ -1037,7 +1037,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     sheet.AutoFilterMode = false
     sheet.AutoFilter = { Mode: true, Filters: { Count: 0, Item: () => ({ On: false }) } }
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     // 兜底生效才会走到「已开启筛选」文案；否则会是「未开启筛选，同步全部数据」
     expect(element.textContent).toBe('筛选已开启但无活动筛选，同步全部数据')
@@ -1055,7 +1055,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
       },
     }
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(element.textContent).toContain('筛选已开启（1 列）')
     expect(element.textContent).toContain('名称(动画A)')
@@ -1081,7 +1081,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
         },
       }
 
-      updateFilterStatus(asWs(sheet))
+      updateFilterStatus(asWorksheet(sheet))
 
       expect(element.textContent).toContain(`名称(A${expected})`)
     }
@@ -1100,7 +1100,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
       throw new Error('单元格不可读')
     }
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(mocks.handleError).toHaveBeenCalled()
     // 生产行为：列名读取失败时退回「列N」且不带条件括号（columnName 为空即丢弃整个括号段）
@@ -1120,7 +1120,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
       },
     }
 
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(mocks.handleError).toHaveBeenCalled()
     expect(element.textContent).toBe('筛选已开启但无活动筛选，同步全部数据')
@@ -1136,7 +1136,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
       },
     })
     // AutoFilterMode=true 时走外层 try，AutoFilter getter 在 try 内抛错 → 外层 catch 写明失败原因
-    updateFilterStatus(asWs(sheet))
+    updateFilterStatus(asWorksheet(sheet))
 
     expect(element.textContent).toBe('检测筛选状态失败: 桥接对象失效')
   })
@@ -1328,8 +1328,8 @@ describe('panel-lifecycle · refreshData', () => {
   it('预览收敛到单列且拿到标量返回值时，直接按标量取值', () => {
     const box = mountDiv('previewBox')
     mountSelect('sheetSelect', '1')
-    // 表头 4 列（1-4），数据行只在第 9 列有值：firstDataCol=9 > headerLastCol=4，
-    // previewColStart 被推到 4 → 预览列数 = 4-4+1 = 1，批量读取的 Range 是单格。
+    // 表头 4 列（1-4），数据行只在第 9 列有值：firstDataColumn=9 > headerLastColumn=4，
+    // previewColumnStart 被推到 4 → 预览列数 = 4-4+1 = 1，批量读取的 Range 是单格。
     const sheet = makeSheet('动画', {
       '1:1': '序列号',
       '1:2': '名称',

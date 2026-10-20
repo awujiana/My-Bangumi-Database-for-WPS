@@ -8,6 +8,42 @@
 
 ## [未发布]
 
+### 新增：命名规范化进入 lint 门禁（2026-10-20）
+
+前几轮 `cf → conditionalFormat`、`ws/col/sid → worksheet/column/subjectId` 都是**人工排查**出来的 ——
+`unicorn/name-replacements` 只认字母形态、不认语义缩写，且它的 110 条替换表里没有
+`ws / col / sid / hl / cf`，lint 全程绿。**「lint 不报」不等于「命名合规」**。
+
+- **新增 `@typescript-eslint/naming-convention` 配置**（`eslint.config.mjs`）：
+  - 缩写黑名单 = `unicorn/name-replacements` 词表（剔除单字母项）+ 本项目增量
+    （`ws` / `col` / `sid` / `hl` / `cf` / `img` / `win` / `cls` / `opt` / `del` …），约 130 条。
+  - 词段判定两个分支互补：开头或 `_` 之后（覆盖 UPPER_CASE 的 `LEN` / `COL`）、
+    camelCase 边界（覆盖 `setWin` 的 `Win`）。词尾锚定「结尾 / 非字母 / 下一个大写+小写」，
+    因此 `colorIndex` / `protocol` / `DEFAULT_BRANCH` / `MAX_ADDRESS_LENGTH` **不误判**，
+    而 `maxCol` / `setWin` / `MAX_COMMENT_LEN` 判中。
+  - 字母形态：变量/函数/参数 `camelCase`、类型 `PascalCase`、常量 `UPPER_CASE`；
+    未使用参数（`_` / `_worksheet`）豁免格式但**不豁免缩写检查**（否则 `_ws` 会永久躲过门禁）。
+  - 报错可读性：`failureMessage` 在 typescript-eslint 8.72 **只在 schema 里、规则体未实现**
+    （已实测），报错文本由 `custom.regex` 决定。故改用「`filter` 挑出含缩写的名字 +
+    永不匹配的 `(?!)` 提示正则」，报错从 5KB 正则变成一行可读提示。
+- **全量清理既有缩写**（约 2050 处 / 100+ 文件）：
+  `xxxCol → xxxColumn`、`xxxWs → xxxWorksheet`、`xxxSid → xxxSubjectId` 三大族，
+  常量 `*_COL → *_COLUMN` / `TXT_* → TEXT_*` / `MAX_COMMENT_LEN → MAX_COMMENT_LENGTH`，
+  以及 `img → image`、`win → windowGlobals`、`cls → cssClass`、`opt → option`、
+  `delRow → rowToDelete`、`impl → implementation`、`_def → _definition` 等。
+- **新增 [`文档/NAMING.md`](文档/NAMING.md)**：规范正文（形态规则、缩写对照表、判定算法正反例、
+  豁免清单、迁移注意事项）。README 文档索引已加指针。
+- **新增 `scripts/probe-naming.mjs`**：不加载主配置（无类型感知，几秒出结果）的独立扫描器，
+  按「命中名 → 次数 → 文件:行」汇总，调黑名单或评估下一批改名量时用。
+
+已知取舍（详见 NAMING.md §4）：
+
+- **属性位（`objectLiteralProperty` / `typeProperty`）整体豁免**：线上 dump 字段、WPS COM
+  （`Interior` / `Color`）、DOM（`className`）的名字所有权不在本项目。
+- **线上键 `sid` 保持原样**，靠解析边界 `WireRemoteEntry` + `toRemoteEntry()` 归一成 `subjectId`。
+- **`init*` 前缀不算缩写**（与 unicorn 词表口径一致），保留 `initPanel` / `initRibbon` 等十余个
+  既有导出名；要收紧只需把 `init` 加进 `PROJECT_ABBREVIATIONS`。
+
 ### 依赖与工具链升级（2026-10-20）
 
 `npm outdated` 逐项核对后升级；全量门禁 `npm run gate` 通过（142 文件 / 4645 用例）。

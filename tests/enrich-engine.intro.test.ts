@@ -106,14 +106,14 @@ function mockReadRangeValues(
   worksheet: unknown,
   startRow: number,
   endRow: number,
-  startCol: number,
-  endCol: number,
+  startColumn: number,
+  endColumn: number,
 ): string[][] {
   const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
-    for (let column = startCol; column <= endCol; column += 1) {
+    for (let column = startColumn; column <= endColumn; column += 1) {
       rowValues.push(getCell(sheetName, row, column))
     }
     result.push(rowValues)
@@ -155,12 +155,12 @@ vi.mock('../ts/tools/util/index.js', () => ({
     worksheet: unknown,
     startRow: number,
     endRow: number,
-    startCol: number,
-    endCol: number,
+    startColumn: number,
+    endColumn: number,
   ): string[][] => {
-    areaRead.calls.push([sheetNameOf(worksheet), startRow, endRow, startCol, endCol])
+    areaRead.calls.push([sheetNameOf(worksheet), startRow, endRow, startColumn, endColumn])
     if (areaRead.failAreaRead) return []
-    return mockReadRangeValues(worksheet, startRow, endRow, startCol, endCol)
+    return mockReadRangeValues(worksheet, startRow, endRow, startColumn, endColumn)
   },
   isEmptyValue,
 }))
@@ -199,7 +199,7 @@ const introSheet = { Name: INTRO } as never
 /** Bangumi 追踪表行号（富化目标行） */
 const BANGUMI_ROW = 5
 /** 日常富化用的列映射：名称 / 导演 / 脚本 / 特点·印象 */
-const BASE_COL_MAP = new Map<string, number>([
+const BASE_COLUMN_MAP = new Map<string, number>([
   ['名称', 1],
   ['导演', 3],
   ['脚本', 4],
@@ -208,7 +208,7 @@ const BASE_COL_MAP = new Map<string, number>([
 
 function runIntro(
   data: Record<string, string>,
-  columnMap: Map<string, number> = BASE_COL_MAP,
+  columnMap: Map<string, number> = BASE_COLUMN_MAP,
   row = BANGUMI_ROW,
 ): { enriched: EnrichedField[]; conflicts: ConflictInfo[] } {
   const enriched: EnrichedField[] = []
@@ -238,33 +238,33 @@ beforeEach(() => {
 
 describe('isIntroSheet 判断逻辑', () => {
   it('有简介列时返回 true', () => {
-    expect(isIntroSheet({ nameCol: 1, introCol: 2 })).toBe(true)
+    expect(isIntroSheet({ nameColumn: 1, introCol: 2 })).toBe(true)
   })
 
   it('有编剧列时返回 true', () => {
-    expect(isIntroSheet({ nameCol: 1, screenplayCol: 3 })).toBe(true)
+    expect(isIntroSheet({ nameColumn: 1, screenplayCol: 3 })).toBe(true)
   })
 
   it('有人设列时返回 true', () => {
-    expect(isIntroSheet({ nameCol: 1, characterDesignCol: 4 })).toBe(true)
+    expect(isIntroSheet({ nameColumn: 1, characterDesignCol: 4 })).toBe(true)
   })
 
   it('有CG导演列时返回 true', () => {
-    expect(isIntroSheet({ nameCol: 1, cgDirectorCol: 5 })).toBe(true)
+    expect(isIntroSheet({ nameColumn: 1, cgDirectorCol: 5 })).toBe(true)
   })
 
   it('只有基本列时返回 false', () => {
-    expect(isIntroSheet({ nameCol: 1, tagsCol: 2 })).toBe(false)
+    expect(isIntroSheet({ nameColumn: 1, tagsColumn: 2 })).toBe(false)
   })
 
   it('空映射返回 false', () => {
-    expect(isIntroSheet({ nameCol: 1 })).toBe(false)
+    expect(isIntroSheet({ nameColumn: 1 })).toBe(false)
   })
 
   it('有多个简介专有列时返回 true', () => {
     expect(
       isIntroSheet({
-        nameCol: 1,
+        nameColumn: 1,
         introCol: 2,
         directorCol: 3,
         screenplayCol: 4,
@@ -330,11 +330,11 @@ describe('INTRO_FIELD_TO_BANGUMI 映射（经 enrichIntroData 验证）', () => 
 
 // ========== 标注白名单机制测试（间接验证） ==========
 
-function written(sourceKey: string, targetCol: string, value: string): string {
+function written(sourceKey: string, targetColumn: string, value: string): string {
   store.clear()
   const columnMap = new Map<string, number>([
     ['名称', 1],
-    [targetCol, 2],
+    [targetColumn, 2],
   ])
   runIntro({ [sourceKey]: value }, columnMap)
   return getCell(BANGUMI, BANGUMI_ROW, 2)
@@ -599,10 +599,10 @@ describe('enrichOpEdPv 逻辑', () => {
     return enriched
   }
 
-  const featureColMap = new Map<string, number>([['特点/印象', 10]])
+  const featureColumnMap = new Map<string, number>([['特点/印象', 10]])
 
   it('OP/ED/PV 追加到特点/印象', () => {
-    const enriched = runOpEdPv({ OP: 'OP1: 歌曲A', ED: 'ED1: 歌曲B' }, featureColMap)
+    const enriched = runOpEdPv({ OP: 'OP1: 歌曲A', ED: 'ED1: 歌曲B' }, featureColumnMap)
 
     expect(enriched).toHaveLength(1)
     expect(enriched[0]).toMatchObject({ fieldName: '特点/印象', action: 'fill', oldValue: null })
@@ -610,7 +610,7 @@ describe('enrichOpEdPv 逻辑', () => {
   })
 
   it('只有 OP 时只添加 OP', () => {
-    runOpEdPv({ OP: 'OP1: 歌曲A' }, featureColMap)
+    runOpEdPv({ OP: 'OP1: 歌曲A' }, featureColumnMap)
 
     const feature = getCell(BANGUMI, BANGUMI_ROW, 10)
     expect(feature).toBe('OP:OP1: 歌曲A')
@@ -618,19 +618,19 @@ describe('enrichOpEdPv 逻辑', () => {
   })
 
   it('只有 PV 时只添加 PV', () => {
-    const enriched = runOpEdPv({ PV: '预告片' }, featureColMap)
+    const enriched = runOpEdPv({ PV: '预告片' }, featureColumnMap)
 
     expect(enriched[0]?.action).toBe('fill')
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('PV:预告片')
   })
 
   it('没有 OP/ED/PV 时不添加', () => {
-    expect(runOpEdPv({}, featureColMap)).toHaveLength(0)
+    expect(runOpEdPv({}, featureColumnMap)).toHaveLength(0)
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('')
   })
 
   it('OP/ED/PV 全为空字符串时不添加', () => {
-    expect(runOpEdPv({ OP: '', ED: '  ', PV: '' }, featureColMap)).toHaveLength(0)
+    expect(runOpEdPv({ OP: '', ED: '  ', PV: '' }, featureColumnMap)).toHaveLength(0)
   })
 
   it('特点/印象列不存在时跳过', () => {
@@ -641,7 +641,7 @@ describe('enrichOpEdPv 逻辑', () => {
   it('已有内容时追加', () => {
     setCell(BANGUMI, BANGUMI_ROW, 10, '已有')
 
-    const enriched = runOpEdPv({ OP: 'OP1' }, featureColMap)
+    const enriched = runOpEdPv({ OP: 'OP1' }, featureColumnMap)
 
     expect(enriched[0]?.action).toBe('append')
     expect(enriched[0]?.oldValue).toBe('已有')
@@ -651,7 +651,7 @@ describe('enrichOpEdPv 逻辑', () => {
   it('内容已存在时记录 skip 且不改写单元格', () => {
     setCell(BANGUMI, BANGUMI_ROW, 10, 'OP:OP1')
 
-    const enriched = runOpEdPv({ OP: 'OP1' }, featureColMap)
+    const enriched = runOpEdPv({ OP: 'OP1' }, featureColumnMap)
 
     expect(enriched).toHaveLength(1)
     expect(enriched[0]?.action).toBe('skip')
@@ -663,7 +663,7 @@ describe('enrichOpEdPv 逻辑', () => {
 
 describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
   /** 无「脚本」列：编剧 回退写「特点/印象」列（同一格被两条链路先后写） */
-  const fallbackColMap = new Map<string, number>([['特点/印象', 10]])
+  const fallbackColumnMap = new Map<string, number>([['特点/印象', 10]])
 
   it('走缓存时：enrichIntroData 写特点列后，enrichOpEdPv 读到写后新值并正确合并', () => {
     const cache = createSheetCellCache(bangumiSheet, [BANGUMI_ROW], 12, {
@@ -676,7 +676,7 @@ describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
       bangumiSheet,
       BANGUMI_ROW,
       { 编剧: '奈须蘑菇' },
-      fallbackColMap,
+      fallbackColumnMap,
       introEnriched,
       [],
       2,
@@ -686,7 +686,14 @@ describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('编剧:奈须蘑菇(编剧)')
 
     const opEnriched: EnrichedField[] = []
-    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: 'OP1: 歌曲A' }, fallbackColMap, opEnriched, cache)
+    enrichOpEdPv(
+      bangumiSheet,
+      BANGUMI_ROW,
+      { OP: 'OP1: 歌曲A' },
+      fallbackColumnMap,
+      opEnriched,
+      cache,
+    )
 
     // 关键断言：OP 必须追加在 intro 写入之后——只读缓存会拿到写前空值，
     // 走 fill 分支把「编剧」整个覆盖掉（文档记录过的合并出错）
@@ -701,14 +708,14 @@ describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
       bangumiSheet,
       BANGUMI_ROW,
       { 编剧: '奈须蘑菇' },
-      fallbackColMap,
+      fallbackColumnMap,
       introEnriched,
       [],
       2,
       '葬送的芙莉莲',
     )
     const opEnriched: EnrichedField[] = []
-    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: 'OP1: 歌曲A' }, fallbackColMap, opEnriched)
+    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: 'OP1: 歌曲A' }, fallbackColumnMap, opEnriched)
 
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('编剧:奈须蘑菇(编剧) | OP:OP1: 歌曲A')
     expect(opEnriched[0]?.action).toBe('append')
@@ -956,7 +963,7 @@ describe('resolveConflictField 冲突解决', () => {
 
 describe('readIntroSheetRow 行读取', () => {
   const FULL_MAPPING: EnrichColumnMapping = {
-    nameCol: 1,
+    nameColumn: 1,
     introCol: 2,
     studioCol: 3,
     directorCol: 4,
@@ -1025,7 +1032,7 @@ describe('readIntroSheetRow 行读取', () => {
 
   it('未配置的列不出现在结果里（只返回名称）', () => {
     setCell(INTRO, 2, 1, '只有名称')
-    expect(readIntroSheetRow(introSheet, 2, { nameCol: 1 })).toEqual({ 名称: '只有名称' })
+    expect(readIntroSheetRow(introSheet, 2, { nameColumn: 1 })).toEqual({ 名称: '只有名称' })
   })
 
   it('空单元格返回空字符串而非 undefined', () => {
@@ -1062,11 +1069,11 @@ describe('buildIntroSheetContext 简介表识别', () => {
     expect(context).not.toBeNull()
     expect(context?.headerRow).toBe(1)
     expect(context?.dataStartRow).toBe(2)
-    expect(context?.mapping.nameCol).toBe(1)
+    expect(context?.mapping.nameColumn).toBe(1)
     expect(context?.mapping.directorCol).toBe(2)
     expect(context?.mapping.screenplayCol).toBe(3)
     expect(context?.mapping.introCol).toBe(4)
-    expect(isIntroSheet(context?.mapping ?? { nameCol: 0 })).toBe(true)
+    expect(isIntroSheet(context?.mapping ?? { nameColumn: 0 })).toBe(true)
   })
 
   it('名称索引按 normalizeName 归一，可跨大小写/空格命中', () => {
@@ -1247,7 +1254,7 @@ describe('enrichIntroFromContext 按名称关联富化', () => {
       BANGUMI_ROW,
       buildContext(),
       '葬送的芙莉莲',
-      BASE_COL_MAP,
+      BASE_COLUMN_MAP,
       enriched,
       conflicts,
     )
@@ -1267,7 +1274,7 @@ describe('enrichIntroFromContext 按名称关联富化', () => {
       BANGUMI_ROW,
       buildContext(),
       '不存在的动画',
-      BASE_COL_MAP,
+      BASE_COLUMN_MAP,
       enriched,
       conflicts,
     )
@@ -1286,7 +1293,7 @@ describe('enrichIntroFromContext 按名称关联富化', () => {
       BANGUMI_ROW,
       buildContext(),
       ' 葬送的 芙莉莲 ',
-      BASE_COL_MAP,
+      BASE_COLUMN_MAP,
       enriched,
       conflicts,
     )

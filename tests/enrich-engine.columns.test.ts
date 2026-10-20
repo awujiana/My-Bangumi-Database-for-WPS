@@ -90,7 +90,7 @@ function createSheet(range: RangeStub): never {
 }
 
 /** 已有列：名称(1) / 别名(2)，因此新列应从第 3 列开始 */
-function createColMap(): Map<string, number> {
+function createColumnMap(): Map<string, number> {
   return new Map<string, number>([
     ['名称', 1],
     ['别名', 2],
@@ -112,7 +112,12 @@ describe('ensureBangumiColumns 新增列全成或全不成 (P2-6)', () => {
     mocks.readBack = [['导演', '脚本']]
     const range = createRange()
 
-    const result = ensureBangumiColumns(createSheet(range), createColMap(), REQUIRED_FIELDS, HEADER_ROW)
+    const result = ensureBangumiColumns(
+      createSheet(range),
+      createColumnMap(),
+      REQUIRED_FIELDS,
+      HEADER_ROW,
+    )
 
     expect(result.get('导演')).toBe(3)
     expect(result.get('脚本')).toBe(4)
@@ -126,7 +131,7 @@ describe('ensureBangumiColumns 新增列全成或全不成 (P2-6)', () => {
 
     const result = ensureBangumiColumns(
       createSheet(createRange()),
-      createColMap(),
+      createColumnMap(),
       REQUIRED_FIELDS,
       HEADER_ROW,
     )
@@ -144,7 +149,7 @@ describe('ensureBangumiColumns 新增列全成或全不成 (P2-6)', () => {
 
     const result = ensureBangumiColumns(
       createSheet(createRange()),
-      createColMap(),
+      createColumnMap(),
       REQUIRED_FIELDS,
       HEADER_ROW,
     )
@@ -156,7 +161,7 @@ describe('ensureBangumiColumns 新增列全成或全不成 (P2-6)', () => {
   it('写入抛错：同样不部分提交并提示用户', () => {
     const result = ensureBangumiColumns(
       createSheet(createRange(true)),
-      createColMap(),
+      createColumnMap(),
       REQUIRED_FIELDS,
       HEADER_ROW,
     )
@@ -171,7 +176,7 @@ describe('ensureBangumiColumns 新增列全成或全不成 (P2-6)', () => {
 
     const result = ensureBangumiColumns(
       createSheet(createRange()),
-      createColMap(),
+      createColumnMap(),
       REQUIRED_FIELDS,
       HEADER_ROW,
     )

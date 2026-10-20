@@ -4,7 +4,7 @@
  * 测试目标：
  *   - Result.ok / Result.fail / Result.fromCode 工厂方法
  *   - isOk / isFail / unwrap / unwrapOr 访问器
- *   - map / mapErr 转换方法
+ *   - map / mapError 转换方法
  *   - 边界场景：null/undefined/空字符串/0/false 作为成功值、链式调用
  *
  * 模块依赖说明：
@@ -135,12 +135,12 @@ describe('Result.map', () => {
   })
 })
 
-// ========== Result.mapErr ==========
-describe('Result.mapErr', () => {
+// ========== Result.mapError ==========
+describe('Result.mapError', () => {
   it('对失败错误应用转换函数', () => {
     const error = new BgmError('原始错误', { code: 'ORIGINAL' })
     const r = Result.fail<number>(error)
-    const mapped = r.mapErr(
+    const mapped = r.mapError(
       (error_) => new BgmError(`包装: ${error_.message}`, { code: `WRAPPED_${error_.code}` }),
     )
     expect(mapped.isFail()).toBe(true)
@@ -151,7 +151,7 @@ describe('Result.mapErr', () => {
   it('成功结果不调用 fn 且保持成功状态', () => {
     const r = Result.ok(42)
     const function_ = vi.fn((error: BgmError) => new BgmError(error.message, { code: error.code }))
-    const mapped = r.mapErr(function_)
+    const mapped = r.mapError(function_)
     expect(mapped.isOk()).toBe(true)
     expect(function_).not.toHaveBeenCalled()
     expect(mapped.unwrap()).toBe(42)
@@ -232,10 +232,10 @@ describe('Result 边界场景', () => {
     expect(function2).not.toHaveBeenCalled()
   })
 
-  it('mapErr 链式调用：fail → mapErr → mapErr', () => {
+  it('mapError 链式调用：fail → mapError → mapError', () => {
     const r = Result.fail<number>(new BgmError('原始', { code: 'A' }))
-      .mapErr((error) => new BgmError(`${error.message}-1`, { code: `${error.code}B` }))
-      .mapErr((error) => new BgmError(`${error.message}-2`, { code: `${error.code}C` }))
+      .mapError((error) => new BgmError(`${error.message}-1`, { code: `${error.code}B` }))
+      .mapError((error) => new BgmError(`${error.message}-2`, { code: `${error.code}C` }))
     expect(r.isFail()).toBe(true)
     expect(r.error?.message).toBe('原始-1-2')
     expect(r.error?.code).toBe('ABC')
@@ -245,7 +245,7 @@ describe('Result 边界场景', () => {
     const function_ = vi.fn((x: number) => x * 2)
     const r = Result.fail<number>(new BgmError('失败', { code: 'CODE' }))
       .map(function_)
-      .mapErr((error) => error)
+      .mapError((error) => error)
     expect(r.unwrapOr(-1)).toBe(-1)
     expect(function_).not.toHaveBeenCalled()
   })

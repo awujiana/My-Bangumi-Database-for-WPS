@@ -16,9 +16,9 @@ const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockReadRowsCache = vi.hoisted(() =>
   vi.fn(
     (
-      _ws: unknown,
+      _worksheet: unknown,
       _rows: readonly number[],
-      _maxCol: number,
+      _maxColumn: number,
     ): Map<number, readonly string[]> | null => null,
   ),
 )
@@ -28,14 +28,14 @@ const mockReadRangeValues = vi.hoisted(() =>
       worksheet: unknown,
       startRow: number,
       endRow: number,
-      startCol: number,
-      endCol: number,
+      startColumn: number,
+      endColumn: number,
     ): string[][] => {
       try {
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
-          for (let column = startCol; column <= endCol; column += 1) {
+          for (let column = startColumn; column <= endColumn; column += 1) {
             const value = mockGetCellValue(worksheet, row, column) as
               string | number | boolean | null
             line.push(value == null ? '' : String(value))
@@ -55,8 +55,8 @@ const mockReadRangeCellValues = vi.hoisted(() =>
       worksheet: unknown,
       startRow: number,
       endRow: number,
-      startCol: number,
-      endCol: number,
+      startColumn: number,
+      endColumn: number,
     ): (string | number | boolean | Date | null)[][] => {
       // 默认实现与 mockReadRangeValues 同源（走 mockGetCellValue），但**保留原始
       // 类型**：与真实宿主「读到什么返什么」一致，宽度自动等于请求列数，
@@ -66,7 +66,7 @@ const mockReadRangeCellValues = vi.hoisted(() =>
         const rows: (string | number | boolean | Date | null)[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
-          for (let column = startCol; column <= endCol; column += 1) {
+          for (let column = startColumn; column <= endColumn; column += 1) {
             const value = mockGetCellValue(worksheet, row, column) as
               string | number | boolean | null
             line.push(value ?? null)
@@ -81,7 +81,9 @@ const mockReadRangeCellValues = vi.hoisted(() =>
   ),
 )
 const mockSetCellValue = vi.hoisted(() => vi.fn())
-const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCodePoint(64 + c)))
+const mockColumnNumberToLetter = vi.hoisted(() =>
+  vi.fn((c: number) => String.fromCodePoint(64 + c)),
+)
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetApp = vi.hoisted(() => vi.fn())
@@ -373,7 +375,7 @@ vi.mock('../ts/core/constants.js', () => ({
     '备注',
     '数据指纹',
   ],
-  SYNC_RECORD_COL: {
+  SYNC_RECORD_COLUMN: {
     SID: 1,
     TIME: 2,
     NAME: 3,
@@ -403,7 +405,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
-  columnNumberToLetter: mockColNumberToLetter,
+  columnNumberToLetter: mockColumnNumberToLetter,
   trim: mockTrim,
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -553,12 +555,12 @@ type MockRange = ReturnType<typeof createMockWorksheet>['Range']
 /**
  * 构造 Range mock。
  *
- * 直接写 `vi.fn(impl)` 时 TS 会按 impl 的返回形状精确推断，而 vitest 的 Mock<T>
+ * 直接写 `vi.fn(implementation)` 时 TS 会按 implementation 的返回形状精确推断，而 vitest 的 Mock<T>
  * 要求 mockReturnValue 收完整 T（参数逆变），于是「返回形状略有不同的另一处赋值」
  * 会被判不兼容（TS2322）。各测试需要返回不同的单元格形状，故在此单点断言收敛。
  */
-function asRangeMock(impl: (address: string) => unknown): MockRange {
-  return vi.fn(impl) as unknown as MockRange
+function asRangeMock(implementation: (address: string) => unknown): MockRange {
+  return vi.fn(implementation) as unknown as MockRange
 }
 
 describe('computeDiff', () => {
@@ -1016,7 +1018,7 @@ describe('getSelectedRowSubjectIds (通过 syncFromGithub selectedRowsOnly)', ()
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
       if (row === 3 && column === 1) return 'https://bgm.tv/subject/222'
       return ''
@@ -1045,8 +1047,8 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
   })
 
   it('日期列应转换为本地年月日格式', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(
@@ -1084,12 +1086,12 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
     const result = await applyDiffToSheet(diffs, 'add-update', undefined, 'test')
     expect(result.added).toBe(1)
     // 验证 Range 被调用（batchWriteNewRows 使用 worksheet.Range().Value2 批量写入）
-    expect(mockWs.Range).toHaveBeenCalled()
+    expect(mockWorksheet.Range).toHaveBeenCalled()
   })
 
   it('无效日期字符串不应抛出错误', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(
@@ -1134,8 +1136,8 @@ describe('readLocalEntries 批量读取路径', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // 默认 mock 让 getDataSheet 返回一个可用的 mock 工作表，避免 readLocalEntriesForSync 返回 null
-    const defaultWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(defaultWs)
+    const defaultWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(defaultWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
@@ -1148,15 +1150,15 @@ describe('readLocalEntries 批量读取路径', () => {
       ['', '', ''],
     ]
 
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((address: string) => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: batchData, Interior: { Color: 0 } }
       }
       return { Value2: '', Text: '', Interior: { Color: 0 }, Font: { Bold: false } }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(4)
     mockGetColumnMap.mockReturnValue(
@@ -1173,12 +1175,12 @@ describe('readLocalEntries 批量读取路径', () => {
     })
 
     // 验证 mock 正确
-    expect(mockWs.Range('A2:C4').Value2).toEqual(batchData)
+    expect(mockWorksheet.Range('A2:C4').Value2).toEqual(batchData)
   })
 
   it('Range.Value2 返回非数组时应回退到逐单元格读取', () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((address: string) => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         // 非数组
         return { Value2: null, Interior: { Color: 0 } }
@@ -1191,7 +1193,7 @@ describe('readLocalEntries 批量读取路径', () => {
       }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
     mockGetColumnMap.mockReturnValue(
@@ -1200,7 +1202,7 @@ describe('readLocalEntries 批量读取路径', () => {
         ['名称', 2],
       ]),
     )
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/1'
       return ''
     })
@@ -1210,19 +1212,19 @@ describe('readLocalEntries 批量读取路径', () => {
     })
 
     // 验证 mock 正确 - Value2 不是数组，getCellValue 会被用作回退
-    expect(mockWs.Range('A2:B3').Value2).toBeNull()
+    expect(mockWorksheet.Range('A2:B3').Value2).toBeNull()
   })
 
   it('批量读取抛出异常时应回退', () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((address: string) => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         throw new Error('COM 读取失败')
       }
       return { Value2: '', Text: '', Interior: { Color: 0 }, Font: { Bold: false } }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
     mockGetColumnMap.mockReturnValue(
@@ -1231,7 +1233,7 @@ describe('readLocalEntries 批量读取路径', () => {
         ['名称', 2],
       ]),
     )
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/1'
       if (row === 2 && column === 2) return 'Test'
       return ''
@@ -1239,12 +1241,12 @@ describe('readLocalEntries 批量读取路径', () => {
     mockExtractSubjectId.mockReturnValue('1')
 
     // 验证异常时会走 getCellValue 回退
-    expect(() => mockWs.Range('A2:B3')).toThrow()
+    expect(() => mockWorksheet.Range('A2:B3')).toThrow()
   })
 
   it('无 Bangumi_URL 列时应返回空结果', () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     // 无 Bangumi_URL 列
@@ -1256,8 +1258,8 @@ describe('readLocalEntries 批量读取路径', () => {
   })
 
   it('无数据行时应返回空结果', () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(10)
     mockGetLastRow.mockReturnValue(5)
 
@@ -1277,12 +1279,12 @@ describe('readLocalEntries 批量读取路径', () => {
       ['https://bgm.tv/subject/3', '条目3', '标签3'],
     ]
 
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // readLocalEntries 已改走统一入口 readRangeValues（含形状守卫），
     // 区域读由该入口的 mock 供给——worksheet.Range 不再是本地读取的数据源。
     mockReadRangeValues.mockReturnValueOnce(batchData)
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(4)
     mockGetColumnMap.mockReturnValue(
@@ -1306,15 +1308,15 @@ describe('readLocalEntries 批量读取路径', () => {
   })
 
   it('readLocalEntriesForSync 空数据时应返回空结构', () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((address: string) => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
       return { Value2: '', Text: '', Interior: { Color: 0 }, Font: { Bold: false } }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -1328,9 +1330,9 @@ describe('readLocalEntries 批量读取路径', () => {
   })
 
   it('readLocalEntriesForSync 无 Bangumi_URL 列时应提前返回', () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((_address: string) => null)
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock((_address: string) => null)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     // 空列映射 - 没有 Bangumi_URL
@@ -1447,8 +1449,8 @@ describe('applyDiffToSheet', () => {
   })
 
   it('空 diffs 数组不应调用任何写入操作', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
 
@@ -1470,8 +1472,8 @@ describe('applyDiffToSheet', () => {
   })
 
   it('add diff 应写入新行', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -1507,13 +1509,13 @@ describe('applyDiffToSheet', () => {
 
     expect(result.added).toBe(1)
     // batchWriteNewRows 使用 worksheet.Range().Value2 写入
-    expect(mockWs.Range).toHaveBeenCalled()
+    expect(mockWorksheet.Range).toHaveBeenCalled()
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
   })
 
   it('update diff 应更新现有行', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -1526,7 +1528,7 @@ describe('applyDiffToSheet', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     mockSetCellValue.mockImplementation(() => {})
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 3 && column === 1) return 'https://bgm.tv/subject/1'
       if (row === 3 && column === 2) return '旧名称'
       return ''
@@ -1552,8 +1554,8 @@ describe('applyDiffToSheet', () => {
   })
 
   it('delete diff 应标记为删除', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -1570,7 +1572,7 @@ describe('applyDiffToSheet', () => {
 
     // 覆盖 Range mock 添加 Delete 方法和行地址支持
     const mockRangeDelete = vi.fn()
-    mockWs.Range = asRangeMock((address: string) => {
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         if (/^\d+:\d+$/.test(address)) {
           // 行地址（如 "3:3"）
@@ -1597,8 +1599,8 @@ describe('applyDiffToSheet', () => {
   })
 
   it('非 add/update/delete 类型应被跳过', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
 
@@ -1708,7 +1710,7 @@ describe('syncFromGithub selectedRowsOnly', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
       if (row === 3 && column === 1) return 'https://bgm.tv/subject/222'
       return ''
@@ -2132,7 +2134,7 @@ describe('getSelectedRowSubjectIds 分支覆盖', () => {
     mockGetLastRow.mockReturnValue(5)
     // 有列但没有 Bangumi_URL
     mockGetColumnMap.mockReturnValue(new Map([['名称', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (row === 2 && column === 1) return 'https://bgm.tv/subject/111'
       return ''
     })
@@ -2494,7 +2496,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(12)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (column === 1 && row >= 2 && row <= 12) return `https://bgm.tv/subject/${String(row - 1)}`
       if (column === 2 && row >= 2 && row <= 12) return `条目${String(row - 1)}`
       return ''
@@ -2602,7 +2604,7 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
       ]),
     )
     mockSetCellValue.mockImplementation(() => {})
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, column: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, column: number) => {
       if (column === 1) return `https://bgm.tv/subject/${String(row)}`
       if (column === 2) return `旧名称${String(row)}`
       return ''
@@ -2914,10 +2916,10 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
   })
 
   it('batchWriteNewRows 返回 0 且 writeRemoteEntryToRow 抛异常时进入 catch (lines 1022-1027)', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 覆盖 Range mock：当批量写入时（address 包含 ':'），返回 null
     // 这会导致 batchWriteNewRows 在 line 655-657 返回 0
-    mockWs.Range = asRangeMock((address: string) => {
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return null
       }
@@ -2928,7 +2930,7 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
         Font: { Bold: false },
       }
     })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -2971,8 +2973,8 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
   })
 
   it('batchWriteNewRows 正常时不应进入 catch 块', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -3158,8 +3160,8 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
 
 describe('batchUpdateRows tryAddCol 去重逻辑 (line 722)', () => {
   it('多个 update 包含相同字段名时 tryAddCol 走去重分支', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3208,9 +3210,9 @@ describe('batchUpdateRows tryAddCol 去重逻辑 (line 722)', () => {
 
 describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
   it('单元格旧值与新值相同时跳过写入', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 模拟 Range 返回旧值与新值相同
-    mockWs.Range = asRangeMock((address: string) => {
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         // 批量范围读取：返回旧值数组，与新值相同
         return {
@@ -3225,7 +3227,7 @@ describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
       }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
     mockGetCellValue.mockReturnValue('保持不变')
@@ -3266,13 +3268,13 @@ describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
 
 describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
   it('批量写入失败且逐字段写入也抛异常时进入 catch', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 模拟 Range 访问抛异常 → 触发批量写入失败回退
-    mockWs.Range = asRangeMock(() => {
+    mockWorksheet.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
     // 逐字段写入也失败
@@ -3319,17 +3321,17 @@ describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
 
 describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
   it('处理 delete diffs 时应删除行并记录', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 覆盖 Range mock，为行地址添加 Delete 方法
-    const originalRange = mockWs.Range
-    mockWs.Range = asRangeMock((address: string) => {
+    const originalRange = mockWorksheet.Range
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (/^\d+:\d+$/.test(address)) {
         return { Delete: vi.fn(), Value2: null, Interior: { Color: 0 } }
       }
       return originalRange(address)
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3367,9 +3369,9 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
   })
 
   it('delete diff 中删除失败时计入 failed', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 模拟 Delete 抛异常 — 行地址匹配时返回带 Delete 方法的对象，但 Delete 抛异常
-    mockWs.Range = asRangeMock((address: string) => {
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (/^\d+:\d+$/.test(address)) {
         // 行地址：返回带 Delete 的对象，但 Delete 抛异常
         return {
@@ -3391,7 +3393,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
       }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('some_value')
@@ -3431,15 +3433,15 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
 
 describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
   it('更新扩展字段时正确匹配 EXTENDED_FIELD_MAP', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致），
     // 使批量写入路径（而非逐字段回退）被真正走到
-    mockWs.Range = asRangeMock((address: string) =>
+    mockWorksheet.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '']], Interior: { Color: 0 } }
         : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
     )
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3485,14 +3487,14 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
   })
 
   it('扩展字段值为数字时转为字符串', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 忠实桩：4 列（Bangumi_URL/名称/集数/时长），单行范围返回二维旧值
-    mockWs.Range = asRangeMock((address: string) =>
+    mockWorksheet.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '', '']], Interior: { Color: 0 } }
         : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
     )
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3541,14 +3543,14 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
 
 describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
   it('日期列值经过 formatDateToLocal 处理', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致）
-    mockWs.Range = asRangeMock((address: string) =>
+    mockWorksheet.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '']], Interior: { Color: 0 } }
         : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
     )
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3596,14 +3598,14 @@ describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
 
 describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
   it('扩展字段为字符串且非日期列时直接赋值 (line 797)', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 忠实桩：单行范围返回二维旧值数组（列数与 columnMap 一致）
-    mockWs.Range = asRangeMock((address: string) =>
+    mockWorksheet.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? { Value2: [['', '', '']], Interior: { Color: 0 } }
         : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
     )
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3654,7 +3656,7 @@ describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
 
 describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安全回归）', () => {
   it('单行范围返回一维数组时：旧值整体读入，区间内非写入列原值写回', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     let writtenRow: unknown = null
     // 列 3..8 的旧值（单行范围的完整一行）。
     // 「单行范围宿主返回**一维**数组」的归一由 readRangeCellValues 内部的 readRect
@@ -3671,18 +3673,18 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
         writtenRow = v
       },
     }
-    mockWs.Range = asRangeMock((address: string) =>
+    mockWorksheet.Range = asRangeMock((address: string) =>
       address.includes(':')
         ? rowRange
         : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
     )
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockReturnValue(true)
     mockTagsToString.mockReturnValue('远程标签')
-    // 列 4~7 是用户自己的列，不在本次 writeCols（标签/分级=3、评分=8）里
+    // 列 4~7 是用户自己的列，不在本次 writeColumns（标签/分级=3、评分=8）里
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
         ['Bangumi_URL', 1],
@@ -3724,12 +3726,12 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
   })
 
   it('旧值读不到（Value2 为 null）时应回退逐字段，不用空值合并覆盖本地标签', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // 单行范围读回 null → readRect 判读失败返 [] → 宽度不足，放弃批量路径。
     // readRangeCellValues 的默认桩会从 getCellValue 造出够宽的行（模拟正常宿主），
     // 这里 once 覆盖成 [] 来锁定「读失败即回退」。
     mockReadRangeCellValues.mockReturnValueOnce([])
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     // 逐字段回退路径用 getCellValue 逐格重取旧值
@@ -3764,7 +3766,7 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
 
     expect(result.updated).toBe(1)
     // 回退路径拿到真实旧值 → 合并而非整体替换
-    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 3, '本地标签A | 远程标签')
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWorksheet, 2, 3, '本地标签A | 远程标签')
   })
 })
 
@@ -3772,8 +3774,8 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
 
 describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
   it('changedFields 不匹配任何列时返回 0 (lines 741-742)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -3812,7 +3814,7 @@ describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
     ]
 
     const result = await applyDiffToSheet(diffs, 'add-update')
-    // writeCols 为空时 batchUpdateRows 返回 0，该条目被跳过
+    // writeColumns 为空时 batchUpdateRows 返回 0，该条目被跳过
     expect(result.updated).toBe(0)
     expect(result.added).toBe(0)
   })
@@ -3821,8 +3823,8 @@ describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
 // ========== 补充测试：formatEta 正数毫秒路径 (line 548) ==========
 describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
   it('有足够 diffs 时 formatEta 走 ms>0 分支 (line 548)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
@@ -3834,7 +3836,7 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
         ['集数', 3],
       ]),
     )
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 创建 600 条 add diffs (超过 BATCH_WRITE_SIZE=500)，确保触发批量写入和事件循环让出
     const diffs: GithubSyncDiff[] = []
@@ -3873,18 +3875,18 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
 // ========== 补充测试：batchWriteNewRows 扩展字段非日期字符串 (line 632) ==========
 describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
   it('扩展字段为字符串且非日期列时直接赋值 (line 632)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟 Range.Value2 可写
     const mockRange = {
       Value2: null as unknown,
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3918,17 +3920,17 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
   })
 
   it('扩展字段为数字时转为字符串 (line 635)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3965,14 +3967,14 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
 // ========== 补充测试：batchWriteNewRows 空列回退 (line 596) ==========
 describe('batchWriteNewRows 空列场景 (line 596)', () => {
   it('无匹配列时批量写入返回 0 并回退到逐行写入', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
-    // 空列映射，导致 writeCols 为空
+    // 空列映射，导致 writeColumns 为空
     mockGetColumnMap.mockReturnValue(new Map<string, number>())
 
     const diffs: GithubSyncDiff[] = [
@@ -4004,16 +4006,16 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
 // ========== 补充测试：applyDiffToSheet delete 异常路径 (lines 1138-1149) ==========
 describe('applyDiffToSheet delete 异常路径', () => {
   it('delete 操作中 Range.Delete 抛出异常时应记录失败 (lines 1138-1149)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟 Range.Delete 抛出异常
-    mockWs.Range = vi.fn().mockImplementation(() => {
+    mockWorksheet.Range = vi.fn().mockImplementation(() => {
       throw new Error('Delete failed')
     })
 
@@ -4038,14 +4040,14 @@ describe('applyDiffToSheet delete 异常路径', () => {
   })
 
   it('delete 操作中记录行值失败应走外层 catch (lines 1151-1163)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockImplementation(() => {
       throw new Error('GetCellValue failed')
     })
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4071,13 +4073,13 @@ describe('applyDiffToSheet delete 异常路径', () => {
 // ========== 补充测试：delete 阶段 undo 快照的矩形读路径 ==========
 describe('applyDiffToSheet delete 批量 undo 快照', () => {
   it('快照优先走矩形读：逐格读不可用时删除仍成功且只读一次', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
-    mockWs.Range = asRangeMock(() => ({ Delete: vi.fn() }))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockWorksheet.Range = asRangeMock(() => ({ Delete: vi.fn() }))
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
         ['Bangumi_URL', 1],
@@ -4098,14 +4100,14 @@ describe('applyDiffToSheet delete 批量 undo 快照', () => {
       [4, ['url-4', 'name-4']],
     ])
     mockReadRangeValues.mockImplementation(
-      (_ws: unknown, startRow: number, endRow: number): string[][] => {
+      (_worksheet: unknown, startRow: number, endRow: number): string[][] => {
         const rows: string[][] = []
         for (let row = startRow; row <= endRow; row += 1) rows.push(grid.get(row) ?? ['', ''])
         return rows
       },
     )
     mockReadRowsCache.mockImplementation(
-      (_ws: unknown, rows: readonly number[]): Map<number, readonly string[]> | null => {
+      (_worksheet: unknown, rows: readonly number[]): Map<number, readonly string[]> | null => {
         const cache = new Map<number, readonly string[]>()
         for (const row of rows) {
           const line = grid.get(row)
@@ -4128,7 +4130,11 @@ describe('applyDiffToSheet delete 批量 undo 快照', () => {
       expect(result.deleted).toBe(2)
       expect(result.failed).toBe(0)
       // 快照一次覆盖整段 1~2 列，而不是 2 行 × 2 列 = 4 次逐格读
-      expect(mockReadRowsCache).toHaveBeenCalledWith(mockWs, expect.arrayContaining([2, 4]), 2)
+      expect(mockReadRowsCache).toHaveBeenCalledWith(
+        mockWorksheet,
+        expect.arrayContaining([2, 4]),
+        2,
+      )
     } finally {
       if (originalRect) mockReadRangeValues.mockImplementation(originalRect)
       if (originalCache) mockReadRowsCache.mockImplementation(originalCache)
@@ -4139,16 +4145,16 @@ describe('applyDiffToSheet delete 批量 undo 快照', () => {
 // ========== 补充测试：formatEta ms>0 路径 精确触发 (line 548) ==========
 describe('formatEta ms>0 精确路径 (line 548)', () => {
   it('应触发 formatEta ms>0 分支 (line 548)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4204,15 +4210,15 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
 // ========== 补充测试：batchWriteNewRows 扩展字段精确写入 (lines 632, 635) ==========
 describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
   it('非日期字符串扩展字段被写入 (line 632)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     // EXTENDED_FIELD_MAP: ['动画制作公司', '制作公司']
     // 制作公司 不在 DATE_COLUMNS (开播日期, 完播日) 中
@@ -4254,15 +4260,15 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
   })
 
   it('数字类型扩展字段被转为字符串 (line 635)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     // EXTENDED_FIELD_MAP: ['片长', '时长']
     mockGetColumnMap.mockReturnValue(
@@ -4299,15 +4305,15 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
 // ========== 补充测试：applyDiffToSheet 写入失败回退 (lines 655-664) ==========
 describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
   it('Range 对象为 null 时回退到逐行写入 (line 655)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // Range 返回 null 触发 line 655 分支
-    mockWs.Range = vi.fn().mockReturnValue(null)
+    mockWorksheet.Range = vi.fn().mockReturnValue(null)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4331,15 +4337,15 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
   })
 
   it('Range.Value2 写入抛出异常时回退 (lines 659-664)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // Range 存在但写入时抛出异常
-    mockWs.Range = vi.fn().mockImplementation(() => {
+    mockWorksheet.Range = vi.fn().mockImplementation(() => {
       throw new Error('COM 异常')
     })
 
@@ -4367,19 +4373,19 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
 // ========== 补充测试：batchUpdateRows 列未选中时跳过写入 (lines 768-772) ==========
 describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
   it('Bangumi_URL 列存在但 fields 不包含时 shouldWrite 为 false (lines 769-771)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4407,23 +4413,23 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     // 验证更新被处理
     expect(result.updated).toBeGreaterThanOrEqual(0)
     // 验证即使 Bangumi_URL 在列映射中，因 fields 不包含它而被跳过
-    expect(mockWs.Range).toHaveBeenCalled()
+    expect(mockWorksheet.Range).toHaveBeenCalled()
   })
 
   it('名称列存在但 fields 不包含时同样跳过', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4458,12 +4464,12 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
 // ========== 补充测试：formatDuration 全分支覆盖 (lines 534-540) ==========
 describe('formatDuration 全分支 (lines 534-540)', () => {
   it('ms < 1000 时走毫秒分支 (line 534)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4501,12 +4507,12 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
   })
 
   it('formatEta ms<=0 时走计算中分支 (line 546)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4543,19 +4549,19 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
 // ========== 补充测试：batchUpdateRows 扩展字段非日期字符串精确覆盖 (lines 788-807) ==========
 describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
   it('扩展字段为字符串且非日期列时 shouldWrite 为 true (line 797)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4586,19 +4592,19 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
   })
 
   it('扩展字段为数字时转为字符串写入 (line 800-802)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4641,19 +4647,19 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
   })
 
   it('formatDuration seconds 分支 (line 536): eta 在 1-59 秒之间', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4704,19 +4710,19 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
   })
 
   it('formatDuration minutes 分支 (line 539): eta >= 60 秒', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4768,19 +4774,19 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
   })
 
   it('formatDuration ms < 1000 分支 (line 534): eta 小于 1 秒', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4825,12 +4831,12 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
 // ========== 补充测试：writeRemoteEntryToRow 数字类型扩展字段 (line 506) ==========
 describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
   it('批量写入失败回退时，数字类型扩展字段应被转为字符串 (line 506)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟批量写入失败，让 Range.Value2 抛异常
     const mockRange = {
@@ -4840,7 +4846,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4869,19 +4875,19 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
   })
 
   it('writeRemoteEntryToRow 逐行写入处理数字扩展字段 (line 506)', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    mockWs.Range = vi.fn().mockReturnValue(mockRange)
+    mockWorksheet.Range = vi.fn().mockReturnValue(mockRange)
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4946,15 +4952,15 @@ describe('getSelectedRowSubjectIds 无选区路径 (lines 1460-1461)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
   it('Selection 为 null 时应记录 WARN 日志 (lines 1460-1461)', async () => {
     setupRemoteEntries([])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     // app 存在但 Selection 为 null → 走 lines 1460-1461
     mockGetApp.mockReturnValue({
@@ -4965,7 +4971,7 @@ describe('getSelectedRowSubjectIds 无选区路径 (lines 1460-1461)', () => {
     })
 
     // selectedRowsOnly=true 触发 getSelectedRowSubjectIds
-    // 由于选区为空，selectedSids.size === 0，syncFromGithub 会抛错
+    // 由于选区为空，selectedSubjectIds.size === 0，syncFromGithub 会抛错
     await expect(
       syncFromGithub(undefined, 'add-update', undefined, undefined, true),
     ).rejects.toThrow(/未选中任何行/)
@@ -4977,13 +4983,13 @@ describe('getSelectedRowSubjectIds 无选区路径 (lines 1460-1461)', () => {
   it('Selection 存在但无 Bangumi_URL 列时返回空集合', async () => {
     setupRemoteEntries([])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     // Selection 存在，但没有 Bangumi_URL 列
     mockGetApp.mockReturnValue({
       Selection: { Row: 2, Rows: { Count: 1 } },
-      ActiveSheet: mockWs,
+      ActiveSheet: mockWorksheet,
       ScreenUpdating: true,
       Calculation: 1,
     })
@@ -5001,16 +5007,16 @@ describe('getSelectedRowSubjectIds 无选区路径 (lines 1460-1461)', () => {
 // ========== 补充测试：writeRemoteEntryToRow safeSet 日期列分支 (lines 468-472) ==========
 describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow fallback', () => {
   it('batchWriteNewRows 失败回退到 writeRemoteEntryToRow 时触发日期列处理 (lines 468-472)', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
 
     // Mock Range 返回 null，触发 batchWriteNewRows 的 fallback
-    mockWs.Range = asRangeMock((_addr: string) => null)
+    mockWorksheet.Range = asRangeMock((_addr: string) => null)
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -5048,16 +5054,16 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
 // ========== 补充测试：safeSet 数字扩展字段 (line 506) ==========
 describe('safeSet 数字扩展字段 (line 506)', () => {
   it('扩展字段值为数字时转为字符串写入 (line 506)', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
 
     // Mock Range 返回 null，触发 fallback 到 writeRemoteEntryToRow
-    mockWs.Range = asRangeMock((_addr: string) => null)
+    mockWorksheet.Range = asRangeMock((_addr: string) => null)
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // '片长' 在 EXTENDED_FIELD_MAP 中映射到 jsonlField '片长'
     mockGetColumnMap.mockReturnValue(
@@ -5135,8 +5141,8 @@ describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
 // ========== 补充测试：readLocalEntries 无可读列/无 Bangumi_URL 列 (lines 293-294) ==========
 describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
   it('columnMap 无 Bangumi_URL 时 readLocalEntriesForSync 返回空 (line 396 外层守卫)', () => {
-    const mockWs = createMockWorksheet({ name: 'DataSheet' })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet({ name: 'DataSheet' })
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 1]]))
@@ -5147,13 +5153,13 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
     expect(result!.lastRow).toBe(1)
   })
 
-  it('columnMap 有 Bangumi_URL 但 get 返回 undefined 时进入 readCols 为空分支 (lines 293-294)', () => {
-    const mockWs = createMockWorksheet({ name: 'DataSheet' })
-    mockGetDataSheet.mockReturnValue(mockWs)
+  it('columnMap 有 Bangumi_URL 但 get 返回 undefined 时进入 readColumns 为空分支 (lines 293-294)', () => {
+    const mockWorksheet = createMockWorksheet({ name: 'DataSheet' })
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     // columnMap.has('Bangumi_URL') 为 true，但 get('Bangumi_URL') 返回 undefined
-    // 这使得外层守卫通过，但 readCols 为空，触发 lines 293-294
+    // 这使得外层守卫通过，但 readColumns 为空，触发 lines 293-294
     const columnMapWithUndefined = new Map<string, number | undefined>([['Bangumi_URL', undefined]])
     // 刻意构造「has 为 true 但 get 为 undefined」的非法状态，覆盖守卫通过后的空 columnMap 分支
     mockGetColumnMap.mockReturnValue(columnMapWithUndefined as unknown as Map<string, number>)
@@ -5275,15 +5281,15 @@ describe('getSelectedRowSubjectIds ActiveSheet 为 null (line 1469)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
   it('ActiveSheet 为 null 时 getSelectedRowSubjectIds 应返回空集合 (line 1469)', async () => {
     setupRemoteEntries([])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     // Selection 存在但 ActiveSheet 为 null → 走 line 1469 early return
     mockGetApp.mockReturnValue({
@@ -5309,26 +5315,26 @@ describe('getSelectedRowSubjectIds row===headerRow continue (line 1479)', () => 
     mockComputeDiff.mockReturnValue([])
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockColumnNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
   it('选区包含表头行时应跳过表头行（row===headerRow continue）', async () => {
     setupRemoteEntries([{ subjectId: 'test1', name: '测试' }])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     // 选区从第1行（表头行）开始，共2行 → 行1(表头)被跳过，行2被处理
     mockGetApp.mockReturnValue({
       Selection: { Row: 1, Rows: { Count: 2 } },
-      ActiveSheet: mockWs,
+      ActiveSheet: mockWorksheet,
       ScreenUpdating: true,
       Calculation: 1,
     })
 
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
+    mockGetCellValue.mockImplementation((_worksheet: unknown, row: number, _column: number) => {
       if (row === 2) return 'https://bgm.tv/subject/999'
       return ''
     })
@@ -5350,13 +5356,13 @@ describe('getSelectedRowSubjectIds row===headerRow continue (line 1479)', () => 
   it('行无 URL 时应跳过（!url continue line 1481）', async () => {
     setupRemoteEntries([{ subjectId: 'test2', name: '测试2' }])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     // 选区行都没有有效 URL
     mockGetApp.mockReturnValue({
       Selection: { Row: 3, Rows: { Count: 1 } },
-      ActiveSheet: mockWs,
+      ActiveSheet: mockWorksheet,
       ScreenUpdating: true,
       Calculation: 1,
     })
@@ -5376,12 +5382,12 @@ describe('getSelectedRowSubjectIds row===headerRow continue (line 1479)', () => 
   it('extractSubjectId 返回有效 SID 时应添加到集合 (lines 1482-1483)', async () => {
     setupRemoteEntries([{ subjectId: 'valid-sid', name: '有效条目' }])
 
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     mockGetApp.mockReturnValue({
       Selection: { Row: 5, Rows: { Count: 1 } },
-      ActiveSheet: mockWs,
+      ActiveSheet: mockWorksheet,
       ScreenUpdating: true,
       Calculation: 1,
     })
@@ -5520,8 +5526,8 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
 // ========== 写入阶段取消（P2-7） ==========
 describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
   it('signal 已 aborted：不写入任何行，全部计入 skipped 并如实报告', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
@@ -5563,12 +5569,12 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
   })
 
   it('删除过程中被取消：已删除的保留，未处理的计入 skipped', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     const controller = new AbortController()
     let hasDeletedOnce = false
 
     // 第一次删除完成后用户点「停止」
-    mockWs.Range = asRangeMock((address: string) => {
+    mockWorksheet.Range = asRangeMock((address: string) => {
       if (!/^\d+:\d+$/.test(address)) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
@@ -5583,7 +5589,7 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
       }
     })
 
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
@@ -5666,11 +5672,11 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('读取旧值失败且没有任何可写值 → 直接返回 0（line 727）', async () => {
-    const mockWs = createMockWorksheet()
+    const mockWorksheet = createMockWorksheet()
     // readRect 读失败返 []（旧内联实现里对应 `worksheet.Range` 抛错 / Value2 为 null）
     // → 宽度不足，range 保持 null，走「回退逐字段写入」分支
     mockReadRangeCellValues.mockReturnValueOnce([])
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     const diffs: GithubSyncDiff[] = [
       {
@@ -5696,11 +5702,11 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('读取旧值失败且逐字段写入全部失败 → 记 ERROR 并计失败（lines 756-757）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock(() => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     // setCellValue 返回 false（不抛错）→ attempted=true / success=false
     mockSetCellValue.mockReturnValue(false)
 
@@ -5726,9 +5732,9 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('整行写入抛错后回退逐字段写入成功 → 计入 updated（lines 1059-1076）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockReturnValue(true)
 
     const diffs: GithubSyncDiff[] = [
@@ -5755,9 +5761,9 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('整行写入抛错且逐字段写入也全部失败 → 计失败（lines 1089-1103）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockReturnValue(false)
 
     const diffs: GithubSyncDiff[] = [
@@ -5778,9 +5784,9 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('整行写入抛错且逐字段写入再抛错 → 记 ERROR（lines 1105-1118）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockImplementation(() => {
       throw new Error('单格写入也失败')
     })
@@ -5806,11 +5812,11 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('读取旧值失败后逐字段写入成功 → 计入 updated（lines 734-752）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock(() => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockReturnValue(true)
 
     const diffs: GithubSyncDiff[] = [
@@ -5828,15 +5834,15 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     expect(result.updated).toBe(1)
     expect(result.failed).toBe(0)
     // 非 writeAll 的更新把名称追加到「别名」列（columnMap 里 别名=3）
-    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 3, '新名字')
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWorksheet, 2, 3, '新名字')
   })
 
   it('更新模式下标签与本地值合并后写入（lines 587-590）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock(() => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockGetColumnMap.mockReturnValue(new Map<string, number>([['标签/分级', 5]]))
     mockGetCellValue.mockReturnValue('本地标签')
     mockTagsToString.mockReturnValue('远程标签')
@@ -5856,15 +5862,15 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
 
     expect(result.updated).toBe(1)
     // 合并策略：本地值 + ` | ` + 远程值
-    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 5, '本地标签 | 远程标签')
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWorksheet, 2, 5, '本地标签 | 远程标签')
   })
 
   it('writeAll 模式下标签直接覆盖写入（lines 583-584）', async () => {
-    const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock(() => {
+    const mockWorksheet = createMockWorksheet()
+    mockWorksheet.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
-    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
         ['Bangumi_URL', 1],
@@ -5888,12 +5894,12 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
 
     expect(result.updated).toBe(1)
     // writeAll 不做合并，远程标签直接落列
-    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 5, '远程标签')
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWorksheet, 2, 5, '远程标签')
   })
 
   it('新增批次开始前被取消 → 未处理的新增计入 skipped（lines 1250-1251）', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
 
     const controller = new AbortController()
     // beginUndoSession 在 line 1197 的「下载阶段已取消」提前返回之后、
@@ -5924,8 +5930,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('新增写完后被取消 → 未处理的更新计入 skipped（lines 1396-1397）', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockReturnValue(true)
 
     const controller = new AbortController()
@@ -5965,8 +5971,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
   })
 
   it('同步记录落盘失败 → 弹出错误 toast 提醒用户（line 1586）', async () => {
-    const mockWs = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(mockWs)
+    const mockWorksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockSetCellValue.mockReturnValue(true)
     // 记录写入失败：工作簿已改但同步记录没落盘 → 必须让用户看见
     mockAddSyncRecords.mockReturnValue(false)

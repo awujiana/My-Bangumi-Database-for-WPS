@@ -61,10 +61,14 @@ const ANNOTATED_FIELD_MAPPINGS = new Set<string>(['编剧→脚本', '人设→�
  * 当源字段名与 Bangumi 列名不同时，只有在白名单中的映射才追加 (源字段名) 后缀
  * 空值不添加标注
  */
-export function getAnnotatedValue(sourceKey: string, targetColName: string, value: string): string {
+export function getAnnotatedValue(
+  sourceKey: string,
+  targetColumnName: string,
+  value: string,
+): string {
   if (!value) return value
-  if (sourceKey === targetColName) return value
-  const mappingKey = `${sourceKey}→${targetColName}`
+  if (sourceKey === targetColumnName) return value
+  const mappingKey = `${sourceKey}→${targetColumnName}`
   if (!ANNOTATED_FIELD_MAPPINGS.has(mappingKey)) return value
   return `${value}(${sourceKey})`
 }

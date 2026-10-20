@@ -6,8 +6,8 @@
  * 本文件单独驱动真实实现。依赖全部从 `ts/index.js` barrel 进入，统一 mock 即可。
  *
  * 覆盖：
- *  - targetWs 提供路径：成功提示 / skippedReason(info/error) 分支
- *  - 无 targetWs 路径：getApp 为 null、未锁定数据表、按锁定索引解析工作表后成功
+ *  - targetWorksheet 提供路径：成功提示 / skippedReason(info/error) 分支
+ *  - 无 targetWorksheet 路径：getApp 为 null、未锁定数据表、按锁定索引解析工作表后成功
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -41,9 +41,9 @@ vi.mock('../ts/sync/sheet-cleaning.js', () => ({
 
 import { cleanLockedDataSheet, selectFailedRowsFromLastSync } from '../ts/ui/handlers/sheet.js'
 
-const fakeWs = { Name: 'Bangumi' }
+const fakeWorksheet = { Name: 'Bangumi' }
 const fakeApp = {
-  ActiveWorkbook: { Sheets: { Item: (_index: number) => fakeWs } },
+  ActiveWorkbook: { Sheets: { Item: (_index: number) => fakeWorksheet } },
 }
 
 describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
@@ -57,9 +57,9 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
     m.buildFailedRowsAddress.mockReturnValue(null)
   })
 
-  it('直接传 targetWs 且清洗成功：提示成功', () => {
-    cleanLockedDataSheet(fakeWs as never)
-    expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWs)
+  it('直接传 targetWorksheet 且清洗成功：提示成功', () => {
+    cleanLockedDataSheet(fakeWorksheet as never)
+    expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWorksheet)
     expect(m.showToast).toHaveBeenCalledWith(
       '清洗完成：删除 1 行，合并 0 个名称组的标签',
       'success',
@@ -68,24 +68,24 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
 
   it('skippedReason 为「未发现重复数据」时按 info 提示', () => {
     m.cleanSheetDuplicates.mockReturnValue({ skippedReason: '未发现重复数据' })
-    cleanLockedDataSheet(fakeWs as never)
+    cleanLockedDataSheet(fakeWorksheet as never)
     expect(m.showToast).toHaveBeenCalledWith('未发现重复数据', 'info')
   })
 
   it('其它 skippedReason 按 error 提示', () => {
     m.cleanSheetDuplicates.mockReturnValue({ skippedReason: '锁定表结构异常' })
-    cleanLockedDataSheet(fakeWs as never)
+    cleanLockedDataSheet(fakeWorksheet as never)
     expect(m.showToast).toHaveBeenCalledWith('锁定表结构异常', 'error')
   })
 
-  it('无 targetWs 且 getApp 为空：提示无法获取工作簿并早退', () => {
+  it('无 targetWorksheet 且 getApp 为空：提示无法获取工作簿并早退', () => {
     m.getApp.mockReturnValue(null)
     cleanLockedDataSheet()
     expect(m.showToast).toHaveBeenCalledWith('无法获取工作簿', 'error')
     expect(m.cleanSheetDuplicates).not.toHaveBeenCalled()
   })
 
-  it('无 targetWs 且未锁定数据表：提示请先锁定并早退', () => {
+  it('无 targetWorksheet 且未锁定数据表：提示请先锁定并早退', () => {
     m.getApp.mockReturnValue(fakeApp)
     m.bgm.sheet.isLocked = false
     cleanLockedDataSheet()
@@ -93,12 +93,12 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
     expect(m.cleanSheetDuplicates).not.toHaveBeenCalled()
   })
 
-  it('无 targetWs 按锁定索引解析工作表后清洗成功', () => {
+  it('无 targetWorksheet 按锁定索引解析工作表后清洗成功', () => {
     m.getApp.mockReturnValue(fakeApp)
     m.bgm.sheet.isLocked = true
     m.bgm.sheet.lockedIndex = 2
     cleanLockedDataSheet()
-    expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWs)
+    expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWorksheet)
     expect(m.showToast).toHaveBeenCalledWith(
       '清洗完成：删除 1 行，合并 0 个名称组的标签',
       'success',
@@ -107,15 +107,15 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
 })
 
 /** 带 Select 的假工作表 */
-const makeSelectableWs = (name: string, selectImpl?: () => void) => ({
+const makeSelectableWorksheet = (name: string, selectImplementation?: () => void) => ({
   Name: name,
-  Range: vi.fn(() => ({ Select: selectImpl ?? vi.fn() })),
+  Range: vi.fn(() => ({ Select: selectImplementation ?? vi.fn() })),
 })
 
 describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
   it('没有失败记录 → 提示「上次同步没有失败行」且不碰选区', () => {
     m.getLastFailedRows.mockReturnValue(null)
-    const worksheet = makeSelectableWs('动画')
+    const worksheet = makeSelectableWorksheet('动画')
     m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
@@ -126,7 +126,7 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
 
   it('失败行属于另一张表 → 拒绝选中（换表后行号就错位了）', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3, 5], sheetName: '动画' })
-    const worksheet = makeSelectableWs('漫画')
+    const worksheet = makeSelectableWorksheet('漫画')
     m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
@@ -150,7 +150,7 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
       sheetName: '动画',
     })
     m.buildFailedRowsAddress.mockReturnValue(null)
-    const worksheet = makeSelectableWs('动画')
+    const worksheet = makeSelectableWorksheet('动画')
     m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
@@ -162,7 +162,7 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
   it('正常路径：按拼出的地址选中并提示「接着点选中行同步」', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3, 4, 9], sheetName: '动画' })
     m.buildFailedRowsAddress.mockReturnValue('A3:A4,A9')
-    const worksheet = makeSelectableWs('动画')
+    const worksheet = makeSelectableWorksheet('动画')
     m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
@@ -177,7 +177,7 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
   it('Select 抛错 → 提示失败原因，不让异常冒泡', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3], sheetName: '动画' })
     m.buildFailedRowsAddress.mockReturnValue('A3')
-    const worksheet = makeSelectableWs('动画', () => {
+    const worksheet = makeSelectableWorksheet('动画', () => {
       throw new Error('只读工作簿')
     })
     m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })

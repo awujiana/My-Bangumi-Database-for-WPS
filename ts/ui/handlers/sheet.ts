@@ -77,14 +77,14 @@ export function selectFailedRowsFromLastSync(): void {
  * 3. 合并被删除行的"标签/分级"到保留行
  * 4. 批量删除行（合并连续行为范围删除，减少 COM 调用）
  *
- * @param targetWs 可选：直接指定要清洗的工作表（富化页在目标表上自动去重时使用）；
+ * @param targetWorksheet 可选：直接指定要清洗的工作表（富化页在目标表上自动去重时使用）；
  *                 缺省时按锁定索引从活动工作簿解析。
  */
-export function cleanLockedDataSheet(targetWs?: WpsWorksheet): void {
+export function cleanLockedDataSheet(targetWorksheet?: WpsWorksheet): void {
   const startTime = Date.now()
   bgmLog(LOG_LEVELS.INFO, '[cleanLockedDataSheet] ======== 开始清洗锁定数据表 ========')
 
-  let worksheet: WpsWorksheet | null = targetWs ?? null
+  let worksheet: WpsWorksheet | null = targetWorksheet ?? null
 
   if (!worksheet) {
     const app = getApp()
@@ -105,7 +105,7 @@ export function cleanLockedDataSheet(targetWs?: WpsWorksheet): void {
   }
 
   const sheetName = worksheet.Name || '未知'
-  const lockedIndex = targetWs ? '' : ` (索引: ${String(BGM.sheet.lockedIndex ?? '')})`
+  const lockedIndex = targetWorksheet ? '' : ` (索引: ${String(BGM.sheet.lockedIndex ?? '')})`
   bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 清洗工作表: "${sheetName}"${lockedIndex}`)
 
   const result = cleanSheetDuplicates(worksheet)

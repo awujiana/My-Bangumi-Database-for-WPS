@@ -319,17 +319,17 @@ function refreshPreview(): void {
   }
 
   // 一次矩形读：日期源列 + 名称列（名称仅用于预览展示）
-  const nameCol = state.columnMap.get('名称')
-  const readCols = new Set<number>([source.column])
-  if (nameCol !== undefined) readCols.add(nameCol)
-  let minCol = Infinity
-  let maxCol = 0
-  for (const column of readCols) {
-    if (column < minCol) minCol = column
-    if (column > maxCol) maxCol = column
+  const nameColumn = state.columnMap.get('名称')
+  const readColumns = new Set<number>([source.column])
+  if (nameColumn !== undefined) readColumns.add(nameColumn)
+  let minColumn = Infinity
+  let maxColumn = 0
+  for (const column of readColumns) {
+    if (column < minColumn) minColumn = column
+    if (column > maxColumn) maxColumn = column
   }
 
-  const block = readRangeValues(worksheet, firstRow, lastRow, minCol, maxCol)
+  const block = readRangeValues(worksheet, firstRow, lastRow, minColumn, maxColumn)
   if (block.length === 0) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
     renderPreviewEmpty('读取工作表失败，请重试')
@@ -341,9 +341,9 @@ function refreshPreview(): void {
   for (const [index, line] of block.entries()) {
     const rowNo = firstRow + index
     const cells = line
-    const value = cells[source.column - minCol] ?? ''
+    const value = cells[source.column - minColumn] ?? ''
     rows.push({ row: rowNo, value })
-    if (nameCol !== undefined) names.set(rowNo, cells[nameCol - minCol] ?? '')
+    if (nameColumn !== undefined) names.set(rowNo, cells[nameColumn - minColumn] ?? '')
   }
 
   const target = currentTarget()

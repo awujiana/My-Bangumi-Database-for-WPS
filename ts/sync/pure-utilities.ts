@@ -9,7 +9,7 @@
  *     本模块 re-export 以保持向后兼容。
  *   - mapWatchStatus 在状态无法识别时调用 bgmLog 记录警告。pure-utilities-core.ts 通过
  *     setLogger 接受注入的日志函数；本模块在加载时注入实际的 bgmLog。
- *   - getSeqColIndex / addTagsFromString / buildTagsArray 不依赖副作用模块，保留在本模块。
+ *   - getSeqColumnIndex / addTagsFromString / buildTagsArray 不依赖副作用模块，保留在本模块。
  *
  * 测试策略：单元测试应直接 import 自 pure-utilities-core.js，并通过 setLogger(vi.fn())
  * 注入 mock 日志函数，以避免触发 tools/util → ui/handlers 的副作用链。
@@ -28,15 +28,15 @@ setLogger(bgmLog)
 export { isBangumiUrl, extractSubjectId, mapWatchStatus } from './pure-utilities-core.js'
 
 /** 序列号列默认索引 */
-const DEFAULT_SEQ_COL = 4
+const DEFAULT_SEQ_COLUMN = 4
 
 /**
  * 获取序列号列索引（支持 columnMap 或默认列号）
  */
-export function getSeqColIndex(columnMap: Map<string, number> | undefined): number {
-  const seqCol = columnMap?.get('序列号') ?? DEFAULT_SEQ_COL
+export function getSeqColumnIndex(columnMap: Map<string, number> | undefined): number {
+  const seqColumn = columnMap?.get('序列号') ?? DEFAULT_SEQ_COLUMN
   // 列号从 1 开始：0 是无效列号，须回退到默认列（原 `||` 的兜底语义）
-  return seqCol === 0 ? DEFAULT_SEQ_COL : seqCol
+  return seqColumn === 0 ? DEFAULT_SEQ_COLUMN : seqColumn
 }
 
 /**

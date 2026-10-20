@@ -151,7 +151,7 @@ function readLocalEntries(
 
   // ===== 批量读取优化：一次矩形读替代逐单元格 getCellValue =====
   // 收集需要读取的列（与旧版 getField 读取的列一致）
-  const readColNames = [
+  const readColumnNames = [
     'Bangumi_URL',
     '名称',
     '是否看完',
@@ -170,21 +170,21 @@ function readLocalEntries(
   for (const alias of getExcelAliases('动画制作公司')) {
     excelFieldsToRead.add(alias)
   }
-  readColNames.push(...excelFieldsToRead)
-  const readCols: { name: string; column: number }[] = []
-  for (const name of readColNames) {
+  readColumnNames.push(...excelFieldsToRead)
+  const readColumns: { name: string; column: number }[] = []
+  for (const name of readColumnNames) {
     const column = columnMap.get(name)
-    if (column) readCols.push({ name, column })
+    if (column) readColumns.push({ name, column })
   }
-  if (readCols.length === 0 || !columnMap.has('Bangumi_URL')) {
+  if (readColumns.length === 0 || !columnMap.has('Bangumi_URL')) {
     bgmLog(LOG_LEVELS.WARN, '[githubSync] 未找到任何可读取的列')
     return result
   }
 
-  readCols.sort((a, b) => a.column - b.column)
-  // 上方已守卫 readCols 非空，?? 分支仅为类型层兜底
-  const minCol = readCols[0]?.column ?? 1
-  const maxCol = readCols.at(-1)?.column ?? minCol
+  readColumns.sort((a, b) => a.column - b.column)
+  // 上方已守卫 readColumns 非空，?? 分支仅为类型层兜底
+  const minColumn = readColumns[0]?.column ?? 1
+  const maxColumn = readColumns.at(-1)?.column ?? minColumn
   const rowCount = lastRow - startRow + 1
 
   // 一次性读取整个矩形区域（统一走 `readRangeValues`，内部 readRect 含形状守卫）：
@@ -196,7 +196,7 @@ function readLocalEntries(
   // `readRangeValues` 无法区分「真空区域」与「读失败」（两者都返回 []），因此以
   // **读回行数 === 请求行数** 作为可用判据：不符即回退逐单元格读（空表逐格读
   // 同样得到空串，最终结果与旧行为一致）。
-  const rect = readRangeValues(worksheet, startRow, lastRow, minCol, maxCol)
+  const rect = readRangeValues(worksheet, startRow, lastRow, minColumn, maxColumn)
   const rawData: string[][] | null = rect.length === rowCount ? rect : null
   if (!rawData) {
     // readRangeValues 读失败（COM 异常/形状不可信）时返回 []，与「真空区域」
@@ -207,8 +207,8 @@ function readLocalEntries(
 
   // 构建 column name → 数组索引 的映射
   const columnIndexMap = new Map<string, number>()
-  for (const rc of readCols) {
-    columnIndexMap.set(rc.name, rc.column - minCol)
+  for (const rc of readColumns) {
+    columnIndexMap.set(rc.name, rc.column - minColumn)
   }
 
   /** 从批量数据中读取字段值 */
@@ -485,7 +485,7 @@ function writeRowValuesWithUndo(
   row: number,
   remote: GithubRemoteEntry,
   fields: string[],
-  minCol: number,
+  minColumn: number,
   columnCount: number,
   oldArray: WpsCellValue[],
   rowValues: (string | number | null)[],
@@ -498,8 +498,8 @@ function writeRowValuesWithUndo(
     // 使用已读取的旧值（oldArray 由 readRangeCellValues 在循环开始前读取）
     // **以旧值为基底**铺满整行：本次不写的列原值写回，而不是铺 null。
     // 原因：null 在 Range.Value2 二维数组里的语义是「清空该单元格」，而
-    // minCol..maxCol 之间可能夹着**不属于本次 writeCols** 的列 ——
-    // writeCols 是整批 updates 的 fields 并集，列号并不连续（例如一批里
+    // minColumn..maxColumn 之间可能夹着**不属于本次 writeColumns** 的列 ——
+    // writeColumns 是整批 updates 的 fields 并集，列号并不连续（例如一批里
     // 有人只改「名称」(列2)、有人只改「评分」(列30)，区间 3..29 全是用户数据）。
     // 原实现把这些位置铺成 null，等于把用户在中段列的数据清掉。
     let hasChanges = false
@@ -520,7 +520,7 @@ function writeRowValuesWithUndo(
           // 记录 undo
           recordUndoEntry({
             row,
-            column: minCol + c,
+            column: minColumn + c,
             oldValue,
             updatedValue: valueString,
           })
@@ -712,7 +712,7 @@ function fallbackWriteRemoteEntry(parameters: {
     return { ok: false, errorMessage }
   }
 }
-interface WriteCol {
+interface WriteColumn {
   name: string
   column: number
 }
@@ -727,15 +727,18 @@ interface WriteCol {
  * @param names 候选列名（可重复、可无序；columnMap 里没有的列会被跳过）
  * @returns 去重且按列号升序的待写列
  */
-function collectWriteCols(columnMap: Map<string, number>, names: Iterable<string>): WriteCol[] {
-  const writeCols: WriteCol[] = []
+function collectWriteColumns(
+  columnMap: Map<string, number>,
+  names: Iterable<string>,
+): WriteColumn[] {
+  const writeColumns: WriteColumn[] = []
   const uniqueNames = new Set(names)
   for (const name of uniqueNames) {
     const column = columnMap.get(name)
-    if (column) writeCols.push({ name, column })
+    if (column) writeColumns.push({ name, column })
   }
-  writeCols.sort((a, b) => a.column - b.column)
-  return writeCols
+  writeColumns.sort((a, b) => a.column - b.column)
+  return writeColumns
 }
 
 /**
@@ -766,27 +769,27 @@ function batchWriteNewRows(
   for (const [, excelField] of EXTENDED_FIELD_MAP) {
     pendingFieldNames.push(excelField)
   }
-  const writeCols = collectWriteCols(columnMap, pendingFieldNames)
-  // 空列映射（表头完全认不出）时必须早退：否则 minCol/maxCol 退化成 1，
+  const writeColumns = collectWriteColumns(columnMap, pendingFieldNames)
+  // 空列映射（表头完全认不出）时必须早退：否则 minColumn/maxColumn 退化成 1，
   // 会把一整列 null 写进 A 列覆盖用户数据，且不触发下方的逐行回退。
-  if (writeCols.length === 0) {
+  if (writeColumns.length === 0) {
     bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] 未找到任何可写入的列')
     return 0
   }
-  // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
-  const minCol = writeCols[0]?.column ?? 1
-  const maxCol = writeCols.at(-1)?.column ?? minCol
-  const columnCount = maxCol - minCol + 1
+  // 上方已守卫 writeColumns 非空，?? 分支仅为类型层兜底
+  const minColumn = writeColumns[0]?.column ?? 1
+  const maxColumn = writeColumns.at(-1)?.column ?? minColumn
+  const columnCount = maxColumn - minColumn + 1
 
-  // 2. 构建二维值数组（列对齐到 minCol 偏移）
+  // 2. 构建二维值数组（列对齐到 minColumn 偏移）
   // 日期列（开播日期、完播日）写入数值序列号以保留本地列格式
   //
-  // **以目标区域旧值为基底**：minCol..maxCol 之间可能夹着不属于 writeCols 的用户列
-  // （writeCols 只收录 columnMap 里认得的字段）。若直接铺 null，会把用户在这些列的数据清掉。
+  // **以目标区域旧值为基底**：minColumn..maxColumn 之间可能夹着不属于 writeColumns 的用户列
+  // （writeColumns 只收录 columnMap 里认得的字段）。若直接铺 null，会把用户在这些列的数据清掉。
   // 且 nextAppendRow 由锚定列的 End(xlUp) 定位，锚定列比别的列短时，目标行本来就有用户数据。
   // 读不到旧值（空表/读失败）时旧值全为 null，与原行为一致。
-  const startColLetter = columnNumberToLetter(minCol)
-  const endColLetter = columnNumberToLetter(maxCol)
+  const startColumnLetter = columnNumberToLetter(minColumn)
+  const endColumnLetter = columnNumberToLetter(maxColumn)
   const endRow = startRow + rows.length - 1
   // 读旧值基底：统一走 `readRangeCellValues`（内部 readRect 含形状守卫）。
   //  · 单行范围（endRow === startRow）宿主返回**一维**数组，由 normalizeValue2Shape
@@ -796,7 +799,7 @@ function batchWriteNewRows(
   //    通常为空，读失败的影响面与原手工 catch 分支一致（oldRows = []）。
   // 必须保留单元格原始类型（preserveCellValue）：基底列可能是数字/日期，
   // String() 化后整行写回会把用户的数据列变成文本列。
-  const oldRows = readRangeCellValues(worksheet, startRow, endRow, minCol, maxCol)
+  const oldRows = readRangeCellValues(worksheet, startRow, endRow, minColumn, maxColumn)
 
   const values: WpsCellValue[][] = []
   for (const [rowIndex, entry] of rows.entries()) {
@@ -804,8 +807,8 @@ function batchWriteNewRows(
       { length: columnCount },
       (_, c) => oldRows[rowIndex]?.[c] ?? null,
     )
-    for (const wc of writeCols) {
-      const index = wc.column - minCol
+    for (const wc of writeColumns) {
+      const index = wc.column - minColumn
       row[index] = resolveNewRowCellValue(wc, entry)
     }
     values.push(row)
@@ -813,7 +816,7 @@ function batchWriteNewRows(
 
   // 3. 批量写入 Range.Value2
   try {
-    const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
+    const rangeAddr = `${startColumnLetter}${String(startRow)}:${endColumnLetter}${String(endRow)}`
     const range = worksheet.Range(rangeAddr)
     range.Value2 = values
   } catch (error: unknown) {
@@ -827,9 +830,9 @@ function batchWriteNewRows(
   // 4. 记录 undo 条目（一次性记录所有变更）
   // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
   for (const [index, rowRecord] of rows.entries()) {
-    for (const wc of writeCols) {
+    for (const wc of writeColumns) {
       const row = startRow + index
-      const raw = values[index]?.[wc.column - minCol]
+      const raw = values[index]?.[wc.column - minColumn]
       const value = raw == null ? '' : String(raw)
       recordUndoEntry({ row, column: wc.column, oldValue: '', updatedValue: value })
     }
@@ -908,15 +911,15 @@ function batchUpdateRows(
     }
   }
 
-  const writeCols = collectWriteCols(columnMap, updateFieldNames)
-  if (writeCols.length === 0) {
+  const writeColumns = collectWriteColumns(columnMap, updateFieldNames)
+  if (writeColumns.length === 0) {
     bgmLog(LOG_LEVELS.WARN, '[batchUpdateRows] 未找到任何可写入的列')
     return 0
   }
-  // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
-  const minCol = writeCols[0]?.column ?? 1
-  const maxCol = writeCols.at(-1)?.column ?? minCol
-  const columnCount = maxCol - minCol + 1
+  // 上方已守卫 writeColumns 非空，?? 分支仅为类型层兜底
+  const minColumn = writeColumns[0]?.column ?? 1
+  const maxColumn = writeColumns.at(-1)?.column ?? minColumn
+  const columnCount = maxColumn - minColumn + 1
 
   // 2. 逐行计算新值，并记录 undo 条目
   // 注意：更新行的行号不连续，不能一次 Range.Value2 写入，需按行逐个写入
@@ -932,7 +935,7 @@ function batchUpdateRows(
     // （旧值全空）——旧内联实现遇到 `Value2` 为 null 时 oldArray 为空数组，
     // 由下方宽度守卫回退逐字段写入，语义一致。
     const oldArray: WpsCellValue[] =
-      readRangeCellValues(worksheet, row, row, minCol, maxCol)[0] ?? []
+      readRangeCellValues(worksheet, row, row, minColumn, maxColumn)[0] ?? []
 
     // 旧值读不全（读失败返回 []、或列数不足 columnCount）时放弃批量路径：
     // 批量路径用 oldArray 做「本地 | 远程」合并，空旧值会使用户已有的标签/别名
@@ -950,7 +953,7 @@ function batchUpdateRows(
       )
     } else {
       try {
-        const rangeAddr = `${columnNumberToLetter(minCol)}${String(row)}:${columnNumberToLetter(maxCol)}${String(row)}`
+        const rangeAddr = `${columnNumberToLetter(minColumn)}${String(row)}:${columnNumberToLetter(maxColumn)}${String(row)}`
         range = worksheet.Range(rangeAddr)
       } catch {
         bgmLog(
@@ -967,8 +970,8 @@ function batchUpdateRows(
       () => null,
     )
 
-    for (const wc of writeCols) {
-      const index = wc.column - minCol
+    for (const wc of writeColumns) {
+      const index = wc.column - minColumn
       // 获取当前单元格的旧值（用于合并）
       const oldCellValue = oldArray[index] == null ? '' : String(oldArray[index])
       const { value: initialValue, shouldWrite } = resolveUpdateCellValue(
@@ -1001,7 +1004,7 @@ function batchUpdateRows(
         row,
         remote,
         fields,
-        minCol,
+        minColumn,
         columnCount,
         oldArray,
         rowValues,
@@ -1064,11 +1067,11 @@ function buildRemovalSnapshot(
   columns: readonly number[],
 ): Map<number, ReadonlyMap<number, string>> | null {
   if (rows.length === 0 || columns.length === 0) return new Map()
-  let maxCol = columns[0] ?? 0
+  let maxColumn = columns[0] ?? 0
   for (const column of columns) {
-    if (column > maxCol) maxCol = column
+    if (column > maxColumn) maxColumn = column
   }
-  const cache = readRowsCache(worksheet, rows, maxCol)
+  const cache = readRowsCache(worksheet, rows, maxColumn)
   if (!cache) return null
   const snapshot = new Map<number, ReadonlyMap<number, string>>()
   for (const row of rows) {

@@ -26,7 +26,7 @@ export interface DialogOptions {
 
 export interface DialogButton {
   id: string
-  cls: string
+  cssClass: string
   text: string
   event: string
 }
@@ -55,42 +55,46 @@ const DIALOG_TYPES: Record<string, DialogConfig> = {
     id: 'bgmAlertDialog',
     titleId: 'bgmAlertTitle',
     messageId: 'bgmAlertMessage',
-    buttons: [{ id: 'bgmAlertOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' }],
+    buttons: [{ id: 'bgmAlertOk', cssClass: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' }],
   },
   confirm: {
     id: 'bgmConfirmDialog',
     titleId: 'bgmConfirmTitle',
     messageId: 'bgmConfirmMessage',
     buttons: [
-      { id: 'bgmConfirmOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
-      { id: 'bgmConfirmCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
+      { id: 'bgmConfirmOk', cssClass: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
+      { id: 'bgmConfirmCancel', cssClass: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
     ],
   },
   error: {
     id: 'bgmErrorDialog',
     titleId: 'bgmErrorTitle',
     messageId: 'bgmErrorMessage',
-    buttons: [{ id: 'bgmErrorOk', cls: 'bgm-dialog-btn-danger', text: '确定', event: 'ok' }],
+    buttons: [{ id: 'bgmErrorOk', cssClass: 'bgm-dialog-btn-danger', text: '确定', event: 'ok' }],
   },
   warning: {
     id: 'bgmWarningDialog',
     titleId: 'bgmWarningTitle',
     messageId: 'bgmWarningMessage',
-    buttons: [{ id: 'bgmWarningOk', cls: 'bgm-dialog-btn-warning', text: '确定', event: 'ok' }],
+    buttons: [
+      { id: 'bgmWarningOk', cssClass: 'bgm-dialog-btn-warning', text: '确定', event: 'ok' },
+    ],
   },
   success: {
     id: 'bgmSuccessDialog',
     titleId: 'bgmSuccessTitle',
     messageId: 'bgmSuccessMessage',
-    buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-dialog-btn-success', text: '确定', event: 'ok' }],
+    buttons: [
+      { id: 'bgmSuccessOk', cssClass: 'bgm-dialog-btn-success', text: '确定', event: 'ok' },
+    ],
   },
   input: {
     id: 'bgmInputDialog',
     titleId: 'bgmInputTitle',
     messageId: 'bgmInputPrompt',
     buttons: [
-      { id: 'bgmInputOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
-      { id: 'bgmInputCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
+      { id: 'bgmInputOk', cssClass: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
+      { id: 'bgmInputCancel', cssClass: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
     ],
   },
 }
@@ -169,7 +173,7 @@ function createDialogs(): void {
     for (const button_ of config.buttons) {
       const button = document.createElement('button')
       button.id = button_.id
-      button.className = `bgm-dialog-btn ${button_.cls}`
+      button.className = `bgm-dialog-btn ${button_.cssClass}`
       button.textContent = button_.text
       button.dataset.event = button_.event
       footer.appendChild(button)

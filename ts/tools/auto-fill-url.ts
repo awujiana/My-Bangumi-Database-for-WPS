@@ -37,21 +37,21 @@ function _buildNameUrlMap(
 ): NameUrlMap {
   const nameUrlMap: NameUrlMap = {}
 
-  const urlCol = columnMap.get('Bangumi_URL')
-  const nameCol = columnMap.get('名称')
-  if (!urlCol || !nameCol) return nameUrlMap
-  const aliasCol = columnMap.get('别名')
+  const urlColumn = columnMap.get('Bangumi_URL')
+  const nameColumn = columnMap.get('名称')
+  if (!urlColumn || !nameColumn) return nameUrlMap
+  const aliasColumn = columnMap.get('别名')
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
-    const urlValue = trim(getCellValue(worksheet, row, urlCol))
+    const urlValue = trim(getCellValue(worksheet, row, urlColumn))
     if (urlValue) {
-      const nameValue = trim(getCellValue(worksheet, row, nameCol))
+      const nameValue = trim(getCellValue(worksheet, row, nameColumn))
       if (nameValue && !Object.hasOwn(nameUrlMap, nameValue)) {
         nameUrlMap[nameValue] = urlValue
       }
 
-      if (aliasCol) {
-        const aliasValue = trim(getCellValue(worksheet, row, aliasCol))
+      if (aliasColumn) {
+        const aliasValue = trim(getCellValue(worksheet, row, aliasColumn))
         const aliases = _splitAliases(aliasValue)
         for (const a of aliases) {
           if (a && !Object.hasOwn(nameUrlMap, a)) {
@@ -82,9 +82,9 @@ export function autoFillUrls(): AutoFillResult {
     }
 
     const columnMap = getColumnMap(worksheet, headerRow)
-    const urlCol = columnMap.get('Bangumi_URL')
-    const nameCol = columnMap.get('名称')
-    if (urlCol === undefined || nameCol === undefined) {
+    const urlColumn = columnMap.get('Bangumi_URL')
+    const nameColumn = columnMap.get('名称')
+    if (urlColumn === undefined || nameColumn === undefined) {
       BGM.Dialog.alert('未找到 "Bangumi_URL" 或 "名称" 列', '提示')
       return result
     }
@@ -97,7 +97,7 @@ export function autoFillUrls(): AutoFillResult {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[autoFillUrls] 表头行: ${String(headerRow)}, 最后数据行: ${String(lastRow)}, URL列: ${String(urlCol)}, 名称列: ${String(nameCol)}`,
+      `[autoFillUrls] 表头行: ${String(headerRow)}, 最后数据行: ${String(lastRow)}, URL列: ${String(urlColumn)}, 名称列: ${String(nameColumn)}`,
     )
 
     const nameUrlMap = _buildNameUrlMap(worksheet, headerRow, lastRow, columnMap)
@@ -112,13 +112,13 @@ export function autoFillUrls(): AutoFillResult {
     bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 已建立 ${String(mappedKeys)} 个名称/别名 → URL 映射`)
 
     for (let row = headerRow + 1; row <= lastRow; row += 1) {
-      const currentUrl = trim(getCellValue(worksheet, row, urlCol))
+      const currentUrl = trim(getCellValue(worksheet, row, urlColumn))
       if (!currentUrl) {
-        const nameValue = trim(getCellValue(worksheet, row, nameCol))
+        const nameValue = trim(getCellValue(worksheet, row, nameColumn))
         if (nameValue) {
           const fillUrl = nameUrlMap[nameValue]
           if (fillUrl) {
-            setCellValue(worksheet, row, urlCol, fillUrl)
+            setCellValue(worksheet, row, urlColumn, fillUrl)
             result.filled += 1
           }
         }

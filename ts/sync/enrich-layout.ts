@@ -8,7 +8,7 @@
  *
  *              承载内容：
  *              - 表头关键字表与列映射类型（KNOWN_COLUMN_MAP / EnrichColumnMapping）
- *              - 列映射识别（detectColumns / findKeywordField / mappingMaxCol）
+ *              - 列映射识别（detectColumns / findKeywordField / mappingMaxColumn）
  *              - 平台值聚合（readPlatformValues）
  *              - Hazx 新番表布局识别（detectAnimeSourceLayout，带缓存）
  *              - Bangumi 追踪表辅助（findAliasColumn / getBangumiColumnMap）
@@ -38,17 +38,17 @@ import { shouldFilterNoise } from './enrich-normalize.js'
  * 将各种可能的表头名称映射到标准字段 key
  */
 const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
-  名称: 'nameCol',
-  动漫名称: 'nameCol',
-  番组名: 'nameCol',
-  TAGS: 'tagsCol',
-  标签: 'tagsCol',
-  分类: 'tagsCol',
+  名称: 'nameColumn',
+  动漫名称: 'nameColumn',
+  番组名: 'nameColumn',
+  TAGS: 'tagsColumn',
+  标签: 'tagsColumn',
+  分类: 'tagsColumn',
   首播: 'premiereCol',
   开播: 'premiereCol',
   播出日期: 'premiereCol',
-  集数: 'episodesCol',
-  话数: 'episodesCol',
+  集数: 'episodesColumn',
+  话数: 'episodesColumn',
   周更时间: 'weekdayCol',
   播出时间: 'weekdayCol',
   播放平台: 'platformCol',
@@ -110,10 +110,10 @@ const ANIME_SOURCE_HEADER_KEYWORDS = [
  * 记录新番表中各字段对应的列号
  */
 export interface EnrichColumnMapping {
-  nameCol: number
-  tagsCol?: number
+  nameColumn: number
+  tagsColumn?: number
   premiereCol?: number
-  episodesCol?: number
+  episodesColumn?: number
   weekdayCol?: number
   platformCol?: number
   /**
@@ -160,22 +160,22 @@ function findKeywordField(normalizedHeader: string): keyof EnrichColumnMapping |
  * 读取表头行，用 KNOWN_COLUMN_MAP 匹配列名
  */
 export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichColumnMapping {
-  const mapping: EnrichColumnMapping = { nameCol: 0 }
+  const mapping: EnrichColumnMapping = { nameColumn: 0 }
 
-  const maxCols = 50
-  for (let column = 1; column <= maxCols; column += 1) {
+  const maxColumns = 50
+  for (let column = 1; column <= maxColumns; column += 1) {
     const headerValue = getCellValue(sheet, headerRow, column).trim()
     if (headerValue) {
       const normalizedHeader = headerValue.toLowerCase()
       const field = findKeywordField(normalizedHeader)
-      if (field === 'nameCol' && mapping.nameCol === 0) {
-        mapping.nameCol = column
+      if (field === 'nameColumn' && mapping.nameColumn === 0) {
+        mapping.nameColumn = column
       } else if (field === 'platformCol' && mapping.platformCol !== undefined) {
         // 重复的「播放平台」表头：横向多列平台，追加进额外平台列
         mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), column]
       } else if (
         field !== null &&
-        field !== 'nameCol' &&
+        field !== 'nameColumn' &&
         field !== 'platformExtraCols' &&
         mapping[field] === undefined
       ) {
@@ -200,8 +200,8 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[detectColumns] 列映射: name=${String(mapping.nameCol)}, tags=${String(mapping.tagsCol ?? 'N/A')}, ` +
-      `premiere=${String(mapping.premiereCol ?? 'N/A')}, episodes=${String(mapping.episodesCol ?? 'N/A')}, ` +
+    `[detectColumns] 列映射: name=${String(mapping.nameColumn)}, tags=${String(mapping.tagsColumn ?? 'N/A')}, ` +
+      `premiere=${String(mapping.premiereCol ?? 'N/A')}, episodes=${String(mapping.episodesColumn ?? 'N/A')}, ` +
       `weekday=${String(mapping.weekdayCol ?? 'N/A')}, platform=${String(mapping.platformCol ?? 'N/A')}, ` +
       `platformExtra=${String(mapping.platformExtraCols?.length ?? 0)}列, ` +
       `exclusive=${String(mapping.exclusiveCol ?? 'N/A')}, special=${String(mapping.specialCol ?? 'N/A')}`,
@@ -213,18 +213,18 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
 /**
  * 计算列映射中用到的最大列号（含 `platformExtraCols`）
  *
- * 用于「一次矩形读覆盖所有需要的列」——矩形读的范围恒为 1..maxCol，
+ * 用于「一次矩形读覆盖所有需要的列」——矩形读的范围恒为 1..maxColumn，
  * 因此必须取到映射里出现过的最大列号，否则靠后的列会读不到而静默取空。
  */
-export function mappingMaxCol(mapping: EnrichColumnMapping): number {
-  let max = mapping.nameCol
+export function mappingMaxColumn(mapping: EnrichColumnMapping): number {
+  let max = mapping.nameColumn
   const values = Object.values(mapping)
   for (const value of values) {
     if (typeof value === 'number' && value > max) max = value
   }
-  const extraCols = mapping.platformExtraCols
-  if (extraCols) {
-    for (const column of extraCols) {
+  const extraColumns = mapping.platformExtraCols
+  if (extraColumns) {
+    for (const column of extraColumns) {
       if (column > max) max = column
     }
   }
@@ -296,7 +296,7 @@ export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout 
  */
 function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout | null {
   let headerRow = 0
-  let firstFieldCol = 0
+  let firstFieldColumn = 0
 
   // 「矩形读 + 逐格读回退」统一改法（见 文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md §5.1）：
   // 循环外一次矩形读覆盖下面两轮扫描（表头行 1..MAX_SCAN_ROWS × 50 列，以及随后的
@@ -304,45 +304,45 @@ function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout
   // （原先每表约 500 次逐格读，且每次 SheetActivate 全簿重跑）。
   // 读回行数 / 列宽与请求不一致 ⇒ 宿主或桩不支持区域读 ⇒ isRectReadUsable 为 false，
   // 全部取值回退到原逐格路径（getCellValue），行为与改造前逐字一致。
-  const scanCols = 50
+  const scanColumns = 50
   const scanEndRow = PANEL_CONFIG.MAX_SCAN_ROWS + 10
-  const scanBlock = readRangeValues(sheet, 1, scanEndRow, 1, scanCols)
+  const scanBlock = readRangeValues(sheet, 1, scanEndRow, 1, scanColumns)
   const isRectReadUsable =
-    scanBlock.length === scanEndRow && scanBlock.every((line) => line.length >= scanCols)
+    scanBlock.length === scanEndRow && scanBlock.every((line) => line.length >= scanColumns)
   const cellAt = (row: number, column: number): string =>
     isRectReadUsable ? (scanBlock[row - 1]?.[column - 1] ?? '') : getCellValue(sheet, row, column)
 
   for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
     let matchedFields = 0
-    let rowFirstFieldCol = 0
-    for (let column = 1; column <= scanCols; column += 1) {
+    let rowFirstFieldColumn = 0
+    for (let column = 1; column <= scanColumns; column += 1) {
       const value = cellAt(row, column).trim().toLowerCase()
       if (
         value &&
         ANIME_SOURCE_HEADER_KEYWORDS.some((keyword) => value === keyword.toLowerCase())
       ) {
         matchedFields += 1
-        if (rowFirstFieldCol === 0) rowFirstFieldCol = column
+        if (rowFirstFieldColumn === 0) rowFirstFieldColumn = column
       }
     }
     if (matchedFields >= 3) {
       headerRow = row
-      firstFieldCol = rowFirstFieldCol
+      firstFieldColumn = rowFirstFieldColumn
       break
     }
   }
 
-  if (headerRow === 0 || firstFieldCol <= 1) return null
+  if (headerRow === 0 || firstFieldColumn <= 1) return null
 
   const columnMapping = detectColumns(sheet, headerRow)
-  if (columnMapping.nameCol === 0) {
+  if (columnMapping.nameColumn === 0) {
     // 该模板的名称列紧邻第一个字段列左侧（C 列在 D 列「周更时间」之前）。
-    columnMapping.nameCol = firstFieldCol - 1
+    columnMapping.nameColumn = firstFieldColumn - 1
   }
 
   let dataStartRow = headerRow + 1
   for (let row = headerRow + 1; row <= scanEndRow; row += 1) {
-    const name = cellAt(row, columnMapping.nameCol).trim()
+    const name = cellAt(row, columnMapping.nameColumn).trim()
     if (name && !name.includes('新番表') && !name.includes('番组表')) {
       dataStartRow = row
       break
@@ -351,7 +351,7 @@ function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[detectAnimeSourceLayout] 新番表布局识别成功: 表头行=${String(headerRow)} / 数据起始行=${String(dataStartRow)} / 名称列=${String(columnMapping.nameCol)}`,
+    `[detectAnimeSourceLayout] 新番表布局识别成功: 表头行=${String(headerRow)} / 数据起始行=${String(dataStartRow)} / 名称列=${String(columnMapping.nameColumn)}`,
   )
   return { headerRow, dataStartRow, columnMapping }
 }

@@ -113,10 +113,10 @@ export function refreshEnrichSheets(
 
   if (!wbName) {
     select.textContent = ''
-    const defaultOpt = document.createElement('option')
-    defaultOpt.value = ''
-    defaultOpt.textContent = '-- 请先选择工作簿 --'
-    select.appendChild(defaultOpt)
+    const defaultOption = document.createElement('option')
+    defaultOption.value = ''
+    defaultOption.textContent = '-- 请先选择工作簿 --'
+    select.appendChild(defaultOption)
     return
   }
 
@@ -132,10 +132,10 @@ export function refreshEnrichSheets(
   const sheetCount = sheets.Count
 
   select.textContent = ''
-  const defaultOpt = document.createElement('option')
-  defaultOpt.value = ''
-  defaultOpt.textContent = '-- 请选择工作表 --'
-  select.appendChild(defaultOpt)
+  const defaultOption = document.createElement('option')
+  defaultOption.value = ''
+  defaultOption.textContent = '-- 请选择工作表 --'
+  select.appendChild(defaultOption)
 
   for (let index = 1; index <= sheetCount; index += 1) {
     const option = document.createElement('option')

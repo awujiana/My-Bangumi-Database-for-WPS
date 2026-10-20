@@ -128,7 +128,7 @@ function buildRowCellsCache(
   worksheet: WpsWorksheet | null | undefined,
   rows: number[],
   columnMap: ColumnMap,
-  seqCol: number,
+  seqColumn: number,
 ): Map<number, ReadonlyMap<number, string>> | undefined {
   if (!worksheet || rows.length === 0) return undefined
 
@@ -140,26 +140,26 @@ function buildRowCellsCache(
   }
   if (maxRow - minRow + 1 > MAX_BATCH_ROW_SPAN) return undefined
 
-  const columns = new Set<number>([columnMap.get('序列号') ?? seqCol])
+  const columns = new Set<number>([columnMap.get('序列号') ?? seqColumn])
   for (const key of PREVIEW_VALUE_KEYS) {
     const column = columnMap.get(key)
     if (column !== undefined) columns.add(column)
   }
-  let minCol = Infinity
-  let maxCol = 0
+  let minColumn = Infinity
+  let maxColumn = 0
   for (const column of columns) {
-    if (column < minCol) minCol = column
-    if (column > maxCol) maxCol = column
+    if (column < minColumn) minColumn = column
+    if (column > maxColumn) maxColumn = column
   }
 
-  const block = readRangeValues(worksheet, minRow, maxRow, minCol, maxCol)
+  const block = readRangeValues(worksheet, minRow, maxRow, minColumn, maxColumn)
   if (block.length !== maxRow - minRow + 1) return undefined
 
   const cache = new Map<number, ReadonlyMap<number, string>>()
   for (const [index, cells] of block.entries()) {
-    const byCol = new Map<number, string>()
-    for (const column of columns) byCol.set(column, cells[column - minCol] ?? '')
-    cache.set(minRow + index, byCol)
+    const byColumn = new Map<number, string>()
+    for (const column of columns) byColumn.set(column, cells[column - minColumn] ?? '')
+    cache.set(minRow + index, byColumn)
   }
   return cache
 }
@@ -169,7 +169,7 @@ function getRowData(
   rowNumber: number,
   columnMap: ColumnMap,
   headerRow: number,
-  seqCol = 9,
+  seqColumn = 9,
   rowCells?: ReadonlyMap<number, string>,
 ): DetailItem {
   const data: DetailItem = {
@@ -185,7 +185,7 @@ function getRowData(
     isUploaded: false,
   }
 
-  const readCol = (mapKey: string): string => {
+  const readColumn = (mapKey: string): string => {
     const column = columnMap.get(mapKey)
     if (column !== undefined) {
       // 命中批量读缓存就用缓存，否则逐格读（兼容未走批量路径的调用点）
@@ -195,15 +195,15 @@ function getRowData(
     return ''
   }
 
-  data.bgmUrl = readCol('Bangumi_URL')
-  data.name = readCol('名称')
-  data.status = readCol('是否看完')
-  data.rate = readCol('打分')
+  data.bgmUrl = readColumn('Bangumi_URL')
+  data.name = readColumn('名称')
+  data.status = readColumn('是否看完')
+  data.rate = readColumn('打分')
   // 合并 "标签/分级" 与 "原作标签" 两列，与 buildJsonPayload 保持一致
-  const tagsGradeRaw = readCol('标签/分级')
-  const originalTagRaw = readCol('原作标签')
+  const tagsGradeRaw = readColumn('标签/分级')
+  const originalTagRaw = readColumn('原作标签')
   data.tagsRaw = [tagsGradeRaw, originalTagRaw].filter(Boolean).join('|')
-  data.finishedDate = readCol('完播日')
+  data.finishedDate = readColumn('完播日')
 
   if (data.bgmUrl) {
     data.subjectId = extractSubjectId(data.bgmUrl) ?? ''
@@ -213,8 +213,8 @@ function getRowData(
   }
 
   // 从列映射中读取序列号列，如果没有则使用默认值
-  const actualSeqCol = columnMap.get('序列号') ?? seqCol
-  const seqCell = getCell(worksheet, rowNumber, actualSeqCol)
+  const actualSeqColumn = columnMap.get('序列号') ?? seqColumn
+  const seqCell = getCell(worksheet, rowNumber, actualSeqColumn)
   data.isUploaded = isUploadedByColor(seqCell)
   return data
 }
@@ -228,8 +228,8 @@ function getRowData(
  */
 function renderDetailItemHtml(
   rowData: DetailItem,
-  _colMap: ColumnMap,
-  _ws: WpsWorksheet | null | undefined,
+  _columnMap: ColumnMap,
+  _worksheet: WpsWorksheet | null | undefined,
 ): string {
   // 定义观看状态类型映射
   const typeNames: Record<number, string> = {
@@ -417,8 +417,8 @@ export async function previewSyncContent(): Promise<void> {
 
   // 进入运行状态（防重入，统一入口）
   if (!BGM.sync.enterRunningState()) return
-  const urlColForLocate = columnMap.get('Bangumi_URL') ?? 1
-  BGM.sync.updatePosition(worksheet, 0, urlColForLocate)
+  const urlColumnForLocate = columnMap.get('Bangumi_URL') ?? 1
+  BGM.sync.updatePosition(worksheet, 0, urlColumnForLocate)
 
   let cardsHtml = '<div class="detail-list">'
   let actualCardCount = 0
@@ -597,10 +597,10 @@ export async function previewSyncContent(): Promise<void> {
     allOption.textContent = `全部 (${String(actualCardCount)})`
     select.appendChild(allOption)
     for (const s of sortedStatus) {
-      const opt = document.createElement('option')
-      opt.value = s
-      opt.textContent = `${s} (${String(statusMap.get(s) ?? 0)})`
-      select.appendChild(opt)
+      const option = document.createElement('option')
+      option.value = s
+      option.textContent = `${s} (${String(statusMap.get(s) ?? 0)})`
+      select.appendChild(option)
     }
 
     const syncAllButton = document.getElementById('syncAllBtn')
@@ -777,8 +777,8 @@ export async function uploadSingleRow(
     )
     const statusCode = result.code || 0
     // 从列映射中读取序列号列
-    const actualSeqCol = columnMap.get('序列号') ?? 9
-    const seqCell = getCell(worksheet, rowNumber, actualSeqCol)
+    const actualSeqColumn = columnMap.get('序列号') ?? 9
+    const seqCell = getCell(worksheet, rowNumber, actualSeqColumn)
 
     if ([200, 201, 202, 204].includes(statusCode)) {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS
