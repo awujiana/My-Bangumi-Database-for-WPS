@@ -1,0 +1,310 @@
+/* ============================================================================
+ * BGM 加载项 · 条件格式管理页面样式（css/cf.css）
+ * ----------------------------------------------------------------------------
+ * 仅负责「条件格式管理」页的展示层：工作表选择行、规则列表（分组/色块/操作）、
+ * 行内编辑器、双策略确认模态框。配色 / 间距 / 圆角一律复用 css/tokens.css。
+ * ==========================================================================*/
+
+/* ---- 目标工作表 ---- */
+.cf-sheet-row {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.cf-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+/* ---- 规则工具栏 ---- */
+.cf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+
+.cf-search {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+.cf-rule-count {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* ---- 规则列表 ---- */
+.cf-rule-list {
+  margin-top: var(--sp-3);
+}
+
+.cf-empty {
+  padding: var(--sp-4) 0;
+  color: var(--text-3);
+  font-size: var(--fs-body);
+  text-align: center;
+}
+
+.cf-group {
+  margin-bottom: var(--sp-4);
+}
+
+.cf-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.cf-group-count {
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--bg-surface-2);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cf-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.cf-rule:last-child {
+  border-bottom: none;
+}
+
+.cf-rule-hidden {
+  opacity: 0.45;
+}
+
+.cf-rule-vis {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.cf-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 0.5px solid var(--border);
+  border-radius: 3px;
+}
+
+.cf-rule-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-rule-name {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-rule-meta {
+  color: var(--text-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-rule-meta code {
+  font-family: var(--font-mono);
+}
+
+.cf-rule-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+}
+
+.cf-rule-actions button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cf-rule-actions button:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
+/* ---- 行内编辑器 ---- */
+.cf-editor {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-surface-2);
+}
+
+.cf-editor h4 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-h3);
+  font-weight: 500;
+}
+
+.cf-field-label {
+  display: block;
+  margin: var(--sp-3) 0 var(--sp-1);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.cf-input,
+.cf-textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-family: var(--font-sans);
+}
+
+.cf-textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: vertical;
+}
+
+.cf-color-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+}
+
+.cf-color {
+  width: 48px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.cf-bold-box {
+  padding-bottom: 6px;
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+.cf-bold-box label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+/* ---- 应用状态 ---- */
+.cf-apply-status {
+  margin-top: var(--sp-3);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* ---- 双策略确认模态框 ---- */
+.cf-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-overlay);
+}
+
+.cf-modal {
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  padding: var(--sp-5);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-surface);
+}
+
+.cf-modal h4 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-h3);
+  font-weight: 500;
+}
+
+.cf-modal-body {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+
+.cf-modal-body p {
+  margin: 0 0 var(--sp-2);
+}
+
+.cf-modal-label {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+.cf-modal-list {
+  max-height: 180px;
+  margin: 0 0 var(--sp-3);
+  padding-left: 20px;
+  overflow: auto;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.cf-modal-list li {
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.cf-modal-list code {
+  font-family: var(--font-mono);
+}
+
+.cf-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.cf-modal-actions .bgm-btn {
+  flex: 1;
+  min-width: 100px;
+}

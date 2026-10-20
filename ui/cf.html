@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/cf.css" />
+  </head>
+  <body data-page="cf">
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/cf-bootstrap.js"></script>
+    <script src="../wpsjsrpcsdk.js"></script>
+
+    <div class="global">
+      <!-- ===================== 顶栏 ===================== -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title">🎨 条件格式管理</span>
+            <span class="brand-sub">规则存本地 · 应用幂等 · 删除行不怕乱</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===================== 侧栏（功能导航） ===================== -->
+      <aside class="sidebar">
+        <nav class="nav" aria-label="功能导航">
+          <div class="nav-label">功能导航</div>
+          <a href="#sec-target" title="目标工作表"
+            ><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a
+          >
+          <a href="#sec-rules" title="规则管理"
+            ><span class="nav-ico">☑️</span><span class="nav-text">规则管理</span></a
+          >
+          <a href="#sec-defaults" title="默认规则集"
+            ><span class="nav-ico">📦</span><span class="nav-text">默认规则集</span></a
+          >
+          <a href="#sec-apply" title="应用与修复"
+            ><span class="nav-ico">🖌️</span><span class="nav-text">应用与修复</span></a
+          >
+        </nav>
+      </aside>
+
+      <!-- ===================== 主区 ===================== -->
+      <main class="main">
+        <!-- 目标工作表 -->
+        <section class="section" id="sec-target">
+          <h3>
+            🎯 目标工作表<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-target"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「目标工作表」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            规则库是全局的，这里选「应用到哪张表、从哪张表读既有规则」。已打开工作簿的全部工作表都可选。
+          </p>
+          <div class="cf-sheet-row">
+            <select id="cfSheet" class="cf-select"></select>
+            <button type="button" class="bgm-btn small" id="cfReloadSheetsBtn">🔄 刷新列表</button>
+          </div>
+        </section>
+
+        <!-- 规则管理 -->
+        <section class="section section-wide" id="sec-rules">
+          <h3>
+            ☑️ 规则管理<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-rules"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「规则管理」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            列表顺序即优先级（靠前先生效）。取消勾选 = 隐藏（留在库里不应用）。复制后可粘贴出副本。
+          </p>
+          <div class="cf-toolbar">
+            <input type="search" id="cfSearch" class="cf-search" placeholder="搜索名称 / 公式 / 范围 / 分组" />
+            <span class="cf-rule-count" id="cfRuleCount">0 条规则</span>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cfNewRuleBtn">➕ 新建规则</button>
+            <button class="bgm-btn small" id="cfPasteBtn">📋 粘贴</button>
+            <button class="bgm-btn small" id="cfImportBtn">📥 导入手工规则</button>
+          </div>
+          <div id="cfRuleList" class="cf-rule-list"></div>
+
+          <!-- 行内编辑器 -->
+          <div id="cfEditor" class="cf-editor" style="display: none">
+            <h4 id="cfEditorTitle">编辑规则</h4>
+            <label class="cf-field-label" for="cfEditName">名称</label>
+            <input type="text" id="cfEditName" class="cf-input" />
+            <label class="cf-field-label" for="cfEditGroup">分组</label>
+            <input type="text" id="cfEditGroup" class="cf-input" />
+            <label class="cf-field-label" for="cfEditRange">应用范围（A1 风格）</label>
+            <input type="text" id="cfEditRange" class="cf-input" placeholder="如 B3:B1048576" />
+            <label class="cf-field-label" for="cfEditFormula">公式（xlExpression，锚定范围首行）</label>
+            <textarea id="cfEditFormula" class="cf-textarea" rows="4" placeholder='如 =$R3="26年10月"'></textarea>
+            <div class="cf-color-row">
+              <div>
+                <label class="cf-field-label" for="cfEditFill">填充色</label>
+                <input type="color" id="cfEditFill" class="cf-color" value="#00B050" />
+              </div>
+              <div>
+                <label class="cf-field-label" for="cfEditFont">字体色</label>
+                <input type="color" id="cfEditFont" class="cf-color" value="#000000" />
+              </div>
+              <div class="cf-bold-box">
+                <label>
+                  <input type="checkbox" id="cfEditBold" />
+                  <span>加粗</span>
+                </label>
+              </div>
+            </div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button class="bgm-btn small primary" id="cfEditorSave">💾 保存</button>
+              <button class="bgm-btn small" id="cfEditorCancel">取消</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 默认规则集 -->
+        <section class="section" id="sec-defaults">
+          <h3>
+            📦 默认规则集<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-defaults"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「默认规则集」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            一键生成 6 条：当前季名称填绿（自维护 TODAY 公式，跨季度不用改）+ 日期格式错误标红 +
+            四季分色。依赖目标表识别到「开播季度」与「名称」列，公式锚定表头行下一行。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cfDefaultsBtn">📦 生成默认规则集</button>
+          </div>
+        </section>
+
+        <!-- 应用与修复 -->
+        <section class="section" id="sec-apply">
+          <h3>
+            🖌️ 应用与修复<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-apply"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「应用与修复」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            应用 = 先读目标表现有规则 → 清空重建（幂等，重复点不会叠出重复规则；删行搞乱范围后
+            重点一次即修复）。检测到你手工建的规则时会先弹框列出，让你选「清掉后应用」或「保留手工规则」。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cfApplyBtn">🖌️ 应用条件格式</button>
+          </div>
+          <p class="cf-apply-status" id="cfApplyStatus"></p>
+        </section>
+      </main>
+    </div>
+
+    <!-- ===================== 双策略确认模态框 ===================== -->
+    <div class="cf-modal-mask" id="cfConfirmMask" style="display: none">
+      <div class="cf-modal" role="dialog" aria-modal="true" aria-labelledby="cfConfirmTitle">
+        <h4 id="cfConfirmTitle">应用条件格式</h4>
+        <div class="cf-modal-body" id="cfConfirmBody"></div>
+        <div class="cf-modal-actions">
+          <button type="button" class="bgm-btn small primary" id="cfConfirmClear">清掉后应用</button>
+          <button type="button" class="bgm-btn small" id="cfConfirmKeep">保留手工规则</button>
+          <button type="button" class="bgm-btn small" id="cfConfirmCancel">取消</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
