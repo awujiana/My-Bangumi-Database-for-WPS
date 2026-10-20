@@ -45,11 +45,15 @@
 
 | 旧函数名                | 新函数名             | 说明                      |
 | ----------------------- | -------------------- | ------------------------- |
-| `initTaskpane`          | `initializePanel`    | Panel 初始化入口          |
+| `initTaskpane`          | `initPanel`          | Panel 初始化入口          |
 | `startTaskpane`         | `startPanel`         | Panel 启动函数            |
 | `refreshTaskpaneUI`     | `refreshPanelUI`     | 刷新 Panel UI             |
 | `isTaskpaneContext`     | `isPanelContext`     | 判断是否在 Panel 上下文中 |
 | `ensureTaskpaneVisible` | `ensurePanelVisible` | 确保 Panel 可见           |
+
+> 上表是 **taskpane → panel** 那一轮的历史对照。此后缩写规范又收紧了一轮：
+> `init*` 一律全拼，因此**当前代码里**本表第 1 行的函数实际名为 `initializePanel`
+> （详见 [`文档/NAMING.md`](NAMING.md) §4.4）。
 
 ### 日志前缀
 

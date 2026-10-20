@@ -47,8 +47,10 @@
 - **属性位（`objectLiteralProperty` / `typeProperty`）整体豁免**：线上 dump 字段、WPS COM
   （`Interior` / `Color`）、DOM（`className`）的名字所有权不在本项目。
 - **线上键 `sid` 保持原样**，靠解析边界 `WireRemoteEntry` + `toRemoteEntry()` 归一成 `subjectId`。
-- **`init*` 前缀不算缩写**（与 unicorn 词表口径一致），保留 `initPanel` / `initRibbon` 等十余个
-  既有导出名；要收紧只需把 `init` 加进 `PROJECT_ABBREVIATIONS`。
+- **公认缩略词不算缩写**：`id` / `url` / `api` / `json` / `xml` / `http` / `ui` / `bgm` / `wps`
+  等首字母缩略词视为独立单词（`subjectId` / `bangumiUrl` 合法）。
+
+> 一度把 `init` 也列进豁免（理由是 `unicorn` 词表里没有它），随后收紧 —— 详见上一条。
 
 ### 依赖与工具链升级（2026-10-20）
 

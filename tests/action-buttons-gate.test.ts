@@ -3,7 +3,7 @@
  * @fileoverview `ts/panel/action-buttons-gate.ts` 单元测试。
  *
  * 这组用例守的是一条**真机踩过的坑**（2026-10-20）：cf / highlight / clean 三页的
- * `initXxxPage()` 忘了派发 `bgm:modulesReady`，门禁只能等 5s 超时兜底，
+ * `initializeXxxPage()` 忘了派发 `bgm:modulesReady`，门禁只能等 5s 超时兜底，
  * 表现为「页面打开后按钮灰 5 秒」，控制台只剩一条容易被当噪声的 warn。
  *
  * 因此这里断言三件事：
