@@ -889,13 +889,12 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
 
   it('用户在写入阶段中断 → 收尾文案如实标注「已停止」而非报成完成', async () => {
     mocks.syncFromRemote.mockImplementationOnce(
-      async (_onProgress: unknown, _strategy: unknown, signal: AbortSignal) => {
+      async (_onProgress: unknown, _strategy: unknown, _signal: AbortSignal) => {
         // 模拟「用户点了停止」：把 signal 置为 aborted 后抛错
         const progressDialogOptions = mocks.showSyncProgressDialog.mock.calls[0]?.[1] as {
           onStop: () => void
         }
         progressDialogOptions.onStop()
-        void signal
         throw new Error('aborted')
       },
     )

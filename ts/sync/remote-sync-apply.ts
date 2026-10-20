@@ -767,6 +767,12 @@ function batchWriteNewRows(
     pendingFieldNames.push(excelField)
   }
   const writeCols = collectWriteCols(colMap, pendingFieldNames)
+  // 空列映射（表头完全认不出）时必须早退：否则 minCol/maxCol 退化成 1，
+  // 会把一整列 null 写进 A 列覆盖用户数据，且不触发下方的逐行回退。
+  if (writeCols.length === 0) {
+    bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] 未找到任何可写入的列')
+    return 0
+  }
   // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
   const minCol = writeCols[0]?.col ?? 1
   const maxCol = writeCols.at(-1)?.col ?? minCol

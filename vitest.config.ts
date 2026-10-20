@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // 默认 10s 太紧：全量并发起 142 个 jsdom 环境（每文件 ~4.5s 启动 + 安全软件扫描），
+    // 遇到机器负载高时 beforeEach 钩子会偶发超时（实测同一个文件单跑 3.6s、全量跑 >10s）。
+    // 抬到 30s 只影响本来就该失败的慢钩子，快路径零成本。
+    hookTimeout: 30_000,
     include: ['tests/**/*.test.ts'],
     // 测试环境保真：jsdom 环境下默认注入真实 DOMPurify，使单测走与生产一致的
     // 严格白名单路径（背景见 tests/setup/dompurify.ts 与 文档/TS_AUDIT_2026_09_10.md P0-2）

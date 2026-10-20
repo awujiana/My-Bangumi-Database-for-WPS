@@ -8,6 +8,40 @@
 
 ## [未发布]
 
+### 依赖与工具链升级（2026-10-20）
+
+`npm outdated` 逐项核对后升级；全量门禁 `npm run gate` 通过（142 文件 / 4645 用例）。
+
+- **主版本跃迁**：vite 6 → 8（构建内核换 rolldown，`npm run build` 实测产出 253 个文件）、
+  vitest 4 → 5（全量耗时 160s → 68~81s）、jsdom 29 → 30、lint-staged 16 → 17、concurrently 9 → 10。
+- **同主版本**：eslint 10.13、typescript-eslint 8.72、@napi-rs/canvas 1.0.11、prettier 3.9.10、
+  globals 17.13、zod 4.6.7、dompurify 3.4.17（`libs/purify.js` **同步覆盖**为同版本 vendored 副本，
+  `check:dompurify-version` 把关——运行时加载的是它，只升 npm 侧等于没升）。
+- **刻意停在旧版（有明确阻塞，别盲升）**：
+  - `typescript` 6.0.3：`typescript-eslint@8.72` 的 peer 是 `>=4.8.4 <6.1.0`；TS 7 是 Go 原生
+    实现（`tsgo`），类型感知规则链不兼容，升上去 `npm install` 直接 ERESOLVE（实测）。
+  - `eslint-plugin-unicorn` 74：v78 把一批规则拆成 json / markdown / css 专用版，本项目
+    「unicorn 整组展开为 error」的配置在**解析阶段**就抛 `rules do not support the language "js/js"`；
+    按语言域过滤后仍冒出 **856 条**新错误（`no-manually-wrapped-comments` 占大头），且
+    `prefer-continue` / `prefer-early-return` 与项目既定的 `no-continue` 直接互斥。迁移需单独一轮。
+- **新增 `.npmrc`（`legacy-peer-deps=true`）**：`eslint-config-airbnb-extended@3.x` 的 peer 仍写
+  `eslint: ^9.0.0`（实际在 v10 下工作正常），不放宽则任何 `npm install` / `npm ci` 都 ERESOLVE，
+  新克隆的仓库装不上依赖。
+- **移除 `@types/dompurify`**：dompurify 3.x 自带 `dist/purify.cjs.d.ts`，该 @types 包从未生效。
+- **`vite.config.js` → `vite.config.mjs`**：vite 8 的 `configLoader: 'native'` 会警告
+  「ESM 语法被按 CJS 加载」，未来该 loader 成为默认后会直接失败。
+
+### 修复
+
+- **`batchWriteNewRows` 缺空列早退**（真 bug）：表头完全认不出（`colMap` 为空）时
+  `writeCols` 为空却不早退，`minCol` / `maxCol` 退化成 1，会把一整列 `null` 写进 A 列
+  **覆盖用户数据**，也不触发逐行回退。补回守卫 + WARN——修好后
+  `tests/github-sync.test.ts` 的空列用例才真正通过（此前一直靠注释「上方已守卫」掩盖）。
+- 三处 `void x` 被 typescript-eslint 8.72 新增的 `no-meaningless-void-operator` 判为无效，
+  改为 `_` 前缀参数（`_signal` / `_address` / `_function_`），语义不变。
+- `vitest` 的 `hookTimeout` 10s → 30s：全量并发起 142 个 jsdom 环境时钩子偶发超时
+  （同一文件单跑 3.6s，全量跑 >10s）。
+
 - **进度弹窗阶段时间线**：通用进度组件新增可选 `phases`（`controller.setPhase(i)` 推进），
   三态（待办 / 进行中呼吸 / 已完成+耗时）。远程同步接入「下载 → 比对 → 写入」
   （`REMOTE_SYNC_PHASES`，下标由编排层与弹窗共用一份常量）。时间线刻意放在

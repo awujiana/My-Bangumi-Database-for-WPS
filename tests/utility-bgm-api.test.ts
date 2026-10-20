@@ -74,8 +74,7 @@ function createFakeDialog() {
 /** 只提供被测代码会用到的 Range/Select 两个成员 */
 function createFakeSheet(select: () => void, isRangeThrowing = false): WpsWorksheet {
   return {
-    Range: (address: string) => {
-      void address
+    Range: (_address: string) => {
       if (isRangeThrowing) throw new Error('无此单元格')
       return { Select: select }
     },

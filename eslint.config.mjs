@@ -135,7 +135,7 @@ const patchedBaseRecommendedConfig = baseRecommendedConfig.map((config) => {
     : { ...config, plugins }
 })
 
-// 将插件的所有规则设为 error，但排除两类**不应启用**的规则：
+// 将插件的所有规则设为 error，但排除四类**不应启用**的规则：
 //   1) meta.deprecated 已弃用规则（共 14 条）——上游已声明由新规则取代。
 //      启用它们有害无益：`import-x/imports-first` 与 `import-x/first` 语义完全相同，
 //      会把同一处问题重复报两次（实测重复计 100 条）；`unicorn/prevent-abbreviations`
@@ -146,9 +146,24 @@ const patchedBaseRecommendedConfig = baseRecommendedConfig.map((config) => {
 //   3) UNSAFE_FIX_RULES——见上方说明，类型不安全的重写型规则，从源头排除，
 //      不参与 allRulesAsError 的自动展开（避免 --fix 把可编译代码改坏，且 ESLint 10
 //      的 fix/non-fix 不一致导致写在 rules 里的 'off' 拦不住 --fix 重写）。
+//   4) 声明了 meta.languages 但**不含 js/js** 的规则（unicorn 78 起集中出现）。
+//      本配置是「全量展开」，而 ESLint 10 在**配置校验阶段**就拒绝这类规则作用于 js/js：
+//        Key "rules": The following rules do not support the language "js/js":
+//          - "unicorn/comma-spacing" / "indent" / "key-name-casing" / "no-empty-link-text"
+//          - "unicorn/no-javascript-url" / "no-loss-of-precision" / "require-frontmatter-fields"
+//      该错误是**致命**的（整份配置加载失败，lint 根本跑不起来，不是报违规），
+//      74 → 78 升级时正是它把 lint:check / gate 全挂。这 7 条只作用于
+//      css / json / jsonc / json5 / yaml / toml / soml / markdown，本仓无此类文件，永不命中。
+//      判定按 meta.languages **自动推导**而非硬编码名单：unicorn 每升一版都会新增同类规则
+//      （74→78 新增 40 条、删 2 条），写死名单下次升级还会崩。
+//      代价：若将来出现只声明 ts/ts 的规则也会被跳过——但本仓 lint 范围含 .mjs
+//      （vite.config.mjs），这类规则本就无法全局启用，跳过不损失覆盖。
 // 说明：这不是"降低严格度"——被排除的规则要么有等价的现行规则在生效，要么在本项目
 // 语言范围内不可能命中；UNSAFE_FIX_RULES 仍保持 error 门禁（靠手工清零，不使用 --fix）。
 const EXCLUDED_RULE_PATTERN = /^jsx-/
+const isLanguageUnsupported = (impl) =>
+  Array.isArray(impl?.meta?.languages) && !impl.meta.languages.includes('js/js')
+
 const allRulesAsError = (plugin, prefix) =>
   Object.fromEntries(
     Object.entries(plugin.rules)
@@ -156,6 +171,7 @@ const allRulesAsError = (plugin, prefix) =>
         ([rule, impl]) =>
           !impl?.meta?.deprecated &&
           !EXCLUDED_RULE_PATTERN.test(rule) &&
+          !isLanguageUnsupported(impl) &&
           !(isFix && UNSAFE_FIX_RULES.has(rule)),
       )
       .map(([rule]) => [`${prefix}/${rule}`, 'error']),
@@ -171,7 +187,7 @@ export default tseslint.config(
       'node_modules/**',
       'coverage/**',
       '**/*.js',
-      '!vite.config.js',
+      '!vite.config.mjs',
       // ESLint 严格化迁移期 codemod 的临时输出目录（.gitignore 同步排除，不入库）
       '.fix_out/**',
       // 配置文件自身：tseslint 的 strictTypeChecked rules 块无 files 限制会套用它，

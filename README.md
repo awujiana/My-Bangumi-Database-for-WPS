@@ -40,7 +40,7 @@ BGM/
 ├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
 ├── manifest.xml                # 加载项清单（ApiVersion / Name）
 ├── ribbon.xml                  # 功能区按钮配置（"Bangumi同步" Tab）
-├── vite.config.js              # Vite 构建配置
+├── vite.config.mjs             # Vite 构建配置
 ├── tsconfig.json               # TS 编译配置（strict）
 ├── package.json                # 脚本与依赖
 ├── ts/                         # TypeScript 源码

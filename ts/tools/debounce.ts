@@ -58,7 +58,6 @@ export function throttle<T extends (...arguments_: unknown[]) => unknown>(
 }
 
 /** 取消防抖/节流的 timer（用于清理） */
-export function clearDebounceTimer(function_: (...arguments_: unknown[]) => void): void {
+export function clearDebounceTimer(_function_: (...arguments_: unknown[]) => void): void {
   // 这是一个简单的清理辅助，实际清理需要在调用点保存 timerId
-  void function_
 }
