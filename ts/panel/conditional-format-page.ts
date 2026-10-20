@@ -45,9 +45,9 @@ import {
   isFormatConditionsSupported,
   readForeignRules,
 } from './conditional-format-apply.js'
-import { initShellNav } from './shell-nav.js'
+import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
-import { initTheme, startThemeSync } from '../tools/theme.js'
+import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 // ===== 常量 =====
@@ -752,10 +752,10 @@ function importForeign(): void {
 
 // ===== 初始化 =====
 
-export function initConditionalFormatPage(): void {
+export function initializeConditionalFormatPage(): void {
   markConditionalFormatPaneLoaded()
-  initShellNav()
-  initTheme()
+  initializeShellNav()
+  initializeTheme()
   startThemeSync()
 
   loadRules()

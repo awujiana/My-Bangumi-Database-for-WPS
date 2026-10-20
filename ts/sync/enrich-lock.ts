@@ -265,7 +265,7 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
  * @param lockButtonId - 锁定按钮的 DOM ID
  * @param statusId - 锁定状态显示的 DOM ID
  */
-export function initEnrichLock(
+export function initializeEnrichLock(
   wbSelectId = 'enrichWorkbookSelect',
   sheetSelectId = 'enrichSheetSelect',
   lockButtonId = 'enrichLockBtn',

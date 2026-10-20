@@ -36,7 +36,7 @@ export function applyTheme(mode: ThemeMode): void {
  * 初始化主题：从配置读取并应用；若为「跟随系统」则监听系统外观变化。
  * 各页面入口（panel / settings / enrich）在启动时调用一次。
  */
-export function initTheme(): void {
+export function initializeTheme(): void {
   const mode = getTheme(true)
   applyTheme(mode)
   systemMedia?.addEventListener('change', () => {

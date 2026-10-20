@@ -1,7 +1,7 @@
 /**
  * @fileoverview 清理页面启动入口（编译产物位于 dist-ts/panel/clean-bootstrap.js）
  * @module panel/cleanBootstrap
- * @description 绑定清理页面初始化逻辑，在 DOM 就绪后调用 initCleanPage()，
+ * @description 绑定清理页面初始化逻辑，在 DOM 就绪后调用 initializeCleanPage()，
  *   并在模块就绪前禁用 data-action 按钮、收到 bgm:modulesReady 后启用。
  *
  * 注意：本文件由 tsc 编译至 dist-ts/panel/，由 ui/clean.html 通过
@@ -26,7 +26,7 @@ import '../sync/exceltobangumi.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
-import { initCleanPage } from './clean-page.js'
+import { initializeCleanPage } from './clean-page.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
 
 if (typeof document !== 'undefined') {
@@ -34,7 +34,7 @@ if (typeof document !== 'undefined') {
 
   // DOM 就绪后初始化清理页面
   const onCleanReady = (): void => {
-    initCleanPage()
+    initializeCleanPage()
     // 跨页导航模式同步：设置页勾选「导航仅显示图标」后本页跟随切换
     startNavModeSync()
     // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）

@@ -58,7 +58,7 @@ const _trackedListeners: TrackedListener[] = []
 
 /**
  * 清理所有已追踪的监听器。
- * 在 initHandlers 重新初始化前调用，防止同一面板内重复注册。
+ * 在 initializeHandlers 重新初始化前调用，防止同一面板内重复注册。
  */
 export function clearTrackedListeners(): void {
   for (const item of _trackedListeners) {

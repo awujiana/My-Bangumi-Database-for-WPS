@@ -14,7 +14,7 @@
 | v3.0  | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrich-lock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | v3.1  | 2026-08-26 | enrich-lock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | v3.2  | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panel-page.ts`/`enrich-page.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| v3.3  | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`error-handler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| v3.3  | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`error-handler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initializePanel` 等）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | v3.4  | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | v3.5  | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | v3.6  | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -27,8 +27,8 @@
 | v3.13 | 2026-10-15 | **全链路数据安全审计**：修复 6 处会「吞数据 / 改用户数据」的缺陷（详见 §2.7）。核心是三条 COM 读写不变式——**单行区域 `Value2` 是一维数组**（原来按二维取 `oldValues[0]` 会拿到首个单元格的值，索引字符串得「第 N 个字符」）、**`null` 在二维数组里的语义是「清空该单元格」**（原来把未变化列铺 null 再整行赋值，会清掉 `writeCols` 区间中段的用户数据）、**读失败必须放弃写入**（原来用空旧值做「本地 \| 远程」合并，等于把用户标签/别名整体替换成远程值）。另修一个用户可见行为 bug：主面板 `#conflictStrategy` 下拉的 change 监听因 `#chkIncremental` 早退而从未注册，用户改了下拉却不落 `bgm_skip_conflicts` 配置。同时确立**测试桩忠实性原则**（桩不忠实就修桩，不为迁就桩弱化生产守卫）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | v3.14 | 2026-10-17 | **sync 结构合并（路线①）**：`syncFromRemote` 与 `syncFromGithub` 主体逐字重复 ~150 行（2026-10-15 逐行比对确认差异仅 5 处：source 获取 / 校验文案 / 日志 tag / 耗时格式 / 时间筛选标签函数是否内联）。新增 `ts/sync/remote-sync-apply.ts`（apply 阶段整体逐字迁入，1537 行，含 `readLocalEntriesForSync` / `applyDiffToSheet` / `applyConflictResolutions` 与 12 个私有辅助）与 `ts/sync/remote-sync-core.ts`（`runRemoteSync` 统一编排，入口差异全部参数化）；`github-sync.ts` 1893 → 215、`sync-source-registry.ts` 314 → 118，均变薄壳，apply 三函数与 `GithubSyncResult` 经兼容 re-export 保留（barrel 与消费方不变）。关键约束：**`vi.mock` 截不住模块内调用 → apply 与编排必须分模块**，否则 registry 测试对 apply 三函数的 mock 静默失效（最终零断言变更，仅 mock 接缝随模块边界迁移）。进度口径统一 `0/1→1/3→2/3→3/3`、编排层耗时统一裸毫秒 `${ms}ms`（github 路径用户可见文案随之小改），apply 阶段内部 `formatDuration` 文案不变。依赖单向无环：apply ← core ← 两个薄壳                                                                                                                                                                                                                                                                                                                                                                                 |
 | v3.15 | 2026-10-17 | **同步前列映射确认框 + 缺列主动通知**：新增 `ts/sync/sync-mapping.ts`（纯逻辑，从既有字段表派生行、排除/改列/补列的解析与落地辅助）与 `ts/ui/sync-mapping-dialog.ts`（勾选 / 拖拽排序 / 改目标列 / 一键补缺失列，写表头读回校验）。主流程贯通四点：排除列从 neededFields 剔除 + update diff 过滤 + 写入层从 colMap 摘列（含别名闭包）+ 缺列体检过滤；改映射用「本地复制字段键 + 写入换列号」实现，computeDiff 与写入函数零改动。缺列从「只进日志」升级为 toast 主动通知 + 弹窗补列指引。接线在 `ACTION_HANDLERS.syncFromGithub`（确认框 → 列映射框 → 同步），两入口新增末尾可选参数 `mapping`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| v3.16 | 2026-10-18 | **清理页执行前预览重构（diff 视图 + 横屏 + 性能）**：新增 `ts/ui/diff-view.ts` + `css/diff.css`（diff2html 范式、零依赖、四页共用）—— 行类型四态（保留/删除/新增/分组说明）+ 行内高亮（公共前后缀裁剪）+ 大列表分页；引擎 `RowPlan` 新增 `rowPreviews`/`groupPreviews`、`RowChange` 新增 `oldValue`（预览数据零额外 COM 采集）。性能三处：工作表勾选状态 write-through 缓存（一次勾选 ~N 次 WebView IPC → 1 次）、扫描数据区整块共用（每目标至多 32 次 COM → 1 次）、`scanCleanRules` 异步化（逐目标让出宏任务，大表扫描不冻结窗格）。横屏排版：≥960px 两列 / ≥1440px 三列 + `.section-wide` 通栏。统计显示六套手写变体收敛为一套 `.stat-grid`/`.stat-card`（导航栏视觉语言）。安全修复：`sanitize.ts` ALLOWED_ATTR 补 `colspan`（运行时表格首次用跨列，严格白名单静默剥属性）
-| v3.17 | 2026-10-19 | **前端体检报告落地（视觉 P0 + 性能 + 重试入口）**：① 浅色主题修复——补 Latte 调色板、29 处 `rgba(255,255,255,…)` 白叠加 token 化、5 处硬编码灰字改 `var(--text-*)`；② StatusBar 写入节流（200ms，结束必写最终值）+ 进度日志去强制布局；③ 新增 `panel/panel-auto-refresh.ts`（SheetChange 事件 + window.focus/visibilitychange 双触发，共享 400ms 防抖与刷新闸门）；④ 预览按 HTML 指纹跳过重建；⑤ 预览表视觉升级（斑马纹 / 表头行粘性 / 单元格 title / 空状态）并把 17 条 `.preview-table` 规则收窄到 `.preview-box`（styles.css 全页加载，原先串到 enrich 页）；⑥ 新增 `core/failed-rows.ts` + 面板「🎯 重试失败行」按钮（只选中失败行，同步复用选中行同步；刻意不持久化，行号会随增删行错位） |
+| v3.16 | 2026-10-18 | **清理页执行前预览重构（diff 视图 + 横屏 + 性能）**：新增 `ts/ui/diff-view.ts` + `css/diff.css`（diff2html 范式、零依赖、四页共用）—— 行类型四态（保留/删除/新增/分组说明）+ 行内高亮（公共前后缀裁剪）+ 大列表分页；引擎 `RowPlan` 新增 `rowPreviews`/`groupPreviews`、`RowChange` 新增 `oldValue`（预览数据零额外 COM 采集）。性能三处：工作表勾选状态 write-through 缓存（一次勾选 ~N 次 WebView IPC → 1 次）、扫描数据区整块共用（每目标至多 32 次 COM → 1 次）、`scanCleanRules` 异步化（逐目标让出宏任务，大表扫描不冻结窗格）。横屏排版：≥960px 两列 / ≥1440px 三列 + `.section-wide` 通栏。统计显示六套手写变体收敛为一套 `.stat-grid`/`.stat-card`（导航栏视觉语言）。安全修复：`sanitize.ts` ALLOWED_ATTR 补 `colspan`（运行时表格首次用跨列，严格白名单静默剥属性）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| v3.17 | 2026-10-19 | **前端体检报告落地（视觉 P0 + 性能 + 重试入口）**：① 浅色主题修复——补 Latte 调色板、29 处 `rgba(255,255,255,…)` 白叠加 token 化、5 处硬编码灰字改 `var(--text-*)`；② StatusBar 写入节流（200ms，结束必写最终值）+ 进度日志去强制布局；③ 新增 `panel/panel-auto-refresh.ts`（SheetChange 事件 + window.focus/visibilitychange 双触发，共享 400ms 防抖与刷新闸门）；④ 预览按 HTML 指纹跳过重建；⑤ 预览表视觉升级（斑马纹 / 表头行粘性 / 单元格 title / 空状态）并把 17 条 `.preview-table` 规则收窄到 `.preview-box`（styles.css 全页加载，原先串到 enrich 页）；⑥ 新增 `core/failed-rows.ts` + 面板「🎯 重试失败行」按钮（只选中失败行，同步复用选中行同步；刻意不持久化，行号会随增删行错位）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## 一、架构概览
 
@@ -90,7 +90,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── container.ts     → 轻量 CDI 服务容器 (register/resolve)
   │   ├── services.ts      → 核心服务注册 (logService/eventBusService)
   │   ├── ui-bridge.ts     → 底层→上层能力桥 (NotifyApi/SyncProgressApi/SyncRunner + 注册/获取)
-  │   └── error-handler.ts → 全局错误处理 (initGlobalErrorHandler)
+  │   └── error-handler.ts → 全局错误处理 (initializeGlobalErrorHandler)
   │
   ├── ts/tools/          (基础设施层 · 直接从源模块导入，不再经 index.ts)
   │   ├── events.ts        → EventBus (发布-订阅 + STATE_CHANGED/CONFIG_CHANGED)
@@ -150,7 +150,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │       └── _constants.ts → 中文常量
   │
   ├── ts/panel/          (Panel 子模块)
-  │   ├── panel-page.ts      → Panel 主模块（initPanel/refreshPanelUI）
+  │   ├── panel-page.ts      → Panel 主模块（initializePanel/refreshPanelUI）
   │   ├── panel-lifecycle.ts → 工作表锁定/解锁
   │   ├── user-info-polling.ts → 用户信息轮询 (PluginStorage)
   │   └── enrich-page.ts     → 新番表富化 UI 控制器
@@ -182,7 +182,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 #### Ribbon 入口
 
 - **文件**: `ts/entry/ribbon-entry.ts`
-- **启动链**: `startRibbon()` → `initRibbon()` →
+- **启动链**: `startRibbon()` → `initializeRibbon()` →
   1. 注册 window message 监听器（接收面板发来的 `BGM:configUpdated` 消息）
   2. 启动 PluginStorage 配置轮询（每 2 秒检查增量同步/跳过冲突/同步记录开关的变化）
 - **自动启动条件**: `typeof window !== 'undefined'`（浏览器上下文）
@@ -191,17 +191,17 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 - **文件**: `ts/entry/panel-entry.ts`
 - **启动链**: `startPanel()` →
-  1. `initPanel()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
-  2. `initHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
-  3. `initGlobalErrorHandler()`: 注册全局错误处理（v3.3 新增）
+  1. `initializePanel()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
+  2. `initializeHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
+  3. `initializeGlobalErrorHandler()`: 注册全局错误处理（v3.3 新增）
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('panel.html')`
 
 #### Settings 入口
 
 - **文件**: `ts/entry/settings-entry.ts`
 - **启动链**: `startSettings()` →
-  1. `initHandlers()`: 复用面板的事件处理器（统一事件分发）
-  2. `initSettingsPage()`: 加载 Token 状态、用户信息、同步偏好、GitHub 配置
+  1. `initializeHandlers()`: 复用面板的事件处理器（统一事件分发）
+  2. `initializeSettingsPage()`: 加载 Token 状态、用户信息、同步偏好、GitHub 配置
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('settings.html')`
 - **UI 结构**: 独立面板（`settings.html`，均通过 WPS `CreateTaskPane` 创建），包含 Token 管理、用户信息、同步偏好、GitHub 配置等模块
 
@@ -226,7 +226,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### `error-handler.ts` — 全局错误处理（v3.3 新增）
 
-- **`initGlobalErrorHandler()`**: 注册全局错误监听
+- **`initializeGlobalErrorHandler()`**: 注册全局错误监听
   - `window.onerror`: 捕获未处理异常
   - `window.onunhandledrejection`: 捕获未处理 Promise 拒绝
 - **错误分级**: 按 ErrorLevel 分类处理（SILENT/WARN/ERROR/THROW）
@@ -565,7 +565,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### `handlers/` — 事件处理器
 
-- **`index.ts`**: 主 handler 分发，`initHandlers()` 注册所有监听器
+- **`index.ts`**: 主 handler 分发，`initializeHandlers()` 注册所有监听器
   - `toggleUsageGuide`: 使用引导详情切换（展开/收起详细操作说明面板）
   - `showSyncGuide`: 同步策略引导切换（根据所选策略动态显示策略说明和通用规则）
   - `saveAllConfig`: 保存所有配置到 PluginStorage
@@ -579,7 +579,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### 其他 UI 模块
 
-- **`message.ts`**: 状态栏消息 (`setStatus()`, `initMessageListener()`)
+- **`message.ts`**: 状态栏消息 (`setStatus()`, `initializeMessageListener()`)
 - **`conflict-resolver.ts`**: 冲突解决 UI (`showConflictResolver()`)
 - **`sync-result-dialog.ts`**: 同步结果增强弹窗 (`showSyncResultDialog()`, `computeDateStatsFromSheet()`)
 - **`sync-mapping-dialog.ts`**: 同步前列映射确认框 (`showSyncMappingDialog()`)——勾选/拖拽排序/改目标列/一键补列；返回 `SyncMappingConfig | null`（null = 取消同步）。纯逻辑在 `sync/sync-mapping.ts`
@@ -726,7 +726,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 | 函数                       | 说明                                                 |
 | -------------------------- | ---------------------------------------------------- |
-| `initDebugPanel()`         | 主入口，检测环境后自动构建并挂载面板到 DOM           |
+| `initializeDebugPanel()`   | 主入口，检测环境后自动构建并挂载面板到 DOM           |
 | `isDebugEnvironment()`     | 检测是否为开发环境（无 WpsInvoke）                   |
 | `getModuleStatuses()`      | 读取 `window.__BGM_MODULE_STATUS__` 获取模块加载状态 |
 | `getLogger()`              | 动态导入 logger 模块（懒加载，避免影响生产环境）     |
@@ -735,7 +735,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### 集成方式
 
-- **自动启动**: 文件末尾通过 `DOMContentLoaded` 事件自动调用 `initDebugPanel()`
+- **自动启动**: 文件末尾通过 `DOMContentLoaded` 事件自动调用 `initializeDebugPanel()`
 - **状态读取**: 从 `window.__BGM_MODULE_STATUS__`（由 `index.ts` main.js 写入）获取模块状态
 - **Logger 集成**: 通过动态 `import('./tools/logger.js')` 获取 `LoggerModule` 接口，读取 `getRecentLogs()`、调用 `clearLogs()`；导出走动态 `import('../ui/handlers/data-export.js')` 的 `exportData('systemLogs', 'txt')`，与设置页 / 日志弹窗同一出口
 - **Ribbon 测试**: 直接调用 `window.OnAction()` 和 `window.GetBangumiImage()`，无需 Ribbon UI 参与
@@ -885,7 +885,7 @@ if (range !== null && oldArray.length < colCount) {
 **首次初始化流程：**
 
 1. `ribbon-entry.ts` 启动 → `OnAddinLoad()` → 设置 `EnableFlag='false'` 和 `ApiEventFlag='false'`
-2. `panel-entry.ts` 启动 → `initPanel()` → 从 PluginStorage 恢复用户信息
+2. `panel-entry.ts` 启动 → `initializePanel()` → 从 PluginStorage 恢复用户信息
 3. `getGithubConfig()` 首次读取时，若 owner/repo/path 全为空，自动写入 `DEFAULT_GITHUB_CONFIG`
 4. Token 通过 `loadBgToken()` 明文读取（已移除历史 XOR 加密自动升级逻辑）
 
@@ -1221,7 +1221,7 @@ WPS 中 Ribbon 和 面板 是**独立的 iframe**（独立 WebView 上下文）�
   window.top.postMessage({ type: 'BGM:configUpdated', data: { key, value } }, '*')
   window.postMessage({ type: 'BGM:configUpdated', data: { key, value } }, '*')
   ```
-- **Ribbon 侧监听**: `initRibbonMessageListener()` 注册 `window.addEventListener('message', handler)`
+- **Ribbon 侧监听**: `initializeRibbonMessageListener()` 注册 `window.addEventListener('message', handler)`
 - **Origin 校验**: 白名单 `['null', '', window.location.origin]`
 
 #### 通道 2: PluginStorage 轮询（兜底通道）
@@ -1450,8 +1450,8 @@ npm run audit:layout -- panel.html      # 只审计单页
 **测试隔离设计：**
 
 - `entry/` 模块使用 `typeof window !== 'undefined'` 守卫，测试环境导入不触发副作用
-- `ribbon.ts` 的消息监听和轮询通过显式 `initRibbon()` 调用启动
-- `panel/panel-page.ts` 的 DOM 操作通过 `initPanel()` 显式调用触发
+- `ribbon.ts` 的消息监听和轮询通过显式 `initializeRibbon()` 调用启动
+- `panel/panel-page.ts` 的 DOM 操作通过 `initializePanel()` 显式调用触发
 
 ### 7.3 代码规范
 

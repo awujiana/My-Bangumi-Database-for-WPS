@@ -64,7 +64,7 @@ export function installActionButtonsGate(logTag: string): void {
 /**
  * 通知门禁：本页模块初始化完成，启用 `data-action` 按钮。
  *
- * 各页面 `initXxxPage()` 末尾必须调用。漏调不会让按钮永久失效（5s 后兜底强开），
+ * 各页面 `initializeXxxPage()` 末尾必须调用。漏调不会让按钮永久失效（5s 后兜底强开），
  * 但用户会看到按钮灰 5 秒，控制台只剩一条极易被当噪声忽略的 warn——所以别漏。
  */
 export function notifyModulesReady(): void {

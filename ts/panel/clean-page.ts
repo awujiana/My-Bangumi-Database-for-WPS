@@ -29,8 +29,8 @@ import { notifyModulesReady } from './action-buttons-gate.js'
 import { appendOperationLog, clearOperationLogs, CLEAN_LOG_SCOPE } from '../tools/operation-log.js'
 import { renderStatCards } from '../ui/stat-cards.js'
 import type { WpsWorksheet } from '../tools/wps.js'
-import { initShellNav } from './shell-nav.js'
-import { initTheme, startThemeSync } from '../tools/theme.js'
+import { initializeShellNav } from './shell-nav.js'
+import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import { createProgress } from '../ui/components/progress.js'
 import type { ProgressController } from '../ui/components/progress.js'
 
@@ -938,13 +938,13 @@ function bindButtons(): void {
  * 初始化清理页面。
  * 幂等：重复调用只会重复渲染（不重复绑定按钮），由 bootstrap 保证单次调用。
  */
-export function initCleanPage(): void {
+export function initializeCleanPage(): void {
   if (typeof document === 'undefined') return
   // 记录页面已成功加载，供 showCleanPanel 判断缓存的面板 ID 是否有效
   markCleanPaneLoaded()
-  initTheme()
+  initializeTheme()
   startThemeSync()
-  initShellNav()
+  initializeShellNav()
   renderSheetList()
   renderCleanItems()
   bindButtons()

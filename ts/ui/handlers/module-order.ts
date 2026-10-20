@@ -139,7 +139,10 @@ function onEditorClick(event: Event): void {
     renderModuleOrderEditor()
     applyModuleState(hidePage)
     showToast(isNowHidden ? '模块已隐藏，可在设置页恢复' : '模块已恢复显示', 'success')
-    bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`,
+    )
     return
   }
 
@@ -264,7 +267,7 @@ export function startModuleOrderSync(): () => void {
  * 初始化模块排序编辑器：渲染清单并绑定容器级事件委托。
  * 仅在存在 `#moduleOrderGroups` 的设置页生效，其余页面静默跳过。
  */
-export function initModuleOrderEditor(): void {
+export function initializeModuleOrderEditor(): void {
   const host = document.getElementById('moduleOrderGroups')
   if (!host) return
   renderModuleOrderEditor()

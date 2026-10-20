@@ -34,7 +34,7 @@ import {
   LOG_LEVELS,
   getApp,
 } from './index.js'
-import { initWorkbookAutoDetection } from './sync/workbook-auto-detect.js'
+import { initializeWorkbookAutoDetection } from './sync/workbook-auto-detect.js'
 
 /**
  * WPS Ribbon 控件回调参数最小接口
@@ -80,11 +80,11 @@ interface RibbonWindowExtensions {
   OnEnableSyncRecordChange?: (control: WpsRibbonControl) => boolean
 }
 
-// 在 Ribbon 启动时通过 initRibbon() 显式注册（不在模块加载时自动执行）
+// 在 Ribbon 启动时通过 initializeRibbon() 显式注册（不在模块加载时自动执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
 let _ribbonMessageHandler: ((event: MessageEvent) => void) | null = null
 
-function initRibbonMessageListener(): void {
+function initializeRibbonMessageListener(): void {
   if (typeof window === 'undefined') return
   // 防止重复注册：先移除旧监听器
   if (_ribbonMessageHandler) {
@@ -206,8 +206,8 @@ function stopRibbonConfigPolling(): void {
  * 必须由显式入口（如 `ts/entry/ribbon-entry.ts`）调用，
  * 不在模块加载时自动执行，便于在测试环境按需初始化。
  */
-export function initRibbon(): void {
-  initRibbonMessageListener()
+export function initializeRibbon(): void {
+  initializeRibbonMessageListener()
   startRibbonConfigPolling()
 }
 
@@ -333,7 +333,7 @@ export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
   app.PluginStorage?.setItem('EnableFlag', 'false')
   app.PluginStorage?.setItem('ApiEventFlag', 'false')
   // 检查方式 A + 事件时机 C/D/E：打开 WPS（加载项加载）时，自动识别已打开的新番表/Bangumi 数据表工作簿并持久化
-  initWorkbookAutoDetection()
+  initializeWorkbookAutoDetection()
   return true
 }
 

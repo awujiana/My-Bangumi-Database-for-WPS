@@ -7,7 +7,7 @@
  * 每条用例都 `vi.resetModules()` 后重新 `import()`，用「按钮状态 / 调用了大盘初始化 /
  * console 输出」这些**外部可观察量**断言，而不是断言内部变量。
  *
- * 四个脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initShellNav` / …）或
+ * 四个脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initializeShellNav` / …）或
  * 纯副作用（`import '../ui/dialog.js'`）。测试把两类一起接管：副作用模块 mock 成空对象
  * （否则会拖进整张真实依赖图，barrel 循环还会静默回退真实现），具名导出换成 spy。
  *
@@ -31,15 +31,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // ========== 依赖替身 ==========
 
 const stubs = vi.hoisted(() => ({
-  initTheme: vi.fn<() => void>(),
+  initializeTheme: vi.fn<() => void>(),
   startThemeSync: vi.fn<() => void>(),
   startNavModeSync: vi.fn<() => void>(),
-  initShellNav: vi.fn<() => void>(),
+  initializeShellNav: vi.fn<() => void>(),
   startNavOrderSync: vi.fn<(page: string) => void>(),
   startModuleStateSync: vi.fn<(page: string) => void>(),
   installModalA11y: vi.fn<() => void>(),
-  initEnrichPage: vi.fn<() => void>(),
-  initCleanPage: vi.fn<() => void>(),
+  initializeEnrichPage: vi.fn<() => void>(),
+  initializeCleanPage: vi.fn<() => void>(),
 }))
 
 // 纯副作用导入：mock 成空对象，避免拖入真实依赖图
@@ -62,7 +62,7 @@ vi.mock('../ts/entry/settings-entry.js', () => ({}))
 
 // 具有名导出的模块：换成 spy
 vi.mock('../ts/tools/theme.js', () => ({
-  initTheme: stubs.initTheme,
+  initializeTheme: stubs.initializeTheme,
   startThemeSync: stubs.startThemeSync,
 }))
 vi.mock('../ts/tools/nav-mode.js', () => ({ startNavModeSync: stubs.startNavModeSync }))
@@ -70,9 +70,9 @@ vi.mock('../ts/tools/module-state.js', () => ({
   startModuleStateSync: stubs.startModuleStateSync,
 }))
 vi.mock('../ts/tools/nav-order.js', () => ({ startNavOrderSync: stubs.startNavOrderSync }))
-vi.mock('../ts/panel/shell-nav.js', () => ({ initShellNav: stubs.initShellNav }))
-vi.mock('../ts/panel/enrich-page.js', () => ({ initEnrichPage: stubs.initEnrichPage }))
-vi.mock('../ts/panel/clean-page.js', () => ({ initCleanPage: stubs.initCleanPage }))
+vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: stubs.initializeShellNav }))
+vi.mock('../ts/panel/enrich-page.js', () => ({ initializeEnrichPage: stubs.initializeEnrichPage }))
+vi.mock('../ts/panel/clean-page.js', () => ({ initializeCleanPage: stubs.initializeCleanPage }))
 vi.mock('../ts/ui/components/modal-a11y.js', () => ({
   installModalA11y: stubs.installModalA11y,
 }))
@@ -162,7 +162,7 @@ describe('panel-bootstrap', () => {
   it('启动外壳导航与跨页同步，页标识为 panel', async () => {
     await import('../ts/panel/panel-bootstrap.js')
 
-    expect(stubs.initShellNav).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeShellNav).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('panel')
     expect(stubs.startModuleStateSync).toHaveBeenCalledWith('panel')
     expect(stubs.installModalA11y).toHaveBeenCalledTimes(1)
@@ -293,10 +293,10 @@ describe('enrich-bootstrap', () => {
   it('装配主题、跨页同步与导航（页标识 enrich）', async () => {
     await import('../ts/panel/enrich-bootstrap.js')
 
-    expect(stubs.initTheme).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeTheme).toHaveBeenCalledTimes(1)
     expect(stubs.startThemeSync).toHaveBeenCalledTimes(1)
     expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
-    expect(stubs.initShellNav).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeShellNav).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('enrich')
     expect(stubs.startModuleStateSync).toHaveBeenCalledWith('enrich')
     expect(stubs.installModalA11y).toHaveBeenCalledTimes(1)
@@ -305,17 +305,17 @@ describe('enrich-bootstrap', () => {
   it('document 已就绪 → 立即初始化富化页', async () => {
     await import('../ts/panel/enrich-bootstrap.js')
 
-    expect(stubs.initEnrichPage).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeEnrichPage).toHaveBeenCalledTimes(1)
   })
 
   it('document 仍在加载 → 等 DOMContentLoaded 再初始化', async () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
 
     await import('../ts/panel/enrich-bootstrap.js')
-    expect(stubs.initEnrichPage).not.toHaveBeenCalled()
+    expect(stubs.initializeEnrichPage).not.toHaveBeenCalled()
 
     document.dispatchEvent(new Event('DOMContentLoaded'))
-    expect(stubs.initEnrichPage).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeEnrichPage).toHaveBeenCalledTimes(1)
   })
 
   it('按钮禁用 → modulesReady 后启用并打印启动日志', async () => {
@@ -356,7 +356,7 @@ describe('clean-bootstrap', () => {
   it('document 已就绪 → 立即初始化清理页并启动三个跨页同步（页标识 clean）', async () => {
     await import('../ts/panel/clean-bootstrap.js')
 
-    expect(stubs.initCleanPage).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeCleanPage).toHaveBeenCalledTimes(1)
     expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('clean')
     expect(stubs.startModuleStateSync).toHaveBeenCalledWith('clean')
@@ -366,18 +366,18 @@ describe('clean-bootstrap', () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
 
     await import('../ts/panel/clean-bootstrap.js')
-    expect(stubs.initCleanPage).not.toHaveBeenCalled()
+    expect(stubs.initializeCleanPage).not.toHaveBeenCalled()
 
     document.dispatchEvent(new Event('DOMContentLoaded'))
-    expect(stubs.initCleanPage).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeCleanPage).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('clean')
   })
 
   it('不装配主题与外壳导航（清理页无对应依赖）', async () => {
     await import('../ts/panel/clean-bootstrap.js')
 
-    expect(stubs.initTheme).not.toHaveBeenCalled()
-    expect(stubs.initShellNav).not.toHaveBeenCalled()
+    expect(stubs.initializeTheme).not.toHaveBeenCalled()
+    expect(stubs.initializeShellNav).not.toHaveBeenCalled()
     expect(stubs.installModalA11y).not.toHaveBeenCalled()
   })
 })

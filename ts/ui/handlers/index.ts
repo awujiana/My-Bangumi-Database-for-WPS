@@ -21,15 +21,15 @@ import {
   getLogLevel,
 } from '../../index.js'
 import { loadGithubConfigIntoForm } from './github-settings.js'
-import { initModuleOrderEditor } from './module-order.js'
-import { initConfigPathControls } from './path-controls.js'
+import { initializeModuleOrderEditor } from './module-order.js'
+import { initializeConfigPathControls } from './path-controls.js'
 import { clearTrackedListeners, trackedAddEventListener } from './resource-tracking.js'
 
 // 子模块
 import { _T } from './_constants.js'
 import { handleActionClick } from './action-handlers.js'
 import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js'
-import { initIncrementalSyncFromRibbon } from './incremental-bindings.js'
+import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js'
 import { setupEventListeners, setupMessageListener } from './panel-events.js'
 import {
   handleEnableSyncRecordChange,
@@ -189,7 +189,7 @@ export function setupButtonListeners(): void {
   updateThemePreview(getTheme(true))
 
   // 设置页：默认导出位置 / 默认导入文件夹（回填已记忆的路径）
-  initConfigPathControls()
+  initializeConfigPathControls()
 
   // 设置页：全局日志级别（记录级别偏好）
   const logLevelSelect = document.getElementById('logLevelSelect') as HTMLSelectElement | null
@@ -201,7 +201,7 @@ export function setupButtonListeners(): void {
 
   // 设置页：模块排序编辑器（↑↓ 按钮 + 拖拽）
   try {
-    initModuleOrderEditor()
+    initializeModuleOrderEditor()
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化模块排序编辑器失败: ${(error as Error).message}`)
   }
@@ -240,8 +240,8 @@ function startHandlers(): void {
   setupTimeFilterControls()
   setupMessageListener()
   setupEventListeners()
-  initIncrementalSyncFromRibbon()
-  bgmLog(LOG_LEVELS.INFO, '[handlers] initHandlers 完成')
+  initializeIncrementalSyncFromRibbon()
+  bgmLog(LOG_LEVELS.INFO, '[handlers] initializeHandlers 完成')
 }
 
 /**
@@ -259,7 +259,7 @@ function startHandlers(): void {
  *  - 注册事件总线监听器（接收配置变更与同步进度通知）
  *  - 从配置恢复增量同步、跳过冲突 UI 状态
  */
-export function initHandlers(): void {
+export function initializeHandlers(): void {
   if (typeof document === 'undefined') {
     // 无 DOM 环境（如 Node 测试环境）下同步执行
     startHandlers()

@@ -7,14 +7,14 @@
  */
 
 // ========== 全局错误处理初始化 ==========
-import { initGlobalErrorHandler } from './core/error-handler.js'
+import { initializeGlobalErrorHandler } from './core/error-handler.js'
 
-initGlobalErrorHandler()
+initializeGlobalErrorHandler()
 
 // ============================================================================
 // 0. 全局初始化（来自 core/error-handler.js）
 // ============================================================================
-export { initGlobalErrorHandler } from './core/error-handler.js'
+export { initializeGlobalErrorHandler } from './core/error-handler.js'
 
 // ============================================================================
 // 1. 核心常量与枚举（来自 core/constants.js）
@@ -146,7 +146,7 @@ export {
 export {
   // 设置状态栏消息
   setStatus,
-  initMessageListener,
+  initializeMessageListener,
 } from './ui/message.js'
 
 // ============================================================================
@@ -460,7 +460,13 @@ export {
 // ============================================================================
 // 13.1 外观主题应用（来自 tools/theme.js）
 // ============================================================================
-export { applyTheme, initTheme, saveTheme, resolveTheme, startThemeSync } from './tools/theme.js'
+export {
+  applyTheme,
+  initializeTheme,
+  saveTheme,
+  resolveTheme,
+  startThemeSync,
+} from './tools/theme.js'
 
 // ============================================================================
 // 13.2 导航显示模式跨页同步（来自 tools/nav-mode.js）
@@ -705,7 +711,7 @@ export {
 // 23. 富化页面 UI 控制器（来自 panel/enrich-page.js）
 // ============================================================================
 export {
-  initEnrichPage,
+  initializeEnrichPage,
   selectNewAnimeFile,
   autoDetectHeader,
   previewMatch,
@@ -725,7 +731,7 @@ export {
   updateEnrichLockButton,
   getLockedEnrichSheet,
   findWorkbookByName,
-  initEnrichLock,
+  initializeEnrichLock,
   findBangumiTargetSheets,
   lockEnrichWorkbookByName,
   autoSelectEnrichTarget,
@@ -737,7 +743,7 @@ export {
 //      名称预筛 + 表头/数据行校验
 // ============================================================================
 export {
-  initWorkbookAutoDetection,
+  initializeWorkbookAutoDetection,
   scanMatchingWorkbooks,
   isMatchingWorkbook,
   isAnimeSourceFilename,

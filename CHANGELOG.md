@@ -38,6 +38,12 @@
 
 已知取舍（详见 NAMING.md §4）：
 
+- **`init` 同样按缩写处理**：`init` 是 `initialize` 的截断词，虽然 `unicorn` 的 110 条表里
+  没有它，但「大家都这么写」不构成豁免理由 —— 23 个 `initXxx` 导出统一改为 `initializeXxx`
+  （`initPanel → initializePanel`、`safeInitPanel → safeInitializePanel`），调用点、
+  `tests/entry-smoke.test.ts`、`文档/ARCHITECTURE.md` 一并同步（474 处 / 59 文件）。
+  判定不误伤 `initialX` / `initializeX`（`init` 后接小写，不构成词尾）。
+
 - **属性位（`objectLiteralProperty` / `typeProperty`）整体豁免**：线上 dump 字段、WPS COM
   （`Interior` / `Color`）、DOM（`className`）的名字所有权不在本项目。
 - **线上键 `sid` 保持原样**，靠解析边界 `WireRemoteEntry` + `toRemoteEntry()` 归一成 `subjectId`。

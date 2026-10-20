@@ -48,7 +48,7 @@ const m = vi.hoisted(() => ({
   toggleEnrichWorkbookLock: vi.fn(),
   updateEnrichLockButton: vi.fn(),
   getLockedEnrichSheet: vi.fn(),
-  initEnrichLock: vi.fn(),
+  initializeEnrichLock: vi.fn(),
   autoSelectEnrichTarget: vi.fn(() => 'none'),
   getOrCreateEnrichRecordSheet: vi.fn(),
   collectDetectedWorkbookPaths: vi.fn(),
@@ -121,7 +121,7 @@ vi.mock('../ts/sync/enrich-lock.js', () => ({
   toggleEnrichWorkbookLock: m.toggleEnrichWorkbookLock,
   updateEnrichLockButton: m.updateEnrichLockButton,
   getLockedEnrichSheet: m.getLockedEnrichSheet,
-  initEnrichLock: m.initEnrichLock,
+  initializeEnrichLock: m.initializeEnrichLock,
   autoSelectEnrichTarget: m.autoSelectEnrichTarget,
 }))
 vi.mock('../ts/sync/enrich-record.js', () => ({
@@ -211,7 +211,7 @@ function mountDiv(id: string): HTMLDivElement {
   return element
 }
 
-/** 批量挂载富化页全部控件（initEnrichPage 的绑定面） */
+/** 批量挂载富化页全部控件（initializeEnrichPage 的绑定面） */
 function mountEnrichControls(): void {
   for (const id of [
     'selectFileBtn',
@@ -309,7 +309,7 @@ async function bootWatch(app: unknown): Promise<WatchSession> {
   document.body.replaceChildren()
   mountEnrichControls()
   m.getApp.mockReturnValue(app)
-  page.initEnrichPage()
+  page.initializeEnrichPage()
 
   return {
     poll: () => {

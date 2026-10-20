@@ -11,7 +11,7 @@ import {
   resolveTheme,
   saveTheme,
   applyTheme,
-  initTheme,
+  initializeTheme,
   startThemeSync,
 } from '../ts/tools/theme.js'
 
@@ -19,7 +19,7 @@ import {
  * 测试环境为 node（vitest.config.ts environment: 'node'），故：
  * - 模块加载时 `typeof window === 'undefined'`，`systemMedia` 恒为 null；
  *   因此 `resolveTheme('system')` 在本环境下固定解析为 'dark'（matchMedia 分支需真实 WPS/jsdom 验证）。
- * - `applyTheme`/`initTheme`/`startThemeSync` 的 document/window 早退分支天然覆盖，
+ * - `applyTheme`/`initializeTheme`/`startThemeSync` 的 document/window 早退分支天然覆盖，
  *   需要真实 DOM 行为的分支通过 vi.stubGlobal('document', ...) 在单测内重建。
  */
 describe('tools/theme', () => {
@@ -113,10 +113,10 @@ describe('tools/theme', () => {
     })
   })
 
-  describe('initTheme', () => {
+  describe('initializeTheme', () => {
     it('从配置读取并应用主题，不抛错', () => {
       vi.mocked(getTheme).mockReturnValue('dark')
-      expect(() => initTheme()).not.toThrow()
+      expect(() => initializeTheme()).not.toThrow()
       expect(getTheme).toHaveBeenCalledWith(true)
     })
   })

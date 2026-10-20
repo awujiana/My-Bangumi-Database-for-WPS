@@ -7,7 +7,7 @@
  *    GetOpenFilename 取消 / GetOpenFilename 抛错兜底 / GetOpenFilename 返回无斜杠文件名 /
  *    既无 FileDialog 也无 GetOpenFilename
  *  - updatePathDisplay：元素存在回填 / 元素缺失不抛
- *  - initConfigPathControls：从 PluginStorage 回填两个只读输入框
+ *  - initializeConfigPathControls：从 PluginStorage 回填两个只读输入框
  *
  * getApp / getExportPath / getImportPath 统一从 ts/index.js barrel mock。
  */
@@ -29,7 +29,7 @@ vi.mock('../ts/index.js', () => ({
 import {
   selectDefaultFolder,
   updatePathDisplay,
-  initConfigPathControls,
+  initializeConfigPathControls,
 } from '../ts/ui/handlers/path-controls.js'
 
 function fileDialogApp(showResult: number, count = 1, item = 'C:/sel/folder'): unknown {
@@ -122,13 +122,13 @@ describe('ui/handlers/path-controls · 路径显示回填', () => {
     expect(() => updatePathDisplay('missing', 'x')).not.toThrow()
   })
 
-  it('initConfigPathControls：回填导出/导入输入框', () => {
+  it('initializeConfigPathControls：回填导出/导入输入框', () => {
     const exp = document.createElement('input')
     exp.id = 'exportPathDisplay'
     const imp = document.createElement('input')
     imp.id = 'importPathDisplay'
     document.body.append(exp, imp)
-    initConfigPathControls()
+    initializeConfigPathControls()
     expect(exp.value).toBe('E:/exp')
     expect(imp.value).toBe('E:/imp')
     expect(m.getExportPath).toHaveBeenCalledWith(true)

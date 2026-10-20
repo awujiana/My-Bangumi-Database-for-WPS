@@ -60,7 +60,7 @@ vi.mock('../ts/services/ribbon-service.js', () => ({
 }))
 
 vi.mock('../ts/sync/workbook-auto-detect.js', () => ({
-  initWorkbookAutoDetection: vi.fn(),
+  initializeWorkbookAutoDetection: vi.fn(),
 }))
 
 import { OnAction, GetBangumiImage } from '../ts/ribbon.js'

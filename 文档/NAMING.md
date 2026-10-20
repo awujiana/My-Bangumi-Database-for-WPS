@@ -83,6 +83,7 @@
 | `sep`                  | separator                                         | `ver`              | version                |
 | `dir` / `dirs`         | directory / directories                           | `pkg`              | package                |
 | `hdr` / `lbl` / `txt`  | header / label / text                             | `dbg`              | debug                  |
+| `init`                 | initialize（`initPanel` → `initializePanel`）     |                    |                        |
 
 ### 3.3 判定算法（为什么不会误伤）
 
@@ -146,14 +147,16 @@ export function toRemoteEntry(wire: WireRemoteEntry): GithubRemoteEntry {
 
 > 代价是属性位不受字母形态约束。**新增自有属性仍应按 §2 命名**，靠 review 把关。
 
-### 4.4 `init*` 前缀
+### 4.4 没有「约定俗成」豁免
 
-`init`（initialize）**不在**黑名单，与 `unicorn/name-replacements` 口径一致
-（其 110 条表里没有 `init`）。项目保留 `initPanel` / `initRibbon` / `initTheme` 等
-十余个既有导出名。
+`init` 一度被当作「约定俗成的动词简写」豁免 —— `unicorn/name-replacements` 的 110 条表里
+确实没有它。但 `init` 就是 `initialize` 的截断词，与本规范第 1 条直接冲突，同轮已收紧：
+**`init` 在 `PROJECT_ABBREVIATIONS` 里**，23 个 `initXxx` 导出统一改成 `initializeXxx`
+（`initPanel → initializePanel`、`safeInitPanel → safeInitializePanel`），
+调用点与 `tests/entry-smoke.test.ts` 一并同步（474 处 / 59 文件）。
 
-> 若日后要收紧，把 `init` 加进 `PROJECT_ABBREVIATIONS` 即可，
-> 代价是十余个导出函数 + 所有调用点 + `tests/entry-smoke.test.ts` 同步改名。
+> 判据：**不因为「大家都这么写」就放行**。`unicorn` 没收录只说明它的表更宽容，
+> 不构成「这不算缩写」的证据。
 
 ### 4.5 CSS 类名 / DOM 属性字符串
 

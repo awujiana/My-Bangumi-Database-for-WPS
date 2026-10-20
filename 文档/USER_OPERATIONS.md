@@ -45,7 +45,7 @@
 
 | 旧函数名                | 新函数名             | 说明                      |
 | ----------------------- | -------------------- | ------------------------- |
-| `initTaskpane`          | `initPanel`          | Panel 初始化入口          |
+| `initTaskpane`          | `initializePanel`    | Panel 初始化入口          |
 | `startTaskpane`         | `startPanel`         | Panel 启动函数            |
 | `refreshTaskpaneUI`     | `refreshPanelUI`     | 刷新 Panel UI             |
 | `isTaskpaneContext`     | `isPanelContext`     | 判断是否在 Panel 上下文中 |
@@ -587,10 +587,10 @@ Panel 头部右上角包含设置按钮与用户头像（窄屏显示）：
 
 #### 2.1.2b 重试失败行（selectFailedRows）
 
-| 属性            | 说明                                                     |
-| --------------- | -------------------------------------------------------- |
-| **位置**        | Panel → 快捷操作 → 🎯 重试失败行                         |
-| **data-action** | `selectFailedRows`                                       |
+| 属性            | 说明                                                        |
+| --------------- | ----------------------------------------------------------- |
+| **位置**        | Panel → 快捷操作 → 🎯 重试失败行                            |
+| **data-action** | `selectFailedRows`                                          |
 | **功能**        | 选中「上次同步失败的行」，再点「📋 选中行同步」只重发这几行 |
 
 **前置条件：** 本次会话中跑过一次上传同步或选中行同步，且其中有失败行。

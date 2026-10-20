@@ -57,8 +57,8 @@ function shouldRefresh(): boolean {
 
 // ========== 初始化 ==========
 
-function initPanelCore(): void {
-  bgmLog(LOG_LEVELS.INFO, 'initPanelCore 开始')
+function initializePanelCore(): void {
+  bgmLog(LOG_LEVELS.INFO, 'initializePanelCore 开始')
 
   // 初始化 WPS 枚举（如果未设置）
   const app = getApp()
@@ -163,7 +163,7 @@ function initPanelCore(): void {
     radio.addEventListener('change', onSelectModeChange)
   })
 
-  // 在 initPanel 中添加
+  // 在 initializePanel 中添加
   document.getElementById('closeSyncPreview')?.addEventListener('click', () => {
     const modal = document.getElementById('syncPreviewModal')
     if (modal) modal.style.display = 'none'
@@ -180,18 +180,18 @@ function initPanelCore(): void {
   })
   // 通知模块就绪
   document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
-  bgmLog(LOG_LEVELS.INFO, 'initPanelCore 完成')
+  bgmLog(LOG_LEVELS.INFO, 'initializePanelCore 完成')
 }
 
 // ========== 导出 ==========
-export { initPanelCore }
+export { initializePanelCore }
 
 // ========== 挂载到 window ==========
-// WPS 宿主（Ribbon）通过 GetTaskPane().initPanelCore / refreshPanelUI 直接调用面板入口，
+// WPS 宿主（Ribbon）通过 GetTaskPane().initializePanelCore / refreshPanelUI 直接调用面板入口，
 // 宿主桥接协议要求属性可写可配置，defineProperties 显式声明挂载契约
 Object.defineProperties(window, {
-  initPanelCore: {
-    value: initPanelCore,
+  initializePanelCore: {
+    value: initializePanelCore,
     writable: true,
     configurable: true,
   },
@@ -209,14 +209,14 @@ Object.defineProperties(window, {
   },
 })
 
-function safeInitPanel(): void {
+function safeInitializePanel(): void {
   try {
-    initPanelCore()
+    initializePanelCore()
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
-      context: 'initPanelCore',
+      context: 'initializePanelCore',
     })
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
   }
@@ -229,19 +229,19 @@ function safeInitPanel(): void {
  * 不在模块加载时自动执行，避免在测试或非 panel 上下文下意外触发副作用。
  *
  * 行为：
- *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitPanel()
+ *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitializePanel()
  *  - 否则推迟到 window load 事件后执行
  */
-export function initPanel(): void {
+export function initializePanel(): void {
   if (typeof document === 'undefined') {
     // 无 DOM 环境（如 Node 测试环境），直接同步初始化
-    safeInitPanel()
+    safeInitializePanel()
     return
   }
   if (document.readyState === 'complete') {
-    safeInitPanel()
+    safeInitializePanel()
   } else {
-    window.addEventListener('load', safeInitPanel)
+    window.addEventListener('load', safeInitializePanel)
   }
 }
 

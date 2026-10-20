@@ -3,7 +3,7 @@
  *
  * 为什么单独一个文件：
  *   `theme.test.ts` 跑在 node 环境，模块加载时 `typeof window === 'undefined'`，
- *   于是模块级常量 `systemMedia` 恒为 `null` —— `initTheme` 里的
+ *   于是模块级常量 `systemMedia` 恒为 `null` —— `initializeTheme` 里的
  *   `systemMedia?.addEventListener('change', …)` 整条被短路，
  *   `startThemeSync` 的 `beforeunload` 清理也一并够不到。
  *
@@ -50,7 +50,7 @@ vi.stubGlobal(
  * `theme.js` 模块求值时读到的 `window.matchMedia` 就是替身。
  */
 let theme: typeof import('../ts/tools/theme.js')
-let getTheme: typeof import('../ts/tools/config.js')['getTheme']
+let getTheme: (typeof import('../ts/tools/config.js'))['getTheme']
 
 beforeAll(async () => {
   theme = await import('../ts/tools/theme.js')
@@ -70,10 +70,10 @@ describe('tools/theme · 跟随系统（systemMedia 非空）', () => {
     vi.useRealTimers()
   })
 
-  it('initTheme 注册系统外观监听，系统切到浅色后重新应用主题', () => {
+  it('initializeTheme 注册系统外观监听，系统切到浅色后重新应用主题', () => {
     vi.mocked(getTheme).mockReturnValue('system')
 
-    theme.initTheme()
+    theme.initializeTheme()
 
     // 初始应用：matches=false → system 解析为 dark
     expect(document.documentElement.dataset.theme).toBe('dark')
@@ -90,7 +90,7 @@ describe('tools/theme · 跟随系统（systemMedia 非空）', () => {
   it('配置不是 system 时，系统外观变化不改变主题', () => {
     vi.mocked(getTheme).mockReturnValue('light')
 
-    theme.initTheme()
+    theme.initializeTheme()
     expect(document.documentElement.dataset.theme).toBe('light')
 
     // 把 dataset 改成哨兵值，再触发系统外观变化 —— 不应被重新写入

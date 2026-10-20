@@ -2,7 +2,7 @@
  * @fileoverview debug-panel-render 单测：调试面板的常量 / 全局读取 / HTML 模板。
  *
  * 该模块从 `entry/debug-panel.ts` 抽出，**无 import 时副作用**（原文件顶部会自动
- * `initDebugPanel()`），因此可直接单测。这里把每条模板的关键结构锁死，并覆盖
+ * `initializeDebugPanel()`），因此可直接单测。这里把每条模板的关键结构锁死，并覆盖
  * 「有 / 无宿主全局」两类分支。
  */
 

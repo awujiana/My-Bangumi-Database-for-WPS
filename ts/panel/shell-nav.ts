@@ -10,7 +10,7 @@
  *      - 侧栏吸顶位置落在顶栏之下被遮挡（导航按钮显示不全）
  *      - 锚点跳转时目标区块标题被顶栏盖住（视觉错位）
  *
- *   2. initScrollspy —— 滚动高亮（scrollspy）：
+ *   2. initializeScrollspy —— 滚动高亮（scrollspy）：
  *      依当前滚动位置反推主导区块并高亮侧栏对应导航项；
  *      点击导航项立即高亮（不等平滑滚动完成），滚动 / 缩放 / 加载后重算。
  */
@@ -41,7 +41,7 @@ export function updateStickyOffsets(): void {
  * 当前区块变化时胶囊平滑滑动到对应导航项，竖排（桌面）与
  * 横排换行（窄态）均通过 offsetLeft/offsetTop 相对定位统一计算。
  */
-export function initScrollspy(): void {
+export function initializeScrollspy(): void {
   if (typeof document === 'undefined') return
   // 模块顺序可由用户在设置页调整（tools/nav-order 会就地重排 DOM），
   // 因此每次判定都按「最新 DOM 顺序」重新取一遍区块，避免数组顺序陈旧导致高亮回跳。
@@ -247,7 +247,7 @@ export function initScrollspy(): void {
  * 外壳导航统一初始化：吸顶偏移测量（含 load/resize 重跑）+ 滚动高亮。
  * 三个面板的启动入口（panel / settings / enrich bootstrap）都应调用一次。
  */
-export function initShellNav(): void {
+export function initializeShellNav(): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
   updateStickyOffsets()
   const onResettled = (): void => {
@@ -259,7 +259,7 @@ export function initShellNav(): void {
   window.addEventListener('load', onResettled)
   window.addEventListener('resize', onResettled)
   // 初始化立即推一次（首屏即可能处于已滚动/恢复位置）
-  initScrollspy()
+  initializeScrollspy()
   onResettled()
 }
 

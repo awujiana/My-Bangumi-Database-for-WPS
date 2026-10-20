@@ -4,18 +4,18 @@
  * @description 设置面板的统一启动入口。
  *
  * 职责：
- *  1. 显式调用 initHandlers()，复用已有的事件处理逻辑。
- *  2. 调用 initSettingsPage() 加载已保存的配置到表单。
+ *  1. 显式调用 initializeHandlers()，复用已有的事件处理逻辑。
+ *  2. 调用 initializeSettingsPage() 加载已保存的配置到表单。
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 
-import { initTheme, startThemeSync } from '../tools/theme.js'
+import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
-import { initHandlers } from '../ui/handlers/index.js'
+import { initializeHandlers } from '../ui/handlers/index.js'
 import { markSettingsPaneLoaded } from '../tools/util/index.js'
-import { initShellNav } from '../panel/shell-nav.js'
+import { initializeShellNav } from '../panel/shell-nav.js'
 
 /**
  * 判断当前是否为设置页面上下文（宽松匹配）。
@@ -41,7 +41,7 @@ function isSettingsContext(): boolean {
  *  - 同步偏好（增量同步、跳过冲突、启用同步记录）
  *  - GitHub 配置（owner/repo/branch/path/strategy）
  */
-function initSettingsPage(): void {
+function initializeSettingsPage(): void {
   // 1. 加载 Token 和用户信息状态
   // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 panel.html 相同的 ID
   void (async () => {
@@ -50,7 +50,7 @@ function initSettingsPage(): void {
       updateTokenStatus()
       updateUserIdStatus()
     } catch {
-      // 静默处理，token 状态在 initHandlers 中也会初始化
+      // 静默处理，token 状态在 initializeHandlers 中也会初始化
     }
   })()
 
@@ -99,7 +99,7 @@ function initSettingsPage(): void {
 function applyAppearance(): void {
   if (typeof document === 'undefined') return
   // 主题：从配置读取并应用（含跟随系统监听）
-  initTheme()
+  initializeTheme()
   // 跨页主题同步：监听其他页面（panel / enrich）的主题变更并重应用
   startThemeSync()
   // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
@@ -109,7 +109,7 @@ function applyAppearance(): void {
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
   startModuleStateSync('settings')
   // 吸顶偏移测量 + 滚动高亮（共享模块，修复侧栏被顶栏遮挡 / 锚点跳转错位）
-  initShellNav()
+  initializeShellNav()
 }
 
 /**
@@ -120,9 +120,9 @@ export function startSettings(): void {
   applyAppearance()
   // 记录设置页已成功加载，供 showSettingsPanel 判断缓存的面板 ID 是否有效
   markSettingsPaneLoaded()
-  initHandlers()
-  initSettingsPage()
-  // 通知模块就绪，启用按钮（与 panelPage.ts 的 initPanelCore 对齐）。
+  initializeHandlers()
+  initializeSettingsPage()
+  // 通知模块就绪，启用按钮（与 panelPage.ts 的 initializePanelCore 对齐）。
   // 必须异步派发：本模块在 settingsBootstrap 的 import 阶段被求值，若同步派发，
   // settingsBootstrap 中注册的 bgm:modulesReady 监听器尚未挂载，按钮会一直禁用
   // 直到 5s 兜底超时。queueMicrotask 在模块求值完成后、settingsBootstrap 主体

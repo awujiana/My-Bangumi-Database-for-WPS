@@ -56,7 +56,7 @@ const m = vi.hoisted(() => ({
   toggleEnrichWorkbookLock: vi.fn(),
   updateEnrichLockButton: vi.fn(),
   getLockedEnrichSheet: vi.fn(),
-  initEnrichLock: vi.fn(),
+  initializeEnrichLock: vi.fn(),
   autoSelectEnrichTarget: vi.fn(() => 'none'),
   // enrich-record
   getOrCreateEnrichRecordSheet: vi.fn(),
@@ -139,7 +139,7 @@ vi.mock('../ts/sync/enrich-lock.js', () => ({
   toggleEnrichWorkbookLock: m.toggleEnrichWorkbookLock,
   updateEnrichLockButton: m.updateEnrichLockButton,
   getLockedEnrichSheet: m.getLockedEnrichSheet,
-  initEnrichLock: m.initEnrichLock,
+  initializeEnrichLock: m.initializeEnrichLock,
   autoSelectEnrichTarget: m.autoSelectEnrichTarget,
 }))
 vi.mock('../ts/sync/enrich-record.js', () => ({
@@ -202,7 +202,7 @@ import {
   autoDetectHeader,
   batchSelectFiles,
   batchStartEnrichment,
-  initEnrichPage,
+  initializeEnrichPage,
   selectNewAnimeFile,
   startEnrichment,
 } from '../ts/panel/enrich-page.js'
@@ -249,7 +249,7 @@ function makeWorksheet(name: string): WpsWorksheet {
   return { Name: name } as unknown as WpsWorksheet
 }
 
-/** 批量挂载富化页全部控件（initEnrichPage 的绑定面） */
+/** 批量挂载富化页全部控件（initializeEnrichPage 的绑定面） */
 function mountEnrichControls(): void {
   for (const id of [
     'selectFileBtn',
@@ -382,15 +382,15 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-// ========== initEnrichPage ==========
+// ========== initializeEnrichPage ==========
 
-describe('enrich-page · initEnrichPage', () => {
+describe('enrich-page · initializeEnrichPage', () => {
   it('完成全部绑定：锁定初始化、记录加载、冲突按钮绑定、列表刷新、页签可见性', () => {
     mountEnrichControls()
 
-    initEnrichPage()
+    initializeEnrichPage()
 
-    expect(m.initEnrichLock).toHaveBeenCalledWith(
+    expect(m.initializeEnrichLock).toHaveBeenCalledWith(
       'workbookSelect',
       'sheetSelect',
       'lockSheetBtn',
@@ -413,7 +413,7 @@ describe('enrich-page · initEnrichPage', () => {
     const readyListener = vi.fn()
     document.addEventListener('bgm:modulesReady', readyListener)
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(readyListener).toHaveBeenCalledTimes(1)
   })
@@ -425,7 +425,7 @@ describe('enrich-page · initEnrichPage', () => {
     const lockedSheet = makeWorksheet('追踪')
     m.getLockedEnrichSheet.mockReturnValue([makeWorksheet('BGM.xlsx'), lockedSheet])
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(state.bangumiSheet).toBe(lockedSheet)
   })
@@ -433,7 +433,7 @@ describe('enrich-page · initEnrichPage', () => {
   it('页面打开检查：未检测到已打开新番表与 Bangumi 表 → 仅记录、不弹提示', () => {
     mountEnrichControls()
 
-    expect(() => initEnrichPage()).not.toThrow()
+    expect(() => initializeEnrichPage()).not.toThrow()
     expect(m.dialogAlert).not.toHaveBeenCalled()
     // Bangumi 检测仍会并入持久化记录并尝试自动选择
     expect(m.mergeDetectedPathsIntoStorage).toHaveBeenCalled()
@@ -447,7 +447,7 @@ describe('enrich-page · initEnrichPage', () => {
     )
     m.autoSelectEnrichTarget.mockReturnValue('matched')
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(m.autoSelectEnrichTarget).toHaveBeenCalledWith(
       'workbookSelect',
@@ -465,7 +465,7 @@ describe('enrich-page · initEnrichPage', () => {
 describe('enrich-page · 绑定路由', () => {
   beforeEach(() => {
     mountEnrichControls()
-    initEnrichPage()
+    initializeEnrichPage()
     vi.clearAllMocks()
     m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
@@ -1324,7 +1324,7 @@ describe('enrich-page · batchStartEnrichment', () => {
 describe('enrich-page · 兜底分支与边界补测', () => {
   beforeEach(() => {
     mountEnrichControls()
-    initEnrichPage()
+    initializeEnrichPage()
     vi.clearAllMocks()
     m.detectHeaderOnSheet.mockReturnValue({ nameColumn: 1 })
     m.ensureSourceSheet.mockReturnValue(null)
@@ -1426,7 +1426,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     sheetState.isLocked = true
     sheetState.lockedWorkbookName = 'BGM.xlsx'
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(wbSelect.value).toBe('BGM.xlsx')
   })
@@ -1522,7 +1522,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     } as unknown as WpsWorkbook
     m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(state.batchFiles).toEqual(['D:/动画A.xlsx'])
     expect(document.getElementById('autoDetectNotice')?.textContent).toContain(
@@ -1539,7 +1539,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
       detector.name === 'anime' ? ['D:/动画A.xlsx'] : [],
     )
 
-    initEnrichPage()
+    initializeEnrichPage()
 
     expect(state.batchFiles).toEqual(['D:/动画A.xlsx'])
     expect(document.getElementById('autoDetectNotice')?.textContent).toBe('')
@@ -1551,7 +1551,7 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     })
 
     expect(() => {
-      initEnrichPage()
+      initializeEnrichPage()
     }).not.toThrow()
 
     expect(m.handleError).toHaveBeenCalledWith(

@@ -16,7 +16,7 @@ import {
   toggleEnrichWorkbookLock,
   updateEnrichLockButton,
   getLockedEnrichSheet,
-  initEnrichLock,
+  initializeEnrichLock,
   autoSelectEnrichTarget,
 } from '../sync/enrich-lock.js'
 import { getOrCreateEnrichRecordSheet } from '../sync/enrich-record.js'
@@ -74,11 +74,11 @@ import { detectHeaderOnSheet, previewMatch, hideMatchDetail } from './enrich-pre
 
 // ========== 初始化 ==========
 
-export function initEnrichPage(): void {
-  bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 开始')
+export function initializeEnrichPage(): void {
+  bgmLog(LOG_LEVELS.INFO, '[enrich] initializeEnrichPage 开始')
 
   // 初始化富化工作簿锁定模块（恢复持久化的锁定状态）
-  initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+  initializeEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
   bindFileSelector()
   bindDetectHeaderButton()
@@ -112,10 +112,10 @@ export function initEnrichPage(): void {
   applyPreviewTabVisibility()
   startEnrichWorkbookWatch()
 
-  // 通知模块就绪，启用按钮（与 panelPage.initPanelCore / settings-entry.startSettings 对齐）
+  // 通知模块就绪，启用按钮（与 panelPage.initializePanelCore / settings-entry.startSettings 对齐）
   if (typeof document !== 'undefined') {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
-    bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 完成，bgm:modulesReady 已触发')
+    bgmLog(LOG_LEVELS.INFO, '[enrich] initializeEnrichPage 完成，bgm:modulesReady 已触发')
   }
 }
 

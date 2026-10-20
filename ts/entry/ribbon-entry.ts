@@ -4,7 +4,7 @@
  * @description Ribbon（WPS 功能区）的统一启动入口。
  *
  * 职责：
- *  1. 显式调用 initRibbon()，替代原 ribbon.ts 中"模块加载时立即执行 initRibbonMessageListener()"
+ *  1. 显式调用 initializeRibbon()，替代原 ribbon.ts 中"模块加载时立即执行 initializeRibbonMessageListener()"
  *     的副作用链。
  *  2. 仅在浏览器上下文自动启动；被 vitest 等测试环境导入时不会触发副作用。
  *
@@ -13,13 +13,13 @@
  *  - 测试可在不污染全局事件监听器的前提下导入 ribbon 模块
  */
 
-import { initRibbon } from '../ribbon.js'
+import { initializeRibbon } from '../ribbon.js'
 
 /**
  * 启动 Ribbon 模块：注册消息监听器以接收来自侧边栏的配置更新。
  */
 export function startRibbon(): void {
-  initRibbon()
+  initializeRibbon()
 }
 
 // 仅在浏览器上下文自动启动；通过 typeof window !== 'undefined' 守卫，

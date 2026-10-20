@@ -1,7 +1,7 @@
 /**
  * @fileoverview 番剧高亮页面启动入口（编译产物位于 dist-ts/panel/highlight-bootstrap.js）
  * @module panel/highlightBootstrap
- * @description 绑定高亮页面初始化逻辑，在 DOM 就绪后调用 initHighlightPage()，
+ * @description 绑定高亮页面初始化逻辑，在 DOM 就绪后调用 initializeHighlightPage()，
  *   并在模块就绪前禁用 data-action 按钮、收到 bgm:modulesReady 后启用。
  *
  * 注意：本文件由 tsc 编译至 dist-ts/panel/，由 ui/highlight.html 通过
@@ -21,7 +21,7 @@ import '../ui/message.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
-import { initHighlightPage } from './highlight-page.js'
+import { initializeHighlightPage } from './highlight-page.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
 
 if (typeof document !== 'undefined') {
@@ -29,7 +29,7 @@ if (typeof document !== 'undefined') {
 
   // DOM 就绪后初始化高亮页面
   const onHighlightReady = (): void => {
-    initHighlightPage()
+    initializeHighlightPage()
     // 跨页导航模式同步：设置页勾选「导航仅显示图标」后本页跟随切换
     startNavModeSync()
     // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）

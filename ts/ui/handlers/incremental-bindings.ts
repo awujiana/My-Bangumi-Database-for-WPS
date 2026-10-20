@@ -188,14 +188,14 @@ export const handleChkSkipConflictsChange = (): void => {
 }
 
 // 从配置读取增量同步状态并初始化 checkbox
-export function initIncrementalSyncFromRibbon(): void {
+export function initializeIncrementalSyncFromRibbon(): void {
   if (!isPanelContext()) return
 
   // 冲突策略与增量同步开关是**两个独立功能**，必须先于下面的早退初始化：
   // 主面板 panel.html 只有 #conflictStrategy、没有 #chkIncremental（后者只在设置页的
   // #chkIncrementalSync），若放在函数尾部，增量复选框不存在时就会早退，
   // 导致冲突策略下拉的 change 监听永不注册 —— 用户改了下拉却不落 bgm_skip_conflicts 配置。
-  initSkipConflictsFromRibbon()
+  initializeSkipConflictsFromRibbon()
 
   const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
   if (!chkIncremental) return
@@ -213,7 +213,7 @@ export function initIncrementalSyncFromRibbon(): void {
 }
 
 // 从配置读取跳过冲突状态并初始化 UI
-export function initSkipConflictsFromRibbon(): void {
+export function initializeSkipConflictsFromRibbon(): void {
   if (!isPanelContext()) return
 
   try {
@@ -227,7 +227,7 @@ export function initSkipConflictsFromRibbon(): void {
     BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.WARN,
-      context: 'initSkipConflictsFromRibbon',
+      context: 'initializeSkipConflictsFromRibbon',
     })
   }
 

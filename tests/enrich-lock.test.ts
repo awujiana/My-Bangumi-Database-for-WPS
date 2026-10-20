@@ -8,7 +8,7 @@
  *   - locked-sheet：findBangumiTargetSheets（表头 + 数据行数 + 名称关键词，跨工作簿，优先活动工作簿/工作表）
  *   - enrich-lock：refreshEnrichWorkbooks / refreshEnrichSheets
  *   - enrich-lock：toggleEnrichWorkbookLock / updateEnrichLockButton
- *   - enrich-lock：lockEnrichWorkbookByName / autoSelectEnrichTarget / initEnrichLock
+ *   - enrich-lock：lockEnrichWorkbookByName / autoSelectEnrichTarget / initializeEnrichLock
  */
 
 // @vitest-environment jsdom
@@ -184,7 +184,7 @@ vi.mock('../ts/ui/preview.js', () => ({
 vi.mock('../ts/ui/handlers/index.js', () => ({
   onAction: vi.fn(),
   setupButtonListeners: vi.fn(),
-  initHandlers: vi.fn(),
+  initializeHandlers: vi.fn(),
   clearAllPendingTimeouts: vi.fn(),
   ACTION_HANDLERS: {},
 }))
@@ -228,7 +228,7 @@ import {
   getLockedEnrichSheet,
   lockEnrichWorkbookByName,
   autoSelectEnrichTarget,
-  initEnrichLock,
+  initializeEnrichLock,
 } from '../ts/sync/enrich-lock.js'
 
 // ========== 测试套件 ==========
@@ -972,7 +972,7 @@ describe('autoSelectEnrichTarget', () => {
     const sheetB = createScanSheet('bangumi B', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
     const storage = createMockPluginStorage()
     setMockApp(createScanApp({ wb1: [sheetA, sheetB] }, 'wb1', '', storage))
-    // 先刷新工作簿下拉框（真实流程中 initEnrichLock 会先调用 refreshEnrichWorkbooks）
+    // 先刷新工作簿下拉框（真实流程中 initializeEnrichLock 会先调用 refreshEnrichWorkbooks）
     refreshEnrichWorkbooks('workbookSelect')
 
     const result = autoSelectEnrichTarget(
@@ -1006,14 +1006,14 @@ describe('autoSelectEnrichTarget', () => {
   })
 })
 
-// ============ 场景 12: initEnrichLock ============
-describe('initEnrichLock', () => {
+// ============ 场景 12: initializeEnrichLock ============
+describe('initializeEnrichLock', () => {
   it('无锁定状态时初始化下拉框（扫描无候选）', () => {
     setupBasicDom()
     setupScanMocks()
     setMockApp(createScanApp({ wb1: [createScanSheet('Sheet数据', null)] }, 'wb1'))
 
-    initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    initializeEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
@@ -1040,7 +1040,7 @@ describe('initEnrichLock', () => {
       ),
     )
 
-    initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    initializeEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
     expect(sharedBGM.sheet.isLocked).toBe(true)
     expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
@@ -1058,7 +1058,7 @@ describe('initEnrichLock', () => {
     })
     setMockApp(createScanApp({ other: [createScanSheet('Sheet数据', null)] }, 'other', '', storage))
 
-    initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    initializeEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
     expect(sharedBGM.sheet.isLocked).toBe(false)
   })

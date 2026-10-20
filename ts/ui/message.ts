@@ -28,8 +28,8 @@ interface MessageEventData {
 // ========== 消息监听 ==========
 let _messageHandler: ((event: MessageEvent<MessageEventData>) => void) | null = null
 
-export function initMessageListener(): void {
-  bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 开始执行`)
+export function initializeMessageListener(): void {
+  bgmLog(LOG_LEVELS.INFO, `[message] initializeMessageListener 开始执行`)
 
   // 先移除已有监听器，避免重复注册
   if (_messageHandler) {
@@ -85,7 +85,7 @@ export function initMessageListener(): void {
 
   window.addEventListener('message', _messageHandler)
 
-  bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 执行完成，监听器已注册`)
+  bgmLog(LOG_LEVELS.INFO, `[message] initializeMessageListener 执行完成，监听器已注册`)
 }
 
 // ========== 状态显示 ==========

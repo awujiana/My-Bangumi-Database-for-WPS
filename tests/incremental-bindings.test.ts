@@ -59,8 +59,8 @@ import {
   handleIncrementalChange,
   handleOverwriteRadioChange,
   handleSkipRadioChange,
-  initIncrementalSyncFromRibbon,
-  initSkipConflictsFromRibbon,
+  initializeIncrementalSyncFromRibbon,
+  initializeSkipConflictsFromRibbon,
   tryUpdateEnableSyncRecordUI,
   tryUpdateIncrementalCheckbox,
   tryUpdateSkipConflictsUI,
@@ -129,9 +129,7 @@ function hasLog(fragment: string): boolean {
 }
 
 function hasLogAtLevel(level: number, fragment: string): boolean {
-  return m.bgmLog.mock.calls.some(
-    (call) => call[0] === level && call[1].includes(fragment),
-  )
+  return m.bgmLog.mock.calls.some((call) => call[0] === level && call[1].includes(fragment))
 }
 
 beforeEach(() => {
@@ -232,9 +230,9 @@ describe('tryUpdateSkipConflictsUI · 主路径（select 存在）', () => {
 describe('tryUpdateSkipConflictsUI · 重试链路', () => {
   it('首次未找到 → 排 100ms 定时器；元素随后出现则重试命中', () => {
     tryUpdateSkipConflictsUI(true)
-    expect(hasLogAtLevel(LOG_LEVELS.WARN, '未找到 conflictStrategy select 元素，延迟重试 (1/3)')).toBe(
-      true,
-    )
+    expect(
+      hasLogAtLevel(LOG_LEVELS.WARN, '未找到 conflictStrategy select 元素，延迟重试 (1/3)'),
+    ).toBe(true)
     // 首次未命中只排定时器，不应直接升级为 ERROR
     expect(hasLogAtLevel(LOG_LEVELS.ERROR, '重试3次后仍未找到')).toBe(false)
 
@@ -255,7 +253,9 @@ describe('tryUpdateSkipConflictsUI · 重试链路', () => {
     vi.advanceTimersByTime(100)
     vi.advanceTimersByTime(100)
 
-    expect(hasLogAtLevel(LOG_LEVELS.ERROR, '重试3次后仍未找到 conflictStrategy select 元素')).toBe(true)
+    expect(hasLogAtLevel(LOG_LEVELS.ERROR, '重试3次后仍未找到 conflictStrategy select 元素')).toBe(
+      true,
+    )
     expect(skip.checked).toBe(true)
     expect(overwrite.checked).toBe(false)
     expect(hasLog('冲突策略 radio 已更新')).toBe(true)
@@ -501,15 +501,15 @@ describe('handleChkSkipConflictsChange', () => {
   })
 })
 
-// ========== initIncrementalSyncFromRibbon ==========
+// ========== initializeIncrementalSyncFromRibbon ==========
 
-describe('initIncrementalSyncFromRibbon', () => {
+describe('initializeIncrementalSyncFromRibbon', () => {
   it('非任务窗格上下文 → 直接返回', () => {
     flags.isPanel = false
     const checkbox = mountInput('chkIncremental')
     m.isIncrementalSyncEnabled.mockReturnValue(true)
 
-    initIncrementalSyncFromRibbon()
+    initializeIncrementalSyncFromRibbon()
 
     expect(checkbox.checked).toBe(false)
     expect(m.bgmLog).not.toHaveBeenCalled()
@@ -517,12 +517,12 @@ describe('initIncrementalSyncFromRibbon', () => {
 
   it('复选框不存在 → 增量部分直接返回，但冲突策略仍要初始化', () => {
     // 主面板 panel.html 只有 #conflictStrategy、没有 #chkIncremental。
-    // 旧实现把 initSkipConflictsFromRibbon 放在函数尾部，被早退挡住 →
+    // 旧实现把 initializeSkipConflictsFromRibbon 放在函数尾部，被早退挡住 →
     // 冲突策略下拉的 change 监听永不注册，用户改了下拉却不落配置。
     const select = mountSelect('conflictStrategy')
     select.value = 'excel'
 
-    initIncrementalSyncFromRibbon()
+    initializeIncrementalSyncFromRibbon()
 
     expect(m.isIncrementalSyncEnabled).not.toHaveBeenCalled()
     expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(true)
@@ -537,7 +537,7 @@ describe('initIncrementalSyncFromRibbon', () => {
     const checkbox = mountInput('chkIncremental')
     m.isIncrementalSyncEnabled.mockReturnValue(true)
 
-    initIncrementalSyncFromRibbon()
+    initializeIncrementalSyncFromRibbon()
 
     expect(checkbox.checked).toBe(true)
     expect(hasLog('从配置读取增量同步状态: 开启')).toBe(true)
@@ -553,7 +553,7 @@ describe('initIncrementalSyncFromRibbon', () => {
     checkbox.checked = true
     m.isIncrementalSyncEnabled.mockReturnValue(false)
 
-    initIncrementalSyncFromRibbon()
+    initializeIncrementalSyncFromRibbon()
 
     expect(checkbox.checked).toBe(false)
     expect(hasLog('从配置读取增量同步状态: 关闭')).toBe(true)
@@ -566,7 +566,7 @@ describe('initIncrementalSyncFromRibbon', () => {
       throw new Error('配置损坏')
     })
 
-    initIncrementalSyncFromRibbon()
+    initializeIncrementalSyncFromRibbon()
 
     expect(hasLogAtLevel(LOG_LEVELS.WARN, '读取增量同步状态失败: 配置损坏')).toBe(true)
     expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(true)
@@ -577,13 +577,13 @@ describe('initIncrementalSyncFromRibbon', () => {
   })
 })
 
-// ========== initSkipConflictsFromRibbon ==========
+// ========== initializeSkipConflictsFromRibbon ==========
 
-describe('initSkipConflictsFromRibbon', () => {
+describe('initializeSkipConflictsFromRibbon', () => {
   it('非任务窗格上下文 → 直接返回', () => {
     flags.isPanel = false
 
-    initSkipConflictsFromRibbon()
+    initializeSkipConflictsFromRibbon()
 
     expect(m.isSkipConflictsEnabled).not.toHaveBeenCalled()
     expect(m.bgmLog).not.toHaveBeenCalled()
@@ -593,7 +593,7 @@ describe('initSkipConflictsFromRibbon', () => {
     const select = mountSelect('conflictStrategy')
     m.isSkipConflictsEnabled.mockReturnValue(true)
 
-    initSkipConflictsFromRibbon()
+    initializeSkipConflictsFromRibbon()
 
     expect(select.value).toBe('skip')
     expect(hasLog('从配置读取跳过冲突状态: 跳过冲突')).toBe(true)
@@ -611,14 +611,14 @@ describe('initSkipConflictsFromRibbon', () => {
       throw new Error('配置损坏')
     })
 
-    initSkipConflictsFromRibbon()
+    initializeSkipConflictsFromRibbon()
 
     const options = m.handleError.mock.calls[0]?.[1]
     expect(options).toMatchObject({
       showAlert: false,
       // BGM.ErrorLevel.WARN
       level: 1,
-      context: 'initSkipConflictsFromRibbon',
+      context: 'initializeSkipConflictsFromRibbon',
     })
     expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(true)
     // 回填逻辑在 try 内、抛错后未执行，预置值保持不变
@@ -628,7 +628,7 @@ describe('initSkipConflictsFromRibbon', () => {
   it('无 select 但 radio 成对存在 → 两个 radio 都注册 change 监听', () => {
     const { skip, overwrite } = mountStrategyRadios()
 
-    initSkipConflictsFromRibbon()
+    initializeSkipConflictsFromRibbon()
 
     skip.checked = true
     dispatchChange(skip)
@@ -642,7 +642,7 @@ describe('initSkipConflictsFromRibbon', () => {
   it('无 select 无 radio 但有 #chkSkipConflicts → 注册复选框监听', () => {
     const checkbox = mountInput('chkSkipConflicts')
 
-    initSkipConflictsFromRibbon()
+    initializeSkipConflictsFromRibbon()
 
     checkbox.checked = true
     dispatchChange(checkbox)
@@ -652,7 +652,7 @@ describe('initSkipConflictsFromRibbon', () => {
 
   it('三种控件都没有 → 静默结束，不抛错', () => {
     expect(() => {
-      initSkipConflictsFromRibbon()
+      initializeSkipConflictsFromRibbon()
     }).not.toThrow()
 
     expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(false)

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Panel 页面启动入口（编译产物位于 dist-ts/panel/panel-bootstrap.js）
  * @module panel/panelBootstrap
- * @description 按依赖顺序加载所有模块并启用按钮；initPanel/initHandlers 由
+ * @description 按依赖顺序加载所有模块并启用按钮；initializePanel/initializeHandlers 由
  *   entry/panel-entry.ts 在导入时（panel.html 上下文）自动触发。
  *
  * 注意：本文件由 tsc 编译至 dist-ts/panel/，由 ui/panel.html 通过
@@ -26,7 +26,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/panel-entry.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
-import { initShellNav } from './shell-nav.js'
+import { initializeShellNav } from './shell-nav.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
@@ -59,7 +59,7 @@ installActionButtonsGate('[BGM]')
 // ========== 外壳导航（吸顶偏移测量 + 滚动高亮） ==========
 // 逻辑已抽到 shell-nav.ts 由三页面共享；此处调用统一初始化。
 if (typeof window !== 'undefined') {
-  initShellNav()
+  initializeShellNav()
   // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
   startNavOrderSync('panel')
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步

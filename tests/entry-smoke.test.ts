@@ -29,14 +29,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const calls = vi.hoisted(() => [] as string[])
 
 vi.mock('../ts/panel/panel-page.js', () => ({
-  initPanel: (): void => {
-    calls.push('initPanel')
+  initializePanel: (): void => {
+    calls.push('initializePanel')
   },
 }))
 
 vi.mock('../ts/tools/theme.js', () => ({
-  initTheme: (): void => {
-    calls.push('initTheme')
+  initializeTheme: (): void => {
+    calls.push('initializeTheme')
   },
   startThemeSync: (): void => {
     calls.push('startThemeSync')
@@ -62,14 +62,14 @@ vi.mock('../ts/tools/module-state.js', () => ({
 }))
 
 vi.mock('../ts/panel/shell-nav.js', () => ({
-  initShellNav: (): void => {
-    calls.push('initShellNav')
+  initializeShellNav: (): void => {
+    calls.push('initializeShellNav')
   },
 }))
 
 vi.mock('../ts/ui/handlers/index.js', () => ({
-  initHandlers: (): void => {
-    calls.push('initHandlers')
+  initializeHandlers: (): void => {
+    calls.push('initializeHandlers')
   },
 }))
 
@@ -80,8 +80,8 @@ vi.mock('../ts/tools/util/index.js', () => ({
 }))
 
 vi.mock('../ts/ribbon.js', () => ({
-  initRibbon: (): void => {
-    calls.push('initRibbon')
+  initializeRibbon: (): void => {
+    calls.push('initializeRibbon')
   },
 }))
 
@@ -177,11 +177,11 @@ describe('entry/panel-entry 装配冒烟', () => {
 
     // 顺序即契约：主题 → 跨页主题同步 → 跨页导航模式同步 → 面板初始化 → 事件处理注册
     expect(calls).toEqual([
-      'initTheme',
+      'initializeTheme',
       'startThemeSync',
       'startNavModeSync',
-      'initPanel',
-      'initHandlers',
+      'initializePanel',
+      'initializeHandlers',
     ])
   })
 
@@ -191,11 +191,11 @@ describe('entry/panel-entry 装配冒烟', () => {
     entry.startPanel()
 
     expect(calls).toEqual([
-      'initTheme',
+      'initializeTheme',
       'startThemeSync',
       'startNavModeSync',
-      'initPanel',
-      'initHandlers',
+      'initializePanel',
+      'initializeHandlers',
     ])
   })
 })
@@ -204,7 +204,7 @@ describe('entry/ribbon-entry 装配冒烟', () => {
   it('浏览器上下文下导入即自动启动（守卫只看 window 是否存在）', async () => {
     await loadEntry<RibbonEntry>('../ts/entry/ribbon-entry.js')
 
-    expect(calls).toEqual(['initRibbon'])
+    expect(calls).toEqual(['initializeRibbon'])
   })
 
   it('导出的 startRibbon() 可显式调用', async () => {
@@ -213,7 +213,7 @@ describe('entry/ribbon-entry 装配冒烟', () => {
 
     entry.startRibbon()
 
-    expect(calls).toEqual(['initRibbon'])
+    expect(calls).toEqual(['initializeRibbon'])
   })
 })
 
@@ -229,7 +229,7 @@ describe('entry/settings-entry 装配冒烟', () => {
 
     await loadEntry<SettingsEntry>('../ts/entry/settings-entry.js')
 
-    expect(calls).toContain('initHandlers')
+    expect(calls).toContain('initializeHandlers')
   })
 
   it('pathname 不含 settings.html 但 document.title 含「设置」时同样自动启动', async () => {
@@ -239,25 +239,25 @@ describe('entry/settings-entry 装配冒烟', () => {
 
     await loadEntry<SettingsEntry>('../ts/entry/settings-entry.js')
 
-    expect(calls).toContain('initHandlers')
+    expect(calls).toContain('initializeHandlers')
   })
 
-  it('装配顺序固定，且 markSettingsPaneLoaded 早于 initHandlers', async () => {
+  it('装配顺序固定，且 markSettingsPaneLoaded 早于 initializeHandlers', async () => {
     gotoPage('/settings.html')
 
     await loadEntry<SettingsEntry>('../ts/entry/settings-entry.js')
 
-    // markSettingsPaneLoaded() 必须早于 initHandlers()：showSettingsPanel 靠它判断
+    // markSettingsPaneLoaded() 必须早于 initializeHandlers()：showSettingsPanel 靠它判断
     // 缓存的面板 ID 是否有效
     expect(calls).toEqual([
-      'initTheme',
+      'initializeTheme',
       'startThemeSync',
       'startNavModeSync',
       'startNavOrderSync:settings',
       'startModuleStateSync:settings',
-      'initShellNav',
+      'initializeShellNav',
       'markSettingsPaneLoaded',
-      'initHandlers',
+      'initializeHandlers',
     ])
   })
 
@@ -287,7 +287,7 @@ describe('entry/settings-entry 装配冒烟', () => {
 
     await loadEntry<SettingsEntry>('../ts/entry/settings-entry.js')
 
-    expect(calls).toContain('initHandlers')
+    expect(calls).toContain('initializeHandlers')
   })
 
   it('startSettings() 把已保存配置回填到设置页表单（ID 改名会静默失效，故用真实 DOM 驱动）', async () => {
@@ -302,7 +302,7 @@ describe('entry/settings-entry 装配冒烟', () => {
 
     entry.startSettings()
 
-    // initSettingsPage() 内部是 `void (async () => …)()`，回填发生在动态 import 之后
+    // initializeSettingsPage() 内部是 `void (async () => …)()`，回填发生在动态 import 之后
     await vi.waitFor(() => {
       expect(chkIncremental.checked).toBe(true)
     })
@@ -320,6 +320,6 @@ describe('entry/settings-entry 装配冒烟', () => {
     await flushDynamicImports()
 
     // 没有元素也不能让初始化中断 —— 中断了就没人派发 bgm:modulesReady，按钮永久禁用
-    expect(calls).toContain('initHandlers')
+    expect(calls).toContain('initializeHandlers')
   })
 })

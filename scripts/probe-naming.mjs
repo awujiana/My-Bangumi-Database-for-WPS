@@ -15,7 +15,7 @@ stmt stmts str tbl temp tit tmp util utils val var vars ver`
 
 // ② 本项目增量：unicorn 表不管、但本项目实际出现过 / 极易再犯的缩写
 const PROJECT_EXTRA = [
-  'ws', 'col', 'cols', 'sid', 'sids', 'hl', 'cf', // 历史遗留：worksheet / column / subjectId / highlight / conditional-format
+  'ws', 'col', 'cols', 'sid', 'sids', 'hl', 'cf', 'init', // 历史遗留：worksheet / column / subjectId / highlight / conditional-format / initialize
   'del', 'orig', 'impl', 'opt', 'vals', 'cnt', 'misc', 'tmpl', 'proc', 'fnc',
   'win', 'cls', 'dbg', 'hdr', 'lbl', 'txt', 'img', 'amt', 'qty',
 ]

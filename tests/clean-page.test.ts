@@ -66,9 +66,9 @@ const m = vi.hoisted(() => ({
   sanitizeHtml: vi.fn<(html: string) => string>(),
   sanitizeTableRows: vi.fn<(rows: string) => string>(),
   // panel/shell-nav.js
-  initShellNav: vi.fn<() => void>(),
+  initializeShellNav: vi.fn<() => void>(),
   // tools/theme.js
-  initTheme: vi.fn<() => void>(),
+  initializeTheme: vi.fn<() => void>(),
   startThemeSync: vi.fn<() => void>(),
   // ui/components/progress.js
   createProgress: vi.fn<(options: ProgressHostOptions) => FakeProgressController>(),
@@ -110,10 +110,10 @@ vi.mock('../ts/tools/sanitize.js', () => ({
   sanitizeTableRows: m.sanitizeTableRows,
 }))
 
-vi.mock('../ts/panel/shell-nav.js', () => ({ initShellNav: m.initShellNav }))
+vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: m.initializeShellNav }))
 
 vi.mock('../ts/tools/theme.js', () => ({
-  initTheme: m.initTheme,
+  initializeTheme: m.initializeTheme,
   startThemeSync: m.startThemeSync,
 }))
 
@@ -377,7 +377,7 @@ async function mountTwoWorkbooks(): Promise<void> {
     }
   })
   await loadPage()
-  page.initCleanPage()
+  page.initializeCleanPage()
   clickById('cleanLoadSheetsBtn')
 }
 /** 装好「已勾选一张表 + 规则默认勾选」的可扫描状态 */
@@ -388,7 +388,7 @@ async function mountScannable(): Promise<void> {
     ]),
   )
   await loadPage()
-  page.initCleanPage()
+  page.initializeCleanPage()
   clickById('cleanLoadSheetsBtn')
 }
 async function mountRunnable(): Promise<void> {
@@ -398,7 +398,7 @@ async function mountRunnable(): Promise<void> {
     ]),
   )
   await loadPage()
-  page.initCleanPage()
+  page.initializeCleanPage()
   clickById('cleanLoadSheetsBtn')
   m.scanCleanRules.mockReturnValue(hitScanResult())
   clickById('cleanScanBtn')
@@ -413,15 +413,15 @@ async function loadPage(): Promise<void> {
 
 // ========== 初始化 ==========
 
-describe('initCleanPage', () => {
+describe('initializeCleanPage', () => {
   it('记录页面已加载、初始化主题与侧栏、渲染日志并锁定执行按钮', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     expect(m.markCleanPaneLoaded).toHaveBeenCalledTimes(1)
-    expect(m.initTheme).toHaveBeenCalledTimes(1)
+    expect(m.initializeTheme).toHaveBeenCalledTimes(1)
     expect(m.startThemeSync).toHaveBeenCalledTimes(1)
-    expect(m.initShellNav).toHaveBeenCalledTimes(1)
+    expect(m.initializeShellNav).toHaveBeenCalledTimes(1)
     expect(m.sanitizeHtml).toHaveBeenCalled()
     expect(buttonById('cleanRunBtn').disabled).toBe(true)
     expect(loggedMessages().at(-1)).toContain('清理页已就绪')
@@ -430,7 +430,7 @@ describe('initCleanPage', () => {
 
   it('未选中任何工作表时列表区显示引导提示', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     expect(byId('cleanSheetList').innerHTML).toContain('加载工作表')
     expect(byId('cleanSheetSummary').textContent).toBe('')
@@ -442,7 +442,7 @@ describe('initCleanPage', () => {
     Reflect.deleteProperty(globalThis, 'document')
     try {
       expect(() => {
-        page.initCleanPage()
+        page.initializeCleanPage()
       }).not.toThrow()
       expect(m.markCleanPaneLoaded).not.toHaveBeenCalled()
     } finally {
@@ -456,7 +456,7 @@ describe('initCleanPage', () => {
 describe('renderCleanItems', () => {
   it('按分组渲染全部规则，未持久化时用规则默认值勾选', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     const html = byId('cleanItemList').innerHTML
     expect(html).toContain('重复数据')
@@ -473,7 +473,7 @@ describe('renderCleanItems', () => {
     storage.set('bgm_clean_on_dup-name', 'false')
     storage.set('bgm_clean_on_empty-name', 'true')
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     expect(inputById('clean-item-dup-name').checked).toBe(false)
     expect(inputById('clean-item-empty-name').checked).toBe(true)
@@ -481,7 +481,7 @@ describe('renderCleanItems', () => {
 
   it('勾选变化即时持久化并使预览失效', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     // 先造出有效预览
     installApp(makeWorkbooks([]))
     selectSheets('A.xlsx', ['动画'])
@@ -498,7 +498,7 @@ describe('renderCleanItems', () => {
     await loadPage()
     byId('cleanItemList').remove()
     expect(() => {
-      page.initCleanPage()
+      page.initializeCleanPage()
     }).not.toThrow()
   })
 })
@@ -508,7 +508,7 @@ describe('renderCleanItems', () => {
 describe('handleLoadSheets', () => {
   it('未连接宿主时弹提示且不写日志', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -520,7 +520,7 @@ describe('handleLoadSheets', () => {
   it('宿主无 Workbooks 时清空候选并记 warn 日志', async () => {
     installAppWithoutWorkbooks()
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -557,7 +557,7 @@ describe('handleLoadSheets', () => {
       }
     })
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -586,7 +586,7 @@ describe('handleLoadSheets', () => {
       dataRows: 3,
     })
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -604,7 +604,7 @@ describe('handleLoadSheets', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -622,7 +622,7 @@ describe('handleLoadSheets', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -633,7 +633,7 @@ describe('handleLoadSheets', () => {
   it('FullName 缺失时用工作表名回退为工作簿键', async () => {
     installApp(makeWorkbooks([makeWorkbook({ name: '无名', sheets: [makeSheet('动画')] })]))
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -651,7 +651,7 @@ describe('handleLoadSheets', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -666,7 +666,7 @@ describe('handleLoadSheets', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -681,7 +681,7 @@ describe('handleLoadSheets', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -700,7 +700,7 @@ describe('handleLoadSheets', () => {
     storage.set('bgm_clean_sheets:D:/A.xlsx', '坏数据')
     storage.set('bgm_clean_sheets:D:/B.xlsx', '{"a":1}')
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -717,7 +717,7 @@ describe('handleLoadSheets', () => {
       },
     })
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     m.appendOperationLog.mockClear()
 
     clickById('cleanLoadSheetsBtn')
@@ -736,7 +736,7 @@ describe('handleLoadSheets', () => {
       },
     })
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 
@@ -1138,7 +1138,7 @@ describe('handleRun / executeClean', () => {
   it('未扫描就执行时提示先扫描', async () => {
     installApp(makeWorkbooks([]))
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     // 初始态执行按钮本就是禁用的，这里强行放开以直接命中「无扫描结果」防呆分支
     buttonById('cleanRunBtn').disabled = false
 
@@ -1356,7 +1356,7 @@ describe('按钮绑定与日志', () => {
   it('全选 / 清空清理项按钮同步勾选框与持久化', async () => {
     installApp(makeWorkbooks([]))
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanSelectNoneBtn')
     for (const rule of CLEAN_RULES) {
@@ -1387,13 +1387,13 @@ describe('按钮绑定与日志', () => {
     }
 
     expect(() => {
-      page.initCleanPage()
+      page.initializeCleanPage()
     }).not.toThrow()
   })
 
   it('清空日志同时清 DOM 与可导出存储', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     expect(byId('cleanLog').children.length).toBeGreaterThan(0)
 
     clickById('cleanClearLogBtn')
@@ -1405,7 +1405,7 @@ describe('按钮绑定与日志', () => {
   it('日志容器缺失时仍写入存储，清空时也只清存储', async () => {
     installAppWithoutWorkbooks()
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     byId('cleanLog').remove()
     m.appendOperationLog.mockClear()
 
@@ -1420,7 +1420,7 @@ describe('按钮绑定与日志', () => {
 
   it('预览区元素缺失时失效处理静默跳过', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     byId('cleanPreviewSummary').remove()
     byId('cleanPreviewDetail').remove()
 
@@ -1436,7 +1436,7 @@ describe('按钮绑定与日志', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
     clickById('cleanLoadSheetsBtn')
     byId('cleanPreviewDetail').remove()
     m.scanCleanRules.mockReturnValue(hitScanResult())
@@ -1453,7 +1453,7 @@ describe('按钮绑定与日志', () => {
 describe('配置驱动', () => {
   it('清理项列表完全由 CLEAN_RULES 驱动（含风险标签与图标）', async () => {
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     const list = byId('cleanItemList')
     const html = list.innerHTML
@@ -1484,7 +1484,7 @@ describe('配置驱动', () => {
       ]),
     )
     await loadPage()
-    page.initCleanPage()
+    page.initializeCleanPage()
 
     clickById('cleanLoadSheetsBtn')
 

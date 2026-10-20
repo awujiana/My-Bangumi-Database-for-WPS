@@ -41,9 +41,9 @@ import {
 } from './highlight-season.js'
 import type { SeasonSelectResult, YearMonth } from './highlight-season.js'
 import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
-import { initShellNav } from './shell-nav.js'
+import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
-import { initTheme, startThemeSync } from '../tools/theme.js'
+import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 // ===== 配置键（PluginStorage，跨会话缓存）=====
@@ -632,10 +632,10 @@ function reloadSheet(): void {
   renderColumnList()
 }
 
-export function initHighlightPage(): void {
+export function initializeHighlightPage(): void {
   markHighlightPaneLoaded()
-  initShellNav()
-  initTheme()
+  initializeShellNav()
+  initializeTheme()
   startThemeSync()
 
   // 恢复缓存配置

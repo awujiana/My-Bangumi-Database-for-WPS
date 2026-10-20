@@ -75,15 +75,15 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 
 **✅ 第十四轮后清单已清空** —— 原 22 个待补测文件全部收口，下表保留收口时的口径备查：
 
-| 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 | 收口结果 |
-| -----: | ---------: | ---------: | ---- | ---- | ---- |
-| ~~137~~ **0** | +1.02% | **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` | ✅ 第 17 批 |
-| ~~69~~ **0** | +0.51% | **100%** | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` | ✅ 第 17 批 |
-| ~~40~~ **0** | +0.30% | **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` | ✅ 第 17 批 |
-| ~~26~~ **0** | +0.19% | **100%** | 难-COM/网络 | `ts/sync/github-sync.ts` | ✅ 第 17 批 |
-| ~~13~~ **0** | +0.10% | **100%** | 难-COM/网络 | `ts/sync/sync-record.ts` | ✅ 第 17 批 |
-| ~~5~~ **0** | +0.04% | **100%** | 难-COM/网络 | `ts/sync/enrich-lock.ts` | ✅ 第 17 批 |
-| ~~5~~ **0** | +0.04% | **100%** | 难-COM/网络 | `ts/sync/github-sync-diff.ts` | ✅ 第 17 批 |
+|        未覆盖 | 全补完提升 | 当前行覆盖 | 难度        | 文件                                       | 收口结果    |
+| ------------: | ---------: | ---------: | ----------- | ------------------------------------------ | ----------- |
+| ~~137~~ **0** |     +1.02% |   **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts`          | ✅ 第 17 批 |
+|  ~~69~~ **0** |     +0.51% |   **100%** | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts`          | ✅ 第 17 批 |
+|  ~~40~~ **0** |     +0.30% |   **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` | ✅ 第 17 批 |
+|  ~~26~~ **0** |     +0.19% |   **100%** | 难-COM/网络 | `ts/sync/github-sync.ts`                   | ✅ 第 17 批 |
+|  ~~13~~ **0** |     +0.10% |   **100%** | 难-COM/网络 | `ts/sync/sync-record.ts`                   | ✅ 第 17 批 |
+|   ~~5~~ **0** |     +0.04% |   **100%** | 难-COM/网络 | `ts/sync/enrich-lock.ts`                   | ✅ 第 17 批 |
+|   ~~5~~ **0** |     +0.04% |   **100%** | 难-COM/网络 | `ts/sync/github-sync-diff.ts`              | ✅ 第 17 批 |
 
 > 📌 **第十四轮后清单形态**：`ts/panel`、`ts/ui`、`ts/tools`、`ts/core`、`ts/sync` 五档**均无成规模待补文件**。
 > 全项目剩余 **46 行**全部是长尾零头（单文件 ≤3 行，合计摊平在 ~30 个文件里，收益 ≤ +0.02%/文件），
@@ -172,7 +172,7 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 12. 🔧 **`ts/panel/panel-lifecycle.ts` 表头检测修复**（第三轮，**已改生产代码**）：`detectHeaderAndColumns` 的「多行表头检测」是死分支，但**不是功能不需要，而是判据写错** ——
     `headerNames` 由 `push` 填满 `MAX_SCAN_COLUMNS` 项（定长稠密数组），4 处却用 `Object.hasOwn(headerNames, c - 1)` 探测「该列有无表头名」→ **恒真**。
     探针实测：`filled` 恒 0（多行表头永不触发、`dataStartRow` 不推进）、`headerLastCol` 恒 60（预览 `columnCount` 恒 60、应 4）、预览起始列恒为 `firstDataCol - 5`（左扩循环空转）。
-    修复：新增 `hasHeaderName(index)`（判值非空）替换 4 处；并把锚点行**向上回溯到连续候选块首行**，解决「补齐行比主表头行更宽时主表头列名整行丢失」。    测试 78 条全绿，文件行覆盖 **98.99%**。
+    修复：新增 `hasHeaderName(index)`（判值非空）替换 4 处；并把锚点行**向上回溯到连续候选块首行**，解决「补齐行比主表头行更宽时主表头列名整行丢失」。 测试 78 条全绿，文件行覆盖 **98.99%**。
     - 🔧 **风险 A（阈值误判窗口）已收口（2026-09-14 第七轮）**：上轮修复后多行表头检测第一次真正生效，但 `filled >= 3` 会把「宽而稀疏的表头行（留 ≥3 个内部空隙）+ 下方数据行恰好填了这些空隙列」误判成多行表头、把数据行 `dataStartRow` 后移吃掉。根因是判据把锚点**内部空隙列**也计入「补齐」。改为：续行只在「锚点最右列**右侧**向右延伸 ≥3 列且**不填补任何内部空隙**」时才认作多行表头；新增回归用例（`tests/panel-lifecycle.test.ts` 的「风险A回归：宽而稀疏的表头行…」）。探针确认此为真实 bug，触发窗口极窄（表头须为最宽候选且下一行恰填 ≥3 空隙列），最坏后果仅预览少一行、不影响按列名同步。
     - 🔎 **未做**：`candidates.sort` 本身未动（它还承担「表头上方有零散关键词行」的取舍）；`autoDetectSheet` 走 `findBangumiTargetSheets()`（`tools/locked-sheet.ts` 里另一套实现），与本函数**不共用**，未受牵连。
 
@@ -227,11 +227,11 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
     - `enrich-conflict-dialog.ts` → **100% 四项全满**（53 → 0，20 条）。`handleConflictResolution` 是**私有函数**，只能经「带 `[data-resolution]` 的按钮点击」驱动，故每条用例都先建对话框骨架再派发 `click`；`enrich-progress-hosts` 用真模块（`progressHosts` 的赋值/清空本身就是断言目标），只把它下层的 `ui/components/progress.js` 换成返回桩的假工厂。
     - `enrich-record-view.ts` → **100% 四项全满**（53 → 0，20 条）。`sanitizeHtml` mock 成恒等（DOMPurify 会重排属性顺序，逐字断言模板变脆），但 `escapeHtml` **保持真实** —— 本文件要断言的正是「用户数据进模板前被转义」，把它一起 mock 掉就等于把被测行为也 mock 掉了。
     - `enrich-source-detail.ts` → **100% lines/funcs/stmts**（46 → 0，22 条）。`renderSourceDetailTable` 同为私有函数，经 `showSourceDetail()` 渲染后对 DOM 断言（「容器缺失 → 早退」是真删 DOM 驱动的）。
-      branch 96.66%：余 1 条是第 74 行 `|| \`第${col}列\`` 兜底，**逻辑不可达** —— 进入该表达式的前提是 `header || field` 为真，header 为空时 field 必来自 `fieldByCol`，其取值只可能是 `COLUMN_MAPPING_FIELDS` 的 key 或 `'platformCol'`，两者都在 `labelByField` 里。已在测试文件头写明不追。
+      branch 96.66%：余 1 条是第 74 行 `|| \`第${col}列\``兜底，**逻辑不可达** —— 进入该表达式的前提是`header || field`为真，header 为空时 field 必来自`fieldByCol`，其取值只可能是 `COLUMN_MAPPING_FIELDS`的 key 或`'platformCol'`，两者都在 `labelByField` 里。已在测试文件头写明不追。
     - **踩坑**：不能用 `innerHTML` 里找 `&lt;` 断言属性转义 —— HTML 序列化会把属性值里的实体还原成字面量（`title="A&lt;B"` 解析后再序列化就是 `title="A<B"`），断言会假失败。改为直接取证「值有没有逃出属性上下文」（注入 `" onmouseover="alert(1)` 后断言 `getAttributeNames()` 只有 `title`）。
 20. ~~`ts/panel/panel-bootstrap.ts`（22 行 / 0%）、`settings-bootstrap.ts`（29 行 / 0%）、`enrich-bootstrap.ts`（20 行 / 0%）~~ ✅ **三个启动脚本全部收口**，合计 71 → **0 行**（`tests/panel-bootstrap.test.ts`，17 条）：
     - 三个文件都是**导入即执行**（无导出、靠模块求值时的副作用工作），故用例 `vi.resetModules()` 后重新 `import()`，对「按钮禁用/启用、初始化函数被调用、console 输出」这些外部可观察量断言，而非断言内部变量。
-    - 16 个纯副作用 import（`../index.js` barrel、`../ui/dialog.js` 等）mock 成空对象 —— 否则会拖进整张真实依赖图（barrel 循环还会静默回退真实现）；有具名导出的 8 个模块（`installModalA11y` / `initShellNav` / `startNavOrderSync` …）换成 spy。
+    - 16 个纯副作用 import（`../index.js` barrel、`../ui/dialog.js` 等）mock 成空对象 —— 否则会拖进整张真实依赖图（barrel 循环还会静默回退真实现）；有具名导出的 8 个模块（`installModalA11y` / `initializeShellNav` / `startNavOrderSync` …）换成 spy。
     - **三条让该文件稳定的做法**：① `vi.clearAllTimers()` 必须留在 `beforeEach` —— settings 的 5 秒兜底定时器会随历史实例累积，不清理就会在下条用例推进时钟时替「本该超时」的实例把按钮启用，断言直接反向；② `document.readyState` 要显式复位成 `'complete'`（用例改成 `'loading'` 后 jsdom 不会自己改回来）；③ `bgm:modulesReady` 监听器跨用例累积（挂在 document 上，清 body 清不掉），断言一律用 `.some(...)` / 状态而非精确调用次数。
     - branch 停在 61~77%：余下全是 `typeof window/document !== 'undefined'` 的**另一侧**，只在无宿主环境可达，收益是 0 行覆盖（lines 已 100%），**刻意不追**。
 21. **首次抽出 `tests/helpers/` 共享桩**（本轮新基建，本轮 4 个新文件已全部复用）：
@@ -254,11 +254,10 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
     - **本轮新踩的坑（已写进 `REF-testing.md`）**：① 两个并行 Edit 写同一测试文件只落地一处（`nullish` 进了、`vi` 导入没进）→ 改为带断言的 `tmp-spec.mjs` 批量修；② `class-methods-use-this` 在 XHR 抛错测试桩上用 `/* eslint-disable class-methods-use-this */` 包子类；③ `typecheck:tests` 基线门禁（`scripts/check-tests-types.mjs`）对新增用例的 TS 错误只许下降，本次 `LiteIssue` 缺 `message?` 触发 2 个 TS2339 当场修；④ `--reporter=basic` 在新版 vitest 已移除，改默认 reporter + `Out-File` 落盘。
     - **全项目**：93.2% → **94.03% lines**（未覆盖 911 → **801**，吃掉 110 行，与 5 文件合计 111 行口径吻合，余 1 行是 http 不可达）；测试 3829 → **3892 条 / 116 文件**；`npm run gate` 七关全绿。
 
-
 **第 13 批（2026-09-15 第十一轮，已完成）**
 
 23. ~~`ts/ui/handlers/path-controls.ts`（22 行 / 18.51%）、`ts/panel/enrich-result-view.ts`（20 行 / 0%）、`ts/ui/handlers/sheet.ts`（24 行 / 0%）~~ ✅ **三个 DOM/UI 文件全部收口**（2026-09-15，新增 3 个测试文件 / 25 条）：
-    - **`path-controls.ts`**：18.51% → **100% lines / 100% funcs**（22 → 0，11 条）。`selectDefaultFolder` 覆盖 8 分支（getApp 空 / FileDialog 选择 / 取消 / GetOpenFilename 回退取目录 / 取消 / 抛错兜底 / 无斜杠文件名返回 null / 既无 FileDialog 也无 GetOpenFilename）、`updatePathDisplay` 2 分支、`initConfigPathControls` 1 分支。branch 余 21/24（87.5%）：`initConfigPathControls` 开头 `if (typeof document === 'undefined') return` 的另一侧（无宿主早退）**刻意不追**（与三个 bootstrap 同判据，收益 0 行覆盖）。
+    - **`path-controls.ts`**：18.51% → **100% lines / 100% funcs**（22 → 0，11 条）。`selectDefaultFolder` 覆盖 8 分支（getApp 空 / FileDialog 选择 / 取消 / GetOpenFilename 回退取目录 / 取消 / 抛错兜底 / 无斜杠文件名返回 null / 既无 FileDialog 也无 GetOpenFilename）、`updatePathDisplay` 2 分支、`initializeConfigPathControls` 1 分支。branch 余 21/24（87.5%）：`initializeConfigPathControls` 开头 `if (typeof document === 'undefined') return` 的另一侧（无宿主早退）**刻意不追**（与三个 bootstrap 同判据，收益 0 行覆盖）。
     - **`enrich-result-view.ts`**：0% → **100% 四项全满**（20 → 0，8 条）。`maybeAutoCleanAfterEnrich`（早退 / 成功 / 异常兜底）+ `showEnrichDetailButton` / `showEnrichDetail` / `hideEnrichDetail`（DOM 切换）。branch 余 13/16（81.25%）：`maybeAutoCleanAfterEnrich` 的 bangumiSheet 空判定两侧与 catch 属不可达/已前移分支。
     - **`sheet.ts`**：0% → **100% lines / 100% funcs / 100% stmts**（24 → 0，6 条）。驱动真实 `cleanLockedDataSheet`，覆盖空工作表 / 有数据 / 异常兜底各分支。branch 余 18/20（90%）：两条 `typeof X === 'undefined'` 另一侧。
     - **mock 策略（三个都走「单一 barrel 单点 mock」）**：`../ts/index.js` 提供 `getApp` / `getExportPath` / `getImportPath` / `LOG_LEVELS` / `bgmLog` / `BGM` 等；叶子模块（`enrich-page-state` / `enrich-page-context` / `sheet-cleaning` / `dialog` / `tools/util/index`）单点 mock，断言打在真实 DOM 写入 / 真实 `cleanSheetDuplicates` 调用 —— 与第 11 批「0% 子流程就地测」同型，不存在假覆盖。
@@ -274,7 +273,7 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
     - **`sanitize.ts`**：83.07% → **100% lines**（11 → 0，42 → 47 条）。新增 `describe('降级路径与无 DOM 环境的兜底分支')` + 模块级 `useFallback()`（**必须同时** `delete globalThis.DOMPurify` **和** `resetSanitizerCache()`，只删一个不生效）。覆盖：降级实现剥离 `javascript:` / `vbscript:` URI 属性但保留安全属性；`vi.stubGlobal('document', undefined)` → 正则粗粒度兜底（script/style/iframe/meta + 三种 `on*=` 形态全清、`<div>` 与正文保留）；`sanitizeTableRows` 无 DOM 时的字符串剥离分支；`document.createElement` 抛错 → 正则回退。
     - **`util/cell.ts`**：85.71% → **100% lines**（8 → 0，38 → 44 条）。新增 `describe('tryGetProperty 属性探测边界（间接）')`：函数返回原生函数 / 函数抛错 / 对象 `toString` 含 `'function'` / 仅含 `'[native code]'` / 普通对象直通，外加一条**真正走到 try/catch 的 own-accessor 抛错**（既有 Proxy 用例因 `Object.hasOwn === false` 在早退处就返回了，从没进过 catch）。
     - **`error-handler.ts`**：55.55% → **100% lines（四项全满）**（4 → 0，新建 `tests/error-handler.test.ts` 5 条）。用 `Object.assign(new Event('unhandledrejection'), { reason, preventDefault })` 派发合成事件；断言 `console.error('[unhandledrejection]', message)`、`preventDefault` 被调、非 Error reason 走 `String()`、以及 `resetErrorHandlerState()` 允许重新注册。
-      **关键坑**：`initGlobalErrorHandler` 只用 `isInitialized` 幂等，但**每次调用都会再注册一个 listener**，而 `resetErrorHandlerState()` 会把开关放回未初始化 → 跨用例 listener 数会累积。因此这里的断言必须用**增量计数**，不能用绝对次数。
+      **关键坑**：`initializeGlobalErrorHandler` 只用 `isInitialized` 幂等，但**每次调用都会再注册一个 listener**，而 `resetErrorHandlerState()` 会把开关放回未初始化 → 跨用例 listener 数会累积。因此这里的断言必须用**增量计数**，不能用绝对次数。
     - **全项目**：94.52% → **94.87% lines**（未覆盖 735 → **687**，吃掉 48 行，与 5 文件合计 48 行**精确吻合**）；测试 3917 → **3944 条 / 120 文件**。
 
 25. ~~第 14 批：`ts/panel/clean-engine.ts`（24 行 / 92.4%）、`ts/ui/handlers/index.ts`（22 行 / 76.34%）、`ts/ui/handlers/action-handlers.ts`（14 行 / 97.59%）~~ ✅ **三个文件全部 100% lines**（2026-09-15，全部就地扩写，+55 条）：
@@ -285,7 +284,7 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       - **规则分派**：`emptyNameRows` 分派、`scanRowRule` 的 `default` 未知种类（临时 push 一条 `kind: 'notAKind'` 规则）、`scanRowRule` catch（行扫描器抛错 → `扫描失败：…` 写 notes 且不影响其他规则）、`cellTransform` 缺 `transform` 配置、`resolveColumn` 的**包含式退化匹配**（列键 `标签/分级（备注）` 命中关键词 `标签/分级`）与完全不匹配返回 `undefined`、`columnName` 的 `第N列` 兜底。
       - **执行/统计**：`runCleanPlans` 待删除行**去重升序排序**（≥2 行才触发比较器）、多个单元格变更按行号升序写入、`countCleanTargets()`、`scanCleanRules` 在「已勾选但无目标」时的专门提示、`estimateRowBytes` 无数据行返回 0 / 末行非有限值时回退 `ROW_BYTES_FALLBACK`。
       - **`inspectWorksheet` 表头展示**：`readHeaderLabels` 的「非空才 push」需要表头行**真有文本**才能覆盖 —— 既有用例的 `getCellValue` 桩恒返回 `''`，所以这一行一直是空的。
-    - **`handlers/index.ts`**：76.34% → **100% lines / 100% stmts**（22 → 0，69 → 77 条）。补 `initHandlers` 的三条分支（`typeof document === 'undefined'` 同步兜底 / `readyState === 'loading'` 挂 `DOMContentLoaded` / 直接执行）、`setupButtonListeners` 的设置页控件回填与三处 try/catch、`onAction('clear' / 'showClearConfirm')`。
+    - **`handlers/index.ts`**：76.34% → **100% lines / 100% stmts**（22 → 0，69 → 77 条）。补 `initializeHandlers` 的三条分支（`typeof document === 'undefined'` 同步兜底 / `readyState === 'loading'` 挂 `DOMContentLoaded` / 直接执行）、`setupButtonListeners` 的设置页控件回填与三处 try/catch、`onAction('clear' / 'showClearConfirm')`。
       - **`readyState === 'loading'` 的解法**：用 **`Proxy` 包住真实 `document`** —— `get` 陷阱只把 `readyState` 改成 `'loading'`、拦下 `addEventListener` 收集 `DOMContentLoaded` 回调，其余成员 `value.bind(target)` 绑回真实 document，这样回调真正执行时 `startHandlers()` 能跑完（否则只能断言「抛错」，等于没测）。
       - **发现并绕开两处测试基建缺陷（不是生产 bug，但会让覆盖率凭空失真）**：① 本仓库 `tests/` 下 **`vi.mock('../index.js')` 根本解析不了**（只有 `../ts/index.js` 可解析），所以该 factory 是**死 mock**，barrel 上的 `showConfirm` / `refreshData` / `bgmLog` / `previewSyncContent` 等断言全部无效 —— 实际跑的是**真实实现**（用探针实测：`onAction('clear')` 命中真实 `showConfirm` → 无对话框 DOM → 落到原生 `window.confirm`，`mockState.showConfirm.mock.calls.length === 0`）。② 因此确认/取消分支改用 `vi.stubGlobal('confirm', …)` 驱动，日志断言改打在 **`logger.*` 的 spy** 上（`bgmLog` 是真实现，且会先过 `BGM.LOG_LEVEL` 门槛）。③ 设置页 `select` 回填必须**预置同值 `<option>`** —— jsdom 对无匹配 option 的 `select.value = 'x'` 会**静默丢弃**赋值，直接断言 value 只会拿到空串。
     - **`action-handlers.ts`**：97.59% → **100% lines**（14 → 0，100 → 111 条）。补三个「barrel 导出缺失」的 WARN 守卫（`syncSelectedRows` / `previewSyncContent` / `enlargePreview`）、`clearToken` 正常路径（`{ PluginStorage: { setItem } }` → 断言 `bgm_user_id` / `bgm_username` 被清）、`clearToken` / `copyToken` 的 catch → `BGM.handleError(…, { context })` + 恒定收尾日志、`timeFilter` 剩余三个 case（`future` / `year` / `month`）、`app.StatusBar = false` 的失败复位、`resetAllConfig` 的 600ms reload。
@@ -312,13 +311,13 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       - **批量边界**：布局命中但 `columnMapping.nameCol === 0` → 标记错误且**不进入匹配**；`wb.Close()` 抛错 → WARN 但不影响该文件结果；`createInlineProgress` 的「停止」回调 → 置位 `batchCancelRequested` 并按停止收尾；批量模式刻意不回调进度。
       - **模块级轮询状态另立文件**：`enrichWatchTimer` / `enrichWatchRetriesLeft` 是 **`enrich-page.ts` 的模块级状态** —— 前者让 `startEnrichWorkbookWatch` 幂等，后者**只递减、永不回补**，而本文件里任何一次 `select` 的 change 都会把它清零。因此 `recheckEnrichTarget` / `takeRecheckReason` / `pollOnce` / `stopEnrichWorkbookWatch` 这 29 行无法在 `enrich-page.test.ts` 里稳定复现，单独建 **`tests/enrich-page-watch.test.ts`**（8 条），每条用例先 `vi.resetModules()` 取一份全新注册表（`state` 也必须从新注册表里取，不能用顶层静态 import），再捕获 `window.setInterval` 的回调手动驱动。
       - **顺手修正两条名不副实的既有用例**：`refreshSheets → 未锁定时走自动选择并联动预览匹配` 实际没断言 `previewMatch`（已改名）；`lockSheetBtn → 解锁后…` 因为 `toggleEnrichWorkbookLock` 是 mock、`isLocked` 根本没被翻成 `false`，走的其实是**锁定**分支（已改成真的翻 `false`，这才覆盖到解锁分支）。
-    - **`panel-page.ts`**：1.28% → **100% lines**（78 → 0，新建 `tests/panel-page.test.ts` 23 条）。四组依赖全 mock（barrel 里放一个**可变的** `stubs.bgm.sheet`，便于逐用例翻 `isLocked` / `lockedIndex`）。覆盖 `window` 桥接契约（`initPanelCore` / `refreshPanelUI` 的 descriptor 必须 `writable + configurable`）、`initPanel` 的 `readyState === 'complete'` 立即执行 / 非 complete 挂 `load` / 抛错 → `handleError` **且仍然广播 `bgm:modulesReady`**（否则按钮永远停在禁用态）/ 无 `document` 的同步分支、`initPanelCore` 的 WPS 枚举注入（仅缺失时）+ 用户信息恢复 + 锁定表恢复 + `setTimeout(…, 0)` 延后扫描 + 四条自动检测分支 + 全部事件绑定（含 `beforeunload` 摘掉 keydown 监听 —— 用「再按一次 Escape」反证）。
+    - **`panel-page.ts`**：1.28% → **100% lines**（78 → 0，新建 `tests/panel-page.test.ts` 23 条）。四组依赖全 mock（barrel 里放一个**可变的** `stubs.bgm.sheet`，便于逐用例翻 `isLocked` / `lockedIndex`）。覆盖 `window` 桥接契约（`initializePanelCore` / `refreshPanelUI` 的 descriptor 必须 `writable + configurable`）、`initializePanel` 的 `readyState === 'complete'` 立即执行 / 非 complete 挂 `load` / 抛错 → `handleError` **且仍然广播 `bgm:modulesReady`**（否则按钮永远停在禁用态）/ 无 `document` 的同步分支、`initializePanelCore` 的 WPS 枚举注入（仅缺失时）+ 用户信息恢复 + 锁定表恢复 + `setTimeout(…, 0)` 延后扫描 + 四条自动检测分支 + 全部事件绑定（含 `beforeunload` 摘掉 keydown 监听 —— 用「再按一次 Escape」反证）。
       - **两个坑**：① jsdom 的 `select.value` 静默丢弃（同上），需要 `addOptions(id, ...values)` 预置选项；② `vi.stubGlobal('document', undefined)` 让 `typeof document === 'undefined'` 成立，但紧接着的 `document.getElementById` 抛的是 **`TypeError` 而不是 `ReferenceError`**。
     - **`github-settings.ts`**：41.23% → **100% lines**（58 → 0，新建 `tests/github-settings.test.ts` 25 条）。刻意使用**真实** `debounce` + **真实** `trackedAddEventListener`，让「input → 300ms → 落盘」端到端可观测。覆盖 `toggleSourceFields` 三种来源类型 + 容器缺失、`saveGithubConfigFromDom`（trim、`branch` 兜底 `main`、必填缺失跳过、local 读 `localFilePath` 而非 `githubPath`、任一 setter 返回 false 则不打成功日志）、`debouncedSaveGithubConfig`（300ms / 合并 / 抛错 → WARN）、`refreshGithubConfigInputs`、`loadGithubConfigIntoForm`（含「配置为空时不打已加载日志」与 change → 立即切换可见性 + 防抖保存）。
-    - **`message.ts`**：3.12% → **100% lines**（32 → 0，新建 `tests/message.test.ts` 18 条）。覆盖重复 `initMessageListener` 会**摘掉旧 listener**（否则一条消息触发两次动作）、origin 白名单（`https://evil.example.com` 静默丢弃、`https://bgm.tv` 与自身 origin 放行、缺 `type` 丢弃）、5 种消息类型 + `default` → WARN、`setStatus` 写 `#statusBox`（`status info` 类名）/ 显式类型 / 回退 `#statusDisplay` / 两者都缺时静默返回。
+    - **`message.ts`**：3.12% → **100% lines**（32 → 0，新建 `tests/message.test.ts` 18 条）。覆盖重复 `initializeMessageListener` 会**摘掉旧 listener**（否则一条消息触发两次动作）、origin 白名单（`https://evil.example.com` 静默丢弃、`https://bgm.tv` 与自身 origin 放行、缺 `type` 丢弃）、5 种消息类型 + `default` → WARN、`setStatus` 写 `#statusBox`（`status info` 类名）/ 显式类型 / 回退 `#statusDisplay` / 两者都缺时静默返回。
     - **`github-config-dialog.ts`**：0% → **100% lines**（19 → 0，新建 `tests/github-config-dialog.test.ts` 12 条）。**同时修掉一处真实的生产漏洞**：该文件自己实现的 `escapeHtml` 只做 `textContent → innerHTML`（转义 `< > &`，**不转义引号**），却被拼进 `title="${escapeHtml(url)}"` —— 攻击者可控的 `"` 能闭合属性并注入新属性。先跑探针确认 jsdom 行为（`innerHTML` 实测得到 `x" onmouseover="alert(1)`，引号确实未转义），再删掉本地实现、改用 `tools/string-utilities-pure.ts` 里的规范 `escapeHtml`（它额外做 `.replace(/"/g,'&quot;').replace(/'/g,'&#39;')`）。`ts/ui/` 引 `ts/tools/` 属合规方向，`check:cycles` 的分层约束不受影响；因该文件可执行行 19 → 16，全项目总行数也由 13411 降到 13408。断言用 `getAttributeNames()` 确认只多出 `title`、`childElementCount === 0`、`<img>` / `<script>` 未被创建。
       - **坑**：`.detail-value` 这个 span 自带 `class`，所以 `getAttributeNames()` 是 `['class','title']`；另外**文本节点里的裸引号是合法的**（文本上下文不解析属性），断言不能写成「innerHTML 不含 `onmouseover="`」，要精确匹配转义后的 `title="…&quot;…"` 子串。
-    - **`clean-bootstrap.ts`**：0% → **100% lines**（17 → 0，扩写既有 `tests/panel-bootstrap.test.ts` 17 → 22 条）。覆盖 import 时禁用按钮、`bgm:modulesReady` 启用 + `[BGM Clean] 模块加载完成，按钮已启用`、ready 后 `initCleanPage` + `startNavModeSync` + `startNavOrderSync('clean')` + `startModuleStateSync('clean')`、`readyState === 'loading'` 延后到 `DOMContentLoaded`、以及「不安装主题 / 壳层导航」的反向断言。
+    - **`clean-bootstrap.ts`**：0% → **100% lines**（17 → 0，扩写既有 `tests/panel-bootstrap.test.ts` 17 → 22 条）。覆盖 import 时禁用按钮、`bgm:modulesReady` 启用 + `[BGM Clean] 模块加载完成，按钮已启用`、ready 后 `initializeCleanPage` + `startNavModeSync` + `startNavOrderSync('clean')` + `startModuleStateSync('clean')`、`readyState === 'loading'` 延后到 `DOMContentLoaded`、以及「不安装主题 / 壳层导航」的反向断言。
     - **`module-order.ts`**：95.45% → **100% lines**（6 → 0，扩写既有 `tests/module-order.test.ts` 25 → 30 条）。覆盖恢复默认顺序写盘失败（`mockSetConfig` 返回 `false` 的唯一可达路径，用 `vi.hoisted` 里一个可控开关驱动）、`dragstart` 写 `setData('text/plain', …)` + `effectAllowed = 'move'`、`dragover` 清掉上一个落点高亮、`drop` 源 id 不在顺序里 → `调整顺序失败`、`beforeunload` 清掉 2s 轮询定时器。
       - **行口径注意**：该文件 `uncovered stmts` 里仍有 12 条零计数（如 `if (!modules || modules.length === 0) return ''` 的 `return`），但**这些行都算已覆盖**（同行的 IfStatement 每轮都求值）—— 见本文档开头「行口径陷阱」。
     - **全项目**：95.33% → **97.45% lines**（未覆盖 626 → **341**，吃掉 **285 行**；7 个文件台账合计 288 行，其中 `github-config-dialog.ts` 因生产修复少了 3 行可执行行，288 − 3 = 285 **精确吻合**）；stmts 94.54% → 96.68%、branch 85.25% → 87.57%、funcs 95.00% → 97.19%；测试 3999 → **4115 条 / 125 文件**。
@@ -342,7 +341,7 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
   - **`visibleCells.Areas` 缺失**（1418）：给 `createVisibleCells` / `createWorksheet` 加 `missingAreas` 开关（`Areas` getter 返回 `undefined`，区别于原有的 `throwOnAreas`）→ 走 `areas.push(visibleCells)` 的单区间降级，且**不**触发 `handleError`。
   - **顺带清掉上一轮遗留的 3 类 lint 错误**（该文件上一轮只跑了 vitest、没跑 eslint）：`prefer-destructuring`（`const cellValue = options.cellValue` → `const { cellValue } = options`）、两处 `unicorn/consistent-function-scoping`（`fullCellValue` / `batchCellValue` 提到模块作用域，与既有 `setupExecution` / `progressHandlers` 同层）、两处 `@typescript-eslint/no-unsafe-assignment`（`expect.objectContaining({ context: expect.stringContaining('…') })` 里嵌套 matcher 返回 `any` → 改成精确字符串 `'SyncToBangumiAsync:preprocess'` / `'SyncToBangumiAsync:createSheet'`，断言反而更强）。
 - **`ts/sync/workbook-auto-detect.ts`**：59.17% → **100% lines**（69 → 0）。新建 `tests/workbook-auto-detect-scan.test.ts`（**35 条**）+ 扩写 `tests/workbook-auto-detect.test.ts`（+4 条 `monthLabelFromWorkbookName`）。三个依赖全 mock（`tools/util/index.js` 的 `getApp` 改为读 `Reflect.get(globalThis, 'Application')`、`tools/locked-sheet.js`、`sync/enrich-engine.js`）。
-  - **模块级一次性标志**：`isEventsRegistered` 只在首次 `initWorkbookAutoDetection` 时置位 → 每条用例必须 `vi.resetModules()` + 动态 `import()` 取全新模块实例（顶层静态 import 在 reset 之后就是陈旧单例）。
+  - **模块级一次性标志**：`isEventsRegistered` 只在首次 `initializeWorkbookAutoDetection` 时置位 → 每条用例必须 `vi.resetModules()` + 动态 `import()` 取全新模块实例（顶层静态 import 在 reset 之后就是陈旧单例）。
   - **踩坑**：断言持久化结果时误比较了**原始存储字符串**（`'["C:\\新番表.xlsx"]'`，反斜杠已被 JSON 转义）→ 4 条断言全红。改为统一通过 `autoDetect.loadDetectedPaths(...)` 取**解析后**的路径数组；「不重复记录」那条要把 storage 预置成已记录状态。
   - **踩坑**：`unicorn/name-replacements` 会把 `mod` 判成需改写为 `module_` → 变量统一改名 `autoDetect`（44 处）；`unicorn/consistent-function-scoping` 要求把 `setupEvents` 提到模块作用域。
 - **`ts/sync/exceltobangumi/chapter-marker.ts`**：0% → **100% lines**（40 → 0）。新建 `tests/chapter-marker.test.ts`（**15 条**，`// @vitest-environment jsdom`，可编程 `FakeXhr` 类沿用 `exceltobangumi.api.test.ts` 的成员形状）。
@@ -366,7 +365,7 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 本批是**清单清空后的收尾优化**，不增加覆盖率（`locked-sheet.ts` 本就是 100% lines），目标是消除 `getLockedSheet()` 的**线性扫描成本**。
 
 - **问题**：`getLockedSheet()` 每次调用都要 `wb.Worksheets.Item(1..N)` 逐张比 `Name`，而它在同步链路里被高频调用（每个条目、每个面板刷新都可能走）—— N 张表就是 N 次 COM 往返，跨进程 COM 单次往返在毫秒量级，大工作簿下累积明显。
-- **方案（关键取舍）**：**不引入模块级缓存变量**。模块级缓存会带来两个麻烦：① 同一测试文件内的用例互相污染，每条用例都得 `vi.resetModules()` + 动态 `import()`；② 需要在**四个**写锁点（`initEnrichLock` / 面板切表 / 清锁 / 工作簿切换）挂失效钩子，漏一个就是「锁的是 A 表、实际去操作 B 表」的静默错。
+- **方案（关键取舍）**：**不引入模块级缓存变量**。模块级缓存会带来两个麻烦：① 同一测试文件内的用例互相污染，每条用例都得 `vi.resetModules()` + 动态 `import()`；② 需要在**四个**写锁点（`initializeEnrichLock` / 面板切表 / 清锁 / 工作簿切换）挂失效钩子，漏一个就是「锁的是 A 表、实际去操作 B 表」的静默错。
   改为**复用锁状态里已经在维护的 `BGM.sheet.lockedIndex`**：它是 `{ isLocked, lockedWorkbookName, lockedName, lockedIndex }` 的一部分，**缓存键就是锁状态本身** —— 任何一次写锁都会顺带改写索引，**天然失效，零钩子**。
 - **实现**：抽出 `resolveSheetInWorkbook(wb, sheetName, hintIndex)`：`hintIndex != null` 时先 `readSheetAtIndex(wb, hintIndex)`（`try/catch` 吞越界与宿主切表异常），**必须 `hinted?.Name === sheetName` 复核通过**才直接返回；否则回落原有全表扫描。索引只是**提示、不是真相**，所以行为与改造前逐字节等价。
   `findSheetInWorkbook(wbName, sheetName)` 改为复用同一函数并传 `hintIndex = null`（按名查表的调用方没有索引可用），顺手删掉一份重复的扫描逻辑。
@@ -396,13 +395,13 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       ③ **假时钟与定时器队列是两件事**：`vi.setSystemTime(0)` 排下定时器后再 `vi.setSystemTime(1000)`，可造出「`remaining <= 0` 且 `timerId !== null`」这个**唯一**能命中 `throttle` 里 `clearTimeout` 清理的状态（用 `vi.getTimerCount()` 断言）。
     - **残留 7 行：全部经可达性分析判定为不可达 / 死代码，按既有判据不造假测**（延续「不追」口径）：
 
-      | 文件:行 | 判定依据 |
-      | --- | --- |
-      | `ts/sync/enrich-engine.ts:632,633,639` | `matchEntriesInner` 每行的 `try` 体里只做 Map / 数组操作，容器由 `buildBangumiIndexes` 内部构造（值恒为 `number[]`）；`normalizeName()` / `getCellValue()` 都在 `try` **之外**调用 → 该 `catch` 不可达 |
-      | `ts/panel/enrich-preview-cell.ts:48` | **类型驱动的防御代码**（第十七轮用 `tsc` 探针证实，原先误记为「死代码」）：`noUncheckedIndexedAccess: true` 下 `CHIP_COLOR_PALETTE[i]` 的类型是 `T \| undefined`，且 `CHIP_COLOR_PALETTE[0]` **同样是** `T \| undefined`，所以第 45 行的 `?? PALETTE[0]` 并不能把类型收窄成 `T` —— 第 47 行的 `if (!palette)` 是**类型收窄所必需**的。运行时确实走不到（`stableColorIndex()` 里 `>>> 0` 保证哈希非负、索引恒在 `[0, 11]`），但**删掉会报 `TS18048: 'palette' is possibly 'undefined'`** → 不能删 |
-      | `ts/services/config-service.ts:203` | `GithubConfigSchema.strategy` 是 `SyncStrategySchema.optional().default('add-update')`，zod 已把值收敛到合法枚举 → `else` 兜底不可达（生产代码里也有作者的注释「配置里的 default 已经保证 value ∈ SyncStrategy」）。**属有意义的防御兜底**，删掉会把「非法策略 → 回落 add-update」变成「静默不设置」 |
-      | `ts/ui/handlers/token.ts:720` | 外层 `if (avatarUrl \|\| username)`（654 行）已蕴含内层 `if (username \|\| userId \|\| avatarUrl)`（698 行），且两个变量都是 `const` 解构、区间内无重赋值 → `else` 不可达 |
-      | `ts/ui/preview.ts:528` | 排序比较器：`dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 `WATCH_STATUS_MAP` 反查出的 **6 个**标准名；其中 5 个已在 `priorityStatus` 里，非优先集合最多只剩「忽略」**一个**元素，而 `Array#sort` 对长度 ≤1 **不调用比较器**（第 8 批已记录，本批复核确认）—— 这一条是**真正的死代码**，已在第十七轮删除，见下 |
+      | 文件:行                                | 判定依据                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+      | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+      | `ts/sync/enrich-engine.ts:632,633,639` | `matchEntriesInner` 每行的 `try` 体里只做 Map / 数组操作，容器由 `buildBangumiIndexes` 内部构造（值恒为 `number[]`）；`normalizeName()` / `getCellValue()` 都在 `try` **之外**调用 → 该 `catch` 不可达                                                                                                                                                                                                                                                                                           |
+      | `ts/panel/enrich-preview-cell.ts:48`   | **类型驱动的防御代码**（第十七轮用 `tsc` 探针证实，原先误记为「死代码」）：`noUncheckedIndexedAccess: true` 下 `CHIP_COLOR_PALETTE[i]` 的类型是 `T \| undefined`，且 `CHIP_COLOR_PALETTE[0]` **同样是** `T \| undefined`，所以第 45 行的 `?? PALETTE[0]` 并不能把类型收窄成 `T` —— 第 47 行的 `if (!palette)` 是**类型收窄所必需**的。运行时确实走不到（`stableColorIndex()` 里 `>>> 0` 保证哈希非负、索引恒在 `[0, 11]`），但**删掉会报 `TS18048: 'palette' is possibly 'undefined'`** → 不能删 |
+      | `ts/services/config-service.ts:203`    | `GithubConfigSchema.strategy` 是 `SyncStrategySchema.optional().default('add-update')`，zod 已把值收敛到合法枚举 → `else` 兜底不可达（生产代码里也有作者的注释「配置里的 default 已经保证 value ∈ SyncStrategy」）。**属有意义的防御兜底**，删掉会把「非法策略 → 回落 add-update」变成「静默不设置」                                                                                                                                                                                             |
+      | `ts/ui/handlers/token.ts:720`          | 外层 `if (avatarUrl \|\| username)`（654 行）已蕴含内层 `if (username \|\| userId \|\| avatarUrl)`（698 行），且两个变量都是 `const` 解构、区间内无重赋值 → `else` 不可达                                                                                                                                                                                                                                                                                                                        |
+      | `ts/ui/preview.ts:528`                 | 排序比较器：`dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 `WATCH_STATUS_MAP` 反查出的 **6 个**标准名；其中 5 个已在 `priorityStatus` 里，非优先集合最多只剩「忽略」**一个**元素，而 `Array#sort` 对长度 ≤1 **不调用比较器**（第 8 批已记录，本批复核确认）—— 这一条是**真正的死代码**，已在第十七轮删除，见下                                                                                                                                                                       |
 
     - **口径**：可执行行 **13411 不变**（**本批零生产代码改动**，只有测试与文档）；测试 **4231 → 4283 条 / 127 → 129 文件**；`npm run gate` 七关全绿。
       （上表 `ui/preview.ts:528` 那一行在**第十七轮**作为死代码删除 → 可执行行 13411 → 13410，见 §三 第 19 批。）
@@ -430,12 +429,13 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       `noUncheckedIndexedAccess: true` 下 `CHIP_COLOR_PALETTE[i]` 与 `CHIP_COLOR_PALETTE[0]` **类型都是 `T | undefined`**，
       所以 `?? PALETTE[0]` 并不能把类型收窄成 `T`，第 47 行的 `if (!palette)` 是**类型收窄所必需**的。
       运行时确实走不到，但**删掉 `tsc` 就报错** → 属「类型驱动的防御代码」，**必须保留**。
+
     - **7 行的最终分类**（1 删 / 1 类型驱动 / 5 防御性分支）：
-      | 类别 | 行 | 处置 |
-      | --- | --- | --- |
-      | **真死代码** | `ui/preview.ts:528` 的 `.sort((a,b) => …)` | ✅ **已删** —— `Array#sort` 对长度 ≤1 不调用比较器，删掉行为逐字节等价（Map 迭代序本身就是确定的）；同时在原位留注释说明「非优先组最多只有『忽略』一个成员，将来若新增不会被 `normalizeStatus` 收敛的状态需把比较器加回来」 |
-      | **类型驱动** | `panel/enrich-preview-cell.ts:48` | ❌ 保留 —— 删了 `tsc` 报 `TS18048`（见上） |
-      | **防御性分支** | `sync/enrich-engine.ts:632,633,639`（每行 `catch`）、`services/config-service.ts:203`（非法策略回落 `add-update`）、`ui/handlers/token.ts:720`（隐藏 Token 区用户信息） | ❌ 保留 —— 删掉会**改语义**（异常不再被吞成 `matchType:'error'` / 非法策略不再回落 / 分支消失），为覆盖率动这些不值得 |
+      | 类别           | 行                                                                                                                                                                      | 处置                                                                                                                                                                                                                        |
+      | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+      | **真死代码**   | `ui/preview.ts:528` 的 `.sort((a,b) => …)`                                                                                                                              | ✅ **已删** —— `Array#sort` 对长度 ≤1 不调用比较器，删掉行为逐字节等价（Map 迭代序本身就是确定的）；同时在原位留注释说明「非优先组最多只有『忽略』一个成员，将来若新增不会被 `normalizeStatus` 收敛的状态需把比较器加回来」 |
+      | **类型驱动**   | `panel/enrich-preview-cell.ts:48`                                                                                                                                       | ❌ 保留 —— 删了 `tsc` 报 `TS18048`（见上）                                                                                                                                                                                  |
+      | **防御性分支** | `sync/enrich-engine.ts:632,633,639`（每行 `catch`）、`services/config-service.ts:203`（非法策略回落 `add-update`）、`ui/handlers/token.ts:720`（隐藏 Token 区用户信息） | ❌ 保留 —— 删掉会**改语义**（异常不再被吞成 `matchType:'error'` / 非法策略不再回落 / 分支消失），为覆盖率动这些不值得                                                                                                       |
     - **口径**：可执行行 13411 → **13410**（删掉 `.sort()` 行 + 其比较器函数）；未覆盖 **7 → 6**，未覆盖文件 **5 → 4**；
       全项目 lines **99.94% → 99.95%**，`ui/preview.ts` 达 **100% lines**；测试条数不变（**4283 条 / 129 文件**，`preview.test.ts` 57 条改的是注释）；
       `npm run gate` 七关全绿。
@@ -482,17 +482,18 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       它**正是为了可测才从 `debug-panel.ts` 拆出来的**，整体排除把拆分目的抹掉了。
       实测放开后（`--config vitest.cov.config.ts`）：
 
-      | 文件 | lines | funcs | branch |
-      | --- | --- | --- | --- |
-      | `entry/debug-panel-render.ts` | **100%** | 100% | 100% |
-      | `entry/panel-entry.ts` | **100%** | 100% | 100% |
-      | `entry/ribbon-entry.ts` | **100%** | 100% | 50% |
-      | `entry/settings-entry.ts` | **100%** | 100% | 87.5% |
-      | `entry/debug-panel.ts` | 28.93% | 27.02% | 10.29% |
+      | 文件                          | lines    | funcs  | branch |
+      | ----------------------------- | -------- | ------ | ------ |
+      | `entry/debug-panel-render.ts` | **100%** | 100%   | 100%   |
+      | `entry/panel-entry.ts`        | **100%** | 100%   | 100%   |
+      | `entry/ribbon-entry.ts`       | **100%** | 100%   | 50%    |
+      | `entry/settings-entry.ts`     | **100%** | 100%   | 87.5%  |
+      | `entry/debug-panel.ts`        | 28.93%   | 27.02% | 10.29% |
 
       故把排除**收窄为 `ts/entry/debug-panel.ts` 单文件**（生产 inert 的开发期 DOM 管线：
       Tab 切换 / Ribbon 卡片点击 / 日志轮询 / 诊断报告导出，约 140 行只经内部函数触达；
       按 §3 既定口径「entry/** 类装配脚本降级为集成冒烟，**不为数字硬造 mock**」）。
+
     - **口径**：可执行行 **13410 → 13499**（+89：4 个 entry 文件纳入统计、实测均 100% lines）；
       **未覆盖行维持 6**（4 个文件），lines 维持 **99.95%**；测试 **4283 → 4308 条 / 129 → 131 文件**；
       stmts 99.15% / branch **90.12% → 90.16%** / funcs 99.67%；`npm run gate` 七关全绿。
@@ -516,14 +517,14 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
   最热的「按可见行扫描」（筛选后常几千行）就在 `ts/sync/exceltobangumi/index.ts`。
 - **静态侧（11 处 hoist，6 文件）**：
 
-  | 文件 | 处数 | 说明 |
-  | --- | ---: | --- |
-  | `ts/panel/panel-lifecycle.ts` | 3 | 其中 `sheets.Count` 的 hoist **必须在探测 `try` 之外**（见下「踩的坑」） |
-  | `ts/sync/enrich-lock.ts` | 1 | 顺带让后续日志复用同一个 `sheetCount` |
-  | `ts/sync/sync-record.ts` | 2 | |
-  | `ts/sync/enrich-record.ts` | 2 | |
-  | `ts/tools/util/sheet.ts` | 1 | |
-  | `ts/sync/exceltobangumi/index.ts` | 2 | 含**两跳链** `Areas.Count` 与最热的可见行扫描 |
+  | 文件                              | 处数 | 说明                                                                     |
+  | --------------------------------- | ---: | ------------------------------------------------------------------------ |
+  | `ts/panel/panel-lifecycle.ts`     |    3 | 其中 `sheets.Count` 的 hoist **必须在探测 `try` 之外**（见下「踩的坑」） |
+  | `ts/sync/enrich-lock.ts`          |    1 | 顺带让后续日志复用同一个 `sheetCount`                                    |
+  | `ts/sync/sync-record.ts`          |    2 |                                                                          |
+  | `ts/sync/enrich-record.ts`        |    2 |                                                                          |
+  | `ts/tools/util/sheet.ts`          |    1 |                                                                          |
+  | `ts/sync/exceltobangumi/index.ts` |    2 | 含**两跳链** `Areas.Count` 与最热的可见行扫描                            |
 
 - **新增第 8 道门禁**：`scripts/check-com-in-loop.mjs`（`npm run check:com-in-loop`，已并入 `gate`）。
   - **用 AST 而不是正则**：正则分不清 `for (const x of arr)` / `i < arr.length` 与真正的 COM 属性访问。
@@ -558,16 +559,16 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 
 `npm run gate` = **八道关**（按顺序，任一失败即中断）：
 
-| # | 阶段 | 作用 |
-| ---: | --- | --- |
-| 1 | `lint:check` | `eslint ts tests`（`scripts/**` 不在 lint 范围，与既有门禁脚本一致） |
-| 2 | `check:dompurify-version` | 锁 DOMPurify 版本，防静默升级引入 XSS 面 |
-| 3 | `check:cycles` | `scripts/check-import-cycles.mjs`：AST 查循环依赖 |
-| 4 | `check:ribbon-buttons` | Ribbon 按钮与宿主配置一致性 |
-| 5 | `check:nav-order` | 导航顺序与 `panel.html` 一致 |
-| 6 | **`check:com-in-loop`** | **`scripts/check-com-in-loop.mjs`（第 19 轮新增）**：AST 查「循环条件里读 COM 属性」，即**跨进程往返放大器**；`// com-loop-ok: <理由>` 可豁免 |
-| 7 | `typecheck:tests` | 测试目录类型检查 |
-| 8 | `test` | `vitest run`（131 文件 / 4309 条） |
+|   # | 阶段                      | 作用                                                                                                                                          |
+| --: | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+|   1 | `lint:check`              | `eslint ts tests`（`scripts/**` 不在 lint 范围，与既有门禁脚本一致）                                                                          |
+|   2 | `check:dompurify-version` | 锁 DOMPurify 版本，防静默升级引入 XSS 面                                                                                                      |
+|   3 | `check:cycles`            | `scripts/check-import-cycles.mjs`：AST 查循环依赖                                                                                             |
+|   4 | `check:ribbon-buttons`    | Ribbon 按钮与宿主配置一致性                                                                                                                   |
+|   5 | `check:nav-order`         | 导航顺序与 `panel.html` 一致                                                                                                                  |
+|   6 | **`check:com-in-loop`**   | **`scripts/check-com-in-loop.mjs`（第 19 轮新增）**：AST 查「循环条件里读 COM 属性」，即**跨进程往返放大器**；`// com-loop-ok: <理由>` 可豁免 |
+|   7 | `typecheck:tests`         | 测试目录类型检查                                                                                                                              |
+|   8 | `test`                    | `vitest run`（131 文件 / 4309 条）                                                                                                            |
 
 `vitest.config.ts` 的全局阈值（2026-09-13 上调）：
 `statements 40 / branches 35 / functions 45 / lines 40`（`perFile: false`）。
@@ -580,4 +581,3 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 > ⚠️ **`coverage.exclude` 是「整份替换」而非「追加」**：写进这个数组就等于**接管** vitest 的默认排除表，
 > 所以每次往里加一条，都要问「默认排除的东西我补回来了吗」。第 20 批就是靠审计这一条，
 > 发现 `ts/entry/**` 被**过度排除**（4 个文件 / 89 行此前完全不可见）。
-

@@ -67,7 +67,7 @@ export function updatePathDisplay(inputId: string, value: string): void {
 }
 
 /** 从 PluginStorage 读取已保存的默认路径并回填到设置页输入框 */
-export function initConfigPathControls(): void {
+export function initializeConfigPathControls(): void {
   if (typeof document === 'undefined') return
   updatePathDisplay('exportPathDisplay', getExportPath(true))
   updatePathDisplay('importPathDisplay', getImportPath(true))

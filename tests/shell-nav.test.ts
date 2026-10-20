@@ -13,8 +13,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  initScrollspy,
-  initShellNav,
+  initializeScrollspy,
+  initializeShellNav,
   recomputeScrollspy,
   updateStickyOffsets,
 } from '../ts/panel/shell-nav.js'
@@ -29,18 +29,17 @@ function setHeight(element: Element, height: number): void {
 }
 
 function setRect(element: Element, top: number, bottom: number): void {
-  element.getBoundingClientRect = () =>
-    ({
-      top,
-      bottom,
-      left: 0,
-      right: 0,
-      width: 0,
-      height: bottom - top,
-      x: 0,
-      y: top,
-      toJSON: () => ({}),
-    })
+  element.getBoundingClientRect = () => ({
+    top,
+    bottom,
+    left: 0,
+    right: 0,
+    width: 0,
+    height: bottom - top,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  })
 }
 
 function setWindowMetric(key: 'innerHeight' | 'scrollY', value: number): void {
@@ -157,7 +156,7 @@ function mountShell(options: { sections?: string[]; extraHrefs?: string[] } = {}
     link.textContent = id
     nav.append(link)
   }
-  const {extraHrefs} = options
+  const { extraHrefs } = options
   if (extraHrefs) {
     for (const href of extraHrefs) {
       const link = document.createElement('a')
@@ -278,14 +277,14 @@ describe('shell-nav · updateStickyOffsets', () => {
   })
 })
 
-// ========== initScrollspy 早退 ==========
+// ========== initializeScrollspy 早退 ==========
 
-describe('shell-nav · initScrollspy 早退', () => {
+describe('shell-nav · initializeScrollspy 早退', () => {
   it('主区没有 sec- 区块 → 静默跳过（不创建胶囊）', () => {
     mountShell()
     getElement('main').replaceChildren()
 
-    initScrollspy()
+    initializeScrollspy()
 
     expect(document.querySelector('.nav-indicator')).toBeNull()
   })
@@ -294,7 +293,7 @@ describe('shell-nav · initScrollspy 早退', () => {
     mountShell()
     getElement('.nav').replaceChildren()
 
-    initScrollspy()
+    initializeScrollspy()
 
     expect(document.querySelector('.nav-indicator')).toBeNull()
   })
@@ -302,7 +301,7 @@ describe('shell-nav · initScrollspy 早退', () => {
   it('无 document 环境 → 直接返回（不抛错）', () => {
     mountShell()
     withoutGlobal('document', () => {
-      expect(() => initScrollspy()).not.toThrow()
+      expect(() => initializeScrollspy()).not.toThrow()
     })
   })
 })
@@ -320,7 +319,7 @@ describe('shell-nav · 导航点击', () => {
       offsetLeft: { value: 8, configurable: true },
       offsetTop: { value: 52, configurable: true },
     })
-    initScrollspy()
+    initializeScrollspy()
 
     second.dispatchEvent(new Event('click'))
 
@@ -336,7 +335,7 @@ describe('shell-nav · 导航点击', () => {
 
   it('点击导航项立即高亮（不等平滑滚动结束，而是靠过渡锁维持）', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
 
     navLinks()[1]?.dispatchEvent(new Event('click'))
 
@@ -346,7 +345,7 @@ describe('shell-nav · 导航点击', () => {
 
   it('点击后进入过渡锁：此后的滚动重算不得把高亮抢回去', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     navLinks()[1]?.dispatchEvent(new Event('click'))
 
     // 把 sec-b 挪出吸顶带（|top - 48| > 12），并让 sec-a 成为「完整可见」的那个
@@ -363,7 +362,7 @@ describe('shell-nav · 导航点击', () => {
     // 只 fake 定时器：默认 toFake 连 requestAnimationFrame 一起替换，会让本文件的帧桩失效
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     navLinks()[1]?.dispatchEvent(new Event('click'))
 
     // 目标顶部与吸顶带顶端对齐（≤12px）→ 进入「等待滚动动画稳定」分支
@@ -384,7 +383,7 @@ describe('shell-nav · 导航点击', () => {
   it('目标已离开吸顶带 → 取消待释放定时器，继续维持高亮', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     navLinks()[1]?.dispatchEvent(new Event('click'))
     setHeadingRect('sec-a', 60, 110)
     setScrollHeight(2000)
@@ -407,7 +406,7 @@ describe('shell-nav · 导航点击', () => {
   it('点击 5s 未完成过渡 → 定时兜底释放锁（锚点滚动被打断也不至于永久锁死）', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     navLinks()[1]?.dispatchEvent(new Event('click'))
 
     // 目标已远离吸顶带（|targetTop - bandTop| > 12）→ 直接维持锁、等 5s 兜底定时器释放
@@ -427,7 +426,7 @@ describe('shell-nav · 导航点击', () => {
 
   it('点击指向不存在区块的锚点 → 忽略（高亮与胶囊都不产生）', () => {
     mountShell({ extraHrefs: ['#sec-missing'] })
-    initScrollspy()
+    initializeScrollspy()
 
     navLinks()[2]?.dispatchEvent(new Event('click'))
 
@@ -441,7 +440,7 @@ describe('shell-nav · 导航点击', () => {
 describe('shell-nav · 滚动判定规则', () => {
   it('规则 1：滚到底（视口底部贴文档底部）→ 高亮末区块', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 1200)
@@ -453,7 +452,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('规则 1 边界：距底部 3px 时不判定为「已滚到底」', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 1197)
@@ -466,7 +465,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('规则 2：内容不足一屏（不可滚动）→ 高亮首区块', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(600)
     setWindowMetric('innerHeight', 800)
 
@@ -477,7 +476,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('规则 3：跳过被顶栏遮挡的标题，高亮第一个完整可见的标题', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 200)
@@ -491,7 +490,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('规则 4：没有完整标题时，取第一个与有效视口相交的区块', () => {
     mountShell({ sections: ['sec-a', 'sec-b', 'sec-c'] })
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 200)
@@ -506,7 +505,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('极端布局：视口内没有任何标题 → 回退首区块', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 200)
@@ -520,7 +519,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('窄态把侧栏高度一并计入遮挡带（否则标题会被横向导航压住却仍判为完整可见）', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     isNarrow = true
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
@@ -536,7 +535,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('resize 也会重算当前区块（布局/字体就绪后无需等滚动）', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 1200)
@@ -548,7 +547,7 @@ describe('shell-nav · 滚动判定规则', () => {
 
   it('滚动重算按帧节流：同一帧内多次 scroll 只排一次帧，且不立即生效', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 1200)
@@ -572,7 +571,7 @@ describe('shell-nav · 滚动判定规则', () => {
       offsetWidth: { value: 100, configurable: true },
     })
     setHeight(second, 30)
-    initScrollspy()
+    initializeScrollspy()
     second.dispatchEvent(new Event('click'))
     expect(getElement('.nav-indicator').style.transform).toBe('translate(10px, 20px)')
 
@@ -586,16 +585,16 @@ describe('shell-nav · 滚动判定规则', () => {
   })
 })
 
-// ========== initShellNav / recomputeScrollspy ==========
+// ========== initializeShellNav / recomputeScrollspy ==========
 
-describe('shell-nav · initShellNav', () => {
+describe('shell-nav · initializeShellNav', () => {
   it('初始化即写吸顶偏移、装配滚动监听、并主动推一次 scroll（首屏可能已处于恢复位置）', () => {
     mountShell()
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
     setWindowMetric('scrollY', 1200)
 
-    initShellNav()
+    initializeShellNav()
 
     expect(rootVariable('--topbar-h')).toBe('48px')
     expect(recordedTypes()).toContain('scroll')
@@ -607,7 +606,7 @@ describe('shell-nav · initShellNav', () => {
 
   it('load 后重测吸顶偏移（字体就绪会改变顶栏高度）', () => {
     mountShell()
-    initShellNav()
+    initializeShellNav()
     setHeight(getElement('.topbar'), 72)
 
     window.dispatchEvent(new Event('load'))
@@ -617,7 +616,7 @@ describe('shell-nav · initShellNav', () => {
 
   it('resize 后同样重测吸顶偏移', () => {
     mountShell()
-    initShellNav()
+    initializeShellNav()
     setHeight(getElement('.topbar'), 64)
 
     window.dispatchEvent(new Event('resize'))
@@ -627,7 +626,7 @@ describe('shell-nav · initShellNav', () => {
 
   it('无 window / document 环境 → 直接返回（不抛错）', () => {
     withoutGlobal('window', () => {
-      expect(() => initShellNav()).not.toThrow()
+      expect(() => initializeShellNav()).not.toThrow()
     })
   })
 })
@@ -635,7 +634,7 @@ describe('shell-nav · initShellNav', () => {
 describe('shell-nav · recomputeScrollspy', () => {
   it('派发一次 scroll 事件驱动重算', () => {
     mountShell()
-    initScrollspy()
+    initializeScrollspy()
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     setScrollHeight(2000)
     setWindowMetric('innerHeight', 800)
@@ -644,9 +643,7 @@ describe('shell-nav · recomputeScrollspy', () => {
     recomputeScrollspy()
     flushFrame()
 
-    const scrollEvents = dispatchSpy.mock.calls.filter(
-      ([event]) => (event).type === 'scroll',
-    )
+    const scrollEvents = dispatchSpy.mock.calls.filter(([event]) => event.type === 'scroll')
     expect(scrollEvents).toHaveLength(1)
     expect(activeHref()).toBe('#sec-b')
   })

@@ -215,7 +215,7 @@ vi.mock('../index.js', () => ({
 vi.mock('../ts/ui/handlers/index.js', () => ({
   onAction: vi.fn(),
   setupButtonListeners: vi.fn(),
-  initHandlers: vi.fn(),
+  initializeHandlers: vi.fn(),
   clearAllPendingTimeouts: vi.fn(),
   ACTION_HANDLERS: {},
 }))

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  initModuleOrderEditor,
+  initializeModuleOrderEditor,
   renderModuleOrderEditor,
   startModuleOrderSync,
 } from '../ts/ui/handlers/module-order.js'
@@ -112,11 +112,11 @@ beforeEach(() => {
   toastCalls.length = 0
   logCalls.length = 0
   setWriteShouldFail(false)
-  // 用假定时器：initModuleOrderEditor 内部会起一个 2s 轮询，不冻结会留下悬挂定时器
+  // 用假定时器：initializeModuleOrderEditor 内部会起一个 2s 轮询，不冻结会留下悬挂定时器
   vi.useFakeTimers()
   buildHost()
   // 点击 / 拖拽的委托监听器由初始化函数绑定 —— 只调 renderModuleOrderEditor 是不会响应交互的
-  initModuleOrderEditor()
+  initializeModuleOrderEditor()
 })
 
 afterEach(() => {
@@ -144,9 +144,9 @@ describe('渲染', () => {
     renderModuleOrderEditor()
     const hiddenItem = document.querySelector('.module-order-item.is-module-hidden')
     expect(hiddenItem?.querySelector('.module-order-label')?.textContent).toBe('账户与凭证')
-    expect(buttonOf('panel', indexOfModule('panel', 'sec-account'), '[data-mod-hidden]').textContent).toBe(
-      '🚫',
-    )
+    expect(
+      buttonOf('panel', indexOfModule('panel', 'sec-account'), '[data-mod-hidden]').textContent,
+    ).toBe('🚫')
   })
 
   it('未隐藏的模块显示 👁️', () => {
@@ -156,7 +156,11 @@ describe('渲染', () => {
 
   it('设置页的「模块排序」模块不可隐藏（隐藏后就没有入口能恢复任何模块）', () => {
     renderModuleOrderEditor()
-    const button = buttonOf('settings', indexOfModule('settings', 'sec-modules'), '[data-mod-hidden]')
+    const button = buttonOf(
+      'settings',
+      indexOfModule('settings', 'sec-modules'),
+      '[data-mod-hidden]',
+    )
     expect(button.hasAttribute('disabled')).toBe(true)
     expect(button.getAttribute('title')).toContain('不可隐藏')
   })
@@ -232,7 +236,11 @@ describe('显示 / 隐藏 开关', () => {
 
   it('不可隐藏的模块即使绕过 disabled 也不生效', () => {
     renderModuleOrderEditor()
-    const button = buttonOf('settings', indexOfModule('settings', 'sec-modules'), '[data-mod-hidden]')
+    const button = buttonOf(
+      'settings',
+      indexOfModule('settings', 'sec-modules'),
+      '[data-mod-hidden]',
+    )
     button.removeAttribute('disabled')
     click(button)
     expect(getHiddenModules('settings')).toEqual([])
@@ -324,8 +332,8 @@ describe('跨页同步与初始化', () => {
 
   it('初始化只绑定一次（重复调用不叠加监听器，否则一次点击移两位）', () => {
     vi.useFakeTimers()
-    initModuleOrderEditor()
-    initModuleOrderEditor()
+    initializeModuleOrderEditor()
+    initializeModuleOrderEditor()
     renderModuleOrderEditor()
     const first = itemsOf('panel')[0]?.dataset.module ?? ''
     click(buttonOf('panel', 0, '[data-mod-move="down"]'))
@@ -335,7 +343,7 @@ describe('跨页同步与初始化', () => {
   it('非设置页初始化时静默跳过', () => {
     document.body.replaceChildren()
     expect(() => {
-      initModuleOrderEditor()
+      initializeModuleOrderEditor()
     }).not.toThrow()
   })
 })

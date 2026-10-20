@@ -6,7 +6,7 @@
  *   - onAction：基于 action 字符串的分发（旧版 Ribbon 入口）
  *   - handleActionClick：基于 DOM 事件的分发（解析 data-action 与 data-args）
  *   - setupButtonListeners：为 [data-action] 元素注册 click 监听
- *   - initHandlers：根据 document.readyState 决定同步或延迟初始化
+ *   - initializeHandlers：根据 document.readyState 决定同步或延迟初始化
  *
  * 模块依赖说明：
  *   - handlers/index.ts 导入 '../../index.js'，触发 index → ui/handlers 副作用链。
@@ -102,7 +102,7 @@ const mockState = vi.hoisted(() => ({
   getRefreshInterval: vi.fn(() => 0),
   getLogLevel: vi.fn(() => 1),
   // handlers/module-order.js
-  initModuleOrderEditor: vi.fn(),
+  initializeModuleOrderEditor: vi.fn(),
   loadBgToken: vi.fn(),
   storeBgToken: vi.fn(),
   clearBgToken: vi.fn(),
@@ -153,10 +153,10 @@ vi.mock('../ts/ui/handlers/sheet.js', () => ({
 }))
 
 // 模块排序编辑器：仅被 handlers/index.ts 引用；mock 掉才能驱动
-// setupButtonListeners 中 `initModuleOrderEditor()` 的异常兜底分支。
+// setupButtonListeners 中 `initializeModuleOrderEditor()` 的异常兜底分支。
 // 真实实现在 tests/module-order.test.ts 中另有完整覆盖，不受影响。
 vi.mock('../ts/ui/handlers/module-order.js', () => ({
-  initModuleOrderEditor: mockState.initModuleOrderEditor,
+  initializeModuleOrderEditor: mockState.initializeModuleOrderEditor,
 }))
 
 vi.mock('../ts/ui/handlers/_constants.js', () => ({
@@ -299,7 +299,7 @@ vi.mock('../index.js', () => ({
   setSyncSourceType: mockState.setSyncSourceType,
   isGithubConfigComplete: vi.fn(() => true),
   buildRawUrl: vi.fn(() => ''),
-  // 默认导出位置 / 默认导入文件夹（initConfigPathControls 使用，缺失会导致 getExportPath is not a function）
+  // 默认导出位置 / 默认导入文件夹（initializeConfigPathControls 使用，缺失会导致 getExportPath is not a function）
   setExportPath: mockState.setExportPath,
   getExportPath: mockState.getExportPath,
   setImportPath: mockState.setImportPath,
@@ -341,7 +341,7 @@ vi.mock('../ts/tools/debounce.js', () => ({
 import {
   onAction,
   setupButtonListeners,
-  initHandlers,
+  initializeHandlers,
   clearAllPendingTimeouts,
 } from '../ts/ui/handlers/index.js'
 
@@ -764,26 +764,26 @@ describe('setupButtonListeners', () => {
   })
 })
 
-// ========== initHandlers ==========
-describe('initHandlers', () => {
+// ========== initializeHandlers ==========
+describe('initializeHandlers', () => {
   it('document.readyState=complete 时应同步执行初始化（不抛错）', () => {
     // jsdom 默认 readyState 为 'complete'
-    expect(() => initHandlers()).not.toThrow()
+    expect(() => initializeHandlers()).not.toThrow()
   })
 
-  it('重复调用 initHandlers 不应抛错（幂等）', () => {
+  it('重复调用 initializeHandlers 不应抛错（幂等）', () => {
     expect(() => {
-      initHandlers()
-      initHandlers()
+      initializeHandlers()
+      initializeHandlers()
     }).not.toThrow()
   })
 
-  it('initHandlers 后点击 [data-action] 按钮应触发 handler', () => {
+  it('initializeHandlers 后点击 [data-action] 按钮应触发 handler', () => {
     const button = document.createElement('button')
     button.dataset.action = 'sync'
     document.body.appendChild(button)
 
-    initHandlers()
+    initializeHandlers()
 
     button.click()
     expect(mockState.syncFromPanel).toHaveBeenCalled()
@@ -811,15 +811,15 @@ describe('initHandlers', () => {
     })
     vi.stubGlobal('document', fakeDocument)
 
-    initHandlers()
+    initializeHandlers()
 
     // 延迟注册：此刻还没有跑初始化
     expect(domContentLoaded).toHaveLength(1)
-    expect(mockState.loggerInfo).not.toHaveBeenCalledWith('[handlers] initHandlers 完成')
+    expect(mockState.loggerInfo).not.toHaveBeenCalledWith('[handlers] initializeHandlers 完成')
 
     // 触发 DOMContentLoaded 后才同步执行 startHandlers
     domContentLoaded[0]!()
-    expect(mockState.loggerInfo).toHaveBeenCalledWith('[handlers] initHandlers 完成')
+    expect(mockState.loggerInfo).toHaveBeenCalledWith('[handlers] initializeHandlers 完成')
   })
 
   it('无 document 环境时走同步分支（Node 兜底；因缺少 DOM 而立即失败）', () => {
@@ -828,7 +828,7 @@ describe('initHandlers', () => {
     // 「进入同步分支」这一事实（表现为同步抛错），而非成功路径 ——
     // 成功路径需要一整套假 DOM，超出本文件职责，且产品里永远不会走这里。
     vi.stubGlobal('document', undefined)
-    expect(() => initHandlers()).toThrow(TypeError)
+    expect(() => initializeHandlers()).toThrow(TypeError)
   })
 })
 
@@ -923,7 +923,7 @@ describe('setupButtonListeners · 设置页控件回填与异常兜底', () => {
   })
 
   it('初始化模块排序编辑器抛错时记 WARN 日志并继续', () => {
-    mockState.initModuleOrderEditor.mockImplementationOnce(() => {
+    mockState.initializeModuleOrderEditor.mockImplementationOnce(() => {
       throw new Error('编辑器初始化失败')
     })
 

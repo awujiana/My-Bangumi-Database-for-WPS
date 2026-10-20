@@ -4,12 +4,12 @@
  *
  * 该文件是面板的**聚合入口**：把 barrel（`../index.js`）、`panel-lifecycle`、
  * `tools/locked-sheet`、`user-info-polling` 四路依赖装配起来，并在模块求值时把
- * `initPanelCore` / `refreshPanelUI` 挂到 `window`（宿主桥接契约）。
+ * `initializePanelCore` / `refreshPanelUI` 挂到 `window`（宿主桥接契约）。
  *
  * ## 断言口径
  * - 依赖全部换成 spy（本文件不碰真实 COM），断言打在**真实 DOM 写入**与**真实配置调用**上
  *   （`sheetSelect.value` / `saveLockedSheet(null)` / `BGM.sheet.*` 字段），不是 `not.toThrow()`。
- * - `window` / `document` 上的监听器**跨用例累积**（`initPanelCore` 每次调用都再注册一遍），
+ * - `window` / `document` 上的监听器**跨用例累积**（`initializePanelCore` 每次调用都再注册一遍），
  *   且清 body 清不掉 window 上的。所以这类断言一律用 `toHaveBeenCalled()`，
  *   绝不用 `toHaveBeenCalledTimes(n)`。
  * - `bootstrapSheetSelection` 是 `setTimeout(…, 0)` 延迟执行的，需要 `advanceTimersByTime(0)` 才会跑。
@@ -84,7 +84,7 @@ vi.mock('../ts/panel/user-info-polling.js', () => ({
   startUserInfoPolling: stubs.startUserInfoPolling,
 }))
 
-import { initPanel, initPanelCore } from '../ts/panel/panel-page.js'
+import { initializePanel, initializePanelCore } from '../ts/panel/panel-page.js'
 
 /** 建面板最小宿主 DOM（含各选择器与模态框） */
 function mountPanelDom(): void {
@@ -136,7 +136,7 @@ beforeEach(() => {
 
 describe('window 桥接契约', () => {
   it('模块求值时把两个入口挂到 window，且可写可配置', () => {
-    const descriptor = Object.getOwnPropertyDescriptor(window, 'initPanelCore')
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'initializePanelCore')
     const refreshDescriptor = Object.getOwnPropertyDescriptor(window, 'refreshPanelUI')
 
     expect(typeof descriptor?.value).toBe('function')
@@ -168,27 +168,27 @@ describe('window 桥接契约', () => {
   })
 })
 
-describe('initPanel', () => {
+describe('initializePanel', () => {
   it('readyState=complete → 立即同步初始化并广播模块就绪', () => {
     const ready: string[] = []
     document.addEventListener('bgm:modulesReady', () => {
       ready.push('ready')
     })
 
-    initPanel()
+    initializePanel()
 
-    expect(hasLog('initPanelCore 完成')).toBe(true)
+    expect(hasLog('initializePanelCore 完成')).toBe(true)
     expect(ready).toHaveLength(1)
   })
 
   it('readyState 非 complete → 推迟到 load 事件', () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
     try {
-      initPanel()
-      expect(hasLog('initPanelCore 开始')).toBe(false)
+      initializePanel()
+      expect(hasLog('initializePanelCore 开始')).toBe(false)
 
       window.dispatchEvent(new Event('load'))
-      expect(hasLog('initPanelCore 开始')).toBe(true)
+      expect(hasLog('initializePanelCore 开始')).toBe(true)
     } finally {
       Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true })
     }
@@ -203,12 +203,12 @@ describe('initPanel', () => {
       ready.push('ready')
     })
 
-    initPanel()
+    initializePanel()
 
     expect(stubs.handleError).toHaveBeenCalledWith(expect.any(Error), {
       showAlert: false,
       level: 'INFO',
-      context: 'initPanelCore',
+      context: 'initializePanelCore',
     })
     expect(ready).toHaveLength(1)
   })
@@ -219,9 +219,9 @@ describe('initPanel', () => {
     vi.stubGlobal('document', undefined)
     try {
       expect(() => {
-        initPanel()
+        initializePanel()
       }).toThrow(TypeError)
-      // 同步进入 initPanelCore 的证据：这些步骤在触碰 document 之前
+      // 同步进入 initializePanelCore 的证据：这些步骤在触碰 document 之前
       expect(stubs.restoreUserInfoFromStorage).toHaveBeenCalled()
       expect(stubs.updateTokenStatus).toHaveBeenCalled()
     } finally {
@@ -230,12 +230,12 @@ describe('initPanel', () => {
   })
 })
 
-describe('initPanelCore · 装配', () => {
+describe('initializePanelCore · 装配', () => {
   it('宿主未设置 Enum 时补上 WPS_ENUM', () => {
     const app: { Enum?: unknown } = {}
     stubs.getApp.mockReturnValue(app)
 
-    initPanelCore()
+    initializePanelCore()
 
     expect(app.Enum).toEqual({ msoAutomationSecurityLow: 1 })
   })
@@ -245,7 +245,7 @@ describe('initPanelCore · 装配', () => {
     const app: { Enum?: unknown } = { Enum: existing }
     stubs.getApp.mockReturnValue(app)
 
-    initPanelCore()
+    initializePanelCore()
 
     expect(app.Enum).toBe(existing)
   })
@@ -254,12 +254,12 @@ describe('initPanelCore · 装配', () => {
     stubs.getApp.mockReturnValue(null)
 
     expect(() => {
-      initPanelCore()
+      initializePanelCore()
     }).not.toThrow()
   })
 
   it('恢复用户信息、启动轮询、恢复锁定表并刷新状态显示', () => {
-    initPanelCore()
+    initializePanelCore()
 
     expect(stubs.restoreUserInfoFromStorage).toHaveBeenCalledTimes(1)
     expect(stubs.startUserInfoPolling).toHaveBeenCalledTimes(1)
@@ -269,7 +269,7 @@ describe('initPanelCore · 装配', () => {
   })
 
   it('首帧之后才做工作表扫描（setTimeout 0 宏任务）', () => {
-    initPanelCore()
+    initializePanelCore()
     expect(stubs.refreshSheets).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(0)
@@ -279,13 +279,13 @@ describe('initPanelCore · 装配', () => {
   })
 })
 
-describe('initPanelCore · 工作表自动检测', () => {
+describe('initializePanelCore · 工作表自动检测', () => {
   it('未检测到追踪表且上次锁定仍有效 → 沿用锁定下标并刷新预览', () => {
     stubs.restoreLockedSheet.mockReturnValue(true)
     stubs.bgm.sheet.isLocked = true
     stubs.bgm.sheet.lockedIndex = 3
     addOptions('sheetSelect', '3')
-    initPanelCore()
+    initializePanelCore()
 
     vi.advanceTimersByTime(0)
 
@@ -298,7 +298,7 @@ describe('initPanelCore · 工作表自动检测', () => {
   it('未检测到追踪表且未锁定 → 不刷新预览', () => {
     stubs.restoreLockedSheet.mockReturnValue(false)
     stubs.bgm.sheet.isLocked = false
-    initPanelCore()
+    initializePanelCore()
 
     vi.advanceTimersByTime(0)
 
@@ -313,7 +313,7 @@ describe('initPanelCore · 工作表自动检测', () => {
     })
     addOptions('workbookSelect', '数据表.xlsx')
     addOptions('sheetSelect', '2')
-    initPanelCore()
+    initializePanelCore()
 
     vi.advanceTimersByTime(0)
 
@@ -326,7 +326,9 @@ describe('initPanelCore · 工作表自动检测', () => {
       name: '动画',
       workbookName: '数据表.xlsx',
     })
-    expect((document.getElementById('workbookSelect') as HTMLSelectElement).value).toBe('数据表.xlsx')
+    expect((document.getElementById('workbookSelect') as HTMLSelectElement).value).toBe(
+      '数据表.xlsx',
+    )
     expect((document.getElementById('sheetSelect') as HTMLSelectElement).value).toBe('2')
     expect(stubs.updateLockButton).toHaveBeenCalled()
     expect(stubs.refreshData).toHaveBeenCalledTimes(1)
@@ -336,7 +338,7 @@ describe('initPanelCore · 工作表自动检测', () => {
     stubs.autoDetectSheet.mockReturnValue({ sheetIndex: 1, sheetName: '动画', workbookName: '' })
     const select = addOptions('workbookSelect', '保持不变')
     select.value = '保持不变'
-    initPanelCore()
+    initializePanelCore()
 
     vi.advanceTimersByTime(0)
 
@@ -346,11 +348,11 @@ describe('initPanelCore · 工作表自动检测', () => {
   })
 })
 
-describe('initPanelCore · 事件绑定', () => {
+describe('initializePanelCore · 事件绑定', () => {
   it('切换工作表 → 清锁定状态、写回 null 配置并刷新预览', () => {
     stubs.bgm.sheet.isLocked = true
     stubs.bgm.sheet.lockedIndex = 5
-    initPanelCore()
+    initializePanelCore()
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
 
     select.dispatchEvent(new Event('change'))
@@ -364,7 +366,7 @@ describe('initPanelCore · 事件绑定', () => {
   })
 
   it('切换工作簿 → 刷新工作表列表并重新自动检测表头', () => {
-    initPanelCore()
+    initializePanelCore()
     const select = document.getElementById('workbookSelect') as HTMLSelectElement
 
     select.dispatchEvent(new Event('change'))
@@ -374,7 +376,7 @@ describe('initPanelCore · 事件绑定', () => {
   })
 
   it('切换自动/手动模式 → 交给 onSelectModeChange', () => {
-    initPanelCore()
+    initializePanelCore()
     const radio = document.querySelector<HTMLInputElement>('input[name="selectMode"]')
 
     radio?.dispatchEvent(new Event('change'))
@@ -383,7 +385,7 @@ describe('initPanelCore · 事件绑定', () => {
   })
 
   it('点关闭按钮 → 隐藏同步预览弹窗', () => {
-    initPanelCore()
+    initializePanelCore()
     const modal = document.getElementById('syncPreviewModal')
 
     document.getElementById('closeSyncPreview')?.dispatchEvent(new MouseEvent('click'))
@@ -392,7 +394,7 @@ describe('initPanelCore · 事件绑定', () => {
   })
 
   it('Escape 不再由本模块处理（统一委托 panel-bootstrap 安装的 modal-a11y）', () => {
-    initPanelCore()
+    initializePanelCore()
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
 
@@ -400,7 +402,7 @@ describe('initPanelCore · 事件绑定', () => {
   })
 
   it('beforeunload → 中止请求并清理消息监听与待执行定时器', () => {
-    initPanelCore()
+    initializePanelCore()
 
     window.dispatchEvent(new Event('beforeunload'))
 
@@ -415,9 +417,9 @@ describe('initPanelCore · 事件绑定', () => {
       ready.push('ready')
     })
 
-    initPanelCore()
+    initializePanelCore()
 
     expect(ready).toHaveLength(1)
-    expect(hasLog('initPanelCore 完成')).toBe(true)
+    expect(hasLog('initializePanelCore 完成')).toBe(true)
   })
 })

@@ -49,7 +49,7 @@ sep src stmt stmts str tbl temp tit tmp util utils val var vars ver`
   .filter(Boolean)
 const PROJECT_ABBREVIATIONS = [
   // 历史遗留（前几轮命名规范化已清掉的家族，防止回潮）
-  'ws', 'col', 'cols', 'sid', 'sids', 'hl', 'cf',
+  'ws', 'col', 'cols', 'sid', 'sids', 'hl', 'cf', 'init',
   // 本项目实际出现过 / 极易再犯
   'del', 'orig', 'impl', 'opt', 'vals', 'cnt', 'misc', 'tmpl', 'proc', 'fnc',
   'win', 'cls', 'dbg', 'hdr', 'lbl', 'txt', 'img', 'amt', 'qty',

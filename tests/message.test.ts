@@ -3,7 +3,7 @@
  * @fileoverview `ts/ui/message.ts` 的单元测试。
  *
  * 模块由两部分组成：
- *  1. `initMessageListener()` —— 在 `window` 上装一个 `message` 监听器，按 `data.type`
+ *  1. `initializeMessageListener()` —— 在 `window` 上装一个 `message` 监听器，按 `data.type`
  *     分派到各 UI 动作。**关键安全语义**：先校验 `event.origin` 只允许 `https://bgm.tv`
  *     与自身 origin，跨站消息一律丢弃；重复调用要先摘掉旧监听器（否则一次消息触发两次动作）。
  *  2. `setStatus()` —— 往 `#statusBox`（回退 `#statusDisplay`）写文案与样式类。
@@ -38,7 +38,7 @@ vi.mock('../ts/index.js', () => ({
   },
 }))
 
-import { initMessageListener, setStatus } from '../ts/ui/message.js'
+import { initializeMessageListener, setStatus } from '../ts/ui/message.js'
 
 /** 自身 origin（jsdom 默认是 http://localhost:3000，不写死） */
 const SELF_ORIGIN = window.location.origin
@@ -55,18 +55,18 @@ function hasLog(fragment: string): boolean {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  initMessageListener()
+  initializeMessageListener()
 })
 
-describe('initMessageListener', () => {
+describe('initializeMessageListener', () => {
   it('注册监听器并打印开始 / 完成日志', () => {
-    expect(hasLog('[message] initMessageListener 开始执行')).toBe(true)
-    expect(hasLog('[message] initMessageListener 执行完成，监听器已注册')).toBe(true)
+    expect(hasLog('[message] initializeMessageListener 开始执行')).toBe(true)
+    expect(hasLog('[message] initializeMessageListener 执行完成，监听器已注册')).toBe(true)
   })
 
   it('重复调用先摘掉旧监听器（一次消息只触发一次动作）', () => {
-    initMessageListener()
-    initMessageListener()
+    initializeMessageListener()
+    initializeMessageListener()
 
     postMessage({ type: 'updateToken' })
 
@@ -156,7 +156,10 @@ describe('消息分派', () => {
   it('未知消息类型 → WARN 日志，不产生动作', () => {
     postMessage({ type: '__nope__' })
 
-    expect(stubs.bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('未知消息类型: __nope__'))
+    expect(stubs.bgmLog).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('未知消息类型: __nope__'),
+    )
     expect(stubs.updateTokenStatus).not.toHaveBeenCalled()
     expect(stubs.refreshSheets).not.toHaveBeenCalled()
     expect(stubs.refreshData).not.toHaveBeenCalled()

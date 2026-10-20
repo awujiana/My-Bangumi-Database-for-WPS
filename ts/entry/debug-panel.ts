@@ -624,7 +624,7 @@ function bindCollapse(root: HTMLElement, fab: HTMLElement): void {
 
 // ========== 主入口 ==========
 
-export function initDebugPanel(): void {
+export function initializeDebugPanel(): void {
   if (!isDebugEnvironment()) return
   if (document.getElementById('bgm-debug-panel-root')) return
 
@@ -713,8 +713,8 @@ export function initDebugPanel(): void {
 
 if (typeof document !== 'undefined') {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDebugPanel)
+    document.addEventListener('DOMContentLoaded', initializeDebugPanel)
   } else {
-    initDebugPanel()
+    initializeDebugPanel()
   }
 }

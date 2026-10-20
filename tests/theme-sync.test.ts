@@ -10,14 +10,18 @@ vi.mock('../ts/tools/config.js', () => ({
 }))
 
 // 必须在导入 theme 之前安装 matchMedia，否则模块级 systemMedia 会是 null，
-// 导致 initTheme/startThemeSync 内依赖 systemMedia 的分支永远走不到。
+// 导致 initializeTheme/startThemeSync 内依赖 systemMedia 的分支永远走不到。
 // systemMedia 在模块加载时捕获 matchMedia 返回对象的 addEventListener，故此处
 // 用稳定的 vi.fn 实例，便于在测试中断言「系统外观变化监听已注册」。
 const mediaAddEventListener = vi.fn()
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   configurable: true,
-  value: () => ({ matches: false, addEventListener: mediaAddEventListener, removeEventListener: vi.fn() }),
+  value: () => ({
+    matches: false,
+    addEventListener: mediaAddEventListener,
+    removeEventListener: vi.fn(),
+  }),
 })
 
 // 动态导入放到 beforeAll，避免顶层 await（n/no-top-level-await）
@@ -33,9 +37,9 @@ describe('theme（jsdom：systemMedia 非 null）', () => {
     vi.useFakeTimers()
   })
 
-  it('initTheme 注册系统外观变化监听', () => {
+  it('initializeTheme 注册系统外观变化监听', () => {
     mediaAddEventListener.mockClear()
-    themeModule.initTheme()
+    themeModule.initializeTheme()
     expect(getTheme).toHaveBeenCalledWith(true)
     expect(mediaAddEventListener).toHaveBeenCalled()
   })

@@ -5,7 +5,7 @@
  *
  * `debug-panel.ts` 是**随生产包发布**的代码：`index.html` 末尾有
  * `<script type="module" src="./dist-ts/entry/debug-panel.js">`，WPS 启动时会加载它。
- * 它之所以没在用户面前出现，全靠 `initDebugPanel()` 开头那条
+ * 它之所以没在用户面前出现，全靠 `initializeDebugPanel()` 开头那条
  * `if (!isDebugEnvironment()) return`（即 `window.WpsInvoke === undefined`）。
  *
  * 所以它唯一真正重要的行为就是**那条守卫**：写错就会在用户的 Excel 任务窗格里
@@ -30,7 +30,7 @@ type DebugPanelModule = typeof import('../ts/entry/debug-panel.js')
 const host = window as unknown as Record<string, unknown>
 
 /**
- * 导入模块体，同时让**模块级自动启动**空转：宿主在场时 `initDebugPanel()` 会立即
+ * 导入模块体，同时让**模块级自动启动**空转：宿主在场时 `initializeDebugPanel()` 会立即
  * return，于是用例可以自己控制「什么时候、在什么宿主状态下」显式调用它。
  */
 async function importIdle(): Promise<DebugPanelModule> {
@@ -75,10 +75,10 @@ describe('debug-panel / 生产守卫', () => {
     expect(document.body.querySelector('.bgm-dp-fab')).toBeNull()
   })
 
-  it('宿主在场时显式调用 initDebugPanel() 也直接返回', async () => {
+  it('宿主在场时显式调用 initializeDebugPanel() 也直接返回', async () => {
     const entry = await importIdle()
 
-    entry.initDebugPanel()
+    entry.initializeDebugPanel()
 
     expect(panelRoot()).toBeNull()
     expect(panelStyles()).toHaveLength(0)
@@ -90,7 +90,7 @@ describe('debug-panel / 开发环境初始化', () => {
     const entry = await importIdle()
     delete host.WpsInvoke
 
-    entry.initDebugPanel()
+    entry.initializeDebugPanel()
 
     const root = panelRoot()
     expect(root?.className).toBe('bgm-dp-root')
@@ -106,8 +106,8 @@ describe('debug-panel / 开发环境初始化', () => {
     const entry = await importIdle()
     delete host.WpsInvoke
 
-    entry.initDebugPanel()
-    entry.initDebugPanel()
+    entry.initializeDebugPanel()
+    entry.initializeDebugPanel()
 
     expect(document.querySelectorAll('.bgm-dp-root')).toHaveLength(1)
     expect(panelStyles()).toHaveLength(1)
@@ -121,7 +121,7 @@ describe('debug-panel / 开发环境初始化', () => {
     document.body.append(existing)
     delete host.WpsInvoke
 
-    entry.initDebugPanel()
+    entry.initializeDebugPanel()
 
     expect(panelStyles()).toHaveLength(0)
     expect(panelRoot()?.textContent).toBe('既有面板')

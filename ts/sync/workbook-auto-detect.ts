@@ -9,7 +9,7 @@
  *   3. 数据行校验：表头行后 ≥2 行有数据。
  *
  * 检查时机（多种，注册后统一生效）：
- *   A. 打开 WPS（加载项加载）时：initWorkbookAutoDetection 全量扫描 + 事件监听，结果持久化到 PluginStorage；
+ *   A. 打开 WPS（加载项加载）时：initializeWorkbookAutoDetection 全量扫描 + 事件监听，结果持久化到 PluginStorage；
  *   B. 打开富化工具页面时：collectDetectedWorkbookPaths 合并持久化结果与实时扫描，由页面自动添加并识别；
  *   C. 打开新工作簿时：WorkbookOpen 事件实时记录；
  *   D. 切换活动工作簿时：WorkbookActivate 事件实时记录；
@@ -388,7 +388,7 @@ function overwriteDetectedPathsInStorage(): void {
  * 2. 注册 WorkbookOpen / WorkbookActivate / SheetActivate 事件，实时维护识别记录。
  *    事件注册失败不影响功能：富化页面打开时仍会做实时扫描检查。
  */
-export function initWorkbookAutoDetection(): void {
+export function initializeWorkbookAutoDetection(): void {
   overwriteDetectedPathsInStorage()
   if (isEventsRegistered) return
   isEventsRegistered = true

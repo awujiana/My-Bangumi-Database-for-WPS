@@ -10,7 +10,7 @@
  *
  * 必须独立成文件的两个原因：
  *   1. mock 图不同（此处 mock 掉 locked-sheet / enrich-engine，与既有文件互斥）；
- *   2. 模块级 `isEventsRegistered` 是一次性开关，同一模块实例内 `initWorkbookAutoDetection`
+ *   2. 模块级 `isEventsRegistered` 是一次性开关，同一模块实例内 `initializeWorkbookAutoDetection`
  *      只会在首次调用时注册事件，因此每个用例都要 `vi.resetModules()` 后重新 import，
  *      拿一个全新的模块实例。
  */
@@ -163,7 +163,7 @@ function clearApp(): void {
   Reflect.deleteProperty(globalThis, 'Application')
 }
 
-/** 取事件回调（initWorkbookAutoDetection 注册后由模块写回 app 上） */
+/** 取事件回调（initializeWorkbookAutoDetection 注册后由模块写回 app 上） */
 function handlerOf(app: Record<string, unknown>, key: string): (argument: unknown) => void {
   const handler = app[key]
   if (typeof handler !== 'function') throw new Error(`${key} 未被注册为函数`)
@@ -209,7 +209,7 @@ function setupEvents(storage: MockStorage): {
   const matched = makeWorkbook('新番表.xlsx', { fullName: String.raw`C:\新番表.xlsx` })
   m.detectAnimeSourceLayout.mockReturnValue({ headerRow: 1, dataStartRow: 2, columnMapping: {} })
   m.getCellValue.mockReturnValue('有值')
-  autoDetect.initWorkbookAutoDetection()
+  autoDetect.initializeWorkbookAutoDetection()
   return { app, matched }
 }
 
@@ -454,7 +454,7 @@ describe('collectDetectedWorkbookPaths', () => {
 
 // ========== WPS 启动检查 + 事件注册 / 回调 ==========
 
-describe('initWorkbookAutoDetection', () => {
+describe('initializeWorkbookAutoDetection', () => {
   it('首次调用：全量刷新持久化并注册三个事件', () => {
     const storage = makeStorage()
     const app = makeApp(storage)
@@ -464,7 +464,7 @@ describe('initWorkbookAutoDetection', () => {
     m.detectAnimeSourceLayout.mockReturnValue({ headerRow: 1, dataStartRow: 2, columnMapping: {} })
     m.getCellValue.mockReturnValue('有值')
 
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     // 全量刷新（overwriteDetectedPathsInStorage）写入了新番表检测器的记录
     expect(storage.map.get(autoDetect.ANIME_SOURCE_DETECTOR.key)).toBe(
@@ -479,9 +479,9 @@ describe('initWorkbookAutoDetection', () => {
     const app = makeApp(makeStorage())
     setApp(app)
 
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
     const firstOpenHandler = app.WorkbookOpen
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     expect(app.WorkbookOpen).toBe(firstOpenHandler)
   })
@@ -489,7 +489,7 @@ describe('initWorkbookAutoDetection', () => {
   it('无 Application 时只做全量刷新，不注册事件且不抛错', () => {
     clearApp()
     expect(() => {
-      autoDetect.initWorkbookAutoDetection()
+      autoDetect.initializeWorkbookAutoDetection()
     }).not.toThrow()
   })
 
@@ -503,7 +503,7 @@ describe('initWorkbookAutoDetection', () => {
     })
     setApp(app)
 
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
@@ -522,7 +522,7 @@ describe('initWorkbookAutoDetection', () => {
     })
     setApp(app)
 
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
@@ -540,7 +540,7 @@ describe('initWorkbookAutoDetection', () => {
     })
     setApp(app)
 
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
@@ -658,7 +658,7 @@ describe('事件回调', () => {
     setApp(app)
     m.detectAnimeSourceLayout.mockReturnValue({ headerRow: 1, dataStartRow: 2, columnMapping: {} })
     m.getCellValue.mockReturnValue('有值')
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     handlerOf(app, 'SheetActivate')(undefined)
 
@@ -687,7 +687,7 @@ describe('事件回调', () => {
       configurable: true,
     })
     setApp(app)
-    autoDetect.initWorkbookAutoDetection()
+    autoDetect.initializeWorkbookAutoDetection()
 
     handlerOf(app, 'SheetActivate')(undefined)
 
