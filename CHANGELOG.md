@@ -53,6 +53,27 @@
   不能整条覆盖（会盖掉 hover 的 transform / box-shadow）。已有 `prefers-reduced-motion`
   全局规则自动降级。
 
+### 重构（命名规范化：cf / hl / cfg → 全拼）
+
+项目既定方针是「缩写标识符 → 全拼」（见 `eslint.config.mjs` 里 `unicorn/name-replacements` 的
+说明：项目内 234 种缩写 / 799 处已全清）。`cf` / `hl` / `cfg` 只是没进 unicorn 的内置替换表，
+**不代表合规**——lint 不报不等于命名对。
+
+- **`cf` → `conditionalFormat`**：文件（`conditional-format-rules/ -apply/ -page/ -bootstrap`、
+  `ui/conditional-format.html`、`css/conditional-format.css`、`images/conditionalFormatPage.svg`）、
+  类型（`ConditionalFormatRule` / `ConditionalFormatApplyPlan` / …）、函数、DOM id、CSS 类、
+  日志 tag（`[conditionalFormat]` / `[BGM ConditionalFormat]`）、ribbon 按钮 id、页面键
+  （`conditional-format`，与 `ui/<page>.html` 同名）全量重命名。
+- **`hl` → `highlight`**（高亮页 DOM id / CSS 类）、**`cfg-` → `config-`**（同步弹窗配置摘要）。
+- **存储键一次性迁移**：`cf.rules.v1` / `cf.strategy.v1` / `cf.sheet.v1` / `cf_pane_id` /
+  `cf_pane_url` → `conditionalFormat.*`。读一次旧键、写新键、清旧键——**用户已保存的规则库不丢**；
+  面板 ID 同样迁移，避免旧任务窗格变成孤儿窗。
+- `scripts/check-nav-order.mjs` 的注册表解析改为同时接受带连字符的字符串键；并补记
+  「整段正则必须用 String.raw，拼进模板字面量会把 `\s` 当转笔画掉」这个坑。
+
+**未纳入本轮**（内部局部变量缩写，量级大一个数量级，需单独一批 review）：`ws`(659) /
+`col`(839) / `sid`(319) / `param`(526) / `msg`(16) / `err`(18) / `env`(35) 等。
+
 ### 修复（真机反馈 · 第三轮：高亮列不可加选 / 看不到既有条件格式）
 
 - **高亮列只能取消、不能新增**：`rebuildColumns` 只把**缓存里已有**的列渲染成勾选框，
@@ -93,7 +114,7 @@
 
 - **cf / highlight / clean 三页按钮灰 5 秒**：三页 `initXxxPage()` 都漏了派发
   `bgm:modulesReady`，门禁只能等 5s 超时强开，控制台留一条
-  `[BGM CF] 5000ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`。
+  `[BGM ConditionalFormat] 5000ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`。
   事件名与日志 tag 收进 `action-buttons-gate.ts`：新增 `notifyModulesReady()`（tag 由
   `installActionButtonsGate` 登记一次，页面侧不再各拼一份——重复手写正是漏派发的成因），
   三页 init 末尾统一调用。新增 `tests/action-buttons-gate.test.ts` 锁住
@@ -126,14 +147,14 @@
   老版本 WPS 隐藏该功能并提示，不影响其它页。
 - **读写按条 try + 计数**：单条失败不中断整批（与同步写入「批次失败可见」一致）；
   Count 提循环外（com-in-loop 铁律）。
-- 引擎 `cf-rules.ts` 纯函数，25 个单测覆盖：双策略计划、降级路径、隐藏规则不进计划、
+- 引擎 `conditional-format-rules.ts` 纯函数，25 个单测覆盖：双策略计划、降级路径、隐藏规则不进计划、
   Store 坏行跳过、公式行号平移不误伤字符串字面量（"26年10月"/TEXT "00"）。
-  修掉一个真 bug：CfApplyEntry 联合类型两分支字段名不同（rule.appliesTo vs range），
+  修掉一个真 bug：ConditionalFormatApplyEntry 联合类型两分支字段名不同（rule.appliesTo vs range），
   收敛出 `entryRange()` 辅助函数。
 
 ### 新增（功能 · 条件格式管理器页面：搜索/分组/隐藏/排序/复制粘贴/导入手工规则）
 
-- **页面能力**（`cf-page.ts` + `ui/cf.html`）：目标工作表下拉（已打开工作簿全部可选，
+- **页面能力**（`conditional-format-page.ts` + `ui/conditional-format.html`）：目标工作表下拉（已打开工作簿全部可选，
   选择持久化）；规则列表按分组渲染 + 搜索框（名称/公式/范围/分组）；勾选框 = 隐藏
   （留库不应用）；↑↓ 改优先级（数组序）；复制 → 粘贴时**可选目标范围，公式锚点行自动
   平移**（`firstRowOfRange` + `shiftFormulaRows`，单测覆盖）；行内编辑器（名称/分组/

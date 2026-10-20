@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * @fileoverview `ts/panel/cf-rules.ts` 条件格式规则引擎单测（纯函数，Node 直跑）
+ * @fileoverview `ts/panel/conditional-format-rules.ts` 条件格式规则引擎单测（纯函数，Node 直跑）
  *
  * 守住的东西：
  * 1. 默认规则集的形状与顺序（当前季最优先 → 错误标红 → 四季分色）
@@ -14,8 +14,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  CF_GROUP_HIGHLIGHT,
-  CF_GROUP_QUALITY,
+  CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
+  CONDITIONAL_FORMAT_GROUP_QUALITY,
   COLOR_CURRENT_SEASON,
   COLOR_ERROR_FILL,
   buildCurrentSeasonExpression,
@@ -29,8 +29,11 @@ import {
   planApply,
   serializeRules,
   shiftFormulaRows,
-} from '../ts/panel/cf-rules.js'
-import type { CfRule, ForeignRuleSnapshot } from '../ts/panel/cf-rules.js'
+} from '../ts/panel/conditional-format-rules.js'
+import type {
+  ConditionalFormatRule,
+  ForeignRuleSnapshot,
+} from '../ts/panel/conditional-format-rules.js'
 
 // ========== 公式构建 ==========
 
@@ -108,8 +111,8 @@ describe('buildDefaultRules：六条默认规则', () => {
   })
 
   it('数组顺序即优先级：当前季压过四季色，错误标红次之', () => {
-    expect(rules[0]?.group).toBe(CF_GROUP_HIGHLIGHT)
-    expect(rules[1]?.group).toBe(CF_GROUP_QUALITY)
+    expect(rules[0]?.group).toBe(CONDITIONAL_FORMAT_GROUP_HIGHLIGHT)
+    expect(rules[1]?.group).toBe(CONDITIONAL_FORMAT_GROUP_QUALITY)
     // 当前季公式用自维护 TODAY 表达式（跨季度无需改规则）
     expect(rules[0]?.formula).toBe(`=$R3=${buildCurrentSeasonExpression()}`)
     expect(rules[0]?.interior).toBe(COLOR_CURRENT_SEASON)
@@ -138,7 +141,7 @@ describe('buildDefaultRules：六条默认规则', () => {
 // ========== Store 存取 ==========
 
 describe('serializeRules / parseRules', () => {
-  const sample: CfRule[] = [
+  const sample: ConditionalFormatRule[] = [
     {
       id: 'a',
       name: '当前季高亮',
@@ -181,7 +184,7 @@ describe('serializeRules / parseRules', () => {
 // ========== 搜索 / 分组 ==========
 
 describe('filterRules', () => {
-  const rules: CfRule[] = [
+  const rules: ConditionalFormatRule[] = [
     {
       id: '1',
       name: '当前季高亮',
@@ -218,7 +221,7 @@ describe('filterRules', () => {
 
 describe('groupRules', () => {
   it('保持组内顺序与组的首现顺序', () => {
-    const rules: CfRule[] = [
+    const rules: ConditionalFormatRule[] = [
       { id: '1', name: 'a', group: 'G1', appliesTo: 'B:B', formula: '=1', interior: '#000' },
       { id: '2', name: 'b', group: 'G2', appliesTo: 'B:B', formula: '=1', interior: '#000' },
       { id: '3', name: 'c', group: 'G1', appliesTo: 'B:B', formula: '=1', interior: '#000' },
@@ -233,7 +236,7 @@ describe('groupRules', () => {
 // ========== 应用计划（双策略）==========
 
 describe('planApply：双策略', () => {
-  const pluginRules: CfRule[] = [
+  const pluginRules: ConditionalFormatRule[] = [
     {
       id: 'p1',
       name: '当前季高亮',
@@ -318,7 +321,9 @@ describe('planApply：双策略', () => {
   it('隐藏规则两种策略都不进应用计划', () => {
     for (const strategy of ['clear-all', 'append-after'] as const) {
       const plan = planApply(pluginRules, [], strategy)
-      expect(plan.entries.some((entry) => entry.source === 'plugin' && entry.rule.id === 'p2')).toBe(false)
+      expect(
+        plan.entries.some((entry) => entry.source === 'plugin' && entry.rule.id === 'p2'),
+      ).toBe(false)
     }
   })
 

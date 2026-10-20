@@ -220,7 +220,7 @@ function rebuildColumns(): void {
 }
 
 function renderSourceSelect(): void {
-  const select = selectById('hlSource')
+  const select = selectById('highlightSource')
   if (!select) return
   const configured = getConfig(KEY_SOURCE, '', true)
   const options: string[] = ['__auto__']
@@ -237,18 +237,18 @@ function renderSourceSelect(): void {
 }
 
 function renderColumnList(): void {
-  const container = byId('hlColList')
+  const container = byId('highlightColList')
   if (!container) return
   container.innerHTML = state.columns
     .map((c) => {
       const isLocked = c.name === state.sourceKey
       return `
-      <label class="hl-row">
+      <label class="highlight-row">
         <input type="checkbox" data-col="${escapeHtml(c.name)}"${c.selected ? ' checked' : ''}${
           isLocked ? ' disabled' : ''
         } />
-        <span class="hl-col-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
-        <span class="hl-col-letter">${escapeHtml(c.letter)} 列</span>
+        <span class="highlight-col-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
+        <span class="highlight-col-letter">${escapeHtml(c.letter)} 列</span>
       </label>`
     })
     .join('')
@@ -265,7 +265,7 @@ function renderColumnList(): void {
 
 /** 列集合变化时才重渲列表（避免每次预览刷新都重建 DOM） */
 function renderColumnListIfChanged(): void {
-  const container = byId('hlColList')
+  const container = byId('highlightColList')
   if (!container) return
   const rendered = new Set(
     [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].map(
@@ -356,9 +356,9 @@ function renderPreview(names: Map<number, string>): void {
   const { matchedRows, emptyCount, invalidCount } = state.lastSelect
   const target = state.lastTarget
 
-  setText('hlPreviewCount', `命中 ${String(matchedRows.length)} 行`)
+  setText('highlightPreviewCount', `命中 ${String(matchedRows.length)} 行`)
   setText(
-    'hlPreviewTarget',
+    'highlightPreviewTarget',
     target
       ? `目标：${formatSeasonLabel(target)}（${formatSeasonKey(target)}）${
           isFormulaSource() ? ' · 公式列口径' : ' · 原始日期口径'
@@ -366,17 +366,17 @@ function renderPreview(names: Map<number, string>): void {
       : '',
   )
 
-  const chips = byId('hlPreviewChips')
+  const chips = byId('highlightPreviewChips')
   if (chips) {
     chips.innerHTML =
       matchedRows.length === 0
-        ? '<span class="hl-chip hl-chip-empty">无匹配行</span>'
+        ? '<span class="highlight-chip highlight-chip-empty">无匹配行</span>'
         : matchedRows
             .slice(0, PREVIEW_CHIP_LIMIT)
-            .map((row) => `<span class="hl-chip">行 ${String(row)}</span>`)
+            .map((row) => `<span class="highlight-chip">行 ${String(row)}</span>`)
             .join('') +
           (matchedRows.length > PREVIEW_CHIP_LIMIT
-            ? `<span class="hl-chip">…共 ${String(matchedRows.length)} 行</span>`
+            ? `<span class="highlight-chip">…共 ${String(matchedRows.length)} 行</span>`
             : '')
   }
 
@@ -384,20 +384,20 @@ function renderPreview(names: Map<number, string>): void {
     .slice(0, 3)
     .map((row) => names.get(row) ?? '')
     .filter((name) => name.trim() !== '')
-  setText('hlPreviewNames', firstNames.length > 0 ? `如：${firstNames.join('、')}` : '')
+  setText('highlightPreviewNames', firstNames.length > 0 ? `如：${firstNames.join('、')}` : '')
   setText(
-    'hlPreviewSkip',
+    'highlightPreviewSkip',
     `空 ${String(emptyCount)} 格 · 非日期文本 ${String(invalidCount)} 条（已跳过）`,
   )
 }
 
 function renderPreviewEmpty(message: string): void {
-  setText('hlPreviewCount', '命中 0 行')
-  setText('hlPreviewTarget', message)
-  const chips = byId('hlPreviewChips')
+  setText('highlightPreviewCount', '命中 0 行')
+  setText('highlightPreviewTarget', message)
+  const chips = byId('highlightPreviewChips')
   chips?.replaceChildren()
-  setText('hlPreviewNames', '')
-  setText('hlPreviewSkip', '')
+  setText('highlightPreviewNames', '')
+  setText('highlightPreviewSkip', '')
 }
 
 // ===== 应用 / 清除 =====
@@ -562,7 +562,7 @@ function setAutoWatch(isEnabled: boolean): void {
 // ===== 手动年月选择器 =====
 
 function buildManualSelectors(): void {
-  const yearSelect = selectById('hlManualYear')
+  const yearSelect = selectById('highlightManualYear')
   if (yearSelect) {
     const thisYear = new Date().getFullYear()
     const years = [thisYear - 3, thisYear - 2, thisYear - 1, thisYear, thisYear + 1]
@@ -576,7 +576,7 @@ function buildManualSelectors(): void {
       refreshPreview()
     })
   }
-  const monthSelect = selectById('hlManualMonth')
+  const monthSelect = selectById('highlightManualMonth')
   if (monthSelect) {
     monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
       .map((m) => `<option value="${String(m)}">${String(m)} 月</option>`)
@@ -601,9 +601,9 @@ function persistMode(): void {
 function setMode(mode: 'auto' | 'manual'): void {
   state.mode = mode
   persistMode()
-  const autoButton = byId('hlModeAuto')
-  const manualButton = byId('hlModeManual')
-  const manualBox = byId('hlManualBox')
+  const autoButton = byId('highlightModeAuto')
+  const manualButton = byId('highlightModeManual')
+  const manualBox = byId('highlightManualBox')
   autoButton?.classList.toggle('active', mode === 'auto')
   manualButton?.classList.toggle('active', mode === 'manual')
   if (manualBox) manualBox.style.display = mode === 'manual' ? 'flex' : 'none'
@@ -616,13 +616,13 @@ function setMode(mode: 'auto' | 'manual'): void {
 function reloadSheet(): void {
   state.ws = getDataSheet()
   if (!state.ws) {
-    setText('hlSheetName', '未识别到数据工作表')
+    setText('highlightSheetName', '未识别到数据工作表')
     renderPreviewEmpty('请先打开包含番剧数据的工作表，然后点「刷新预览」')
     return
   }
   state.headerRow = findHeaderRow(state.ws)
   state.colMap = getColumnMap(state.ws, state.headerRow)
-  setText('hlSheetName', state.ws.Name)
+  setText('highlightSheetName', state.ws.Name)
   renderSourceSelect()
   rebuildColumns()
   renderColumnList()
@@ -647,32 +647,32 @@ export function initHighlightPage(): void {
   reloadSheet()
 
   // 事件接线（直接用元素引用，不绕 event.target）
-  const sourceSelect = selectById('hlSource')
+  const sourceSelect = selectById('highlightSource')
   sourceSelect?.addEventListener('change', () => {
     const { value } = sourceSelect
     setConfig(KEY_SOURCE, value === '__auto__' ? '' : value)
     refreshPreview()
     renderColumnListIfChanged()
   })
-  byId('hlModeAuto')?.addEventListener('click', () => {
+  byId('highlightModeAuto')?.addEventListener('click', () => {
     setMode('auto')
   })
-  byId('hlModeManual')?.addEventListener('click', () => {
+  byId('highlightModeManual')?.addEventListener('click', () => {
     setMode('manual')
   })
-  byId('hlRefreshBtn')?.addEventListener('click', () => {
+  byId('highlightRefreshBtn')?.addEventListener('click', () => {
     reloadSheet()
     refreshPreview()
   })
-  byId('hlApplyBtn')?.addEventListener('click', () => {
+  byId('highlightApplyBtn')?.addEventListener('click', () => {
     applyHighlight()
   })
-  byId('hlClearBtn')?.addEventListener('click', () => {
+  byId('highlightClearBtn')?.addEventListener('click', () => {
     clearHighlight()
   })
 
   // 恢复开关状态（默认关；打开时才注册 SheetChange，不常驻）
-  const watchBox = inputById('hlAutoWatch')
+  const watchBox = inputById('highlightAutoWatch')
   if (watchBox) {
     watchBox.checked = getConfig(KEY_AUTO_WATCH, '0', true) === '1'
     watchBox.addEventListener('change', () => {

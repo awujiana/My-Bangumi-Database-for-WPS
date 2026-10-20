@@ -242,10 +242,10 @@ describe('applyNavOrder 就地重排 DOM', () => {
 })
 
 describe('nav-order 页面注册表', () => {
-  it('六个页面全部登记：panel / enrich / clean / highlight / cf / settings', () => {
+  it('六个页面全部登记：panel / enrich / clean / highlight / conditional-format / settings', () => {
     expect([...ORDERABLE_PAGES].sort((a, b) => a.localeCompare(b))).toEqual([
-      'cf',
       'clean',
+      'conditional-format',
       'enrich',
       'highlight',
       'panel',

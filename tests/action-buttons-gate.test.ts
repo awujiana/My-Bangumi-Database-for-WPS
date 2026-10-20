@@ -67,10 +67,10 @@ describe('installActionButtonsGate', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const { installActionButtonsGate, notifyModulesReady } = await loadGate()
 
-    installActionButtonsGate('[BGM CF]')
+    installActionButtonsGate('[BGM ConditionalFormat]')
     notifyModulesReady()
 
-    expect(logSpy).toHaveBeenCalledWith('[BGM CF] 模块就绪事件已派发')
+    expect(logSpy).toHaveBeenCalledWith('[BGM ConditionalFormat] 模块就绪事件已派发')
   })
 
   it('5s 内没收到事件时兜底强开并 warn（脚本 404 不能让按钮永久失效）', async () => {

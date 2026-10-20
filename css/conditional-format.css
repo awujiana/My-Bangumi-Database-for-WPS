@@ -1,18 +1,18 @@
 /* ============================================================================
- * BGM 加载项 · 条件格式管理页面样式（css/cf.css）
+ * BGM 加载项 · 条件格式管理页面样式（css/conditional-format.css）
  * ----------------------------------------------------------------------------
  * 仅负责「条件格式管理」页的展示层：工作表选择行、规则列表（分组/色块/操作）、
  * 行内编辑器、双策略确认模态框。配色 / 间距 / 圆角一律复用 css/tokens.css。
  * ==========================================================================*/
 
 /* ---- 目标工作表 ---- */
-.cf-sheet-row {
+.conditional-format-sheet-row {
   display: flex;
   gap: var(--sp-2);
   margin-top: var(--sp-3);
 }
 
-.cf-select {
+.conditional-format-select {
   flex: 1;
   min-width: 0;
   padding: 7px 10px;
@@ -24,14 +24,14 @@
 }
 
 /* ---- 规则工具栏 ---- */
-.cf-toolbar {
+.conditional-format-toolbar {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   margin: var(--sp-3) 0;
 }
 
-.cf-search {
+.conditional-format-search {
   flex: 1;
   min-width: 0;
   padding: 7px 10px;
@@ -42,29 +42,29 @@
   font-size: var(--fs-body);
 }
 
-.cf-rule-count {
+.conditional-format-rule-count {
   flex: 0 0 auto;
   color: var(--text-3);
   font-size: var(--fs-sm);
 }
 
 /* ---- 规则列表 ---- */
-.cf-rule-list {
+.conditional-format-rule-list {
   margin-top: var(--sp-3);
 }
 
-.cf-empty {
+.conditional-format-empty {
   padding: var(--sp-4) 0;
   color: var(--text-3);
   font-size: var(--fs-body);
   text-align: center;
 }
 
-.cf-group {
+.conditional-format-group {
   margin-bottom: var(--sp-4);
 }
 
-.cf-group-title {
+.conditional-format-group-title {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -74,7 +74,7 @@
   font-weight: 500;
 }
 
-.cf-group-count {
+.conditional-format-group-count {
   padding: 0 8px;
   border-radius: var(--r-pill);
   background: var(--bg-surface-2);
@@ -83,7 +83,7 @@
   font-weight: 400;
 }
 
-.cf-existing-index {
+.conditional-format-existing-index {
   flex: 0 0 auto;
   min-width: 1.6em;
   text-align: center;
@@ -91,7 +91,7 @@
   opacity: 0.7;
 }
 
-.cf-rule {
+.conditional-format-rule {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -99,22 +99,22 @@
   border-bottom: 1px solid var(--border-faint);
 }
 
-.cf-rule:last-child {
+.conditional-format-rule:last-child {
   border-bottom: none;
 }
 
-.cf-rule-hidden {
+.conditional-format-rule-hidden {
   opacity: 0.45;
 }
 
-.cf-rule-vis {
+.conditional-format-rule-vis {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   cursor: pointer;
 }
 
-.cf-swatch {
+.conditional-format-swatch {
   flex: 0 0 auto;
   width: 14px;
   height: 14px;
@@ -122,12 +122,12 @@
   border-radius: 3px;
 }
 
-.cf-rule-main {
+.conditional-format-rule-main {
   flex: 1;
   min-width: 0;
 }
 
-.cf-rule-name {
+.conditional-format-rule-name {
   color: var(--text-1);
   font-size: var(--fs-body);
   overflow: hidden;
@@ -135,7 +135,7 @@
   white-space: nowrap;
 }
 
-.cf-rule-meta {
+.conditional-format-rule-meta {
   color: var(--text-3);
   font-size: 12px;
   overflow: hidden;
@@ -143,17 +143,17 @@
   white-space: nowrap;
 }
 
-.cf-rule-meta code {
+.conditional-format-rule-meta code {
   font-family: var(--font-mono);
 }
 
-.cf-rule-actions {
+.conditional-format-rule-actions {
   flex: 0 0 auto;
   display: flex;
   gap: 2px;
 }
 
-.cf-rule-actions button {
+.conditional-format-rule-actions button {
   width: 26px;
   height: 26px;
   border: none;
@@ -164,13 +164,13 @@
   cursor: pointer;
 }
 
-.cf-rule-actions button:hover {
+.conditional-format-rule-actions button:hover {
   background: var(--bg-surface-2);
   color: var(--text-1);
 }
 
 /* ---- 行内编辑器 ---- */
-.cf-editor {
+.conditional-format-editor {
   margin-top: var(--sp-4);
   padding: var(--sp-4);
   border: 0.5px solid var(--border);
@@ -178,21 +178,21 @@
   background: var(--bg-surface-2);
 }
 
-.cf-editor h4 {
+.conditional-format-editor h4 {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-h3);
   font-weight: 500;
 }
 
-.cf-field-label {
+.conditional-format-field-label {
   display: block;
   margin: var(--sp-3) 0 var(--sp-1);
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
 
-.cf-input,
-.cf-textarea {
+.conditional-format-input,
+.conditional-format-textarea {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -203,19 +203,19 @@
   font-family: var(--font-sans);
 }
 
-.cf-textarea {
+.conditional-format-textarea {
   font-family: var(--font-mono);
   font-size: 13px;
   resize: vertical;
 }
 
-.cf-color-row {
+.conditional-format-color-row {
   display: flex;
   align-items: flex-end;
   gap: var(--sp-4);
 }
 
-.cf-color {
+.conditional-format-color {
   width: 48px;
   height: 30px;
   padding: 2px;
@@ -225,13 +225,13 @@
   cursor: pointer;
 }
 
-.cf-bold-box {
+.conditional-format-bold-box {
   padding-bottom: 6px;
   color: var(--text-1);
   font-size: var(--fs-body);
 }
 
-.cf-bold-box label {
+.conditional-format-bold-box label {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -239,14 +239,14 @@
 }
 
 /* ---- 应用状态 ---- */
-.cf-apply-status {
+.conditional-format-apply-status {
   margin-top: var(--sp-3);
   color: var(--text-3);
   font-size: var(--fs-sm);
 }
 
 /* ---- 双策略确认模态框 ---- */
-.cf-modal-mask {
+.conditional-format-modal-mask {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -256,7 +256,7 @@
   background: var(--bg-overlay);
 }
 
-.cf-modal {
+.conditional-format-modal {
   width: min(400px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   overflow: auto;
@@ -266,28 +266,28 @@
   background: var(--bg-surface);
 }
 
-.cf-modal h4 {
+.conditional-format-modal h4 {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-h3);
   font-weight: 500;
 }
 
-.cf-modal-body {
+.conditional-format-modal-body {
   color: var(--text-1);
   font-size: var(--fs-body);
   line-height: 1.6;
 }
 
-.cf-modal-body p {
+.conditional-format-modal-body p {
   margin: 0 0 var(--sp-2);
 }
 
-.cf-modal-label {
+.conditional-format-modal-label {
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
 
-.cf-modal-list {
+.conditional-format-modal-list {
   max-height: 180px;
   margin: 0 0 var(--sp-3);
   padding-left: 20px;
@@ -296,23 +296,23 @@
   font-size: 13px;
 }
 
-.cf-modal-list li {
+.conditional-format-modal-list li {
   margin-bottom: 4px;
   word-break: break-all;
 }
 
-.cf-modal-list code {
+.conditional-format-modal-list code {
   font-family: var(--font-mono);
 }
 
-.cf-modal-actions {
+.conditional-format-modal-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
   margin-top: var(--sp-4);
 }
 
-.cf-modal-actions .bgm-btn {
+.conditional-format-modal-actions .bgm-btn {
   flex: 1;
   min-width: 100px;
 }

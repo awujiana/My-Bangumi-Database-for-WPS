@@ -1,6 +1,6 @@
 /**
  * @fileoverview 条件格式规则引擎（纯函数，零 WPS / DOM 依赖，可在 Node 下单测）
- * @module panel/cfRules
+ * @module panel/conditionalFormatRules
  * @description 「条件格式管理器」独立页的规则模型与全部判断逻辑：
  *   默认规则集（当前季 / 日期格式错误 / 四季分色）、自维护季节公式、
  *   PluginStorage 存取校验、搜索分组、双策略应用计划。
@@ -20,7 +20,7 @@
 // ===== 规则模型 =====
 
 /** 单条条件格式规则（Store 里的一条记录） */
-export interface CfRule {
+export interface ConditionalFormatRule {
   /** 唯一 id（页面创建时生成） */
   id: string
   /** 人类可读名（「当前季高亮」） */
@@ -61,14 +61,14 @@ export interface ForeignRuleSnapshot {
 export type ApplyStrategy = 'clear-all' | 'append-after'
 
 /** 计划里的一条待写入项 */
-export type CfApplyEntry =
+export type ConditionalFormatApplyEntry =
   | { source: 'foreign'; range: string; formula: string; interior?: string; fontColor?: string }
-  | { source: 'plugin'; rule: CfRule }
+  | { source: 'plugin'; rule: ConditionalFormatRule }
 
 /** 应用计划（由 planApply 纯函数算出，COM 层只负责执行） */
-export interface CfApplyPlan {
+export interface ConditionalFormatApplyPlan {
   /** 按优先级排序的写入项（靠前 = 优先） */
-  entries: CfApplyEntry[]
+  entries: ConditionalFormatApplyEntry[]
   /** 将被丢弃的手工规则（供确认弹窗列出） */
   discarded: ForeignRuleSnapshot[]
   /** 需要醒目展示的警告（如「N 条规则类型不支持保留」） */
@@ -78,17 +78,17 @@ export interface CfApplyPlan {
 // ===== 常量 =====
 
 /** 规则 Store 的 PluginStorage 键 */
-export const CF_STORE_KEY = 'cf.rules.v1'
+export const CONDITIONAL_FORMAT_STORE_KEY = 'conditionalFormat.rules.v1'
 
 /** 默认应用策略的 PluginStorage 键 */
-export const CF_STRATEGY_KEY = 'cf.strategy.v1'
+export const CONDITIONAL_FORMAT_STRATEGY_KEY = 'conditionalFormat.strategy.v1'
 
 /** 默认策略（无历史选择时）：清掉后应用——插件规则完整生效 */
-export const CF_STRATEGY_FALLBACK: ApplyStrategy = 'clear-all'
+export const CONDITIONAL_FORMAT_STRATEGY_FALLBACK: ApplyStrategy = 'clear-all'
 
 /** 默认分组名 */
-export const CF_GROUP_HIGHLIGHT = '番剧高亮'
-export const CF_GROUP_QUALITY = '数据质量'
+export const CONDITIONAL_FORMAT_GROUP_HIGHLIGHT = '番剧高亮'
+export const CONDITIONAL_FORMAT_GROUP_QUALITY = '数据质量'
 
 /** 当前季高亮色：与宏的 RGB(0,176,80) 一致 */
 export const COLOR_CURRENT_SEASON = '#00B050'
@@ -192,7 +192,7 @@ export interface DefaultRulesOptions {
  * 「当前季」用自维护 TODAY 公式（跨季度无需改规则）；其余按 anchorRow 锚定。
  * 数组顺序即优先级：当前季最靠前（压过四季色），错误标红次之。
  */
-export function buildDefaultRules(options: DefaultRulesOptions): CfRule[] {
+export function buildDefaultRules(options: DefaultRulesOptions): ConditionalFormatRule[] {
   const { seasonCol, nameCol, firstRow, makeId } = options
   const seasonExpression = buildCurrentSeasonExpression()
 
@@ -200,7 +200,7 @@ export function buildDefaultRules(options: DefaultRulesOptions): CfRule[] {
     {
       id: makeId(),
       name: '当前季高亮',
-      group: CF_GROUP_HIGHLIGHT,
+      group: CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
       appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
       formula: `=$${seasonCol}${String(firstRow)}=${seasonExpression}`,
       interior: COLOR_CURRENT_SEASON,
@@ -208,7 +208,7 @@ export function buildDefaultRules(options: DefaultRulesOptions): CfRule[] {
     {
       id: makeId(),
       name: '日期格式错误',
-      group: CF_GROUP_QUALITY,
+      group: CONDITIONAL_FORMAT_GROUP_QUALITY,
       appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
       formula: buildErrorFormula(seasonCol, firstRow),
       interior: COLOR_ERROR_FILL,
@@ -217,7 +217,7 @@ export function buildDefaultRules(options: DefaultRulesOptions): CfRule[] {
     ...SEASON_COLORS.map(([monthToken, fill, font]) => ({
       id: makeId(),
       name: `${monthToken}季`,
-      group: CF_GROUP_HIGHLIGHT,
+      group: CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
       appliesTo: `${nameCol}${String(firstRow)}:${nameCol}1048576`,
       formula: buildSeasonFormula(seasonCol, firstRow, monthToken),
       interior: fill,
@@ -228,7 +228,7 @@ export function buildDefaultRules(options: DefaultRulesOptions): CfRule[] {
 
 // ===== Store 存取（序列化/校验为纯函数，配置读写由页面接）=====
 
-function isCfRule(value: unknown): value is CfRule {
+function isConditionalFormatRule(value: unknown): value is ConditionalFormatRule {
   if (value === null || typeof value !== 'object') return false
   const rule = value as Record<string, unknown>
   return (
@@ -246,12 +246,12 @@ function isCfRule(value: unknown): value is CfRule {
 }
 
 /** 序列化（顺序即优先级，原样保留） */
-export function serializeRules(rules: readonly CfRule[]): string {
+export function serializeRules(rules: readonly ConditionalFormatRule[]): string {
   return JSON.stringify(rules)
 }
 
 /** 反序列化：坏行跳过不致命（与分片解析「非法行不中断」同口径） */
-export function parseRules(text: string): { rules: CfRule[]; dropped: number } {
+export function parseRules(text: string): { rules: ConditionalFormatRule[]; dropped: number } {
   if (!text) return { rules: [], dropped: 0 }
   let parsed: unknown
   try {
@@ -260,10 +260,10 @@ export function parseRules(text: string): { rules: CfRule[]; dropped: number } {
     return { rules: [], dropped: 1 }
   }
   if (!Array.isArray(parsed)) return { rules: [], dropped: 1 }
-  const rules: CfRule[] = []
+  const rules: ConditionalFormatRule[] = []
   let dropped = 0
   for (const item of parsed) {
-    if (isCfRule(item)) rules.push(item)
+    if (isConditionalFormatRule(item)) rules.push(item)
     else dropped += 1
   }
   return { rules, dropped }
@@ -272,7 +272,10 @@ export function parseRules(text: string): { rules: CfRule[]; dropped: number } {
 // ===== 搜索 / 分组 =====
 
 /** 搜索：名称 / 公式 / 范围 / 分组，大小写不敏感子串 */
-export function filterRules(rules: readonly CfRule[], query: string): CfRule[] {
+export function filterRules(
+  rules: readonly ConditionalFormatRule[],
+  query: string,
+): ConditionalFormatRule[] {
   const q = query.trim().toLowerCase()
   if (!q) return [...rules]
   return rules.filter((rule) =>
@@ -283,8 +286,10 @@ export function filterRules(rules: readonly CfRule[], query: string): CfRule[] {
 }
 
 /** 分组：保持组内顺序与组的首现顺序（Map 插入序） */
-export function groupRules(rules: readonly CfRule[]): [string, CfRule[]][] {
-  const groups = new Map<string, CfRule[]>()
+export function groupRules(
+  rules: readonly ConditionalFormatRule[],
+): [string, ConditionalFormatRule[]][] {
+  const groups = new Map<string, ConditionalFormatRule[]>()
   for (const rule of rules) {
     const bucket = groups.get(rule.group)
     if (bucket) bucket.push(rule)
@@ -304,16 +309,19 @@ export function groupRules(rules: readonly CfRule[]): [string, CfRule[]][] {
  *   warnings 说明——不静默丢数据。
  */
 export function planApply(
-  rules: readonly CfRule[],
+  rules: readonly ConditionalFormatRule[],
   foreign: readonly ForeignRuleSnapshot[],
   strategy: ApplyStrategy,
-): CfApplyPlan {
+): ConditionalFormatApplyPlan {
   const visible = rules.filter((rule) => rule.hidden !== true)
-  const pluginEntries: CfApplyEntry[] = visible.map((rule) => ({ source: 'plugin', rule }))
+  const pluginEntries: ConditionalFormatApplyEntry[] = visible.map((rule) => ({
+    source: 'plugin',
+    rule,
+  }))
   const warnings: string[] = []
 
   if (strategy === 'append-after' && foreign.every((f) => f.kind === 'expression')) {
-    const foreignEntries: CfApplyEntry[] = foreign.map((f) => ({
+    const foreignEntries: ConditionalFormatApplyEntry[] = foreign.map((f) => ({
       source: 'foreign',
       range: f.range,
       formula: f.formula,

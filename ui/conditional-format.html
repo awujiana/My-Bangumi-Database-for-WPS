@@ -12,11 +12,11 @@
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
-    <link rel="stylesheet" href="../css/cf.css" />
+    <link rel="stylesheet" href="../css/conditional-format.css" />
   </head>
-  <body data-page="cf">
+  <body data-page="conditional-format">
     <script type="text/javascript" src="../libs/purify.js"></script>
-    <script type="module" src="../dist-ts/panel/cf-bootstrap.js"></script>
+    <script type="module" src="../dist-ts/panel/conditional-format-bootstrap.js"></script>
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="global">
@@ -70,9 +70,11 @@
           <p class="hint">
             规则库是全局的，这里选「应用到哪张表、从哪张表读既有规则」。已打开工作簿的全部工作表都可选。
           </p>
-          <div class="cf-sheet-row">
-            <select id="cfSheet" class="cf-select"></select>
-            <button type="button" class="bgm-btn small" id="cfReloadSheetsBtn">🔄 刷新列表</button>
+          <div class="conditional-format-sheet-row">
+            <select id="conditionalFormatSheet" class="conditional-format-select"></select>
+            <button type="button" class="bgm-btn small" id="conditionalFormatReloadSheetsBtn">
+              🔄 刷新列表
+            </button>
           </div>
         </section>
 
@@ -93,13 +95,13 @@
             目标工作表<strong>现在就有</strong>的条件格式（只读，按优先级排列）。应用前先看这里：
             数据条 / 色阶 / 图标集等类型插件无法重建，双策略会按你的选择处理。
           </p>
-          <div class="cf-toolbar">
-            <span class="cf-rule-count" id="cfExistingCount">—</span>
-            <button type="button" class="bgm-btn small" id="cfRefreshExistingBtn">
+          <div class="conditional-format-toolbar">
+            <span class="conditional-format-rule-count" id="conditionalFormatExistingCount">—</span>
+            <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
           </div>
-          <div id="cfExistingList" class="cf-rule-list"></div>
+          <div id="conditionalFormatExistingList" class="conditional-format-rule-list"></div>
         </section>
 
         <!-- 规则管理 -->
@@ -118,59 +120,90 @@
           <p class="hint">
             列表顺序即优先级（靠前先生效）。取消勾选 = 隐藏（留在库里不应用）。复制后可粘贴出副本。
           </p>
-          <div class="cf-toolbar">
+          <div class="conditional-format-toolbar">
             <input
               type="search"
-              id="cfSearch"
-              class="cf-search"
+              id="conditionalFormatSearch"
+              class="conditional-format-search"
               placeholder="搜索名称 / 公式 / 范围 / 分组"
             />
-            <span class="cf-rule-count" id="cfRuleCount">0 条规则</span>
+            <span class="conditional-format-rule-count" id="conditionalFormatRuleCount"
+              >0 条规则</span
+            >
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="cfNewRuleBtn">➕ 新建规则</button>
-            <button class="bgm-btn small" id="cfPasteBtn">📋 粘贴</button>
-            <button class="bgm-btn small" id="cfImportBtn">📥 导入手工规则</button>
+            <button class="bgm-btn small primary" id="conditionalFormatNewRuleBtn">
+              ➕ 新建规则
+            </button>
+            <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
+            <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
           </div>
-          <div id="cfRuleList" class="cf-rule-list"></div>
+          <div id="conditionalFormatRuleList" class="conditional-format-rule-list"></div>
 
           <!-- 行内编辑器 -->
-          <div id="cfEditor" class="cf-editor" style="display: none">
-            <h4 id="cfEditorTitle">编辑规则</h4>
-            <label class="cf-field-label" for="cfEditName">名称</label>
-            <input type="text" id="cfEditName" class="cf-input" />
-            <label class="cf-field-label" for="cfEditGroup">分组</label>
-            <input type="text" id="cfEditGroup" class="cf-input" />
-            <label class="cf-field-label" for="cfEditRange">应用范围（A1 风格）</label>
-            <input type="text" id="cfEditRange" class="cf-input" placeholder="如 B3:B1048576" />
-            <label class="cf-field-label" for="cfEditFormula"
+          <div id="conditionalFormatEditor" class="conditional-format-editor" style="display: none">
+            <h4 id="conditionalFormatEditorTitle">编辑规则</h4>
+            <label class="conditional-format-field-label" for="conditionalFormatEditName"
+              >名称</label
+            >
+            <input type="text" id="conditionalFormatEditName" class="conditional-format-input" />
+            <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
+              >分组</label
+            >
+            <input type="text" id="conditionalFormatEditGroup" class="conditional-format-input" />
+            <label class="conditional-format-field-label" for="conditionalFormatEditRange"
+              >应用范围（A1 风格）</label
+            >
+            <input
+              type="text"
+              id="conditionalFormatEditRange"
+              class="conditional-format-input"
+              placeholder="如 B3:B1048576"
+            />
+            <label class="conditional-format-field-label" for="conditionalFormatEditFormula"
               >公式（xlExpression，锚定范围首行）</label
             >
             <textarea
-              id="cfEditFormula"
-              class="cf-textarea"
+              id="conditionalFormatEditFormula"
+              class="conditional-format-textarea"
               rows="4"
               placeholder='如 =$R3="26年10月"'
             ></textarea>
-            <div class="cf-color-row">
+            <div class="conditional-format-color-row">
               <div>
-                <label class="cf-field-label" for="cfEditFill">填充色</label>
-                <input type="color" id="cfEditFill" class="cf-color" value="#00B050" />
+                <label class="conditional-format-field-label" for="conditionalFormatEditFill"
+                  >填充色</label
+                >
+                <input
+                  type="color"
+                  id="conditionalFormatEditFill"
+                  class="conditional-format-color"
+                  value="#00B050"
+                />
               </div>
               <div>
-                <label class="cf-field-label" for="cfEditFont">字体色</label>
-                <input type="color" id="cfEditFont" class="cf-color" value="#000000" />
+                <label class="conditional-format-field-label" for="conditionalFormatEditFont"
+                  >字体色</label
+                >
+                <input
+                  type="color"
+                  id="conditionalFormatEditFont"
+                  class="conditional-format-color"
+                  value="#000000"
+                />
               </div>
-              <div class="cf-bold-box">
+              <div class="conditional-format-bold-box">
                 <label>
-                  <input type="checkbox" id="cfEditBold" />
+                  <input type="checkbox" id="conditionalFormatEditBold" />
                   <span>加粗</span>
                 </label>
               </div>
             </div>
             <div class="bgm-btn-group bgm-btn-row">
-              <button class="bgm-btn small primary" id="cfEditorSave">💾 保存</button>
-              <button class="bgm-btn small" id="cfEditorCancel">取消</button>
+              <button class="bgm-btn small primary" id="conditionalFormatEditorSave">
+                💾 保存
+              </button>
+              <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
             </div>
           </div>
         </section>
@@ -193,7 +226,9 @@
             四季分色。依赖目标表识别到「开播季度」与「名称」列，公式锚定表头行下一行。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="cfDefaultsBtn">📦 生成默认规则集</button>
+            <button class="bgm-btn small primary" id="conditionalFormatDefaultsBtn">
+              📦 生成默认规则集
+            </button>
           </div>
         </section>
 
@@ -215,24 +250,39 @@
             重点一次即修复）。检测到你手工建的规则时会先弹框列出，让你选「清掉后应用」或「保留手工规则」。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="cfApplyBtn">🖌️ 应用条件格式</button>
+            <button class="bgm-btn small primary" id="conditionalFormatApplyBtn">
+              🖌️ 应用条件格式
+            </button>
           </div>
-          <p class="cf-apply-status" id="cfApplyStatus"></p>
+          <p class="conditional-format-apply-status" id="conditionalFormatApplyStatus"></p>
         </section>
       </main>
     </div>
 
     <!-- ===================== 双策略确认模态框 ===================== -->
-    <div class="cf-modal-mask" id="cfConfirmMask" style="display: none">
-      <div class="cf-modal" role="dialog" aria-modal="true" aria-labelledby="cfConfirmTitle">
-        <h4 id="cfConfirmTitle">应用条件格式</h4>
-        <div class="cf-modal-body" id="cfConfirmBody"></div>
-        <div class="cf-modal-actions">
-          <button type="button" class="bgm-btn small primary" id="cfConfirmClear">
+    <div
+      class="conditional-format-modal-mask"
+      id="conditionalFormatConfirmMask"
+      style="display: none"
+    >
+      <div
+        class="conditional-format-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="conditionalFormatConfirmTitle"
+      >
+        <h4 id="conditionalFormatConfirmTitle">应用条件格式</h4>
+        <div class="conditional-format-modal-body" id="conditionalFormatConfirmBody"></div>
+        <div class="conditional-format-modal-actions">
+          <button type="button" class="bgm-btn small primary" id="conditionalFormatConfirmClear">
             清掉后应用
           </button>
-          <button type="button" class="bgm-btn small" id="cfConfirmKeep">保留手工规则</button>
-          <button type="button" class="bgm-btn small" id="cfConfirmCancel">取消</button>
+          <button type="button" class="bgm-btn small" id="conditionalFormatConfirmKeep">
+            保留手工规则
+          </button>
+          <button type="button" class="bgm-btn small" id="conditionalFormatConfirmCancel">
+            取消
+          </button>
         </div>
       </div>
     </div>

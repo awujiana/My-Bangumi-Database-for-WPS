@@ -2220,7 +2220,7 @@ select.input {
     }
 }
 
-.bgm-progress__config .cfg-summary {
+.bgm-progress__config .config-summary {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -2231,12 +2231,12 @@ select.input {
     line-height: 1.6;
 }
 
-.bgm-progress__config .cfg-item {
+.bgm-progress__config .config-item {
     color: var(--text, #cdd6f4);
     white-space: nowrap;
 }
 
-.bgm-progress__config .cfg-item.warn {
+.bgm-progress__config .config-item.warn {
     color: var(--yellow, #f9e2af);
     font-weight: 600;
 }

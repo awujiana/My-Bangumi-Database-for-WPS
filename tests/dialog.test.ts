@@ -147,8 +147,8 @@ describe('renderConfigSummary', () => {
   it('单项配置应正确渲染', () => {
     const html = renderConfigSummary({ sourceLabel: '远程仓库' })
     expect(html).toContain('📁 远程仓库')
-    expect(html).toContain('cfg-summary')
-    expect(html).toContain('cfg-item')
+    expect(html).toContain('config-summary')
+    expect(html).toContain('config-item')
   })
 
   it('完整配置应正确渲染所有字段', () => {
@@ -170,7 +170,7 @@ describe('renderConfigSummary', () => {
 
   it('selectedRowsOnly 应添加 warn 样式类', () => {
     const html = renderConfigSummary({ selectedRowsOnly: true })
-    expect(html).toContain('cfg-item warn')
+    expect(html).toContain('config-item warn')
   })
 
   it('不应包含未设置的字段', () => {

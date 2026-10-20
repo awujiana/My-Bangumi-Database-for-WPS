@@ -1087,10 +1087,10 @@ export function markHighlightPaneLoaded(): void {
 /**
  * 标记「条件格式管理」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
  */
-export function markCfPaneLoaded(): void {
+export function markConditionalFormatPaneLoaded(): void {
   if (typeof window === 'undefined') return
   const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
-  app?.PluginStorage?.setItem('cf_pane_url', window.location.href)
+  app?.PluginStorage?.setItem('conditionalFormat_pane_url', window.location.href)
 }
 
 /**
@@ -1099,7 +1099,7 @@ export function markCfPaneLoaded(): void {
  * 面板 ID 缓存于 `cf_pane_id`；配合 `cf_pane_url` 标记做自愈：缓存 ID 存在但
  * 页面从未成功加载时，隐藏旧面板并重建。与清理 / 高亮面板同款机制。
  */
-export function showCfPanel(): void {
+export function showConditionalFormatPanel(): void {
   const app = getApp() as {
     PluginStorage?: {
       getItem: (k: string) => string | null
@@ -1109,42 +1109,55 @@ export function showCfPanel(): void {
     GetTaskPane?: (id: string) => { Visible: boolean }
   } | null
   if (!app) {
-    bgmLog(LOG_LEVELS.ERROR, '[showCfPanel] 无法获取 WPS Application 对象')
+    bgmLog(LOG_LEVELS.ERROR, '[showConditionalFormatPanel] 无法获取 WPS Application 对象')
     return
   }
 
-  let cfId = app.PluginStorage?.getItem('cf_pane_id')
-  const storedPaneUrl = app.PluginStorage?.getItem('cf_pane_url')
+  let conditionalFormatId = app.PluginStorage?.getItem('conditionalFormat_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('conditionalFormat_pane_url')
+  // 命名规范化（cf → conditionalFormat）前的旧键：读一次并迁走，
+  // 否则升级后旧面板拿不到缓存 ID，会被重复 CreateTaskPane 成孤儿窗
+  if (!conditionalFormatId) {
+    const legacyId = app.PluginStorage?.getItem('cf_pane_id')
+    if (legacyId) {
+      conditionalFormatId = legacyId
+      app.PluginStorage?.setItem('conditionalFormat_pane_id', legacyId)
+      app.PluginStorage?.setItem('cf_pane_id', '')
+    }
+  }
 
   // 自愈：缓存 ID 存在但页面从未成功加载 → 隐藏并重建
-  if (cfId && !storedPaneUrl?.includes('cf.html')) {
-    const stalePane = app.GetTaskPane?.(cfId)
+  if (conditionalFormatId && !storedPaneUrl?.includes('conditional-format.html')) {
+    const stalePane = app.GetTaskPane?.(conditionalFormatId)
     if (stalePane) stalePane.Visible = false
-    app.PluginStorage?.setItem('cf_pane_id', '')
-    app.PluginStorage?.setItem('cf_pane_url', '')
-    cfId = null
-    bgmLog(LOG_LEVELS.WARN, '[showCfPanel] 检测到加载失败的旧条件格式面板，已重建')
+    app.PluginStorage?.setItem('conditionalFormat_pane_id', '')
+    app.PluginStorage?.setItem('conditionalFormat_pane_url', '')
+    conditionalFormatId = null
+    bgmLog(LOG_LEVELS.WARN, '[showConditionalFormatPanel] 检测到加载失败的旧条件格式面板，已重建')
   }
 
-  if (cfId) {
-    const pane = app.GetTaskPane?.(cfId)
+  if (conditionalFormatId) {
+    const pane = app.GetTaskPane?.(conditionalFormatId)
     if (pane) {
       pane.Visible = !pane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showCfPanel] 条件格式面板可见性切换: ${String(pane.Visible)}`)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[showConditionalFormatPanel] 条件格式面板可见性切换: ${String(pane.Visible)}`,
+      )
       return
     }
-    app.PluginStorage?.setItem('cf_pane_id', '')
-    app.PluginStorage?.setItem('cf_pane_url', '')
-    bgmLog(LOG_LEVELS.WARN, '[showCfPanel] 条件格式面板ID失效，已清除存储')
+    app.PluginStorage?.setItem('conditionalFormat_pane_id', '')
+    app.PluginStorage?.setItem('conditionalFormat_pane_url', '')
+    bgmLog(LOG_LEVELS.WARN, '[showConditionalFormatPanel] 条件格式面板ID失效，已清除存储')
   }
 
-  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('cf.html'))
+  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('conditional-format.html'))
   if (pane) {
     pane.Visible = true
-    app.PluginStorage?.setItem('cf_pane_id', pane.ID)
-    bgmLog(LOG_LEVELS.INFO, `[showCfPanel] 条件格式面板已创建(ID:${pane.ID})`)
+    app.PluginStorage?.setItem('conditionalFormat_pane_id', pane.ID)
+    bgmLog(LOG_LEVELS.INFO, `[showConditionalFormatPanel] 条件格式面板已创建(ID:${pane.ID})`)
   } else {
-    bgmLog(LOG_LEVELS.ERROR, '[showCfPanel] 创建条件格式面板失败')
+    bgmLog(LOG_LEVELS.ERROR, '[showConditionalFormatPanel] 创建条件格式面板失败')
   }
 }
 

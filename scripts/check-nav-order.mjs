@@ -69,9 +69,16 @@ function readPageModules(source) {
 
   const result = new Map()
   // 逐页面块解析：`panel: [ { id: '...' }, ... ],`
-  for (const pageMatch of declaration[1].matchAll(/(\w+)\s*:\s*\[([\s\S]*?)\]/gu)) {
-    const page = pageMatch[1]
-    const ids = [...pageMatch[2].matchAll(/id:\s*'([^']+)'/gu)].map((m) => m[1])
+  // 页面键可能是带连字符的字符串字面量（'conditional-format':）——页面键即
+  // ui/<page>.html 的文件名，只能 kebab-case，故 key 同时接受 'xxx' 与裸标识符。
+  // 必须整段用 String.raw：拼进模板字面量时 `\s` 会被当转笔画掉，正则直接失效
+  const pageBlocks = new RegExp(
+    String.raw`(?:'([^']+)'|(\w+))\s*:\s*\[([\s\S]*?)\]`,
+    'gu',
+  )
+  for (const pageMatch of declaration[1].matchAll(pageBlocks)) {
+    const page = pageMatch[1] ?? pageMatch[2]
+    const ids = [...pageMatch[3].matchAll(/id:\s*'([^']+)'/gu)].map((m) => m[1])
     result.set(page, ids)
   }
   if (result.size === 0) {
@@ -92,7 +99,8 @@ function readPageLabels(source) {
   if (body === null || body[1] === undefined) {
     throw new Error('无法从 ts/tools/nav-order.ts 解析 PAGE_LABELS（脚本解析可能已失效）')
   }
-  const pages = [...body[1].matchAll(/(\w+)\s*:\s*'/gu)].map((m) => m[1])
+  // 同 readPageModules：键可能是带连字符的字符串字面量
+  const pages = [...body[1].matchAll(/(?:'([^']+)'|(\w+))\s*:\s*'/gu)].map((m) => m[1] ?? m[2])
   if (pages.length === 0) {
     throw new Error('PAGE_LABELS 解析结果为空（脚本解析可能已失效）')
   }

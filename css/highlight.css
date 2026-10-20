@@ -6,7 +6,7 @@
  * ==========================================================================*/
 
 /* ---- 匹配条件 ---- */
-.hl-field-label {
+.highlight-field-label {
   display: block;
   margin-top: var(--sp-3);
   margin-bottom: var(--sp-2);
@@ -15,7 +15,7 @@
   font-weight: 500;
 }
 
-.hl-select {
+.highlight-select {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -25,12 +25,12 @@
   font-size: var(--fs-body);
 }
 
-.hl-mode-row {
+.highlight-mode-row {
   display: flex;
   gap: var(--sp-2);
 }
 
-.hl-mode-btn {
+.highlight-mode-btn {
   flex: 1;
   padding: 7px 0;
   border: 1px solid var(--border);
@@ -41,20 +41,20 @@
   cursor: pointer;
 }
 
-.hl-mode-btn.active {
+.highlight-mode-btn.active {
   border-color: var(--accent);
   background: var(--bg-surface-2);
   color: var(--text-1);
   font-weight: 500;
 }
 
-.hl-manual-box {
+.highlight-manual-box {
   display: flex;
   gap: var(--sp-2);
   margin-top: var(--sp-2);
 }
 
-.hl-watch-row {
+.highlight-watch-row {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -65,12 +65,12 @@
 }
 
 /* ---- 高亮列 ---- */
-.hl-col-list {
+.highlight-col-list {
   display: flex;
   flex-direction: column;
 }
 
-.hl-row {
+.highlight-row {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -79,11 +79,11 @@
   cursor: pointer;
 }
 
-.hl-row:last-child {
+.highlight-row:last-child {
   border-bottom: none;
 }
 
-.hl-col-name {
+.highlight-col-name {
   flex: 1;
   min-width: 0;
   color: var(--text-1);
@@ -93,7 +93,7 @@
   white-space: nowrap;
 }
 
-.hl-col-letter {
+.highlight-col-letter {
   flex: 0 0 auto;
   color: var(--text-3);
   font-size: var(--fs-sm);
@@ -101,32 +101,32 @@
 }
 
 /* ---- 实时预览 ---- */
-.hl-preview-box {
+.highlight-preview-box {
   padding: var(--sp-4);
   border-radius: var(--r-lg);
   background: var(--bg-surface-2);
 }
 
-.hl-preview-count {
+.highlight-preview-count {
   color: var(--text-1);
   font-size: var(--fs-display);
   font-weight: 500;
   line-height: 1.2;
 }
 
-.hl-preview-target {
+.highlight-preview-target {
   margin-top: var(--sp-1);
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
 
-.hl-preview-chips {
+.highlight-preview-chips {
   display: flex;
   flex-wrap: wrap;
   margin-top: var(--sp-3);
 }
 
-.hl-chip {
+.highlight-chip {
   padding: 1px 10px;
   margin: 0 6px 6px 0;
   border-radius: var(--r-pill);
@@ -135,16 +135,16 @@
   font-size: var(--fs-sm);
 }
 
-.hl-chip-empty {
+.highlight-chip-empty {
   color: var(--text-3);
 }
 
-.hl-preview-names {
+.highlight-preview-names {
   color: var(--text-2);
   font-size: var(--fs-sm);
 }
 
-.hl-preview-skip {
+.highlight-preview-skip {
   margin-top: var(--sp-2);
   color: var(--text-3);
   font-size: var(--fs-sm);

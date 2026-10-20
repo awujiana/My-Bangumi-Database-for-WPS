@@ -22,7 +22,7 @@ import {
   showSettingsPanel,
   showCleanPanel,
   showHighlightPanel,
-  showCfPanel,
+  showConditionalFormatPanel,
   BGM,
   isIncrementalSyncEnabled,
   isSkipConflictsEnabled,
@@ -350,7 +350,7 @@ const SYNC_ACTIONS: Record<string, () => unknown> = {
   btnOpenEnrichPanel: showEnrichPanel,
   btnOpenCleanPanel: showCleanPanel,
   btnOpenHighlightPanel: showHighlightPanel,
-  btnOpenCfPanel: showCfPanel,
+  btnOpenConditionalFormatPanel: showConditionalFormatPanel,
   btnSetToken: setTokenForRibbon,
   btnSetUserId: setUserIdForRibbon,
   btnOpenCollection: openCollectionForRibbon,
@@ -437,7 +437,7 @@ const ICON_PATHS: Record<string, string> = {
   btnOpenEnrichPanel: 'images/enrichPage.svg',
   btnOpenCleanPanel: 'images/cleanPage.svg',
   btnOpenHighlightPanel: 'images/highlightPage.svg',
-  btnOpenCfPanel: 'images/cfPage.svg',
+  btnOpenConditionalFormatPanel: 'images/conditionalFormatPage.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

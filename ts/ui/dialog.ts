@@ -409,18 +409,20 @@ function _syncElapsed(): number {
  */
 export function renderConfigSummary(config: SyncConfigSummary): string {
   const items: string[] = []
-  if (config.sourceLabel) items.push(`<span class="cfg-item">📁 ${config.sourceLabel}</span>`)
-  if (config.strategyLabel) items.push(`<span class="cfg-item">🔧 ${config.strategyLabel}</span>`)
-  if (config.directionLabel) items.push(`<span class="cfg-item">📡 ${config.directionLabel}</span>`)
+  if (config.sourceLabel) items.push(`<span class="config-item">📁 ${config.sourceLabel}</span>`)
+  if (config.strategyLabel)
+    items.push(`<span class="config-item">🔧 ${config.strategyLabel}</span>`)
+  if (config.directionLabel)
+    items.push(`<span class="config-item">📡 ${config.directionLabel}</span>`)
   if (config.timeFilterLabel)
-    items.push(`<span class="cfg-item">📅 ${config.timeFilterLabel}</span>`)
-  if (config.selectedRowsOnly) items.push(`<span class="cfg-item warn">⚠️ 仅选中行</span>`)
+    items.push(`<span class="config-item">📅 ${config.timeFilterLabel}</span>`)
+  if (config.selectedRowsOnly) items.push(`<span class="config-item warn">⚠️ 仅选中行</span>`)
   if (config.extra) {
     for (const ex of config.extra) {
-      items.push(`<span class="cfg-item">${ex.label}: ${ex.value}</span>`)
+      items.push(`<span class="config-item">${ex.label}: ${ex.value}</span>`)
     }
   }
-  return items.length > 0 ? `<div class="cfg-summary">${items.join('')}</div>` : ''
+  return items.length > 0 ? `<div class="config-summary">${items.join('')}</div>` : ''
 }
 
 /**

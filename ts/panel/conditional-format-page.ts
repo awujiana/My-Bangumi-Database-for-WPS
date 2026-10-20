@@ -1,12 +1,12 @@
 /**
  * @fileoverview 条件格式管理页 UI 控制器
- * @module panel/cfPage
+ * @module panel/conditionalFormatPage
  * @description 「条件格式管理」独立页：任意工作表可选、规则搜索/分组/隐藏/排序/
  *   复制粘贴/编辑、默认规则集生成、双策略应用（应用前读手工规则快照，弹模态框
  *   列出范围+公式，用户选「清掉后应用」或「保留手工规则」）。
  *
- * 本页面只做渲染与编排，判断逻辑全在纯函数引擎（cf-rules.ts），宿主交互全在
- * cf-apply.ts——单测覆盖在那一层，页面保持薄。
+ * 本页面只做渲染与编排，判断逻辑全在纯函数引擎（conditional-format-rules.ts），宿主交互全在
+ * conditional-format-apply.ts——单测覆盖在那一层，页面保持薄。
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
@@ -17,14 +17,14 @@ import {
   findHeaderRow,
   getApp,
   getColumnMap,
-  markCfPaneLoaded,
+  markConditionalFormatPaneLoaded,
 } from '../tools/util/index.js'
 import { getConfig, setConfig } from '../tools/config.js'
 import {
-  CF_GROUP_HIGHLIGHT,
-  CF_STRATEGY_FALLBACK,
-  CF_STORE_KEY,
-  CF_STRATEGY_KEY,
+  CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
+  CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
+  CONDITIONAL_FORMAT_STORE_KEY,
+  CONDITIONAL_FORMAT_STRATEGY_KEY,
   buildDefaultRules,
   filterRules,
   firstRowOfRange,
@@ -33,14 +33,18 @@ import {
   planApply,
   serializeRules,
   shiftFormulaRows,
-} from './cf-rules.js'
-import type { ApplyStrategy, CfRule, ForeignRuleSnapshot } from './cf-rules.js'
+} from './conditional-format-rules.js'
+import type {
+  ApplyStrategy,
+  ConditionalFormatRule,
+  ForeignRuleSnapshot,
+} from './conditional-format-rules.js'
 import {
-  applyCfPlan,
+  applyConditionalFormatPlan,
   checkFormatConditionsReadable,
   isFormatConditionsSupported,
   readForeignRules,
-} from './cf-apply.js'
+} from './conditional-format-apply.js'
 import { initShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
@@ -49,7 +53,26 @@ import type { WpsWorksheet } from '../tools/wps.js'
 // ===== 常量 =====
 
 /** 选中工作表持久化键 */
-const KEY_SHEET = 'cf.sheet.v1'
+const KEY_SHEET = 'conditionalFormat.sheet.v1'
+
+// ===== 旧键迁移（cf.* → conditionalFormat.*）=====
+// 2026-10-20 命名规范化前的键名。直接换键会让用户已保存的规则库/策略/选中表凭空消失，
+// 所以读一次旧键、写入新键、再清掉旧键——一次性，之后旧键即可弃。
+const LEGACY_STORE_KEY = 'cf.rules.v1'
+const LEGACY_STRATEGY_KEY = 'cf.strategy.v1'
+const LEGACY_SHEET_KEY = 'cf.sheet.v1'
+
+/** 读配置：新键有值直接用；否则回退旧键并迁到新键 */
+function readMigratedConfig(targetKey: string, legacyKey: string): string {
+  const current = getConfig(targetKey, '', true)
+  if (current) return current
+  const legacy = getConfig(legacyKey, '', true)
+  if (legacy) {
+    setConfig(targetKey, legacy)
+    setConfig(legacyKey, '')
+  }
+  return legacy
+}
 
 /** 导入的手工规则所在分组 */
 const IMPORTED_GROUP = '导入的规则'
@@ -65,7 +88,7 @@ interface SheetEntry {
 }
 
 interface PageState {
-  rules: CfRule[]
+  rules: ConditionalFormatRule[]
   sheets: SheetEntry[]
   selectedKey: string
   /** 复制粘贴的剪贴板（规则 id，会话内有效） */
@@ -91,7 +114,7 @@ const state: PageState = {
   editingId: null,
   editingIsNew: false,
   searchQuery: '',
-  pendingStrategy: CF_STRATEGY_FALLBACK,
+  pendingStrategy: CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
   existing: [],
   existingError: null,
 }
@@ -158,7 +181,7 @@ function collectSheets(): SheetEntry[] {
 }
 
 function renderSheetSelect(): void {
-  const select = selectById('cfSheet')
+  const select = selectById('conditionalFormatSheet')
   if (!select) return
   if (state.sheets.length === 0) {
     select.innerHTML = '<option value="">（未找到已打开的工作表）</option>'
@@ -237,30 +260,30 @@ function loadExistingRules(): void {
 
 /** 渲染既有规则列表（只读，按优先级排列） */
 function renderExistingRules(): void {
-  const container = byId('cfExistingList')
+  const container = byId('conditionalFormatExistingList')
   if (!container) return
   if (state.existingError !== null) {
-    container.innerHTML = `<p class="cf-empty">${escapeHtml(state.existingError)}</p>`
-    setText('cfExistingCount', '—')
+    container.innerHTML = `<p class="conditional-format-empty">${escapeHtml(state.existingError)}</p>`
+    setText('conditionalFormatExistingCount', '—')
     return
   }
   if (state.existing.length === 0) {
-    container.innerHTML = '<p class="cf-empty">这张表当前没有条件格式规则。</p>'
-    setText('cfExistingCount', '0 条')
+    container.innerHTML = '<p class="conditional-format-empty">这张表当前没有条件格式规则。</p>'
+    setText('conditionalFormatExistingCount', '0 条')
     return
   }
 
-  setText('cfExistingCount', `${String(state.existing.length)} 条`)
+  setText('conditionalFormatExistingCount', `${String(state.existing.length)} 条`)
   container.innerHTML = state.existing
     .map(
       (rule, index) => `
-      <div class="cf-rule">
-        <span class="cf-existing-index" title="优先级（靠前先生效）">${String(index + 1)}</span>
-        <div class="cf-rule-main">
-          <div class="cf-rule-name">${escapeHtml(fcTypeLabel(rule.type, rule.kind))}${
+      <div class="conditional-format-rule">
+        <span class="conditional-format-existing-index" title="优先级（靠前先生效）">${String(index + 1)}</span>
+        <div class="conditional-format-rule-main">
+          <div class="conditional-format-rule-name">${escapeHtml(fcTypeLabel(rule.type, rule.kind))}${
             rule.kind === 'other' ? ' · 插件无法重建' : ''
           }</div>
-          <div class="cf-rule-meta">${escapeHtml(rule.range || '（未读到范围）')}${
+          <div class="conditional-format-rule-meta">${escapeHtml(rule.range || '（未读到范围）')}${
             rule.formula
               ? ` · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
                   rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula,
@@ -276,15 +299,17 @@ function renderExistingRules(): void {
 // ===== Store 读写 =====
 
 function loadRules(): void {
-  const { rules, dropped } = parseRules(getConfig(CF_STORE_KEY, '', true))
+  const { rules, dropped } = parseRules(
+    readMigratedConfig(CONDITIONAL_FORMAT_STORE_KEY, LEGACY_STORE_KEY),
+  )
   state.rules = rules
   if (dropped > 0) {
-    bgmLog(LOG_LEVELS.WARN, `[cf] 规则库有 ${String(dropped)} 条损坏记录已忽略`)
+    bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 规则库有 ${String(dropped)} 条损坏记录已忽略`)
   }
 }
 
 function persistRules(): void {
-  setConfig(CF_STORE_KEY, serializeRules(state.rules))
+  setConfig(CONDITIONAL_FORMAT_STORE_KEY, serializeRules(state.rules))
 }
 
 function nextId(): string {
@@ -362,25 +387,25 @@ function pasteRules(): void {
 }
 
 function renderRuleList(): void {
-  const container = byId('cfRuleList')
+  const container = byId('conditionalFormatRuleList')
   if (!container) return
   const visible = filterRules(state.rules, state.searchQuery)
 
   if (state.rules.length === 0) {
     container.innerHTML =
-      '<p class="cf-empty">规则库是空的。到「默认规则集」生成一套，或点「新建规则」手写。</p>'
-    setText('cfRuleCount', '0 条规则')
+      '<p class="conditional-format-empty">规则库是空的。到「默认规则集」生成一套，或点「新建规则」手写。</p>'
+    setText('conditionalFormatRuleCount', '0 条规则')
     return
   }
   if (visible.length === 0) {
-    container.innerHTML = '<p class="cf-empty">没有匹配当前搜索词的规则。</p>'
-    setText('cfRuleCount', `0 / ${String(state.rules.length)} 条规则`)
+    container.innerHTML = '<p class="conditional-format-empty">没有匹配当前搜索词的规则。</p>'
+    setText('conditionalFormatRuleCount', `0 / ${String(state.rules.length)} 条规则`)
     return
   }
 
   const hiddenCount = state.rules.filter((rule) => rule.hidden === true).length
   setText(
-    'cfRuleCount',
+    'conditionalFormatRuleCount',
     `${String(state.rules.length)} 条规则${hiddenCount > 0 ? `（${String(hiddenCount)} 条已隐藏）` : ''}`,
   )
 
@@ -391,18 +416,18 @@ function renderRuleList(): void {
         .map((rule) => {
           const isHidden = rule.hidden === true
           return `
-        <div class="cf-rule${isHidden ? ' cf-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}">
-          <label class="cf-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
+        <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}">
+          <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
             <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
           </label>
-          <span class="cf-swatch" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)}"></span>
-          <div class="cf-rule-main">
-            <div class="cf-rule-name">${escapeHtml(rule.name)}</div>
-            <div class="cf-rule-meta">${escapeHtml(rule.appliesTo)} · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
+          <span class="conditional-format-swatch" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)}"></span>
+          <div class="conditional-format-rule-main">
+            <div class="conditional-format-rule-name">${escapeHtml(rule.name)}</div>
+            <div class="conditional-format-rule-meta">${escapeHtml(rule.appliesTo)} · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
               rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula,
             )}</code></div>
           </div>
-          <div class="cf-rule-actions">
+          <div class="conditional-format-rule-actions">
             <button type="button" data-action="up" title="上移（提高优先级）">↑</button>
             <button type="button" data-action="down" title="下移（降低优先级）">↓</button>
             <button type="button" data-action="copy" title="复制">⧉</button>
@@ -413,14 +438,14 @@ function renderRuleList(): void {
         })
         .join('')
       return `
-      <div class="cf-group">
-        <div class="cf-group-title">${escapeHtml(group)}<span class="cf-group-count">${String(rules.length)}</span></div>
+      <div class="conditional-format-group">
+        <div class="conditional-format-group-title">${escapeHtml(group)}<span class="conditional-format-group-count">${String(rules.length)}</span></div>
         ${rows}
       </div>`
     })
     .join('')
 
-  container.querySelectorAll<HTMLElement>('.cf-rule').forEach((row) => {
+  container.querySelectorAll<HTMLElement>('.conditional-format-rule').forEach((row) => {
     const id = row.dataset.ruleId ?? ''
     row.querySelectorAll<HTMLInputElement>('input[data-action="toggle"]').forEach((box) => {
       box.addEventListener('change', () => {
@@ -462,11 +487,11 @@ function renderRuleList(): void {
 
 // ===== 规则编辑器（行内）=====
 
-function blankRule(): CfRule {
+function blankRule(): ConditionalFormatRule {
   return {
     id: nextId(),
     name: '',
-    group: CF_GROUP_HIGHLIGHT,
+    group: CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
     appliesTo: '',
     formula: '',
     interior: '#00B050',
@@ -478,13 +503,13 @@ function openEditor(id: string | null, isNew: boolean): void {
   state.editingIsNew = isNew
   const rule = id ? state.rules.find((r) => r.id === id) : blankRule()
   if (!rule) return
-  const nameInput = inputById('cfEditName')
-  const groupInput = inputById('cfEditGroup')
-  const rangeInput = inputById('cfEditRange')
-  const formulaInput = byId('cfEditFormula') as HTMLTextAreaElement | null
-  const fillInput = inputById('cfEditFill')
-  const fontInput = inputById('cfEditFont')
-  const boldInput = inputById('cfEditBold')
+  const nameInput = inputById('conditionalFormatEditName')
+  const groupInput = inputById('conditionalFormatEditGroup')
+  const rangeInput = inputById('conditionalFormatEditRange')
+  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
+  const fillInput = inputById('conditionalFormatEditFill')
+  const fontInput = inputById('conditionalFormatEditFont')
+  const boldInput = inputById('conditionalFormatEditBold')
   if (nameInput) nameInput.value = rule.name
   if (groupInput) groupInput.value = rule.group
   if (rangeInput) rangeInput.value = rule.appliesTo
@@ -492,26 +517,26 @@ function openEditor(id: string | null, isNew: boolean): void {
   if (fillInput) fillInput.value = rule.interior
   if (fontInput) fontInput.value = rule.fontColor ?? '#000000'
   if (boldInput) boldInput.checked = rule.fontBold === true
-  const editor = byId('cfEditor')
+  const editor = byId('conditionalFormatEditor')
   if (editor) editor.style.display = 'block'
-  setText('cfEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
+  setText('conditionalFormatEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
 }
 
 function closeEditor(): void {
   state.editingId = null
   state.editingIsNew = false
-  const editor = byId('cfEditor')
+  const editor = byId('conditionalFormatEditor')
   if (editor) editor.style.display = 'none'
 }
 
 function saveEditor(): void {
-  const nameInput = inputById('cfEditName')
-  const groupInput = inputById('cfEditGroup')
-  const rangeInput = inputById('cfEditRange')
-  const formulaInput = byId('cfEditFormula') as HTMLTextAreaElement | null
-  const fillInput = inputById('cfEditFill')
-  const fontInput = inputById('cfEditFont')
-  const boldInput = inputById('cfEditBold')
+  const nameInput = inputById('conditionalFormatEditName')
+  const groupInput = inputById('conditionalFormatEditGroup')
+  const rangeInput = inputById('conditionalFormatEditRange')
+  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
+  const fillInput = inputById('conditionalFormatEditFill')
+  const fontInput = inputById('conditionalFormatEditFont')
+  const boldInput = inputById('conditionalFormatEditBold')
 
   const name = nameInput?.value.trim() ?? ''
   const appliesTo = rangeInput?.value.trim() ?? ''
@@ -526,10 +551,10 @@ function saveEditor(): void {
   const fillText = fillInput?.value ?? ''
   const fontText = fontInput?.value ?? ''
   const isBold = boldInput?.checked === true
-  const rule: CfRule = {
+  const rule: ConditionalFormatRule = {
     id: existing?.id ?? nextId(),
     name,
-    group: groupText === '' ? CF_GROUP_HIGHLIGHT : groupText,
+    group: groupText === '' ? CONDITIONAL_FORMAT_GROUP_HIGHLIGHT : groupText,
     appliesTo,
     formula,
     interior: fillText === '' ? '#00B050' : fillText,
@@ -582,7 +607,7 @@ function generateDefaults(): void {
 // ===== 应用流程（双策略）=====
 
 function lastStrategy(): ApplyStrategy {
-  const stored = getConfig(CF_STRATEGY_KEY, CF_STRATEGY_FALLBACK, true)
+  const stored = readMigratedConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, LEGACY_STRATEGY_KEY)
   return stored === 'append-after' ? 'append-after' : 'clear-all'
 }
 
@@ -603,9 +628,9 @@ function runApply(strategy: ApplyStrategy): void {
   }
 
   const foreign = readForeignRules(entry.ws)
-  setConfig(CF_STRATEGY_KEY, strategy)
+  setConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, strategy)
   const plan = planApply(state.rules, foreign, strategy)
-  const result = applyCfPlan(entry.ws, plan)
+  const result = applyConditionalFormatPlan(entry.ws, plan)
   if (result.failed > 0) {
     showToast(
       `写入 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`,
@@ -617,14 +642,14 @@ function runApply(strategy: ApplyStrategy): void {
   const discardedNote =
     plan.discarded.length > 0 ? ` · 清理手工规则 ${String(plan.discarded.length)} 条` : ''
   setText(
-    'cfApplyStatus',
+    'conditionalFormatApplyStatus',
     `上次应用：${entry.sheet} · ${String(result.added)} 条（失败 ${String(result.failed)}）${discardedNote}`,
   )
 }
 
 function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
-  const mask = byId('cfConfirmMask')
-  const body = byId('cfConfirmBody')
+  const mask = byId('conditionalFormatConfirmMask')
+  const body = byId('conditionalFormatConfirmBody')
   if (!mask || !body) return
   const last = lastStrategy()
   const rows = foreign
@@ -638,11 +663,11 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
     .join('')
   body.innerHTML = `
     <p>目标工作表上检测到 <strong>${String(foreign.length)}</strong> 条既有条件格式规则（你手工建的或别的工具建的）。</p>
-    <p class="cf-modal-label">将被处理的规则：</p>
-    <ul class="cf-modal-list">${rows}</ul>
-    <p class="cf-modal-label">怎么处理它们？</p>`
-  const clearButton = byId('cfConfirmClear')
-  const keepButton = byId('cfConfirmKeep')
+    <p class="conditional-format-modal-label">将被处理的规则：</p>
+    <ul class="conditional-format-modal-list">${rows}</ul>
+    <p class="conditional-format-modal-label">怎么处理它们？</p>`
+  const clearButton = byId('conditionalFormatConfirmClear')
+  const keepButton = byId('conditionalFormatConfirmKeep')
   if (clearButton) {
     clearButton.textContent = last === 'clear-all' ? '清掉后应用（上次选择）' : '清掉后应用'
   }
@@ -654,7 +679,7 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
 }
 
 function closeConfirmModal(): void {
-  const mask = byId('cfConfirmMask')
+  const mask = byId('conditionalFormatConfirmMask')
   if (mask) mask.style.display = 'none'
 }
 
@@ -706,7 +731,7 @@ function importForeign(): void {
     loadExistingRules()
     return
   }
-  const imported: CfRule[] = expressible.map((rule) => ({
+  const imported: ConditionalFormatRule[] = expressible.map((rule) => ({
     id: nextId(),
     name: `导入 ${rule.range}`,
     group: IMPORTED_GROUP,
@@ -727,74 +752,74 @@ function importForeign(): void {
 
 // ===== 初始化 =====
 
-export function initCfPage(): void {
-  markCfPaneLoaded()
+export function initConditionalFormatPage(): void {
+  markConditionalFormatPaneLoaded()
   initShellNav()
   initTheme()
   startThemeSync()
 
   loadRules()
-  state.selectedKey = getConfig(KEY_SHEET, '', true)
+  state.selectedKey = readMigratedConfig(KEY_SHEET, LEGACY_SHEET_KEY)
   reloadSheets()
 
   // 搜索
-  inputById('cfSearch')?.addEventListener('input', (event) => {
+  inputById('conditionalFormatSearch')?.addEventListener('input', (event) => {
     state.searchQuery = (event.target as HTMLInputElement).value
     renderRuleList()
   })
 
   // 工作表选择
-  selectById('cfSheet')?.addEventListener('change', (event) => {
+  selectById('conditionalFormatSheet')?.addEventListener('change', (event) => {
     state.selectedKey = (event.target as HTMLSelectElement).value
     setConfig(KEY_SHEET, state.selectedKey)
     loadExistingRules()
   })
-  byId('cfReloadSheetsBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatReloadSheetsBtn')?.addEventListener('click', () => {
     reloadSheets()
   })
-  byId('cfRefreshExistingBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatRefreshExistingBtn')?.addEventListener('click', () => {
     loadExistingRules()
   })
 
   // 规则操作
-  byId('cfNewRuleBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatNewRuleBtn')?.addEventListener('click', () => {
     openEditor(null, true)
   })
-  byId('cfPasteBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatPasteBtn')?.addEventListener('click', () => {
     pasteRules()
   })
-  byId('cfImportBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatImportBtn')?.addEventListener('click', () => {
     importForeign()
   })
-  byId('cfDefaultsBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatDefaultsBtn')?.addEventListener('click', () => {
     generateDefaults()
   })
-  byId('cfApplyBtn')?.addEventListener('click', () => {
+  byId('conditionalFormatApplyBtn')?.addEventListener('click', () => {
     applyFlow()
   })
 
   // 编辑器
-  byId('cfEditorSave')?.addEventListener('click', () => {
+  byId('conditionalFormatEditorSave')?.addEventListener('click', () => {
     saveEditor()
   })
-  byId('cfEditorCancel')?.addEventListener('click', () => {
+  byId('conditionalFormatEditorCancel')?.addEventListener('click', () => {
     closeEditor()
   })
 
   // 确认模态框（双策略）
-  byId('cfConfirmClear')?.addEventListener('click', () => {
+  byId('conditionalFormatConfirmClear')?.addEventListener('click', () => {
     closeConfirmModal()
     runApply('clear-all')
   })
-  byId('cfConfirmKeep')?.addEventListener('click', () => {
+  byId('conditionalFormatConfirmKeep')?.addEventListener('click', () => {
     closeConfirmModal()
     runApply('append-after')
   })
-  byId('cfConfirmCancel')?.addEventListener('click', () => {
+  byId('conditionalFormatConfirmCancel')?.addEventListener('click', () => {
     closeConfirmModal()
   })
-  byId('cfConfirmMask')?.addEventListener('click', (event) => {
-    if (event.target === byId('cfConfirmMask')) closeConfirmModal()
+  byId('conditionalFormatConfirmMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatConfirmMask')) closeConfirmModal()
   })
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeConfirmModal()
