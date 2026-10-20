@@ -531,7 +531,7 @@ function writeRowValuesWithUndo(
     if (hasChanges) {
       // 只写入有变化的列：构建最小写入范围
       // 简化处理：直接写入整行（一次 COM 调用）
-      // 局部别名：避免对函数参数 range 的属性赋值（no-param-reassign）
+      // 局部别名：避免对函数参数 range 的属性赋值（no-parameter-reassign）
       const targetRange = range
       targetRange.Value2 = finalValues as unknown as WpsCellValue
     }

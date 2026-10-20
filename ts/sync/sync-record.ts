@@ -869,7 +869,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
   const pendingRows: string[][] = []
   const sidToUpdate = new Map<
     string,
-    { row: number; updatedCount: number; status: string; params: UpdateRecordParameters }
+    { row: number; updatedCount: number; status: string; parameters: UpdateRecordParameters }
   >()
 
   for (const parameters of records) {
@@ -899,7 +899,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
         row: existingRow,
         updatedCount: totalCount,
         status: parameters.status ?? SYNC_STATUS.SUCCESS,
-        params: parameters,
+        parameters,
       })
     }
   }
@@ -920,7 +920,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
   }
 
   // 更新已有 SID 的时间、次数、状态及其他字段（整行读-改-写，替代逐单元格 setCellValue）
-  for (const [sid, { row, updatedCount, status, params }] of sidToUpdate) {
+  for (const [sid, { row, updatedCount, status, parameters }] of sidToUpdate) {
     const existingRows = readRangeCellValues(sheet, row, row, 1, SYNC_RECORD_COLUMNS.length)
     const existing = existingRows[0]
     // 读回失败（形状归一化失败）或读回宽度不足时放弃该行的更新并记录日志：
@@ -932,7 +932,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
         `[addSyncRecords] 第 ${String(row)} 行旧值读取失败或宽度不足，放弃更新（SID=${sid}）`,
       )
     } else {
-      const rowValues = buildUpdatedSyncRow(existing, params, now, updatedCount, status)
+      const rowValues = buildUpdatedSyncRow(existing, parameters, now, updatedCount, status)
       writeSheetRows(sheet, row, [rowValues])
       setSyncRecordColors(sheet, row, status, updatedCount)
       _syncRecordSidCache.set(sid, row)

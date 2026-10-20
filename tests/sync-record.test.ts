@@ -3012,7 +3012,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockClear()
 
-    // 不传 fingerprint → 走 params.fingerprint !== undefined ? ... : ''
+    // 不传 fingerprint → 走 parameters.fingerprint !== undefined ? ... : ''
     const isResult = addSyncRecord({
       sid: 'no-fingerprint',
       name: '无指纹测试',

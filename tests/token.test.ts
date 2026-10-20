@@ -240,12 +240,12 @@ describe('token · showTokenDialog', () => {
   })
 
   it('传入 currentToken 时优先预填（不经 loadBgToken）', () => {
-    token.showTokenDialog('from-param')
+    token.showTokenDialog('from-parameter')
 
     expect(m.showInput).toHaveBeenCalledWith(
       _T.setBgmToken,
       _T.inputToken,
-      'from-param',
+      'from-parameter',
       expect.any(Function),
     )
   })
@@ -406,7 +406,10 @@ describe('token · updateTokenStatus', () => {
 
     const status = getElement('tokenStatus')
     expect(status.textContent).toContain('⚠ 网络无法连接')
-    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('无法连接到 Bangumi API'), 'warn')
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('无法连接到 Bangumi API'),
+      'warn',
+    )
     expect(getElement('tokenExpiresDisplay').textContent).toContain(_T.tokenExpiresLabel)
   })
 

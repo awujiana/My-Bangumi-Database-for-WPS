@@ -287,7 +287,7 @@ function renderGlobalEta(
 /**
  * 追加一行日志并维持行数上限（超出丢弃最旧行）
  * @returns 追加后的日志行数
- * @remarks 滚动位置由调用方处理：直接写参数的 scrollTop 会触发 no-param-reassign
+ * @remarks 滚动位置由调用方处理：直接写参数的 scrollTop 会触发 no-parameter-reassign
  */
 function appendLogLine(log: HTMLElement, line: string, logCount: number): number {
   log.appendChild(document.createTextNode(`${line}\n`))

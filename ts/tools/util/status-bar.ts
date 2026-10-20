@@ -42,7 +42,7 @@ export function createStatusBarWriter(
   intervalMs: number = STATUS_BAR_THROTTLE_MS,
   now: () => number = Date.now,
 ): StatusBarWriter {
-  // 参数只在闭包里读取：写入统一走 commit（避免 no-param-reassign，也便于收窄空值）
+  // 参数只在闭包里读取：写入统一走 commit（避免 no-parameter-reassign，也便于收窄空值）
   const host = app
   const isSupported = (): boolean => host?.StatusBar !== undefined
   // 初值 -Infinity：保证「第一次写入」无论时钟起点在哪都立即落盘

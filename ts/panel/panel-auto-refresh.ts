@@ -83,7 +83,7 @@ export function registerSheetChangeAutoRefresh(
 ): () => void {
   if (!app) return NOOP_DISPOSER
 
-  // 参数只在闭包里读取：赋值统一走 host（避免 no-param-reassign）
+  // 参数只在闭包里读取：赋值统一走 host（避免 no-parameter-reassign）
   const host = app
   const { trigger, dispose } = createDebouncedRefresh(refresh, options)
 

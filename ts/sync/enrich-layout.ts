@@ -143,7 +143,7 @@ export interface EnrichColumnMapping {
 }
 
 /**
- * 匹配表头对应的首个字段名（独立辅助函数，用 return 替代嵌套循环内 break，且不改写参数避免 no-param-reassign）
+ * 匹配表头对应的首个字段名（独立辅助函数，用 return 替代嵌套循环内 break，且不改写参数避免 no-parameter-reassign）
  * @returns 命中的字段名；无匹配返回 null
  */
 function findKeywordField(normalizedHeader: string): keyof EnrichColumnMapping | null {
