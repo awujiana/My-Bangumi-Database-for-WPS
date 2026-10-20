@@ -247,7 +247,7 @@ let uploadedRows = new Set<number>()
 
 function setDataPreview(overrides: Record<string, unknown> = {}): void {
   mocks.dataPreview = {
-    ws: { Name: '动画' },
+    worksheet: { Name: '动画' },
     visibleRows: [1, 2, 3],
     headerRow: 1,
     dataStartRow: 2,
@@ -436,8 +436,8 @@ describe('preview · previewSyncContent', () => {
     mountDiv('scrollToBottomBtn')
     // 第 3 行拿不到 Interior（宿主返回裸对象）→ 已上传判定走「无 Interior」早退
     const baseGetCell = mocks.getCell.getMockImplementation()
-    mocks.getCell.mockImplementation((ws: unknown, row: number, col: number) =>
-      row === 3 ? null : baseGetCell?.(ws, row, col),
+    mocks.getCell.mockImplementation((worksheet: unknown, row: number, col: number) =>
+      row === 3 ? null : baseGetCell?.(worksheet, row, col),
     )
 
     await previewSyncContent()
@@ -516,9 +516,9 @@ describe('preview · previewSyncContent', () => {
     // 第 5 行：有 URL 但读取时抛错 → 错误
     cells['5:3'] = 'https://bgm.tv/subject/500'
     const original = mocks.getCellValue.getMockImplementation()
-    mocks.getCellValue.mockImplementation((ws: unknown, row: number, col: number) => {
+    mocks.getCellValue.mockImplementation((worksheet: unknown, row: number, col: number) => {
       if (row === 5) throw new Error('读取越界')
-      return original?.(ws, row, col) ?? ''
+      return original?.(worksheet, row, col) ?? ''
     })
 
     // 本用例覆盖的是「逐格读抛错 ⇒ 计入错误行」：矩形读可用时整块读成功，

@@ -109,15 +109,15 @@ function fieldOrDefault(entry: Record<string, unknown>, field: string): unknown 
  * 而 Text 属性返回的是单元格显示的格式化文本（如 "2024-01-01" 或 "2024/1/1"）。
  * 优先使用 Text 属性可以保留用户设置的本地日期格式。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param row 行号
  * @param col 列号
  * @returns 单元格显示文本，空值返回空字符串
  */
-function getCellText(ws: WpsWorksheet, row: number, col: number): string {
+function getCellText(worksheet: WpsWorksheet, row: number, col: number): string {
   try {
     const address = colNumberToLetter(col) + String(row)
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     // 尝试读取 Text 属性（保留本地格式）
     const raw = (cell as unknown as { Text?: unknown }).Text
     if (raw != null && typeof raw === 'string' && raw.trim()) {
@@ -126,7 +126,7 @@ function getCellText(ws: WpsWorksheet, row: number, col: number): string {
   } catch {
     // 忽略，回退到 getCellValue
   }
-  return trim(getCellValue(ws, row, col))
+  return trim(getCellValue(worksheet, row, col))
 }
 
 /**
@@ -143,15 +143,15 @@ function getCellText(ws: WpsWorksheet, row: number, col: number): string {
  * @returns JSONL 字符串，若无数据则返回空字符串
  */
 export function buildJsonlFromSheet(): string {
-  const ws = getDataSheet()
-  if (!ws) {
+  const worksheet = getDataSheet()
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, '[exportJsonl] 未找到数据工作表')
     return ''
   }
 
-  const headerRow = findHeaderRow(ws) || 1
-  const lastRow = getLastRow(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const lastRow = getLastRow(worksheet)
+  const colMap = getColumnMap(worksheet, headerRow)
 
   const urlCol = colMap.get('Bangumi_URL')
   if (urlCol === undefined) {
@@ -172,11 +172,11 @@ export function buildJsonlFromSheet(): string {
     const col = colMap.get(key)
     if (col !== undefined && col > batchMaxCol) batchMaxCol = col
   }
-  const block = readRangeValues(ws, startRow, lastRow, 1, batchMaxCol)
+  const block = readRangeValues(worksheet, startRow, lastRow, 1, batchMaxCol)
   const canBatch = block.length === lastRow - startRow + 1
   // 矩形读不可用时回退逐格读（行为与改造前一致）
   const cellText = (row: number, col: number): string =>
-    canBatch ? (block[row - startRow]?.[col - 1] ?? '') : getCellValue(ws, row, col)
+    canBatch ? (block[row - startRow]?.[col - 1] ?? '') : getCellValue(worksheet, row, col)
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(cellText(row, urlCol))
@@ -193,7 +193,7 @@ export function buildJsonlFromSheet(): string {
         const getDateField = (key: string): string => {
           const col = colMap.get(key)
           if (!col) return ''
-          return getCellText(ws, row, col)
+          return getCellText(worksheet, row, col)
         }
 
         const name = getField('名称')

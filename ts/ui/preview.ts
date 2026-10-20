@@ -125,12 +125,12 @@ const MAX_BATCH_ROW_SPAN = 20_000
  * 读回行数不足或行跨度过大时返回 undefined —— 调用方回退逐格读。
  */
 function buildRowCellsCache(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   rows: number[],
   colMap: ColumnMap,
   seqCol: number,
 ): Map<number, ReadonlyMap<number, string>> | undefined {
-  if (!ws || rows.length === 0) return undefined
+  if (!worksheet || rows.length === 0) return undefined
 
   let minRow = rows[0] ?? 0
   let maxRow = minRow
@@ -152,7 +152,7 @@ function buildRowCellsCache(
     if (col > maxCol) maxCol = col
   }
 
-  const block = readRangeValues(ws, minRow, maxRow, minCol, maxCol)
+  const block = readRangeValues(worksheet, minRow, maxRow, minCol, maxCol)
   if (block.length !== maxRow - minRow + 1) return undefined
 
   const cache = new Map<number, ReadonlyMap<number, string>>()
@@ -165,7 +165,7 @@ function buildRowCellsCache(
 }
 
 function getRowData(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   rowNumber: number,
   colMap: ColumnMap,
   headerRow: number,
@@ -189,7 +189,7 @@ function getRowData(
     const col = colMap.get(mapKey)
     if (col !== undefined) {
       // 命中批量读缓存就用缓存，否则逐格读（兼容未走批量路径的调用点）
-      const raw = rowCells?.get(col) ?? getCellValue(ws, rowNumber, col)
+      const raw = rowCells?.get(col) ?? getCellValue(worksheet, rowNumber, col)
       return trim(raw)
     }
     return ''
@@ -214,7 +214,7 @@ function getRowData(
 
   // 从列映射中读取序列号列，如果没有则使用默认值
   const actualSeqCol = colMap.get('序列号') ?? seqCol
-  const seqCell = getCell(ws, rowNumber, actualSeqCol)
+  const seqCell = getCell(worksheet, rowNumber, actualSeqCol)
   data.isUploaded = isUploadedByColor(seqCell)
   return data
 }
@@ -223,7 +223,7 @@ function getRowData(
  * 渲染详情项的HTML内容
  * @param rowData - 详情项数据对象，包含名称、类型、标签等信息
  * @param colMap - 列映射关系（预留，用于扩展）
- * @param ws - 工作表对象（预留，用于扩展）
+ * @param worksheet - 工作表对象（预留，用于扩展）
  * @returns 返回渲染后的详情项HTML字符串
  */
 function renderDetailItemHtml(
@@ -366,12 +366,12 @@ export async function previewSyncContent(): Promise<void> {
   }
 
   const dp = BGM.dataPreview
-  if (!dp?.ws) {
+  if (!dp?.worksheet) {
     showToast('请先在预览面板中加载数据', 'warn')
     return
   }
 
-  const { ws, visibleRows, headerRow, dataStartRow } = dp
+  const { worksheet, visibleRows, headerRow, dataStartRow } = dp
   // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
   const dataRows = [
     ...new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
@@ -389,7 +389,7 @@ export async function previewSyncContent(): Promise<void> {
     return
   }
 
-  const colMap = getColumnMap(ws, headerRow)
+  const colMap = getColumnMap(worksheet, headerRow)
   if (colMap.size === 0) {
     showToast('无法读取列映射', 'error')
     return
@@ -418,7 +418,7 @@ export async function previewSyncContent(): Promise<void> {
   // 进入运行状态（防重入，统一入口）
   if (!BGM.sync.enterRunningState()) return
   const urlColForLocate = colMap.get('Bangumi_URL') ?? 1
-  BGM.sync.updatePosition(ws, 0, urlColForLocate)
+  BGM.sync.updatePosition(worksheet, 0, urlColForLocate)
 
   let cardsHtml = '<div class="detail-list">'
   let actualCardCount = 0
@@ -427,7 +427,7 @@ export async function previewSyncContent(): Promise<void> {
   let errorCount = 0
 
   // 循环外一次矩形读全部取数列（缓存未建成时 getRowData 自动回退逐格读）
-  const rowCellsCache = buildRowCellsCache(ws, dataRows, colMap, 9)
+  const rowCellsCache = buildRowCellsCache(worksheet, dataRows, colMap, 9)
 
   const renderPreviewCards = async (): Promise<void> => {
     for (const [index, rowNumber] of dataRows.entries()) {
@@ -462,7 +462,7 @@ export async function previewSyncContent(): Promise<void> {
       // 缓存查表放在 try 外：可选链会抬高 try 块复杂度（unicorn/try-complexity）
       const rowCells = rowCellsCache?.get(rowNumber)
       try {
-        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9, rowCells)
+        const rowData = getRowData(worksheet, rowNumber, colMap, headerRow, 9, rowCells)
 
         // 过滤无效行
         if (!rowData.bgmUrl || !rowData.sid) {
@@ -501,7 +501,7 @@ export async function previewSyncContent(): Promise<void> {
           }
 
           // 生成卡片 HTML（渲染成功后才计数）
-          cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
+          cardsHtml += renderDetailItemHtml(rowData, colMap, worksheet)
           actualCardCount += 1
           updateSyncProgressDialog(
             index + 1,
@@ -754,18 +754,18 @@ export async function uploadSingleRow(
     const parsedSheetIndex =
       BGM.sheet.lockedIndex ?? (selectedSheetValue === '' ? NaN : Number(selectedSheetValue))
     const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
-    const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
+    const worksheet = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
-    const headerRow = findHeaderRow(ws) || 1
-    const colMap: ColumnMap = getColumnMap(ws, headerRow)
+    const headerRow = findHeaderRow(worksheet) || 1
+    const colMap: ColumnMap = getColumnMap(worksheet, headerRow)
     if (!colMap.has('Bangumi_URL')) throw new Error('未找到 Bangumi URL 列')
 
-    const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
+    const rowData = getRowData(worksheet, rowNumber, colMap, headerRow, 9)
     if (!rowData.sid) throw new Error('无法提取 Subject ID')
 
     const jsonBody = buildJsonPayload((key) => {
       const col = colMap.get(key)
-      return col === undefined ? '' : trim(getCellValue(ws, rowNumber, col))
+      return col === undefined ? '' : trim(getCellValue(worksheet, rowNumber, col))
     }, rowData.finishedDate)
     if (!jsonBody) throw new Error('无法构建请求体')
 
@@ -778,7 +778,7 @@ export async function uploadSingleRow(
     const statusCode = result.code || 0
     // 从列映射中读取序列号列
     const actualSeqCol = colMap.get('序列号') ?? 9
-    const seqCell = getCell(ws, rowNumber, actualSeqCol)
+    const seqCell = getCell(worksheet, rowNumber, actualSeqCol)
 
     if ([200, 201, 202, 204].includes(statusCode)) {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS
@@ -918,7 +918,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   }
 
   const dp = BGM.dataPreview
-  if (!dp?.ws) {
+  if (!dp?.worksheet) {
     showToast('请先在预览面板中加载数据', 'warn')
     return { success: 0, fail: 0, skip: 0 }
   }
@@ -940,7 +940,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     return { success: 0, fail: 0, skip: 0 }
   }
 
-  const { ws, visibleRows, headerRow, dataStartRow } = dp
+  const { worksheet, visibleRows, headerRow, dataStartRow } = dp
   // 防御性排序 + 去重：确保行号严格升序且无重复
   const dataRows = [
     ...new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
@@ -950,7 +950,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     return { success: 0, fail: 0, skip: 0 }
   }
 
-  const colMap = getColumnMap(ws, headerRow)
+  const colMap = getColumnMap(worksheet, headerRow)
   if (colMap.size === 0) {
     showToast('无法读取列映射', 'error')
     return { success: 0, fail: 0, skip: 0 }
@@ -964,7 +964,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   // ---------- 2. 冲突检测（可选，默认以 Excel 覆盖） ----------
   let conflictInfo = ''
   try {
-    const { conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token)
+    const { conflictCount } = await detectConflicts(worksheet, colMap, lastRow, headerRow, token)
     if (conflictCount > 0) {
       // 使用 Ribbon 的统一策略：默认以 Excel 覆盖，所以只需记录，不跳过
       conflictInfo = `检测到 ${String(conflictCount)} 条冲突，将以 Excel 数据覆盖。`
@@ -996,7 +996,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
   try {
     // 更新当前位置（便于暂停时定位到表头）
-    BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') ?? 9)
+    BGM.sync.updatePosition(worksheet, headerRow, colMap.get('序列号') ?? 9)
 
     const uploadConfig: SyncConfigSummary = buildSyncConfig({
       source: '当前工作表',
@@ -1010,7 +1010,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
     showSyncProgressDialog('正在上传同步', createSyncControlHandlers(BGM.sync), uploadConfig)
 
-    const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+    const result = await SyncToBangumiAsync(worksheet, colMap, token, lastRow, headerRow, {
       // 从 Ribbon 设置读取
       incremental: isIncremental,
       onProgress: (current, total, message) => {

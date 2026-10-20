@@ -23,7 +23,7 @@ export type FieldGetter = (row: number, key: string) => string
 /**
  * 批量读取数据并创建字段快速访问器（矩形读 + 逐格回退）。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列名 → 列号
  * @param startRow 数据起始行
  * @param lastRow 数据末行
@@ -31,7 +31,7 @@ export type FieldGetter = (row: number, key: string) => string
  * @returns 字段访问器
  */
 export function createBatchFieldGetter(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   startRow: number,
   lastRow: number,
@@ -43,7 +43,7 @@ export function createBatchFieldGetter(
     const col = colMap.get(key)
     if (col !== undefined) maxCol = Math.max(maxCol, col)
   }
-  const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol)
+  const allData = readRangeValues(worksheet, startRow, lastRow, 1, maxCol)
 
   return (row: number, key: string): string => {
     const col = colMap.get(key)
@@ -57,7 +57,7 @@ export function createBatchFieldGetter(
     }
     // 回退到逐单元格读取
     const fallbackCol = colMap.get(key)
-    return fallbackCol === undefined ? '' : trim(getCellValue(ws, row, fallbackCol))
+    return fallbackCol === undefined ? '' : trim(getCellValue(worksheet, row, fallbackCol))
   }
 }
 

@@ -132,14 +132,14 @@ const MIN_REQUEST_INTERVAL = 100
 
 /**
  * 检查单元格是否已标记为同步成功（颜色判断）
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param row 行号
  * @param seqCol 序列号列索引（可选，默认4）
  */
-function isCellMarkedSuccess(ws: WpsWorksheet, row: number, seqCol?: number): boolean {
+function isCellMarkedSuccess(worksheet: WpsWorksheet, row: number, seqCol?: number): boolean {
   try {
     const col = seqCol ?? _DEFAULT_SEQ_COL
-    const cell = getCell(ws, row, col)
+    const cell = getCell(worksheet, row, col)
     if (!cell?.Interior) return false
     const color = cell.Interior.Color
     return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(color)
@@ -160,13 +160,13 @@ function isCellMarkedSuccess(ws: WpsWorksheet, row: number, seqCol?: number): bo
 
 /**
  * 获取筛选状态（可见行）
- * @param wsOrLastRow 工作表对象或最后行号（兼容旧用法）
- * @param lastRow 最后行号（当 wsOrLastRow 为工作表时）
+ * @param worksheetOrLastRow 工作表对象或最后行号（兼容旧用法）
+ * @param lastRow 最后行号（当 worksheetOrLastRow 为工作表时）
  * @param headerRow 表头行号，用于排除
  * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
  */
 export function getFilterStatus(
-  wsOrLastRow?: WpsWorksheet | number,
+  worksheetOrLastRow?: WpsWorksheet | number,
   lastRow?: number,
   headerRow?: number,
   // true: 也检测非 AutoFilter 的隐藏行（性能开销）
@@ -183,7 +183,7 @@ export function getFilterStatus(
   }
 
   try {
-    return getFilterStatusCore(result, wsOrLastRow, lastRow, headerRow, shouldDeepCheck)
+    return getFilterStatusCore(result, worksheetOrLastRow, lastRow, headerRow, shouldDeepCheck)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
   }
@@ -242,19 +242,19 @@ interface RowProcessOutcome {
 /**
  * 获取可见行（数据获取层 - 步骤1）
  * 根据筛选状态确定需要处理的行号列表；无筛选时返回 [startRow, lastRow] 全量行。
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param startRow 起始数据行
  * @param lastRow 最后一行
  * @param headerRow 表头行（用于排除）
  * @returns 待处理的行号数组
  */
 function fetchVisibleRowsForSync(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   startRow: number,
   lastRow: number,
   headerRow: number,
 ): number[] {
-  const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
+  const filterStatus = getFilterStatus(worksheet, lastRow, headerRow, true)
   if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
     const rows = filterStatus.visibleRows.filter((r) => r >= startRow)
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 筛选模式：处理 ${String(rows.length)} 个可见行`)
@@ -293,7 +293,7 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  * 处理单行数据并转换为同步任务（业务处理层 - 步骤4循环体）
  * 校验链：URL → SID → 冲突跳过 → 观看状态 → 状态类型 → 指纹对比 → 颜色标记 → 构建 SyncTask。
  * 任何校验失败均返回 skipped=true；异常返回 failed=true。
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rowNumber 当前行号
  * @param getField 字段访问器（基于批量缓存）
  * @param skipSids 需跳过的 SID 集合（冲突处理）
@@ -302,7 +302,7 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  * @returns 处理结果：task 有值表示需要同步
  */
 function processRowToSyncTask(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   rowNumber: number,
   getField: (row: number, key: string) => string,
   skipSids: Set<string> | undefined,
@@ -310,7 +310,14 @@ function processRowToSyncTask(
   seqCol: number,
 ): RowProcessOutcome {
   try {
-    return processRowToSyncTaskInner(ws, rowNumber, getField, skipSids, fingerprintMap, seqCol)
+    return processRowToSyncTaskInner(
+      worksheet,
+      rowNumber,
+      getField,
+      skipSids,
+      fingerprintMap,
+      seqCol,
+    )
   } catch (error: unknown) {
     BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' })
     return { task: null, skipped: false, failed: true }
@@ -321,7 +328,7 @@ function processRowToSyncTask(
  * processRowToSyncTask 主体（自 try 块抽离，降低 unicorn/try-complexity 计数）
  */
 function processRowToSyncTaskInner(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   rowNumber: number,
   getField: (row: number, key: string) => string,
   skipSids: Set<string> | undefined,
@@ -363,7 +370,7 @@ function processRowToSyncTaskInner(
   }
 
   // 检查已上传颜色（非增量模式）
-  if (!fingerprintMap && isCellMarkedSuccess(ws, rowNumber, seqCol)) {
+  if (!fingerprintMap && isCellMarkedSuccess(worksheet, rowNumber, seqCol)) {
     return { task: null, skipped: true, failed: false }
   }
 
@@ -391,7 +398,7 @@ function processRowToSyncTaskInner(
  * 预处理同步任务（协调函数 - 步骤 1-4）
  * 协调 fetchVisibleRowsForSync → buildFingerprintMap → processRowToSyncTask 三个子步骤，
  * 完成筛选可见行、批量读取数据缓存、构建历史指纹映射、收集所有需要同步的任务。
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列映射
  * @param options 同步选项
  * @param startRow 起始数据行（headerRow + 1）
@@ -400,7 +407,7 @@ function processRowToSyncTaskInner(
  * @returns 待同步任务列表及预处理阶段的跳过/失败计数
  */
 function prepareSyncTasks(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   options: SyncOptions | undefined,
   startRow: number,
@@ -412,10 +419,10 @@ function prepareSyncTasks(
   const headerRow = startRow - 1
 
   // 步骤1：获取可见行（数据获取）
-  const rowsToProcess = fetchVisibleRowsForSync(ws, startRow, lastRow, headerRow)
+  const rowsToProcess = fetchVisibleRowsForSync(worksheet, startRow, lastRow, headerRow)
 
   // 步骤2：批量读取数据缓存（性能关键）
-  const getField = createBatchFieldGetter(ws, colMap, startRow, lastRow, BATCH_READ_COLUMNS)
+  const getField = createBatchFieldGetter(worksheet, colMap, startRow, lastRow, BATCH_READ_COLUMNS)
 
   // 步骤3：构建历史指纹映射（数据获取）
   const fingerprintMap = buildFingerprintMap(options?.incremental)
@@ -426,7 +433,14 @@ function prepareSyncTasks(
   const skipSids = options?.skipSids
 
   for (const rowNumber of rowsToProcess) {
-    const outcome = processRowToSyncTask(ws, rowNumber, getField, skipSids, fingerprintMap, seqCol)
+    const outcome = processRowToSyncTask(
+      worksheet,
+      rowNumber,
+      getField,
+      skipSids,
+      fingerprintMap,
+      seqCol,
+    )
     if (outcome.failed) {
       fail += 1
     } else if (outcome.skipped) {
@@ -613,7 +627,7 @@ async function batchSyncRequests(
  * @param token API Token
  * @param userIdPath 用户 API 路径
  * @param options 同步选项
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param headerRow 表头行
  * @param seqCol 序列号列索引
  * @returns 成功/失败任务列表及是否被停止
@@ -623,7 +637,7 @@ async function executeBatchSync(
   token: string,
   userIdPath: string,
   options: SyncOptions | undefined,
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   headerRow: number,
   seqCol: number,
 ): Promise<{ successTasks: _SyncTask[]; failTasks: _SyncTask[]; stopped: boolean }> {
@@ -639,7 +653,7 @@ async function executeBatchSync(
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求')
   // 设置同步状态机的当前位置（工作表 + 序列号列），供暂停时定位
-  BGM.sync.updatePosition(ws, headerRow, seqCol)
+  BGM.sync.updatePosition(worksheet, headerRow, seqCol)
   const {
     success: successTasks,
     fail: failTasks,
@@ -655,7 +669,7 @@ async function executeBatchSync(
 }
 
 export async function SyncToBangumiAsync(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   token: string,
   lastRow: number,
@@ -686,7 +700,14 @@ export async function SyncToBangumiAsync(
   )
 
   // 步骤 1-4: 预处理（筛选可见行 + 数据缓存 + 指纹映射 + 任务收集）
-  const { syncTasks, skip, fail } = prepareSyncTasks(ws, colMap, options, startRow, lastRow, seqCol)
+  const { syncTasks, skip, fail } = prepareSyncTasks(
+    worksheet,
+    colMap,
+    options,
+    startRow,
+    lastRow,
+    seqCol,
+  )
   result.skip = skip
   result.fail = fail
 
@@ -696,7 +717,7 @@ export async function SyncToBangumiAsync(
     token,
     userIdPath,
     options,
-    ws,
+    worksheet,
     headerRow,
     seqCol,
   )
@@ -704,7 +725,7 @@ export async function SyncToBangumiAsync(
   // 失败行留档（含所属表名）：供「重试失败行」只重发这几行，而不是整表重跑
   setLastFailedRows(
     failTasks.map((task) => task.rowNum),
-    ws.Name || '',
+    worksheet.Name || '',
   )
 
   // 步骤 6: 批量更新 UI 和记录
@@ -712,7 +733,7 @@ export async function SyncToBangumiAsync(
     if (options?.onProgress) options.onProgress(current, syncTasks.length, message)
   }
   _finalizeSyncResults(
-    ws,
+    worksheet,
     seqCol,
     successTasks,
     failTasks,
@@ -800,13 +821,13 @@ function collectSelectedRows(app: WpsApp): number[] {
 
 /**
  * 校验选中行并准备同步所需数据（排除表头、阈值确认、构建列映射、加载 Token）
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rawRows 原始选中行号
  * @param headerRow 表头行号
  * @returns 准备结果（rows/colMap/token）；若校验失败则返回 null（已提示用户）
  */
 async function validateSelectedRows(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   rawRows: number[],
   headerRow: number,
 ): Promise<{ rows: number[]; colMap: Map<string, number>; token: string } | null> {
@@ -842,8 +863,8 @@ async function validateSelectedRows(
     }
   }
 
-  clearSheetCache(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  clearSheetCache(worksheet)
+  const colMap = getColumnMap(worksheet, headerRow)
   bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${String(colMap.size)} 列`)
   bgmLog(
     LOG_LEVELS.INFO,
@@ -869,7 +890,7 @@ async function validateSelectedRows(
 
 /**
  * 执行选中行同步（启动状态机、显示进度弹窗、循环同步、完成弹窗、异常处理、重置状态机）
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rows 待同步行号数组（已排除表头）
  * @param colMap 列映射
  * @param token Bangumi Token
@@ -877,7 +898,7 @@ async function validateSelectedRows(
  * @param startTime 同步开始时间戳（用于耗时统计）
  */
 async function executeSelectedSync(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   rows: number[],
   colMap: Map<string, number>,
   token: string,
@@ -923,7 +944,7 @@ async function executeSelectedSync(
       selectedRowsConfig,
     )
     // 设置同步状态机位置（用于暂停时定位到单元格）
-    BGM.sync.updatePosition(ws, 0, urlCol)
+    BGM.sync.updatePosition(worksheet, 0, urlCol)
 
     // 性能：复用 tools/util 的 createBatchFieldGetter 做一次矩形读（原先每行要
     // URL / 名称 / 完播日 / 集数 + buildJsonPayload 的十余个字段，全是逐格读）。
@@ -934,7 +955,13 @@ async function executeSelectedSync(
       if (row < batchMinRow) batchMinRow = row
       if (row > batchMaxRow) batchMaxRow = row
     }
-    const readField = createBatchFieldGetter(ws, colMap, batchMinRow, batchMaxRow, BATCH_READ_COLUMNS)
+    const readField = createBatchFieldGetter(
+      worksheet,
+      colMap,
+      batchMinRow,
+      batchMaxRow,
+      BATCH_READ_COLUMNS,
+    )
 
     for (const [index, rowNumber] of rows.entries()) {
       // 检查停止
@@ -1138,7 +1165,7 @@ async function executeSelectedSync(
     // 输出最终汇总日志
     const elapsed = Date.now() - startTime
     // 失败行留档（含所属表名）：下一次「重试失败行」就只重发这几行
-    setLastFailedRows(failedRows, ws.Name || '')
+    setLastFailedRows(failedRows, worksheet.Name || '')
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 汇总 ==========`)
     bgmLog(
       LOG_LEVELS.INFO,
@@ -1188,7 +1215,7 @@ export async function syncSelectedRows(): Promise<void> {
       void wpsMessageBox('无法获取 Application', 0, 48)
       return
     }
-    const ws = app.ActiveWorkbook.ActiveSheet
+    const worksheet = app.ActiveWorkbook.ActiveSheet
     bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 工作表获取成功')
 
     // 1. 收集选中行号（含非连续区域 Areas 处理）
@@ -1196,7 +1223,7 @@ export async function syncSelectedRows(): Promise<void> {
     if (rawRows.length === 0) return
 
     // 2. 定位表头行
-    const headerRow = findHeaderRow(ws)
+    const headerRow = findHeaderRow(worksheet)
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${String(headerRow)}`)
     if (headerRow === 0) {
       bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 未找到有效表头行，中止同步')
@@ -1209,12 +1236,12 @@ export async function syncSelectedRows(): Promise<void> {
     }
 
     // 3. 校验选中行并准备同步数据（排除表头、阈值确认、列映射、Token）
-    const validated = await validateSelectedRows(ws, rawRows, headerRow)
+    const validated = await validateSelectedRows(worksheet, rawRows, headerRow)
     if (!validated) return
 
     // 4. 执行同步（状态机、弹窗、循环、完成、异常处理、重置状态机）
     await executeSelectedSync(
-      ws,
+      worksheet,
       validated.rows,
       validated.colMap,
       validated.token,
@@ -1239,7 +1266,7 @@ export async function syncSelectedRows(): Promise<void> {
  */
 function getFilterStatusCore(
   result: { hasFilter: boolean; visibleRows: number[]; hiddenRows: number[] },
-  wsOrLastRow?: WpsWorksheet | number,
+  worksheetOrLastRow?: WpsWorksheet | number,
   lastRow?: number,
   headerRow?: number,
   shouldDeepCheck?: boolean,
@@ -1247,37 +1274,37 @@ function getFilterStatusCore(
   const app = getApp()
   if (!app?.ActiveWorkbook) return result
 
-  // 三个分支均会赋值 ws，无需初始化为 null（消除 no-useless-assignment）
-  let ws: WpsWorksheet | null
+  // 三个分支均会赋值 worksheet，无需初始化为 null（消除 no-useless-assignment）
+  let worksheet: WpsWorksheet | null
   let effectiveLastRow: number | undefined
   let effectiveHeaderRow: number | undefined
 
-  if (typeof wsOrLastRow === 'number') {
-    effectiveLastRow = wsOrLastRow
+  if (typeof worksheetOrLastRow === 'number') {
+    effectiveLastRow = worksheetOrLastRow
     effectiveHeaderRow = lastRow
-    ws = app.ActiveWorkbook.ActiveSheet
+    worksheet = app.ActiveWorkbook.ActiveSheet
     bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（兼容模式）`)
-  } else if (wsOrLastRow) {
-    ws = wsOrLastRow
+  } else if (worksheetOrLastRow) {
+    worksheet = worksheetOrLastRow
     effectiveLastRow = lastRow
     effectiveHeaderRow = headerRow
-    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用传入的工作表: ${ws.Name}`)
+    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用传入的工作表: ${worksheet.Name}`)
   } else {
-    ws = app.ActiveWorkbook.ActiveSheet
+    worksheet = app.ActiveWorkbook.ActiveSheet
     bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（无参数）`)
   }
 
-  if (!isWpsWorksheet(ws)) return result
+  if (!isWpsWorksheet(worksheet)) return result
 
   let isAutoFilterMode = false
   try {
-    isAutoFilterMode = !!ws.AutoFilterMode
+    isAutoFilterMode = !!worksheet.AutoFilterMode
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
   }
   bgmLog(
     LOG_LEVELS.INFO,
-    `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(shouldDeepCheck ?? '')}`,
+    `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, worksheet.Name=${worksheet.Name}, deepCheck=${String(shouldDeepCheck ?? '')}`,
   )
 
   // 2. 快速检测：仅在 deepCheck 时才扫描全范围
@@ -1288,16 +1315,16 @@ function getFilterStatusCore(
   }
 
   // 3. 确定扫描范围（非 AutoFilter 模式需要全范围扫描隐藏行）
-  const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count
-  const scanRange = ws.Range(`A1:A${String(maxRow)}`)
+  const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : worksheet.Rows.Count
+  const scanRange = worksheet.Range(`A1:A${String(maxRow)}`)
   bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 扫描范围 A1:A${String(maxRow)}`)
 
   // 4. 获取可见单元格来检测筛选/隐藏行
   let visibleCells: WpsRange | null = null
   if (isAutoFilterMode) {
     try {
-      if (ws.AutoFilter?.Range) {
-        visibleCells = ws.AutoFilter.Range.SpecialCells(12)
+      if (worksheet.AutoFilter?.Range) {
+        visibleCells = worksheet.AutoFilter.Range.SpecialCells(12)
         bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilter 模式`)
       }
     } catch (error: unknown) {

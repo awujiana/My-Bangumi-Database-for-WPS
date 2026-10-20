@@ -197,11 +197,11 @@ export async function loadEntriesFromPath(options: LoadEntriesOptions): Promise<
  * @returns 需要的字段集合；读不到工作表或读不到任何列时为 undefined
  */
 export function collectNeededFieldsFromSheet(): Set<string> | undefined {
-  const ws = getDataSheet()
-  if (!ws) return undefined
+  const worksheet = getDataSheet()
+  if (!worksheet) return undefined
 
-  const headerRow = findHeaderRow(ws) || 1
-  const colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const colMap = getColumnMap(worksheet, headerRow)
   const columns = [...colMap.keys()]
   if (columns.length === 0) return undefined
 

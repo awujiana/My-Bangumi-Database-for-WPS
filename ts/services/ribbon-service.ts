@@ -172,7 +172,7 @@ function collectEntryConflicts(
 
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
- * @param ws 工作表对象
+ * @param worksheet 工作表对象
  * @param colMap 列映射
  * @param lastRow 数据最后一行
  * @param headerRow 表头行
@@ -180,7 +180,7 @@ function collectEntryConflicts(
  * @returns 统计信息 { total, valid, plannedSyncCount, plannedSkipCount, alreadyUploaded, noUrl, emptyStatus }
  */
 export function getSyncPreview(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   lastRow: number,
   headerRow: number,
@@ -217,7 +217,7 @@ export function getSyncPreview(
   // 批量读取（与同步函数相同的列范围）：矩形读 + 逐格回退的字段访问器，
   // 与上传同步（exceltobangumi）共用 tools/util/field-getter.ts 的一份实现
   const getField = createBatchFieldGetter(
-    ws,
+    worksheet,
     colMap,
     startRow,
     lastRow,
@@ -225,7 +225,7 @@ export function getSyncPreview(
   )
 
   // 获取可见行（与同步函数相同）
-  const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
+  const filterStatus = getFilterStatus(worksheet, lastRow, headerRow, true)
   bgmLog(
     LOG_LEVELS.INFO,
     `[getSyncPreview] 筛选检测结果: hasFilter=${String(filterStatus.hasFilter)}, visibleRows=${String(filterStatus.visibleRows.length)}`,
@@ -252,7 +252,7 @@ export function getSyncPreview(
 
       // 检查是否已上传（序列号列颜色）
       const seqCol = colMap.get('序列号') ?? 4
-      const seqCell = getCell(ws, rowNumber, seqCol)
+      const seqCell = getCell(worksheet, rowNumber, seqCol)
       const isUploaded =
         seqCell?.Interior &&
         [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(
@@ -360,7 +360,7 @@ interface BgmCollectionEntry {
  * @returns 包含冲突条目列表及统计信息的对象
  */
 export async function detectConflicts(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   lastRow: number,
   headerRow: number,
@@ -409,7 +409,7 @@ export async function detectConflicts(
   }
 
   // 2. 遍历 Excel 可见行，比对差异
-  const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
+  const filterStatus = getFilterStatus(worksheet, lastRow, headerRow, true)
   bgmLog(
     LOG_LEVELS.INFO,
     `[detectConflicts] 筛选检测结果: hasFilter=${String(filterStatus.hasFilter)}, visibleRows=${String(filterStatus.visibleRows.length)}`,
@@ -432,7 +432,7 @@ export async function detectConflicts(
     const col = colMap.get(key)
     if (col !== undefined) conflictMaxCol = Math.max(conflictMaxCol, col)
   }
-  const allData = readRangeValues(ws, startRow, lastRow, 1, conflictMaxCol)
+  const allData = readRangeValues(worksheet, startRow, lastRow, 1, conflictMaxCol)
 
   const getField = (row: number, key: string): string => {
     const col = colMap.get(key)
@@ -440,7 +440,7 @@ export async function detectConflicts(
     const rowData = allData[row - startRow]
     if (rowData && col - 1 < rowData.length) return trim(rowData[col - 1])
     // 矩形读不可用（宿主/桩未返回完整矩形）→ 回退逐格读，行为与改造前一致
-    return trim(getCellValue(ws, row, col))
+    return trim(getCellValue(worksheet, row, col))
   }
 
   for (const rowNumber of rowsToProcess) {
@@ -478,8 +478,8 @@ export async function detectConflicts(
  */
 export async function syncWithConfirmation(): Promise<void> {
   const app = getApp()
-  const ws = getDataSheet()
-  if (!ws) {
+  const worksheet = getDataSheet()
+  if (!worksheet) {
     void wpsMessageBox('未找到数据工作表', 0, 64)
     return
   }
@@ -493,16 +493,16 @@ export async function syncWithConfirmation(): Promise<void> {
     return
   }
 
-  const headerRow = findHeaderRow(ws) || 1
-  const lastRow = getLastRow(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const lastRow = getLastRow(worksheet)
+  const colMap = getColumnMap(worksheet, headerRow)
   if (!colMap.has('Bangumi_URL')) {
     void wpsMessageBox('未找到 Bangumi URL 列', 0, 48)
     return
   }
 
   // 1. 预览统计
-  const preview = getSyncPreview(ws, colMap, lastRow, headerRow)
+  const preview = getSyncPreview(worksheet, colMap, lastRow, headerRow)
 
   // 2. 读取 Ribbon 复选框状态（冲突策略 + 增量同步）
   let conflictStrategy: 'excel' | 'skip' = 'excel'
@@ -545,7 +545,7 @@ export async function syncWithConfirmation(): Promise<void> {
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...')
     const { conflicts, conflictCount } = await detectConflicts(
-      ws,
+      worksheet,
       colMap,
       lastRow,
       headerRow,
@@ -572,7 +572,7 @@ export async function syncWithConfirmation(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...')
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
-    const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+    const result = await SyncToBangumiAsync(worksheet, colMap, token, lastRow, headerRow, {
       ...(skipSids !== undefined && { skipSids }),
       incremental: isIncremental,
       onProgress: (current, total, message) => {

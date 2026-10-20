@@ -51,12 +51,12 @@ function makeWorksheet(): WpsWorksheet {
 }
 
 /** 造一个带 Worksheets.Item(1) 的工作簿 */
-function makeWorkbookWithSheet(name: string, ws: WpsWorksheet | null): WpsWorkbook {
+function makeWorkbookWithSheet(name: string, worksheet: WpsWorksheet | null): WpsWorkbook {
   return {
     Name: name,
     FullName: `D:/data/${name}`,
     Close: vi.fn(),
-    Worksheets: { Item: () => ws },
+    Worksheets: { Item: () => worksheet },
   } as unknown as WpsWorkbook
 }
 
@@ -193,9 +193,9 @@ describe('closeSourceWorkbookOnly', () => {
 
 describe('ensureSourceSheet', () => {
   it('已持有活动源表时直接返回（不重开）', () => {
-    const ws = makeWorksheet()
-    state.animeSourceSheet = ws
-    expect(ensureSourceSheet()).toBe(ws)
+    const worksheet = makeWorksheet()
+    state.animeSourceSheet = worksheet
+    expect(ensureSourceSheet()).toBe(worksheet)
     expect(getApp).not.toHaveBeenCalled()
   })
 
@@ -206,8 +206,8 @@ describe('ensureSourceSheet', () => {
   })
 
   it('closeSourceAfterDetect 模式下重开文件并恢复源表引用', () => {
-    const ws = makeWorksheet()
-    const wb = makeWorkbookWithSheet('a.xlsx', ws)
+    const worksheet = makeWorksheet()
+    const wb = makeWorkbookWithSheet('a.xlsx', worksheet)
     state.filePath = 'D:/data/a.xlsx'
     state.headerRow = 2
     state.columnMapping = { nameCol: 3 }
@@ -215,8 +215,8 @@ describe('ensureSourceSheet', () => {
       Workbooks: { Open: vi.fn(() => wb) },
     })
 
-    expect(ensureSourceSheet()).toBe(ws)
-    expect(state.animeSourceSheet).toBe(ws)
+    expect(ensureSourceSheet()).toBe(worksheet)
+    expect(state.animeSourceSheet).toBe(worksheet)
     expect(state.sourceWorkbook).toBe(wb)
     expect(state.isSourceWorkbookOpenedByUs).toBe(true)
   })

@@ -56,13 +56,13 @@ describe('wps 类型守卫', () => {
 })
 
 describe('getRowRange', () => {
-  const ws = {
+  const worksheet = {
     Range: (addr: string) => ({ Address: addr }),
     Rows: { Item: (index: number) => ({ Row: index }) },
   } as unknown as WpsWorksheet
 
   it('返回 A1 表示法的整行 Range', () => {
-    const range = getRowRange(ws, 5)
+    const range = getRowRange(worksheet, 5)
     expect(range.Address).toBe('5:5')
   })
 
@@ -72,24 +72,24 @@ describe('getRowRange', () => {
   })
 
   it('行号非法时抛 Error', () => {
-    expect(() => getRowRange(ws, 0)).toThrow(Error)
-    expect(() => getRowRange(ws, NaN)).toThrow(Error)
+    expect(() => getRowRange(worksheet, 0)).toThrow(Error)
+    expect(() => getRowRange(worksheet, NaN)).toThrow(Error)
   })
 })
 
 describe('getRowRangeSafe', () => {
   it('Range 可用时走 getRowRange', () => {
-    const ws = {
+    const worksheet = {
       Range: (addr: string) => ({ Address: addr }),
     } as unknown as WpsWorksheet
-    expect(getRowRangeSafe(ws, 2).Address).toBe('2:2')
+    expect(getRowRangeSafe(worksheet, 2).Address).toBe('2:2')
   })
 
   it('Range 抛错时回退到 Rows.Item', () => {
-    const ws = {
+    const worksheet = {
       Rows: { Item: (index: number) => ({ Row: index }) },
     } as unknown as WpsWorksheet
-    const range = getRowRangeSafe(ws, 3) as unknown as { Row: number }
+    const range = getRowRangeSafe(worksheet, 3) as unknown as { Row: number }
     expect(range.Row).toBe(3)
   })
 })

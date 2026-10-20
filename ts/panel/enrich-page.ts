@@ -6,17 +6,10 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { enrichEntries } from '../sync/enrich-engine.js'
-import {
-  buildIntroSheetContext,
-  findIntroSheetInWorkbook,
-} from '../sync/enrich-intro.js'
+import { buildIntroSheetContext, findIntroSheetInWorkbook } from '../sync/enrich-intro.js'
 import { detectAnimeSourceLayout, detectColumns } from '../sync/enrich-layout.js'
 import { matchEntries } from '../sync/enrich-matching.js'
-import type {
-  EnrichConfig,
-  EnrichProgress,
-  EnrichResultItem,
-} from '../sync/enrich-types.js'
+import type { EnrichConfig, EnrichProgress, EnrichResultItem } from '../sync/enrich-types.js'
 import {
   refreshEnrichWorkbooks,
   refreshEnrichSheets,
@@ -634,13 +627,13 @@ function autoDetectHeaderFromFile(filePath: string): boolean {
       closeOpenedSourceWorkbook()
     }
 
-    const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
-    if (!ws) {
+    const worksheet = wb.Worksheets.Item(1) as WpsWorksheet | null
+    if (!worksheet) {
       if (isOpenedByUs) closeWorkbook(wb)
       throw new Error('文件中没有工作表')
     }
 
-    const mapping = detectHeaderOnSheet(ws, fileName)
+    const mapping = detectHeaderOnSheet(worksheet, fileName)
     if (!mapping) {
       // 识别失败：本次为识别而打开的工作簿立即回收，不接管到 state
       if (isOpenedByUs) closeWorkbook(wb)
@@ -880,13 +873,13 @@ export function autoDetectHeader(): void {
     return
   }
 
-  const ws = app.ActiveWorkbook.ActiveSheet as WpsWorksheet | null
-  if (!ws) {
+  const worksheet = app.ActiveWorkbook.ActiveSheet as WpsWorksheet | null
+  if (!worksheet) {
     BGM.Dialog.alert('提示', '请先打开新番表文件并激活其工作表')
     return
   }
 
-  detectHeaderOnSheet(ws, '活动工作表')
+  detectHeaderOnSheet(worksheet, '活动工作表')
 }
 
 // ========== 目标工作表选择 ==========
@@ -942,9 +935,12 @@ function selectTargetSheet(): void {
   }
 
   try {
-    const ws = wb.Worksheets.Item(sheetIndex)
-    applyTargetSheet(ws)
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${String(sheetIndex)})`)
+    const worksheet = wb.Worksheets.Item(sheetIndex)
+    applyTargetSheet(worksheet)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 已选择目标工作表: ${worksheet.Name} (索引: ${String(sheetIndex)})`,
+    )
   } catch (error: unknown) {
     applyTargetSheet(null)
     BGM.handleError(error, {
@@ -958,11 +954,11 @@ function selectTargetSheet(): void {
 /**
  * 更新目标工作表引用：目标表变化时清空已有的匹配结果（结果依赖目标表，失效结果不可继续展示）。
  */
-function applyTargetSheet(ws: WpsWorksheet | null): void {
+function applyTargetSheet(worksheet: WpsWorksheet | null): void {
   const previousName = state.bangumiSheet?.Name ?? null
-  state.bangumiSheet = ws
+  state.bangumiSheet = worksheet
 
-  if ((ws?.Name ?? null) === previousName) {
+  if ((worksheet?.Name ?? null) === previousName) {
     refreshMatchHintText()
     applyPreviewTabVisibility()
     return
@@ -1271,7 +1267,7 @@ function updateBatchProgressUI(current: number, total: number, currentFileName: 
 function openBatchSourceWorkbook(
   filePath: string,
   fileName: string,
-): { wb: WpsWorkbook; ws: WpsWorksheet } {
+): { wb: WpsWorkbook; worksheet: WpsWorksheet } {
   const app = getApp()
   if (!app?.Workbooks) throw new Error('WPS 应用不可用')
 
@@ -1284,21 +1280,21 @@ function openBatchSourceWorkbook(
   const wb = workbooks.Open(filePath)
   if (!wb) throw new Error('无法打开文件：WPS 返回了 null')
 
-  const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
-  if (!ws) throw new Error('文件中没有工作表')
-  return { wb, ws }
+  const worksheet = wb.Worksheets.Item(1) as WpsWorksheet | null
+  if (!worksheet) throw new Error('文件中没有工作表')
+  return { wb, worksheet }
 }
 
 /** 对已打开的批量源表执行布局识别、匹配和富化。 */
 function enrichSingleBatchSource(
   filePath: string,
   fileName: string,
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   bangumiSheet: WpsWorksheet,
   result: BatchFileResult,
 ): void {
-  const sourceLayout = detectAnimeSourceLayout(ws)
-  const headerRow = sourceLayout?.headerRow ?? findHeaderRow(ws)
+  const sourceLayout = detectAnimeSourceLayout(worksheet)
+  const headerRow = sourceLayout?.headerRow ?? findHeaderRow(worksheet)
   if (headerRow === 0) {
     result.error = '未检测到有效的表头行'
     bgmLog(
@@ -1309,7 +1305,7 @@ function enrichSingleBatchSource(
   }
 
   const dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
-  const columnMapping = sourceLayout?.columnMapping ?? detectColumns(ws, headerRow)
+  const columnMapping = sourceLayout?.columnMapping ?? detectColumns(worksheet, headerRow)
   if (columnMapping.nameCol === 0) {
     result.error = '已找到字段行，但未找到名称列'
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName}: 表头识别失败 - 未找到名称列`)
@@ -1319,30 +1315,30 @@ function enrichSingleBatchSource(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
+    `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
   )
 
   const config: EnrichConfig = {
     filePath,
-    sheetName: ws.Name || '',
+    sheetName: worksheet.Name || '',
     headerRow,
     dataStartRow,
     columnMapping,
     targetSheetName: bangumiSheet.Name || '',
   }
-  const matches = matchEntries(ws, bangumiSheet, config)
+  const matches = matchEntries(worksheet, bangumiSheet, config)
   const matched = matches.filter(
     (m) => m.matchType !== 'unmatched' && m.matchType !== 'error',
   ).length
   const unmatched = matches.length - matched
 
   // 批量模式同样关联简介工作表：在源工作簿内查找
-  const parentWb = (ws as unknown as { Parent?: WpsWorkbook } | null)?.Parent ?? null
-  const introSheet = parentWb ? findIntroSheetInWorkbook(parentWb, ws.Name) : null
+  const parentWb = (worksheet as unknown as { Parent?: WpsWorkbook } | null)?.Parent ?? null
+  const introSheet = parentWb ? findIntroSheetInWorkbook(parentWb, worksheet.Name) : null
   const introContext = introSheet ? buildIntroSheetContext(introSheet) : undefined
 
   const enrichResults = enrichEntries(
-    ws,
+    worksheet,
     bangumiSheet,
     matches,
     config,
@@ -1406,7 +1402,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
   try {
     const opened = openBatchSourceWorkbook(filePath, fileName)
     wb = opened.wb
-    enrichSingleBatchSource(filePath, fileName, opened.ws, bangumiSheet, result)
+    enrichSingleBatchSource(filePath, fileName, opened.worksheet, bangumiSheet, result)
   } catch (error: unknown) {
     result.error = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName} 处理失败: ${result.error}`)

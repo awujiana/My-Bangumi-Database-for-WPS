@@ -30,7 +30,7 @@ function _splitAliases(aliasValue: string): string[] {
 }
 
 function _buildNameUrlMap(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   headerRow: number,
   lastRow: number,
   colMap: Map<string, number>,
@@ -43,15 +43,15 @@ function _buildNameUrlMap(
   const aliasCol = colMap.get('别名')
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
-    const urlValue = trim(getCellValue(ws, row, urlCol))
+    const urlValue = trim(getCellValue(worksheet, row, urlCol))
     if (urlValue) {
-      const nameValue = trim(getCellValue(ws, row, nameCol))
+      const nameValue = trim(getCellValue(worksheet, row, nameCol))
       if (nameValue && !Object.hasOwn(nameUrlMap, nameValue)) {
         nameUrlMap[nameValue] = urlValue
       }
 
       if (aliasCol) {
-        const aliasValue = trim(getCellValue(ws, row, aliasCol))
+        const aliasValue = trim(getCellValue(worksheet, row, aliasCol))
         const aliases = _splitAliases(aliasValue)
         for (const a of aliases) {
           if (a && !Object.hasOwn(nameUrlMap, a)) {
@@ -69,19 +69,19 @@ export function autoFillUrls(): AutoFillResult {
   const result: AutoFillResult = { filled: 0, mappedNames: 0 }
 
   try {
-    const ws = getDataSheet()
-    if (!ws) {
+    const worksheet = getDataSheet()
+    if (!worksheet) {
       BGM.Dialog.alert('无法获取工作表', '提示')
       return result
     }
 
-    const headerRow = findHeaderRow(ws)
+    const headerRow = findHeaderRow(worksheet)
     if (!headerRow || headerRow < 1) {
       BGM.Dialog.alert('未找到表头行', '提示')
       return result
     }
 
-    const colMap = getColumnMap(ws, headerRow)
+    const colMap = getColumnMap(worksheet, headerRow)
     const urlCol = colMap.get('Bangumi_URL')
     const nameCol = colMap.get('名称')
     if (urlCol === undefined || nameCol === undefined) {
@@ -89,7 +89,7 @@ export function autoFillUrls(): AutoFillResult {
       return result
     }
 
-    const lastRow = getLastRow(ws)
+    const lastRow = getLastRow(worksheet)
     if (lastRow <= headerRow) {
       BGM.Dialog.alert('没有数据行需要补全', '提示')
       return result
@@ -100,7 +100,7 @@ export function autoFillUrls(): AutoFillResult {
       `[autoFillUrls] 表头行: ${String(headerRow)}, 最后数据行: ${String(lastRow)}, URL列: ${String(urlCol)}, 名称列: ${String(nameCol)}`,
     )
 
-    const nameUrlMap = _buildNameUrlMap(ws, headerRow, lastRow, colMap)
+    const nameUrlMap = _buildNameUrlMap(worksheet, headerRow, lastRow, colMap)
     const mappedKeys = Object.keys(nameUrlMap).length
     result.mappedNames = mappedKeys
 
@@ -112,13 +112,13 @@ export function autoFillUrls(): AutoFillResult {
     bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 已建立 ${String(mappedKeys)} 个名称/别名 → URL 映射`)
 
     for (let row = headerRow + 1; row <= lastRow; row += 1) {
-      const currentUrl = trim(getCellValue(ws, row, urlCol))
+      const currentUrl = trim(getCellValue(worksheet, row, urlCol))
       if (!currentUrl) {
-        const nameValue = trim(getCellValue(ws, row, nameCol))
+        const nameValue = trim(getCellValue(worksheet, row, nameCol))
         if (nameValue) {
           const fillUrl = nameUrlMap[nameValue]
           if (fillUrl) {
-            setCellValue(ws, row, urlCol, fillUrl)
+            setCellValue(worksheet, row, urlCol, fillUrl)
             result.filled += 1
           }
         }
@@ -134,16 +134,16 @@ export function autoFillUrls(): AutoFillResult {
 }
 
 export function showAutoFillUrlDialog(): void {
-  const ws = getDataSheet()
-  if (!ws) return
+  const worksheet = getDataSheet()
+  if (!worksheet) return
 
-  const headerRow = findHeaderRow(ws)
+  const headerRow = findHeaderRow(worksheet)
   if (!headerRow || headerRow < 1) {
     BGM.Dialog.alert('未找到表头行', '提示')
     return
   }
 
-  const colMap = getColumnMap(ws, headerRow)
+  const colMap = getColumnMap(worksheet, headerRow)
   const nameCount = colMap.has('名称') ? colMap.get('名称') : '?'
   const urlCount = colMap.has('Bangumi_URL') ? colMap.get('Bangumi_URL') : '未找到'
 

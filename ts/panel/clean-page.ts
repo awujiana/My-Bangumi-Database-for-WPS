@@ -340,18 +340,18 @@ interface WpsWorkbookLike {
 function buildSheetCandidate(
   wb: WpsWorkbookLike,
   path: string,
-  ws: unknown,
+  worksheet: unknown,
 ): SheetCandidate | null {
   const sheetName = (() => {
     try {
-      return (ws as { Name?: string }).Name ?? ''
+      return (worksheet as { Name?: string }).Name ?? ''
     } catch {
       return ''
     }
   })()
   if (!sheetName || hasAnyKeyword(sheetName, CLEAN_EXCLUDES.sheetName)) return null
 
-  const info = inspectWorksheet(ws as WpsWorksheet)
+  const info = inspectWorksheet(worksheet as WpsWorksheet)
   return {
     workbookKey: path || wb.Name,
     workbookName: wb.Name,

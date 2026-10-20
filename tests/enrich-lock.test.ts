@@ -279,11 +279,11 @@ function setupBasicDom(): void {
   }
 }
 
-/** 配置跨工作簿扫描的 getCellValue / findHeaderRow mock（基于 ws._scan） */
+/** 配置跨工作簿扫描的 getCellValue / findHeaderRow mock（基于 worksheet._scan） */
 function setupScanMocks(): void {
-  mockFindHeaderRow.mockImplementation((ws: ScanSheet) => ws._scan?.headerRow ?? 0)
-  mockGetCellValue.mockImplementation((ws: ScanSheet, row: number, col: number) => {
-    const scan = ws._scan
+  mockFindHeaderRow.mockImplementation((worksheet: ScanSheet) => worksheet._scan?.headerRow ?? 0)
+  mockGetCellValue.mockImplementation((worksheet: ScanSheet, row: number, col: number) => {
+    const scan = worksheet._scan
     if (!scan) return ''
     if (row === scan.headerRow) return col <= scan.headerKeyCount ? '名称' : ''
     if (row > scan.headerRow && row <= scan.headerRow + scan.dataCount) return '追踪数据'
@@ -1253,7 +1253,11 @@ describe('findBangumiTargetSheetInWorkbook', () => {
   it('优先返回名称命中关键词的强候选', () => {
     setupScanMocks()
     const plain = createScanSheet('表数据', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
-    const nameHit = createScanSheet('bangumi 追番', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const nameHit = createScanSheet('bangumi 追番', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
     const app = createScanApp({ wb1: [plain, nameHit] })
 
     const result = findBangumiTargetSheetInWorkbook(

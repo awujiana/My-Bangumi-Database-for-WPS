@@ -44,11 +44,11 @@ vi.mock('../ts/tools/locked-sheet.js', () => ({
   TARGET_SHEET_NAME_KEYWORDS: m.TARGET_SHEET_NAME_KEYWORDS,
   // 忠实复刻 locked-sheet.ts countDataRowsAfter：表头行后前 10 行中
   // 「前 MAX_SCAN_COLUMNS(60) 列任一有值」的行数，由本文件的 getCellValue 桩驱动
-  countDataRowsAfter: (ws: WpsWorksheet, headerRow: number): number => {
+  countDataRowsAfter: (worksheet: WpsWorksheet, headerRow: number): number => {
     /** 该行前 MAX_SCAN_COLUMNS(60) 列是否有值 */
     const hasCellValue = (row: number): boolean => {
       for (let col = 1; col <= 60; col += 1) {
-        if (String(m.getCellValue(ws, row, col) ?? '').trim()) {
+        if (String(m.getCellValue(worksheet, row, col) ?? '').trim()) {
           return true
         }
       }
@@ -107,7 +107,7 @@ function makeWorkbook(
     FullName: options.fullName ?? `C:\\${name}`,
     Worksheets: sheets,
     Sheets: sheets,
-    ActiveSheet: ({} as WpsWorksheet),
+    ActiveSheet: {} as WpsWorksheet,
   }
 }
 
@@ -142,7 +142,10 @@ function makeStorage(): MockStorage {
 }
 
 /** 构造 mock Application（Workbooks / Windows / ActiveWorkbook / PluginStorage） */
-function makeApp(storage: MockStorage, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function makeApp(
+  storage: MockStorage,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     Workbooks: { Count: 0 },
     Windows: { Count: 0 },
@@ -229,8 +232,8 @@ afterEach(() => {
 describe('findAnimeSourceSheetInWorkbook（新番表布局 + 数据行校验）', () => {
   it('跳过布局未命中的工作表，返回首个「布局命中且 ≥2 数据行」的表', () => {
     const sheets = makeSheets(['说明', '新番数据'])
-    m.detectAnimeSourceLayout.mockImplementation((ws: WpsWorksheet) =>
-      ws.Name === '新番数据' ? { headerRow: 1, dataStartRow: 2, columnMapping: {} } : null,
+    m.detectAnimeSourceLayout.mockImplementation((worksheet: WpsWorksheet) =>
+      worksheet.Name === '新番数据' ? { headerRow: 1, dataStartRow: 2, columnMapping: {} } : null,
     )
     m.getCellValue.mockReturnValue('有值')
 
@@ -274,7 +277,9 @@ describe('findAnimeSourceSheetInWorkbook（新番表布局 + 数据行校验）'
     m.detectAnimeSourceLayout.mockReturnValue(null)
 
     expect(
-      autoDetect.findAnimeSourceSheetInWorkbook(makeWorkbook('新番表.xlsx', { sheetNames: ['a', 'b'] })),
+      autoDetect.findAnimeSourceSheetInWorkbook(
+        makeWorkbook('新番表.xlsx', { sheetNames: ['a', 'b'] }),
+      ),
     ).toBeNull()
   })
 })
@@ -290,19 +295,23 @@ describe('isMatchingWorkbook', () => {
     m.detectAnimeSourceLayout.mockReturnValue({ headerRow: 1, dataStartRow: 2, columnMapping: {} })
     m.getCellValue.mockReturnValue('有值')
 
-    expect(autoDetect.isMatchingWorkbook(autoDetect.ANIME_SOURCE_DETECTOR, makeWorkbook('新番表.xlsx'))).toBe(true)
+    expect(
+      autoDetect.isMatchingWorkbook(autoDetect.ANIME_SOURCE_DETECTOR, makeWorkbook('新番表.xlsx')),
+    ).toBe(true)
   })
 
   it('名称命中但无目标表 → 判为未命中', () => {
     m.detectAnimeSourceLayout.mockReturnValue(null)
 
-    expect(autoDetect.isMatchingWorkbook(autoDetect.ANIME_SOURCE_DETECTOR, makeWorkbook('新番表.xlsx'))).toBe(
-      false,
-    )
+    expect(
+      autoDetect.isMatchingWorkbook(autoDetect.ANIME_SOURCE_DETECTOR, makeWorkbook('新番表.xlsx')),
+    ).toBe(false)
   })
 
   it('工作表校验抛错时按未命中处理，不向外冒泡', () => {
-    expect(autoDetect.isMatchingWorkbook(THROWING_FIND_DETECTOR, makeWorkbook('任意.xlsx'))).toBe(false)
+    expect(autoDetect.isMatchingWorkbook(THROWING_FIND_DETECTOR, makeWorkbook('任意.xlsx'))).toBe(
+      false,
+    )
   })
 })
 
@@ -458,7 +467,9 @@ describe('initWorkbookAutoDetection', () => {
     autoDetect.initWorkbookAutoDetection()
 
     // 全量刷新（overwriteDetectedPathsInStorage）写入了新番表检测器的记录
-    expect(storage.map.get(autoDetect.ANIME_SOURCE_DETECTOR.key)).toBe(JSON.stringify([matched.FullName]))
+    expect(storage.map.get(autoDetect.ANIME_SOURCE_DETECTOR.key)).toBe(
+      JSON.stringify([matched.FullName]),
+    )
     expect(typeof app.WorkbookOpen).toBe('function')
     expect(typeof app.WorkbookActivate).toBe('function')
     expect(typeof app.SheetActivate).toBe('function')
@@ -545,7 +556,9 @@ describe('事件回调', () => {
 
     handlerOf(app, 'WorkbookOpen')(matched)
 
-    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(matched.FullName)
+    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(
+      matched.FullName,
+    )
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining('已记录工作簿: 新番表.xlsx'),
@@ -613,7 +626,9 @@ describe('事件回调', () => {
 
     handlerOf(app, 'WorkbookActivate')(matched)
 
-    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(matched.FullName)
+    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(
+      matched.FullName,
+    )
   })
 
   it('WorkbookActivate：处理抛错时记 WARN', () => {
@@ -647,7 +662,9 @@ describe('事件回调', () => {
 
     handlerOf(app, 'SheetActivate')(undefined)
 
-    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(matched.FullName)
+    expect(autoDetect.loadDetectedPaths(autoDetect.ANIME_SOURCE_DETECTOR)).toContain(
+      matched.FullName,
+    )
   })
 
   it('SheetActivate：无活动工作簿时静默返回', () => {

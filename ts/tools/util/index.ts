@@ -101,7 +101,7 @@ export const BGM: {
   ErrorLevel: typeof ErrorLevel
   BgmError: typeof BgmError
   dataPreview?: {
-    ws: WpsWorksheet | null | undefined
+    worksheet: WpsWorksheet | null | undefined
     visibleRows: number[]
     headerRow: number
     dataStartRow: number
@@ -275,10 +275,10 @@ export const BGM: {
     locateCurrentCell(): boolean {
       if (!this.currentRow || this.currentRow < 1 || !this.currentSheet) return false
       try {
-        const ws = this.currentSheet
+        const worksheet = this.currentSheet
         const col = this.currentCol > 0 ? this.currentCol : 1
         const cellAddr = `${colNumberToLetter(col)}${String(this.currentRow)}`
-        const cell = ws.Range(cellAddr)
+        const cell = worksheet.Range(cellAddr)
         cell.Select()
         bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
         return true
@@ -291,10 +291,10 @@ export const BGM: {
     },
 
     /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
-    updatePosition(ws: WpsWorksheet | null | undefined, row: number, col?: number): void {
+    updatePosition(worksheet: WpsWorksheet | null | undefined, row: number, col?: number): void {
       // 行号范围校验：必须为非负整数
       if (!Number.isSafeInteger(row) || row < 0) return
-      if (ws !== undefined) this.currentSheet = ws
+      if (worksheet !== undefined) this.currentSheet = worksheet
       this.currentRow = row
       if (col !== undefined && col > 0) this.currentCol = col
     },

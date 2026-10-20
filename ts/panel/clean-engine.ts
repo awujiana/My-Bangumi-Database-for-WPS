@@ -68,7 +68,7 @@ export interface CleanTargetInfo {
   /** 列名 → 列号 */
   colMap: Map<string, number>
   /** 工作表对象（执行阶段使用） */
-  ws: WpsWorksheet
+  worksheet: WpsWorksheet
 }
 
 /** 单元格变更（含新旧值，供预览与日志使用） */
@@ -218,11 +218,11 @@ function countXinFanHeaderHits(cells: string[], keywords: string[]): number {
 }
 
 /** 扫描前若干行，返回首个命中新番表专属表头签名的行号（0 表示未识别） */
-function scanXinFanHeaderRow(ws: WpsWorksheet): number {
+function scanXinFanHeaderRow(worksheet: WpsWorksheet): number {
   const keywords = XINFAN_HEADER.headerKeywords.map((keyword) => keyword.toLowerCase())
   // 快路径：一次矩形读扫描区（原先 30 行 × 50 列 = 1500 次逐格 COM 往返）。
   // 读回行数不足（宿主/桩未返回完整矩形）时回退逐格读，行为与改造前完全一致。
-  const block = readRangeValues(ws, 1, XINFAN_SCAN_ROWS, 1, XINFAN_SCAN_COLS)
+  const block = readRangeValues(worksheet, 1, XINFAN_SCAN_ROWS, 1, XINFAN_SCAN_COLS)
   if (block.length === XINFAN_SCAN_ROWS) {
     for (const [index, cells] of block.entries()) {
       if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) {
@@ -234,7 +234,7 @@ function scanXinFanHeaderRow(ws: WpsWorksheet): number {
   for (let row = 1; row <= XINFAN_SCAN_ROWS; row += 1) {
     const cells: string[] = []
     for (let col = 1; col <= XINFAN_SCAN_COLS; col += 1) {
-      cells.push(getCellValue(ws, row, col))
+      cells.push(getCellValue(worksheet, row, col))
     }
     if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) return row
   }
@@ -242,18 +242,24 @@ function scanXinFanHeaderRow(ws: WpsWorksheet): number {
 }
 
 /** 查找锚点列（表头含 nameAnchorKeyword，默认「周更时间」）；找不到返回 0 */
-function findXinFanAnchorCol(ws: WpsWorksheet, headerRow: number): number {
+function findXinFanAnchorCol(worksheet: WpsWorksheet, headerRow: number): number {
   const anchor = XINFAN_HEADER.nameAnchorKeyword.toLowerCase()
   for (let col = 1; col <= 50; col += 1) {
-    const value = getCellValue(ws, headerRow, col).toLowerCase()
+    const value = getCellValue(worksheet, headerRow, col).toLowerCase()
     if (value.includes(anchor)) return col
   }
   return 0
 }
 
 /** 名称列候选（表头为空）在数据区前 nameProbeRows 行是否有非空值 */
-function hasNameProbeValue(ws: WpsWorksheet, headerRow: number, col: number): boolean {
-  const rows = readRangeValues(ws, headerRow + 1, headerRow + XINFAN_HEADER.nameProbeRows, col, col)
+function hasNameProbeValue(worksheet: WpsWorksheet, headerRow: number, col: number): boolean {
+  const rows = readRangeValues(
+    worksheet,
+    headerRow + 1,
+    headerRow + XINFAN_HEADER.nameProbeRows,
+    col,
+    col,
+  )
   return rows.some((row) => (row[0] ?? '').trim() !== '')
 }
 
@@ -263,15 +269,15 @@ function hasNameProbeValue(ws: WpsWorksheet, headerRow: number, col: number): bo
  *   （新番表布局中该列紧邻周更时间左侧，可稳定绕开同为空的播放时间列）；
  * - 标签列：表头命中 tagHeaderKeywords 时映射为「标签/分级」，复用 tag-format / noise-tags 规则。
  */
-function buildXinFanColumnMap(ws: WpsWorksheet, headerRow: number): Map<string, number> {
+function buildXinFanColumnMap(worksheet: WpsWorksheet, headerRow: number): Map<string, number> {
   const colMap = new Map<string, number>()
 
-  const anchorCol = findXinFanAnchorCol(ws, headerRow)
+  const anchorCol = findXinFanAnchorCol(worksheet, headerRow)
   let nameCol: number | undefined
   if (anchorCol > 1) {
     for (let col = anchorCol - 1; col >= 1; col -= 1) {
-      if (getCellValue(ws, headerRow, col).trim() !== '') break
-      if (hasNameProbeValue(ws, headerRow, col)) {
+      if (getCellValue(worksheet, headerRow, col).trim() !== '') break
+      if (hasNameProbeValue(worksheet, headerRow, col)) {
         nameCol = col
         break
       }
@@ -280,7 +286,7 @@ function buildXinFanColumnMap(ws: WpsWorksheet, headerRow: number): Map<string, 
   if (nameCol) colMap.set('名称', nameCol)
 
   for (let col = 1; col <= 50; col += 1) {
-    const value = getCellValue(ws, headerRow, col).trim()
+    const value = getCellValue(worksheet, headerRow, col).trim()
     if (
       value &&
       XINFAN_HEADER.tagHeaderKeywords.some((keyword) =>
@@ -321,9 +327,9 @@ export interface SheetInspection {
 }
 
 /** 读取工作表末行（UsedRange 优先，异常回退 getLastRow） */
-function readLastRow(ws: WpsWorksheet): number {
+function readLastRow(worksheet: WpsWorksheet): number {
   try {
-    const used = ws.UsedRange
+    const used = worksheet.UsedRange
     if (used) {
       const startRow = used.Row
       const rowCount = used.Rows.Count
@@ -335,18 +341,18 @@ function readLastRow(ws: WpsWorksheet): number {
     // 回落到 getLastRow
   }
   try {
-    return getLastRow(ws)
+    return getLastRow(worksheet)
   } catch {
     return 0
   }
 }
 
 /** 读取表头文本（前 8 个非空值，仅用于页面展示） */
-function readHeaderLabels(ws: WpsWorksheet, headerRow: number): string[] {
+function readHeaderLabels(worksheet: WpsWorksheet, headerRow: number): string[] {
   const labels: string[] = []
   if (!headerRow) return labels
   for (let col = 1; col <= 40 && labels.length < 8; col += 1) {
-    const text = getCellValue(ws, headerRow, col).trim()
+    const text = getCellValue(worksheet, headerRow, col).trim()
     if (text) labels.push(text)
   }
   return labels
@@ -360,9 +366,9 @@ interface SheetLayoutInfo {
 }
 
 /** 安全读取表头行（异常时返回 0） */
-function safeFindHeaderRow(ws: WpsWorksheet): number {
+function safeFindHeaderRow(worksheet: WpsWorksheet): number {
   try {
-    return findHeaderRow(ws)
+    return findHeaderRow(worksheet)
   } catch {
     return 0
   }
@@ -372,23 +378,23 @@ function safeFindHeaderRow(ws: WpsWorksheet): number {
  * 解析工作表结构（只读）：标准路径优先，失败后尝试新番表签名路径。
  * 页面探测与目标构造共用本函数，保证「页面显示」与「实际清理范围」一致。
  */
-function resolveSheetLayout(ws: WpsWorksheet): SheetLayoutInfo {
-  const headerRow = safeFindHeaderRow(ws)
+function resolveSheetLayout(worksheet: WpsWorksheet): SheetLayoutInfo {
+  const headerRow = safeFindHeaderRow(worksheet)
 
   if (headerRow) {
     try {
-      return { headerRow, colMap: getColumnMap(ws, headerRow), isXinFan: false }
+      return { headerRow, colMap: getColumnMap(worksheet, headerRow), isXinFan: false }
     } catch {
       return { headerRow, colMap: new Map(), isXinFan: false }
     }
   }
 
   try {
-    const xinFanHeaderRow = scanXinFanHeaderRow(ws)
+    const xinFanHeaderRow = scanXinFanHeaderRow(worksheet)
     if (xinFanHeaderRow) {
       return {
         headerRow: xinFanHeaderRow,
-        colMap: buildXinFanColumnMap(ws, xinFanHeaderRow),
+        colMap: buildXinFanColumnMap(worksheet, xinFanHeaderRow),
         isXinFan: true,
       }
     }
@@ -406,10 +412,10 @@ function resolveSheetLayout(ws: WpsWorksheet): SheetLayoutInfo {
  *     {@link CLEAN_TARGETS.identityColumns} 特征列（名称 / Bangumi_URL）；
  *  2. 新番表路径：表头无特征列，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
  */
-export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
-  const { headerRow, colMap, isXinFan } = resolveSheetLayout(ws)
+export function inspectWorksheet(worksheet: WpsWorksheet): SheetInspection {
+  const { headerRow, colMap, isXinFan } = resolveSheetLayout(worksheet)
 
-  const lastRow = readLastRow(ws)
+  const lastRow = readLastRow(worksheet)
   const dataRows = headerRow > 0 ? Math.max(0, lastRow - headerRow) : Math.max(0, lastRow - 1)
   const hasNameColumn = colMap.has('名称')
   // 身份判定：命中特征列（名称 / Bangumi_URL），或命中月历式新番表专属签名
@@ -430,7 +436,7 @@ export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
     headerRow,
     lastRow,
     dataRows,
-    headers: readHeaderLabels(ws, headerRow),
+    headers: readHeaderLabels(worksheet, headerRow),
     isXinFan,
     hasNameColumn,
     isBangumiSheet,
@@ -466,21 +472,21 @@ function readWorksheets(wb: WpsWorkbook): WpsWorksheet[] {
  */
 function buildTarget(
   wb: WpsWorkbook,
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   path: string,
   isForced = false,
 ): CleanTargetInfo | null {
-  const sheetName = ws.Name
+  const sheetName = worksheet.Name
   if (!sheetName || !isSheetAllowed(sheetName)) return null
 
-  const layout = resolveSheetLayout(ws)
+  const layout = resolveSheetLayout(worksheet)
   if (!isForced && !hasIdentityColumn(layout.colMap) && !layout.isXinFan) return null
 
   // 未识别到表头时退化为第 1 行表头 + 空列映射（规则按列缺失自行跳过）
   const headerRow = layout.headerRow > 0 ? layout.headerRow : 1
   const colMap = layout.headerRow > 0 ? layout.colMap : new Map<string, number>()
 
-  const lastRow = readLastRow(ws)
+  const lastRow = readLastRow(worksheet)
   const dataRows = lastRow - headerRow
   if (dataRows < CLEAN_EXCLUDES.minDataRows) return null
   if (dataRows > CLEAN_TARGETS.maxDataRows) return null
@@ -494,14 +500,14 @@ function buildTarget(
     headerRow,
     lastRow,
     colMap,
-    ws,
+    worksheet,
   }
 }
 
 /** 安全读取工作表名（异常时返回空串） */
-function safeSheetName(ws: WpsWorksheet): string {
+function safeSheetName(worksheet: WpsWorksheet): string {
   try {
-    return ws.Name
+    return worksheet.Name
   } catch {
     return ''
   }
@@ -532,11 +538,11 @@ export function listCleanTargets(
     const path = readWorkbookPath(wb)
     if (isWorkbookAllowed(path)) {
       const picked = readWorksheets(wb)
-        .map((ws) => ({ ws, sheetName: safeSheetName(ws) }))
+        .map((worksheet) => ({ worksheet, sheetName: safeSheetName(worksheet) }))
         .filter((item) => shouldScanSheet(whitelist, path, item.sheetName))
       for (const item of picked) {
         const isPicked = whitelist.has(`${path}\u{0000}${item.sheetName}`)
-        const target = buildTarget(wb, item.ws, path, isPicked)
+        const target = buildTarget(wb, item.worksheet, path, isPicked)
         if (target) targets.push(target)
       }
     }
@@ -558,7 +564,8 @@ export function collectExcludedRows(
   if (CLEAN_EXCLUDES.rowText.length === 0) return excluded
   const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   // block 为调用方（scanTarget）已读入的数据区整块；未提供时按原行为自行读取
-  const rows = block ?? readRangeValues(target.ws, target.headerRow + 1, target.lastRow, 1, maxCol)
+  const rows =
+    block ?? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxCol)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (CLEAN_EXCLUDES.rowText.some((keyword) => joined.includes(keyword))) {
@@ -590,7 +597,7 @@ export function estimateRowBytes(target: CleanTargetInfo, block?: readonly strin
     const values = block
       ? (block[index] ?? [])
       : (readRangeValues(
-          target.ws,
+          target.worksheet,
           target.headerRow + 1 + index,
           target.headerRow + 1 + index,
           1,
@@ -649,9 +656,9 @@ function scanCellTransform(
   // 需要「名称」参照列的变换（别名去重）额外读取名称列
   const isNameRequired = rule.transform === 'dedupAliasAgainstName'
   const nameCol = isNameRequired ? target.colMap.get('名称') : undefined
-  const values = readRangeValues(target.ws, target.headerRow + 1, target.lastRow, col, col)
+  const values = readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, col, col)
   const names = nameCol
-    ? readRangeValues(target.ws, target.headerRow + 1, target.lastRow, nameCol, nameCol)
+    ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, nameCol, nameCol)
     : null
 
   const changes: CellChange[] = []
@@ -693,7 +700,7 @@ function truncatePreviewText(text: string): string {
 
 /** 扫描噪声行：按 {@link CLEAN_EXCLUDES.noiseRowText} 命中的行整行删除（不遵守 excludedRows） */
 function planNoiseRows(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   headerRow: number,
   lastRow: number,
   block?: readonly string[][],
@@ -712,7 +719,7 @@ function planNoiseRows(
   const rowsToDelete: number[] = []
   const rowPreviews: DeletedRowPreview[] = []
   // block 为调用方（scanTarget）已读入的数据区整块（列跨度一致）；未提供时自行读取
-  const rows = block ?? readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol)
+  const rows = block ?? readRangeValues(worksheet, headerRow + 1, lastRow, 1, maxCol)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (keywords.some((keyword) => joined.includes(keyword))) {
@@ -759,20 +766,20 @@ function scanRowRule(
   try {
     switch (rule.kind) {
       case 'duplicateNameRows': {
-        plan = planDuplicateRows(target.ws, { excludedRows, layout: getLayout() })
+        plan = planDuplicateRows(target.worksheet, { excludedRows, layout: getLayout() })
         break
       }
       case 'duplicateUrlRows': {
-        plan = planDuplicateUrlRows(target.ws, { excludedRows, layout: getLayout() })
+        plan = planDuplicateUrlRows(target.worksheet, { excludedRows, layout: getLayout() })
         break
       }
       case 'emptyNameRows': {
-        plan = planEmptyNameRows(target.ws, { excludedRows, layout: getLayout() })
+        plan = planEmptyNameRows(target.worksheet, { excludedRows, layout: getLayout() })
         break
       }
       case 'noiseRows': {
         // 噪声行刻意不遵守 excludedRows：否则这些行会被 rowText 保护语义先行排除，永远删不掉
-        plan = planNoiseRows(target.ws, target.headerRow, target.lastRow, block)
+        plan = planNoiseRows(target.worksheet, target.headerRow, target.lastRow, block)
         break
       }
       default: {
@@ -844,7 +851,7 @@ function scanTarget(
   const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   const block =
     target.lastRow > target.headerRow
-      ? readRangeValues(target.ws, target.headerRow + 1, target.lastRow, 1, maxCol)
+      ? readRangeValues(target.worksheet, target.headerRow + 1, target.lastRow, 1, maxCol)
       : undefined
   const excludedRows = collectExcludedRows(target, block)
   if (excludedRows.size > 0) {
@@ -859,7 +866,7 @@ function scanTarget(
   let sharedLayout: SheetLayout | null = null
   const getLayout = (): SheetLayout | null => {
     if (!isLayoutResolved) {
-      sharedLayout = readSheetLayout(target.ws)
+      sharedLayout = readSheetLayout(target.worksheet)
       isLayoutResolved = true
     }
     return sharedLayout
@@ -1023,7 +1030,7 @@ export async function runCleanPlans(
       await Promise.resolve()
       const changes = [...bucket.changes.values()].sort((a, b) => a.row - b.row || a.col - b.col)
       for (const change of changes) {
-        setCellValue(target.ws, change.row, change.col, change.nextValue)
+        setCellValue(target.worksheet, change.row, change.col, change.nextValue)
       }
       changedCells += changes.length
 
@@ -1033,7 +1040,7 @@ export async function runCleanPlans(
         groups: 0,
         mergedGroups: 0,
       }
-      const removed = applyRowPlan(target.ws, rowPlan)
+      const removed = applyRowPlan(target.worksheet, rowPlan)
       deletedRows += removed
       targets.push({
         targetKey: target.key,

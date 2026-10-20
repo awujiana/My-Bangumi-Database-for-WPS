@@ -50,12 +50,14 @@ export function numberToColumnLetters(col: number): string {
 export const utilityMock = {
   bgmLog: vi.fn<(level: number, message: string) => void>(),
   getApp: vi.fn<() => unknown>(() => null),
-  getCellValue: vi.fn<(ws: unknown, row: number, col: number) => string>(() => ''),
-  getLastRow: vi.fn<(ws: unknown) => number>(() => 0),
+  getCellValue: vi.fn<(worksheet: unknown, row: number, col: number) => string>(() => ''),
+  getLastRow: vi.fn<(worksheet: unknown) => number>(() => 0),
   setCellValue: vi.fn<(...input: unknown[]) => boolean>(() => true),
   readRangeValues: vi.fn<(...input: unknown[]) => string[][]>(() => []),
-  findHeaderRow: vi.fn<(ws: unknown) => number>(() => 1),
-  getColumnMap: vi.fn<(ws: unknown, headerRow?: number) => Map<string, number>>(() => new Map()),
+  findHeaderRow: vi.fn<(worksheet: unknown) => number>(() => 1),
+  getColumnMap: vi.fn<(worksheet: unknown, headerRow?: number) => Map<string, number>>(
+    () => new Map(),
+  ),
   colNumberToLetter: vi.fn((col: number) => numberToColumnLetters(col)),
   BGM: {
     Dialog: {

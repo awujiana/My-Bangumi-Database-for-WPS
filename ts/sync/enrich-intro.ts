@@ -24,11 +24,7 @@ import { bgmLog, getCellValue, getLastRow, isEmptyValue } from '../tools/util/in
 import type { SheetCellCache } from '../tools/util/sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
-import {
-  detectAnimeSourceLayout,
-  detectColumns,
-  readScanBlock,
-} from './enrich-layout.js'
+import { detectAnimeSourceLayout, detectColumns, readScanBlock } from './enrich-layout.js'
 import type { EnrichColumnMapping } from './enrich-layout.js'
 import { getAnnotatedValue, readTargetCell, writeTargetCell } from './enrich-cells.js'
 import { appendFeatures, FEATURE_SEPARATOR, normalizeName } from './enrich-normalize.js'
@@ -291,17 +287,13 @@ export function readIntroSheetRow(
   if (mapping.edCol) data.ED = cell(mapping.edCol) || ''
   if (mapping.pvCol) data.PV = cell(mapping.pvCol) || ''
   if (mapping.screenplayCol) data['编剧'] = cell(mapping.screenplayCol) || ''
-  if (mapping.characterDesignCol)
-    data['人设'] = cell(mapping.characterDesignCol) || ''
+  if (mapping.characterDesignCol) data['人设'] = cell(mapping.characterDesignCol) || ''
   if (mapping.cgDirectorCol) data['CG导演'] = cell(mapping.cgDirectorCol) || ''
-  if (mapping.seriesCompositionCol)
-    data['系列构成'] = cell(mapping.seriesCompositionCol) || ''
+  if (mapping.seriesCompositionCol) data['系列构成'] = cell(mapping.seriesCompositionCol) || ''
   if (mapping.storyboardCol) data['分镜'] = cell(mapping.storyboardCol) || ''
-  if (mapping.originalWorkCol)
-    data['原作'] = cell(mapping.originalWorkCol) || ''
+  if (mapping.originalWorkCol) data['原作'] = cell(mapping.originalWorkCol) || ''
   if (mapping.languageCol) data['语言'] = cell(mapping.languageCol) || ''
-  if (mapping.productionCountryCol)
-    data['制片国家'] = cell(mapping.productionCountryCol) || ''
+  if (mapping.productionCountryCol) data['制片国家'] = cell(mapping.productionCountryCol) || ''
   if (mapping.typeCol) data['类型'] = cell(mapping.typeCol) || ''
   return data
 }
@@ -318,7 +310,6 @@ export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
     mapping.cgDirectorCol !== undefined
   )
 }
-
 
 /**
  * 简介表头扫描块（§5.6 B1）：一次矩形读覆盖 `1..MAX_SCAN_ROWS` 行 ×
@@ -381,26 +372,26 @@ export function findIntroSheetInWorkbook(
 ): WpsWorksheet | null {
   const sheetCount = wb.Worksheets.Count
   for (let index = 1; index <= sheetCount; index += 1) {
-    let ws: WpsWorksheet | null = null
+    let worksheet: WpsWorksheet | null = null
     try {
-      ws = wb.Worksheets.Item(index)
+      worksheet = wb.Worksheets.Item(index)
     } catch {
-      ws = null
+      worksheet = null
     }
-    if (ws) {
+    if (worksheet) {
       const name = (() => {
         try {
-          return ws.Name
+          return worksheet.Name
         } catch {
           return ''
         }
       })()
       // 排除当前主源表与主新番表布局的工作表，其余表头命中简介关键字的才算候选
-      if ((!name || name !== excludeSheetName) && !detectAnimeSourceLayout(ws)) {
+      if ((!name || name !== excludeSheetName) && !detectAnimeSourceLayout(worksheet)) {
         // §5.6 B1：候选表的表头扫描一次矩形读完成（原为每行 50 次逐格读）
-        const scanBlock = readIntroScanBlock(ws)
+        const scanBlock = readIntroScanBlock(worksheet)
         for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-          if (countIntroHeaderHits(ws, row, scanBlock) >= 2) return ws
+          if (countIntroHeaderHits(worksheet, row, scanBlock) >= 2) return worksheet
         }
       }
     }

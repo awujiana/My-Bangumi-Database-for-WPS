@@ -90,7 +90,7 @@ interface LastApplied {
 }
 
 interface PageState {
-  ws: WpsWorksheet | null | undefined
+  worksheet: WpsWorksheet | null | undefined
   headerRow: number
   colMap: Map<string, number>
   /** 日期源规范列名 */
@@ -105,7 +105,7 @@ interface PageState {
 }
 
 const state: PageState = {
-  ws: null,
+  worksheet: null,
   headerRow: 1,
   colMap: new Map(),
   sourceKey: '',
@@ -293,8 +293,8 @@ function currentTarget(): YearMonth {
 }
 
 function refreshPreview(): void {
-  const { ws } = state
-  if (!ws) return
+  const { worksheet } = state
+  if (!worksheet) return
 
   const source = resolveSource()
   if (!source) {
@@ -308,9 +308,9 @@ function refreshPreview(): void {
   rebuildColumns()
   renderColumnListIfChanged()
 
-  const headerRow = findHeaderRow(ws)
+  const headerRow = findHeaderRow(worksheet)
   state.headerRow = headerRow
-  const lastRow = getLastRow(ws, true, headerRow)
+  const lastRow = getLastRow(worksheet, true, headerRow)
   const firstRow = headerRow + 1
   if (lastRow < firstRow) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
@@ -329,7 +329,7 @@ function refreshPreview(): void {
     if (col > maxCol) maxCol = col
   }
 
-  const block = readRangeValues(ws, firstRow, lastRow, minCol, maxCol)
+  const block = readRangeValues(worksheet, firstRow, lastRow, minCol, maxCol)
   if (block.length === 0) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
     renderPreviewEmpty('读取工作表失败，请重试')
@@ -457,11 +457,15 @@ function applyRangeStyle(range: WpsRange, style: RangeStyle): void {
  *
  * @returns 写入成功的组数（0 表示全部失败）
  */
-function paintSheet(ws: WpsWorksheet, addresses: readonly string[], style: RangeStyle): number {
+function paintSheet(
+  worksheet: WpsWorksheet,
+  addresses: readonly string[],
+  style: RangeStyle,
+): number {
   return runRangeGroupsWithSplit(
     splitRangeAddresses(addresses),
     (group) => {
-      applyRangeStyle(ws.Range(group.join(',')), style)
+      applyRangeStyle(worksheet.Range(group.join(',')), style)
     },
     (group, error) => {
       bgmLog(
@@ -473,8 +477,8 @@ function paintSheet(ws: WpsWorksheet, addresses: readonly string[], style: Range
 }
 
 function applyHighlight(isSilent = false): void {
-  const { ws } = state
-  if (!ws) {
+  const { worksheet } = state
+  if (!worksheet) {
     if (!isSilent) showToast('请先打开一个数据工作表', 'warn')
     return
   }
@@ -491,13 +495,13 @@ function applyHighlight(isSilent = false): void {
     addresses.push(...rowsToRangeAddresses(rows, column.letter))
   }
   const selectedColumns = state.columns.filter((c) => c.selected).length
-  const painted = paintSheet(ws, addresses, { fillColor: HIGHLIGHT_COLOR, fontColor: 0 })
+  const painted = paintSheet(worksheet, addresses, { fillColor: HIGHLIGHT_COLOR, fontColor: 0 })
   if (painted === 0) {
     if (!isSilent) showToast('高亮写入失败，请查看日志', 'error')
     return
   }
 
-  const record: LastApplied = { sheet: ws.Name, addresses }
+  const record: LastApplied = { sheet: worksheet.Name, addresses }
   setConfig(KEY_LAST_APPLIED, JSON.stringify(record))
   bgmLog(
     LOG_LEVELS.INFO,
@@ -514,13 +518,13 @@ function clearHighlight(isSilent = false): void {
     if (!isSilent) showToast('没有本插件施加的高亮记录', 'info')
     return
   }
-  const { ws } = state
-  if (ws?.Name !== record.sheet) {
+  const { worksheet } = state
+  if (worksheet?.Name !== record.sheet) {
     if (!isSilent) showToast(`请先切换到工作表「${record.sheet}」再清除`, 'warn')
     return
   }
 
-  paintSheet(ws, record.addresses, {
+  paintSheet(worksheet, record.addresses, {
     fillColorIndex: COLOR_INDEX_NONE,
     fontColorIndex: COLOR_INDEX_AUTOMATIC,
   })
@@ -539,12 +543,12 @@ function setAutoWatch(isEnabled: boolean): void {
     disposeAutoWatch = registerSheetChangeAutoRefresh(
       app,
       () => {
-        const { ws } = state
-        if (!ws) return
+        const { worksheet } = state
+        if (!worksheet) return
         refreshPreview()
         // 之前应用过且仍在同一张表 → 清旧 + 应用新，保持「表格变了高亮跟着变」
         const record = readLastApplied()
-        if (record?.sheet === ws.Name) {
+        if (record?.sheet === worksheet.Name) {
           clearHighlight(true)
           applyHighlight(true)
         }
@@ -614,15 +618,15 @@ function setMode(mode: 'auto' | 'manual'): void {
 
 /** 重新绑定工作表与列映射（init 与「刷新预览」按钮共用） */
 function reloadSheet(): void {
-  state.ws = getDataSheet()
-  if (!state.ws) {
+  state.worksheet = getDataSheet()
+  if (!state.worksheet) {
     setText('highlightSheetName', '未识别到数据工作表')
     renderPreviewEmpty('请先打开包含番剧数据的工作表，然后点「刷新预览」')
     return
   }
-  state.headerRow = findHeaderRow(state.ws)
-  state.colMap = getColumnMap(state.ws, state.headerRow)
-  setText('highlightSheetName', state.ws.Name)
+  state.headerRow = findHeaderRow(state.worksheet)
+  state.colMap = getColumnMap(state.worksheet, state.headerRow)
+  setText('highlightSheetName', state.worksheet.Name)
   renderSourceSelect()
   rebuildColumns()
   renderColumnList()

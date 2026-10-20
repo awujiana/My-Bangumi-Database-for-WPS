@@ -510,32 +510,32 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
 
 /**
  * 安全获取指定行的 Range 对象（推荐使用）
- * @param ws  当前工作表
+ * @param worksheet  当前工作表
  * @param row 1‑based 行号
  * @returns   该行对应的 WpsRange
  */
-export function getRowRange(ws: WpsWorksheet, row: number): WpsRange {
-  if (typeof ws.Range !== 'function') {
+export function getRowRange(worksheet: WpsWorksheet, row: number): WpsRange {
+  if (typeof worksheet.Range !== 'function') {
     throw new TypeError('Invalid worksheet object')
   }
   if (!Number.isFinite(row) || row < 1) {
     throw new Error(`Row index must be a positive integer, got ${String(row)}`)
   }
-  return ws.Range(`${String(row)}:${String(row)}`)
+  return worksheet.Range(`${String(row)}:${String(row)}`)
 }
 
 /**
  * 带后备的安全行 Range 获取（当 Range 构造异常时尝试使用 Rows.Item）
- * @param ws  当前工作表
+ * @param worksheet  当前工作表
  * @param row 1‑based 行号
  * @returns   该行对应的 WpsRange
  */
-export function getRowRangeSafe(ws: WpsWorksheet, row: number): WpsRange {
+export function getRowRangeSafe(worksheet: WpsWorksheet, row: number): WpsRange {
   try {
-    return getRowRange(ws, row)
+    return getRowRange(worksheet, row)
   } catch {
     try {
-      const item = ws.Rows.Item(row)
+      const item = worksheet.Rows.Item(row)
       return item as unknown as WpsRange
     } catch {
       throw new Error(`Failed to access row ${String(row)}`)

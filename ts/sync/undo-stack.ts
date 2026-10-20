@@ -120,8 +120,8 @@ export function undoLastSync(): number {
   }
 
   // 缓存工作表引用，避免每次恢复都调用 getDataSheet()
-  const ws: WpsWorksheet | null | undefined = getDataSheet()
-  if (!ws) {
+  const worksheet: WpsWorksheet | null | undefined = getDataSheet()
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, '[undoLastSync] 无法获取数据工作表，撤销失败')
     return 0
   }
@@ -130,14 +130,14 @@ export function undoLastSync(): number {
   for (let index = cellEntries.length - 1; index >= 0; index -= 1) {
     const entry = cellEntries[index]
     if (entry) {
-      setCellValue(ws, entry.row, entry.col, entry.oldValue)
+      setCellValue(worksheet, entry.row, entry.col, entry.oldValue)
     }
   }
 
   // 2. 按行号从大到小恢复被删除的行
   rowDeleteEntries.sort((a, b) => b.row - a.row)
   for (const snapshot of rowDeleteEntries) {
-    restoreDeletedRowWithWs(ws, snapshot)
+    restoreDeletedRowWithWs(worksheet, snapshot)
   }
 
   return session.entries.length
@@ -170,13 +170,13 @@ export function clearUndoStack(): void {
 
 /**
  * 恢复被删除的整行（使用已缓存的工作表引用）
- * @param ws 数据工作表引用
+ * @param worksheet 数据工作表引用
  * @param snapshot 删除前保存的行快照
  */
-function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void {
+function restoreDeletedRowWithWs(worksheet: WpsWorksheet, snapshot: RowSnapshot): void {
   try {
     // 在删除位置插入新行
-    ws.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()
+    worksheet.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${String(snapshot.row)} 失败: ${errorMessage}`)
@@ -187,7 +187,7 @@ function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void 
   for (const [colString, value] of Object.entries(snapshot.values)) {
     const col = Number(colString)
     if (!Number.isNaN(col)) {
-      setCellValue(ws, snapshot.row, col, value)
+      setCellValue(worksheet, snapshot.row, col, value)
     }
   }
 }

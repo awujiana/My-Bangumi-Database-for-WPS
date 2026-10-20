@@ -7,10 +7,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import {
-  buildIntroSheetContext,
-  findIntroSheetInWorkbook,
-} from '../sync/enrich-intro.js'
+import { buildIntroSheetContext, findIntroSheetInWorkbook } from '../sync/enrich-intro.js'
 import {
   detectAnimeSourceLayout,
   detectColumns,
@@ -60,19 +57,22 @@ import { state, safeGetElement } from './enrich-page-context.js'
  * 在指定工作表上识别表头并写入 state（不负责工作簿的打开/关闭）。
  * @returns 识别成功返回列映射；失败返回 null
  */
-export function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColumnMapping | null {
+export function detectHeaderOnSheet(
+  worksheet: WpsWorksheet,
+  label: string,
+): EnrichColumnMapping | null {
   try {
-    const sourceLayout = detectAnimeSourceLayout(ws)
-    const headerRow = sourceLayout?.headerRow ?? findHeaderRow(ws)
+    const sourceLayout = detectAnimeSourceLayout(worksheet)
+    const headerRow = sourceLayout?.headerRow ?? findHeaderRow(worksheet)
     if (headerRow === 0) {
       BGM.Dialog.alert('提示', '未检测到有效的表头行，请检查表头是否在前 10 行内')
       bgmLog(LOG_LEVELS.ERROR, `[enrich] 表头识别失败: ${label} 未检测到有效的表头行`)
       return null
     }
 
-    const mapping = sourceLayout?.columnMapping ?? detectColumns(ws, headerRow)
+    const mapping = sourceLayout?.columnMapping ?? detectColumns(worksheet, headerRow)
 
-    state.animeSourceSheet = ws
+    state.animeSourceSheet = worksheet
     state.headerRow = headerRow
     state.dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
     state.columnMapping = mapping
@@ -81,13 +81,13 @@ export function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColu
     discoverIntroContext()
     renderWorkbookTabs()
 
-    renderDetectResult(ws, mapping)
-    renderColumnMappingEditor(ws, mapping)
-    renderSourcePreview(ws, mapping)
+    renderDetectResult(worksheet, mapping)
+    renderColumnMappingEditor(worksheet, mapping)
+    renderSourcePreview(worksheet, mapping)
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 表头识别成功: ${label} / 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(mapping.nameCol)}`,
+      `[enrich] 表头识别成功: ${label} / 工作表=${worksheet.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(mapping.nameCol)}`,
     )
     return mapping
   } catch (error: unknown) {
@@ -104,11 +104,11 @@ export function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColu
   }
 }
 
-function renderDetectResult(ws: WpsWorksheet, _mapping: EnrichColumnMapping): void {
+function renderDetectResult(worksheet: WpsWorksheet, _mapping: EnrichColumnMapping): void {
   const resultArea = safeGetElement('detectResult')
   if (!resultArea) return
 
-  const sheetName = ws.Name || '未知'
+  const sheetName = worksheet.Name || '未知'
   const sheetNameElement = safeGetElement('detectSheetName')
   if (sheetNameElement) sheetNameElement.textContent = sheetName
 
@@ -121,7 +121,7 @@ function renderDetectResult(ws: WpsWorksheet, _mapping: EnrichColumnMapping): vo
   resultArea.style.display = ''
 }
 
-function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
+function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const mappingList = safeGetElement('mappingList')
   if (!mappingList) return
 
@@ -132,7 +132,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
   // 覆盖全部列（含表头为空的列）：Hazx 模板的名称列 C 没有表头，
   // 若只列有表头的列，自动识别的名称列将无法在下拉中回显
   for (let col = 1; col <= maxCols; col += 1) {
-    const header = getCellValue(ws, headerRow, col).trim()
+    const header = getCellValue(worksheet, headerRow, col).trim()
     colOptions.push({ col, header })
   }
 
@@ -393,7 +393,7 @@ const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: strin
 
 // 着色工具（TAGS / 首播 / 平台按内容稳定配色）已抽至 ./enrich-preview-cell.ts（renderPreviewCell / renderPlatformChipsCell）
 
-function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
+function renderSourcePreview(worksheet: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
   // 预览配置按页加载缓存（避免逐单元格读 PluginStorage）。此处是「每次预览只跑一次」
@@ -447,7 +447,7 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   const maxRows = 20
   const rowsHtml: string[] = []
   // 源表末行单独取一次：既要算预览上限，也要算「数据总行」统计（避免重复调 COM）
-  const sourceLastRow = getLastRow(ws)
+  const sourceLastRow = getLastRow(worksheet)
   const lastRow = Math.min(sourceLastRow, dataStartRow + maxRows - 1)
 
   for (let row = dataStartRow; row <= lastRow; row += 1) {
@@ -457,19 +457,19 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
     // 简介表按名称关联本行（无关联行时简介列留空）
     const introRow = state.introContext
       ? state.introContext.nameIndex.get(
-          normalizeName(getCellValue(ws, row, mapping.nameCol).trim()),
+          normalizeName(getCellValue(worksheet, row, mapping.nameCol).trim()),
         )
       : undefined
 
     for (const f of fieldCols) {
       if (hasPlatformCol && f.key === 'platformCol') {
         // 播放平台聚合展示：platformCol + platformExtraCols + exclusiveCol 去重
-        const platforms = readPlatformValues(ws, row, mapping)
+        const platforms = readPlatformValues(worksheet, row, mapping)
         if (platforms.length > 0) hasData = true
         rowCells.push(renderPlatformChipsCell(platforms))
       } else {
         const col = mapping[f.key] ?? 0
-        const value = getCellValue(ws, row, col)
+        const value = getCellValue(worksheet, row, col)
         if (value.trim()) hasData = true
         rowCells.push(renderPreviewCell(f.key, value))
       }

@@ -42,8 +42,8 @@ let throwOnCol: number | null = null
 /** 为 true 时 `getColumnMap` 抛错（用于 matchEntries 外层兜底） */
 let isThrowOnGetColumnMap = false
 
-function sheetNameOf(ws: unknown): string {
-  return (ws as { Name?: string } | null | undefined)?.Name ?? 'ws'
+function sheetNameOf(worksheet: unknown): string {
+  return (worksheet as { Name?: string } | null | undefined)?.Name ?? 'worksheet'
 }
 
 function cellKey(sheetName: string, row: number, col: number): string {
@@ -67,17 +67,17 @@ function hasAnyValue(sheetName: string, row: number): boolean {
 }
 
 /** 与生产接口同形；`throwOnCol` 用于制造 COM 读取异常 */
-function mockGetCellValue(ws: unknown, row: number, col: number): string {
+function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
   if (throwOnCol !== null && col === throwOnCol) throw new Error('COM 读取失败')
-  return getCell(sheetNameOf(ws), row, col)
+  return getCell(sheetNameOf(worksheet), row, col)
 }
 
-function mockSetCellValue(ws: unknown, row: number, col: number, value: unknown): void {
-  setCell(sheetNameOf(ws), row, col, String(value))
+function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
+  setCell(sheetNameOf(worksheet), row, col, String(value))
 }
 
-function mockFindHeaderRow(ws: unknown, startRow = 1): number {
-  const sheetName = sheetNameOf(ws)
+function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
+  const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
     for (let col = 1; col <= 12; col += 1) {
       const value = getCell(sheetName, row, col).trim()
@@ -87,9 +87,9 @@ function mockFindHeaderRow(ws: unknown, startRow = 1): number {
   return 0
 }
 
-function mockGetColumnMap(ws: unknown, headerRow: number): Map<string, number> {
+function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, number> {
   if (isThrowOnGetColumnMap) throw new Error('COM 读取表头失败')
-  const sheetName = sheetNameOf(ws)
+  const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
   for (let col = 1; col <= 50; col += 1) {
     const value = getCell(sheetName, headerRow, col).trim()
@@ -98,9 +98,13 @@ function mockGetColumnMap(ws: unknown, headerRow: number): Map<string, number> {
   return map
 }
 
-function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: number): number {
-  const sheetName = sheetNameOf(ws)
-  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(ws)
+function mockGetLastRow(
+  worksheet: unknown,
+  _shouldForceRefresh = false,
+  headerRow?: number,
+): number {
+  const sheetName = sheetNameOf(worksheet)
+  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(worksheet)
   if (resolvedHeaderRow <= 0) return 1
   let lastRow = resolvedHeaderRow
   for (let row = resolvedHeaderRow + 1; row <= 500; row += 1) {
@@ -111,14 +115,14 @@ function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: nu
 
 /** 矩形批量读取（生产接口）：按行/列区间从内存 store 取值 */
 function mockReadRangeValues(
-  ws: unknown,
+  worksheet: unknown,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
 ): string[][] {
   if (mocks.readBackOverride) return mocks.readBackOverride
-  const sheetName = sheetNameOf(ws)
+  const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
@@ -234,7 +238,13 @@ const ANIME_MAPPING: EnrichColumnMapping = {
 }
 
 function makeConfig(mapping: EnrichColumnMapping = ANIME_MAPPING): EnrichConfig {
-  return { filePath: 'anime.tsv', sheetName: '新番表', headerRow: 1, dataStartRow: 2, columnMapping: mapping }
+  return {
+    filePath: 'anime.tsv',
+    sheetName: '新番表',
+    headerRow: 1,
+    dataStartRow: 2,
+    columnMapping: mapping,
+  }
 }
 
 /** 范围桩：`Font` 可配置为「读取即抛错」，用于样式降级路径 */
@@ -532,7 +542,11 @@ describe('enrichTags 标签富化', () => {
   })
 
   it('目标列为空时填充', () => {
-    const enriched = runFieldFunction(enrichTags, { TAGS: '奇幻|冒险' }, new Map([['标签/分级', 3]]))
+    const enriched = runFieldFunction(
+      enrichTags,
+      { TAGS: '奇幻|冒险' },
+      new Map([['标签/分级', 3]]),
+    )
 
     expect(enriched[0]).toMatchObject({ fieldName: '标签/分级', action: 'fill', oldValue: null })
     expect(getCell(BANGUMI, 2, 3)).toBe('奇幻|冒险')
@@ -546,7 +560,11 @@ describe('enrichTags 标签富化', () => {
   it('已有标签时去重追加', () => {
     setCell(BANGUMI, 2, 3, '奇幻')
 
-    const enriched = runFieldFunction(enrichTags, { TAGS: '奇幻|冒险' }, new Map([['标签/分级', 3]]))
+    const enriched = runFieldFunction(
+      enrichTags,
+      { TAGS: '奇幻|冒险' },
+      new Map([['标签/分级', 3]]),
+    )
 
     expect(enriched[0]).toMatchObject({ action: 'append', updatedValue: '奇幻 | 冒险' })
     expect(getCell(BANGUMI, 2, 3)).toBe('奇幻 | 冒险')
@@ -565,13 +583,15 @@ describe('enrichTags 标签富化', () => {
 describe('enrichPlatform 播放平台富化', () => {
   it('新番表无平台信息时直接返回', () => {
     expect(runFieldFunction(enrichPlatform, {}, new Map([['在线播放平台', 6]]))).toEqual([])
-    expect(runFieldFunction(enrichPlatform, { 播放平台: '  ' }, new Map([['在线播放平台', 6]]))).toEqual(
-      [],
-    )
+    expect(
+      runFieldFunction(enrichPlatform, { 播放平台: '  ' }, new Map([['在线播放平台', 6]])),
+    ).toEqual([])
   })
 
   it('目标列不存在时直接返回', () => {
-    expect(runFieldFunction(enrichPlatform, { 播放平台: 'B站' }, new Map([['导演', 3]]))).toEqual([])
+    expect(runFieldFunction(enrichPlatform, { 播放平台: 'B站' }, new Map([['导演', 3]]))).toEqual(
+      [],
+    )
   })
 
   it('目标列为空时填充', () => {
@@ -672,7 +692,9 @@ describe('enrichFeatures 特点/印象富化', () => {
   const featureColMap = new Map<string, number>([['特点/印象', 7]])
 
   it('目标列不存在时直接返回', () => {
-    expect(runFieldFunction(enrichFeatures, { 周更时间: '周五' }, new Map([['导演', 3]]))).toEqual([])
+    expect(runFieldFunction(enrichFeatures, { 周更时间: '周五' }, new Map([['导演', 3]]))).toEqual(
+      [],
+    )
   })
 
   it('四个来源字段都为空时不写入', () => {
@@ -802,7 +824,15 @@ describe('enrichEntries 批量富化', () => {
     // （不能用第 3 列：新番表读取在 enrichIntoRow 的 try 之外，会直接冒泡）
     throwOnCol = 7
 
-    const matches: MatchResult[] = [{ animeRow: 2, matchedAnimeName: '芙莉莲', matchType: 'exact', bangumiRow: 2, bangumiName: '芙莉莲' }]
+    const matches: MatchResult[] = [
+      {
+        animeRow: 2,
+        matchedAnimeName: '芙莉莲',
+        matchType: 'exact',
+        bangumiRow: 2,
+        bangumiName: '芙莉莲',
+      },
+    ]
     const results = enrichEntries(animeSheet, bangumiSheet, matches, makeConfig())
 
     const [item] = results
@@ -818,10 +848,30 @@ describe('enrichEntries 批量富化', () => {
     setCell(BANGUMI, 3, 1, '葬送的芙莉莲')
 
     const matches: MatchResult[] = [
-      { animeRow: 2, matchedAnimeName: '芙莉莲', matchType: 'exact', bangumiRow: 2, bangumiName: '芙莉莲' },
-      { animeRow: 3, matchedAnimeName: '葬送的芙莉莲', matchType: 'alias', bangumiRow: 3, bangumiName: '葬送的芙莉莲' },
+      {
+        animeRow: 2,
+        matchedAnimeName: '芙莉莲',
+        matchType: 'exact',
+        bangumiRow: 2,
+        bangumiName: '芙莉莲',
+      },
+      {
+        animeRow: 3,
+        matchedAnimeName: '葬送的芙莉莲',
+        matchType: 'alias',
+        bangumiRow: 3,
+        bangumiName: '葬送的芙莉莲',
+      },
     ]
-    const results = enrichEntries(animeSheet, bangumiSheet, matches, makeConfig(), undefined, undefined, () => true)
+    const results = enrichEntries(
+      animeSheet,
+      bangumiSheet,
+      matches,
+      makeConfig(),
+      undefined,
+      undefined,
+      () => true,
+    )
 
     // 第一个条目边界即取消 → 一条都没处理
     expect(results).toHaveLength(0)
@@ -834,13 +884,18 @@ describe('enrichEntries 批量富化', () => {
     setCell(BANGUMI, 2, 1, '芙莉莲')
     mocks.addEnrichRecords.mockReturnValue(false)
 
-    const matches: MatchResult[] = [{ animeRow: 2, matchedAnimeName: '芙莉莲', matchType: 'exact', bangumiRow: 2, bangumiName: '芙莉莲' }]
+    const matches: MatchResult[] = [
+      {
+        animeRow: 2,
+        matchedAnimeName: '芙莉莲',
+        matchType: 'exact',
+        bangumiRow: 2,
+        bangumiName: '芙莉莲',
+      },
+    ]
     enrichEntries(animeSheet, bangumiSheet, matches, makeConfig())
 
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.stringContaining('富化记录写入失败'),
-      'error',
-    )
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('富化记录写入失败'), 'error')
   })
 
   it('传入简介表上下文时按名称关联富化（主表与简介表独立场景）', () => {
@@ -859,7 +914,13 @@ describe('enrichEntries 批量富化', () => {
     expect(intro).not.toBeNull()
 
     const matches: MatchResult[] = [
-      { animeRow: 2, matchedAnimeName: '芙莉莲', matchType: 'exact', bangumiRow: 2, bangumiName: '芙莉莲' },
+      {
+        animeRow: 2,
+        matchedAnimeName: '芙莉莲',
+        matchType: 'exact',
+        bangumiRow: 2,
+        bangumiName: '芙莉莲',
+      },
     ]
     const results = enrichEntries(
       animeSheet,
@@ -899,7 +960,15 @@ describe('enrichEntries 批量富化', () => {
     } as never
 
     const introMapping: EnrichColumnMapping = { nameCol: 1, introCol: 2, directorCol: 3 }
-    const matches: MatchResult[] = [{ animeRow: 2, matchedAnimeName: '芙莉莲', matchType: 'exact', bangumiRow: 2, bangumiName: '芙莉莲' }]
+    const matches: MatchResult[] = [
+      {
+        animeRow: 2,
+        matchedAnimeName: '芙莉莲',
+        matchType: 'exact',
+        bangumiRow: 2,
+        bangumiName: '芙莉莲',
+      },
+    ]
 
     const results = enrichEntries(animeSheet, noStyleSheet, matches, makeConfig(introMapping))
 
@@ -928,10 +997,7 @@ describe('ensureBangumiColumns 样式降级', () => {
     )
 
     expect(result.get('导演')).toBe(2)
-    expect(mocks.bgmLog).toHaveBeenCalledWith(
-      'WARN',
-      expect.stringContaining('无法获取样式模板'),
-    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('无法获取样式模板'))
   })
 
   it('复制样式到新列失败时降级且仍添加列', () => {
@@ -945,10 +1011,7 @@ describe('ensureBangumiColumns 样式降级', () => {
     )
 
     expect(result.get('导演')).toBe(2)
-    expect(mocks.bgmLog).toHaveBeenCalledWith(
-      'WARN',
-      expect.stringContaining('复制样式失败'),
-    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('复制样式失败'))
   })
 })
 

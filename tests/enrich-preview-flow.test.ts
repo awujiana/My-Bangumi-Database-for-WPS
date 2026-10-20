@@ -30,10 +30,10 @@ import type { WpsWorkbook, WpsWorksheet } from '../ts/tools/wps.js'
 
 const m = vi.hoisted(() => ({
   // sync/enrich-engine.js
-  detectColumns: vi.fn<(ws?: unknown, headerRow?: number) => unknown>(),
-  detectAnimeSourceLayout: vi.fn<(ws?: unknown) => unknown>(),
+  detectColumns: vi.fn<(worksheet?: unknown, headerRow?: number) => unknown>(),
+  detectAnimeSourceLayout: vi.fn<(worksheet?: unknown) => unknown>(),
   matchEntries: vi.fn<(source?: unknown, target?: unknown, config?: unknown) => MatchResult[]>(),
-  readPlatformValues: vi.fn<(ws?: unknown, row?: number, mapping?: unknown) => string[]>(),
+  readPlatformValues: vi.fn<(worksheet?: unknown, row?: number, mapping?: unknown) => string[]>(),
   findIntroSheetInWorkbook: vi.fn<(workbook?: unknown, sourceName?: string) => unknown>(),
   buildIntroSheetContext: vi.fn<(sheet?: unknown) => unknown>(),
   normalizeName: vi.fn<(name: string) => string>(),
@@ -49,10 +49,10 @@ const m = vi.hoisted(() => ({
   // tools/string-utilities.js
   escapeHtml: vi.fn<(value: string) => string>(),
   // tools/util/index.js
-  getCellValue: vi.fn<(ws?: unknown, row?: number, col?: number) => string>(),
-  getLastRow: vi.fn<(ws?: unknown) => number>(),
-  findHeaderRow: vi.fn<(ws?: unknown) => number>(),
-  getColumnMap: vi.fn<(ws?: unknown, headerRow?: number) => Map<string, number>>(),
+  getCellValue: vi.fn<(worksheet?: unknown, row?: number, col?: number) => string>(),
+  getLastRow: vi.fn<(worksheet?: unknown) => number>(),
+  findHeaderRow: vi.fn<(worksheet?: unknown) => number>(),
+  getColumnMap: vi.fn<(worksheet?: unknown, headerRow?: number) => Map<string, number>>(),
   bgmLog: vi.fn<(level: number, message: string) => void>(),
   dialogAlert: vi.fn<(title: string, message: string) => void>(),
   dialogError: vi.fn<(title: string, message: string) => void>(),
@@ -311,9 +311,7 @@ function mappingList(): HTMLElement {
 
 /** 按下拉框的 `data-field` 取到具体那个 select */
 function mappingSelect(field: string): HTMLSelectElement {
-  const selects = [
-    ...mappingList().querySelectorAll<HTMLSelectElement>(':scope .mapping-select'),
-  ]
+  const selects = [...mappingList().querySelectorAll<HTMLSelectElement>(':scope .mapping-select')]
   const found = selects.find((select) => select.dataset.field === field)
   if (!found) throw new Error(`mapping select not found: ${field}`)
   return found
@@ -344,9 +342,9 @@ function currentSourceWorkbook(): WpsWorkbook | null {
 }
 
 function sourceHeaderLabels(): (string | null)[] {
-  return [
-    ...elementById('sourceTable').querySelectorAll(':scope > thead th'),
-  ].map((cell) => cell.textContent)
+  return [...elementById('sourceTable').querySelectorAll(':scope > thead th')].map(
+    (cell) => cell.textContent,
+  )
 }
 
 /** 单元格坐标 → 值；未设置的坐标返回空串（与真实空单元格一致） */
@@ -459,7 +457,10 @@ function primeReadyState(mapping: EnrichColumnMapping = makeMapping({ nameCol: 3
 }
 
 /** 直接跑一次匹配预览渲染（匹配结果表 / 详情弹窗相关用例的入口） */
-function runMatchPreview(matches: MatchResult[], mapping: EnrichColumnMapping = makeMapping({ nameCol: 3 })): void {
+function runMatchPreview(
+  matches: MatchResult[],
+  mapping: EnrichColumnMapping = makeMapping({ nameCol: 3 }),
+): void {
   primeReadyState(mapping)
   m.matchEntries.mockReturnValue(matches)
   previewMatch()
@@ -550,7 +551,11 @@ describe('detectHeaderOnSheet', () => {
 
     expect(result).toBeNull()
     expect(m.handleError).toHaveBeenCalledTimes(1)
-    const options = m.handleError.mock.calls[0]?.[1] as { context?: string; showAlert?: boolean; level?: number }
+    const options = m.handleError.mock.calls[0]?.[1] as {
+      context?: string
+      showAlert?: boolean
+      level?: number
+    }
     expect(options.context).toBe('detectHeaderOnSheet')
     expect(options.showAlert).toBe(false)
     // 4 = 替身 BGM.ErrorLevel.ERROR
@@ -653,7 +658,9 @@ describe('列映射下拉与 updateColumnMapping', () => {
     select.dispatchEvent(new Event('change'))
 
     expect(mapping.nameCol).toBeUndefined()
-    expect(loggedMessages().some((text) => text.includes('列映射更新: nameCol → 未映射'))).toBe(true)
+    expect(loggedMessages().some((text) => text.includes('列映射更新: nameCol → 未映射'))).toBe(
+      true,
+    )
   })
 
   it('选项值为非数字时按 0 处理', () => {
@@ -724,9 +731,9 @@ describe('源数据预览', () => {
     detectWithMapping(makeMapping({ nameCol: 3, weekdayCol: 4, platformCol: 5, exclusiveCol: 6 }))
 
     expect(sourceHeaderLabels()).toEqual(['', '名称', '周更时间', '播放平台'])
-    expect(
-      elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML,
-    ).toContain('[chips:B站|爱奇艺]')
+    expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain(
+      '[chips:B站|爱奇艺]',
+    )
     expect(m.renderPreviewCell).toHaveBeenCalledWith('weekdayCol', '周一')
   })
 
@@ -757,7 +764,9 @@ describe('源数据预览', () => {
     detectWithMapping(makeMapping({ nameCol: 3 }))
 
     expect(sourceHeaderLabels()).toEqual(['', '名称', '导演', '编剧'])
-    expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain('某导演')
+    expect(elementById('sourceTable').querySelector(':scope > tbody')?.innerHTML).toContain(
+      '某导演',
+    )
   })
 
   it('简介表里没有同名行时简介列留空但行仍渲染', () => {
@@ -783,9 +792,8 @@ describe('源数据预览', () => {
 
     detectWithMapping(makeMapping({ nameCol: 3 }))
 
-    const rows = elementById('sourceTable').querySelectorAll<HTMLTableRowElement>(
-      ':scope > tbody > tr',
-    )
+    const rows =
+      elementById('sourceTable').querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr')
     expect(rows).toHaveLength(1)
     expect(rows[0]?.dataset.row).toBe('3')
   })
@@ -1118,7 +1126,10 @@ describe('previewMatch', () => {
 
   it('正常预览时把配置交给引擎并刷新统计、表格与页签', () => {
     primeReadyState()
-    const matches = [makeMatch({ matchType: 'exact' }), makeMatch({ animeRow: 6, matchType: 'unmatched', hasBangumiRow: false })]
+    const matches = [
+      makeMatch({ matchType: 'exact' }),
+      makeMatch({ animeRow: 6, matchType: 'unmatched', hasBangumiRow: false }),
+    ]
     m.matchEntries.mockReturnValue(matches)
     m.getColumnMap.mockReturnValue(new Map([['周更时间', 5]]))
 
@@ -1474,7 +1485,12 @@ describe('匹配结果表与详情弹窗', () => {
       makeMatch({ matchType: 'exact' }),
       makeMatch({ animeRow: 6, matchType: 'alias' }),
       makeMatch({ animeRow: 7, matchType: 'unmatched', hasBangumiRow: false }),
-      makeMatch({ animeRow: 8, matchType: 'error', hasBangumiRow: false, errorMessage: '网络错误' }),
+      makeMatch({
+        animeRow: 8,
+        matchType: 'error',
+        hasBangumiRow: false,
+        errorMessage: '网络错误',
+      }),
     ])
 
     const expectedTexts = ['✅ 精确匹配', '🔄 别名匹配', '❌ 未匹配', '⚠️ 错误']

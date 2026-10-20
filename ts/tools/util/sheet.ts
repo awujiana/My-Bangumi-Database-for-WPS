@@ -23,7 +23,7 @@ import { BGM, bgmLog, getApp } from './index.js'
 /**
  * 批量读取工作表中指定范围的所有值，返回字符串二维数组 [行][列]
  * 如果读取失败则返回空数组，调用方应处理空数组情况
- * @param ws 工作表对象
+ * @param worksheet 工作表对象
  * @param startRow 起始行
  * @param endRow 结束行
  * @param startCol 起始列
@@ -162,16 +162,16 @@ function normalizeValue2Shape(
  * @returns 二维数组 [行][列]；读取失败时 `null`
  */
 function readRect<T>(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
   convert: (cell: unknown) => T,
 ): T[][] | null {
-  if (!ws) return null
+  if (!worksheet) return null
   try {
-    const range = ws.Range(
+    const range = worksheet.Range(
       `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
     )
     // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
@@ -198,13 +198,13 @@ function readRect<T>(
  * 读取失败返回空数组——调用方**必须**据此放弃写入，绝不能拿空数组覆盖整行。
  */
 export function readRangeValues(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
 ): string[][] {
-  return readRect(ws, startRow, endRow, startCol, endCol, safeCellValue) ?? []
+  return readRect(worksheet, startRow, endRow, startCol, endCol, safeCellValue) ?? []
 }
 
 /**
@@ -244,14 +244,14 @@ export interface SheetCellCache {
  * 打到无宿主的真实封装上（写变 no-op）。
  */
 export interface SheetCellIo {
-  read(ws: WpsWorksheet, row: number, col: number): string
-  write(ws: WpsWorksheet, row: number, col: number, value: string): void
+  read(worksheet: WpsWorksheet, row: number, col: number): string
+  write(worksheet: WpsWorksheet, row: number, col: number, value: string): void
 }
 
 const realCellIo: SheetCellIo = {
-  read: (ws, row, col) => getCellValue(ws, row, col),
-  write: (ws, row, col, value) => {
-    setCellValue(ws, row, col, value)
+  read: (worksheet, row, col) => getCellValue(worksheet, row, col),
+  write: (worksheet, row, col, value) => {
+    setCellValue(worksheet, row, col, value)
   },
 }
 
@@ -263,20 +263,20 @@ const realCellIo: SheetCellIo = {
  * 播种失败（跨度过大 / 宿主返回形状不符）时不播种——读写全部回落逐格路径，
  * 行为与不建缓存一致（只是没有加速）。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rows 预计会访问的行号（可离散；循环中动态新增的行不在此列也能用——
  *   未播种的行首次读回落 `getCellValue` 并回填）
  * @param maxCol 预计会访问的最大列号（超出列的访问同样回落逐格读）
  * @param io 后备单元格 IO（默认真实 COM 封装；见 {@link SheetCellIo}）
  */
 export function createSheetCellCache(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   rows: readonly number[],
   maxCol: number,
   io: SheetCellIo = realCellIo,
 ): SheetCellCache {
   const cells = new Map<string, string>()
-  const seeded = readRowsCache(ws, rows, maxCol)
+  const seeded = readRowsCache(worksheet, rows, maxCol)
   if (seeded) {
     for (const [row, line] of seeded) {
       for (let col = 1; col <= maxCol; col += 1) {
@@ -289,12 +289,12 @@ export function createSheetCellCache(
       const key = `${String(row)}:${String(col)}`
       const hit = cells.get(key)
       if (hit !== undefined) return hit
-      const value = io.read(ws, row, col)
+      const value = io.read(worksheet, row, col)
       cells.set(key, value)
       return value
     },
     write(row: number, col: number, value: string): void {
-      io.write(ws, row, col, value)
+      io.write(worksheet, row, col, value)
       cells.set(`${String(row)}:${String(col)}`, value)
     },
   }
@@ -310,13 +310,13 @@ export function createSheetCellCache(
  *
  * 形状守卫沿用本项目不变式：行数/列宽对不上就返回 `null`，调用方回退逐格读，绝不猜形状。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rows 需要的行号（可离散、可无序、允许重复）
  * @param maxCol 需要的最大列号（读取范围恒为 1..maxCol）
  * @returns 行号 → 该行文本数组；`null` 表示批量读不可用，调用方须回退逐格读
  */
 export function readRowsCache(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   rows: readonly number[],
   maxCol: number,
 ): Map<number, readonly string[]> | null {
@@ -329,7 +329,7 @@ export function readRowsCache(
   }
   const span = maxRow - minRow + 1
   if (span > ROWS_CACHE_MAX_SPAN) return null
-  const block = readRangeValues(ws, minRow, maxRow, 1, maxCol)
+  const block = readRangeValues(worksheet, minRow, maxRow, 1, maxCol)
   // 行数不足 ⇒ 宿主返回了非预期形状，宁可判为读取失败（回退逐格读），绝不猜形状
   if (block.length !== span) return null
   const cache = new Map<number, readonly string[]>()
@@ -346,7 +346,7 @@ export function readRowsCache(
  * 与 `readRangeValues`（一律 `String()` 化）不同，本函数用于「读-改-写整行」场景：
  * 读回的 number/Date 不会被强转成字符串，从而避免整行写回时把数字列变成文本列。
  * 如果读取失败则返回空数组，调用方**必须**据此放弃写入（绝不能拿空数组覆盖整行，否则会清空用户数据）。
- * @param ws 工作表对象
+ * @param worksheet 工作表对象
  * @param startRow 起始行
  * @param endRow 结束行
  * @param startCol 起始列
@@ -354,13 +354,13 @@ export function readRowsCache(
  * @returns `WpsCellValue` 二维数组（失败时为空数组）
  */
 export function readRangeCellValues(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
 ): WpsCellValue[][] {
-  return readRect(ws, startRow, endRow, startCol, endCol, preserveCellValue) ?? []
+  return readRect(worksheet, startRow, endRow, startCol, endCol, preserveCellValue) ?? []
 }
 
 // 缓存相关（模块级 Map）
@@ -381,8 +381,11 @@ export function cacheGet<T>(key: string, factory: () => T): T {
   return value
 }
 
-export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number {
-  const sheetName = ws?.Name ?? ''
+export function findHeaderRow(
+  worksheet: WpsWorksheet | null | undefined,
+  startRow?: number,
+): number {
+  const sheetName = worksheet?.Name ?? ''
   const cacheKey = `${sheetName}:headerRow:${String(startRow ?? 1)}`
   return cacheGet(cacheKey, () => {
     const sRow = startRow ?? 1
@@ -390,7 +393,7 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
     // 快路径：一次矩形读整块扫描区（原先 10 行 × 60 列 = 最多 600 次逐格 COM 往返）。
     // 读回行数不足（宿主未返回完整矩形 / 桩未实现区域读）时回退逐格扫描，
     // 保证行为与改造前完全一致。
-    const block = readRangeValues(ws, sRow, endRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
+    const block = readRangeValues(worksheet, sRow, endRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
     if (block.length === endRow - sRow + 1) {
       for (const [index, rowCells] of block.entries()) {
         if (isRowHeaderMatch(rowCells)) return sRow + index
@@ -398,7 +401,7 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
       return 0
     }
     for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-      if (isRowHeaderMatch(readRowCellsByCell(ws, row))) return row
+      if (isRowHeaderMatch(readRowCellsByCell(worksheet, row))) return row
     }
     return 0
   })
@@ -409,13 +412,13 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
  *
  * 单格读取失败按空串处理：表头识别是「尽力而为」，不该因个别列抛错整行判否。
  */
-function readRowCellsByCell(ws: WpsWorksheet | null | undefined, row: number): string[] {
+function readRowCellsByCell(worksheet: WpsWorksheet | null | undefined, row: number): string[] {
   const cells: string[] = []
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
     try {
       // 取值即转小写（与改造前一致）：取不到或不是字符串会抛错，
       // 由下面的 catch 按空串处理，不因此把整行判为「非表头行」。
-      cells.push(getCellValue(ws, row, col).toLowerCase())
+      cells.push(getCellValue(worksheet, row, col).toLowerCase())
     } catch {
       cells.push('')
     }
@@ -453,15 +456,15 @@ function applyColumnRules(colMap: Map<string, number>, colName: string, index: n
 
 /**
  * 获取列名到列号的映射（优化版：正则规则数组 + 缓存）
- * @param ws 工作表对象
+ * @param worksheet 工作表对象
  * @param headerRow 表头行号
  * @returns Map<string, number> 列名 -> 列号
  */
 export function getColumnMap(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   headerRow: number,
 ): Map<string, number> {
-  const sheetName = ws?.Name ?? ''
+  const sheetName = worksheet?.Name ?? ''
   const cacheKey = `${sheetName}:columnMap:${String(headerRow)}`
   return cacheGet(cacheKey, () => {
     const colMap = new Map<string, number>()
@@ -470,9 +473,9 @@ export function getColumnMap(
     const lastCol = 50
     // 快路径：一次矩形读表头行（原先两轮循环共 100 次逐格读）。
     // 读回为空（宿主/桩未返回该行）时 readColName 自动回退逐格读，行为不变。
-    const headerCells = readRangeValues(ws, headerRow, headerRow, 1, lastCol)[0]
+    const headerCells = readRangeValues(worksheet, headerRow, headerRow, 1, lastCol)[0]
     const readColName = (index: number): string =>
-      trim(headerCells ? (headerCells[index - 1] ?? '') : getCellValue(ws, headerRow, index))
+      trim(headerCells ? (headerCells[index - 1] ?? '') : getCellValue(worksheet, headerRow, index))
 
     for (let index = 1; index <= lastCol; index += 1) {
       const colName = readColName(index)
@@ -517,8 +520,8 @@ export function getColumnMap(
 }
 
 /** 清除指定工作表的所有缓存 */
-export function clearSheetCache(ws: WpsWorksheet | null | undefined): void {
-  const prefix = ws?.Name ?? ''
+export function clearSheetCache(worksheet: WpsWorksheet | null | undefined): void {
+  const prefix = worksheet?.Name ?? ''
   for (const key of sheetCache.keys()) {
     if (key.startsWith(prefix)) sheetCache.delete(key)
   }
@@ -526,11 +529,11 @@ export function clearSheetCache(ws: WpsWorksheet | null | undefined): void {
 
 /**
  * 在表头行中查找第一个匹配「序列号 / Bangumi URL / 名称 / 别名」的列索引
- * @param ws           工作表
+ * @param worksheet           工作表
  * @param headerRow 表头行号
  * @returns 列索引（1‑based），若未找到返回 undefined
  */
-function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefined {
+function findAnchorColumn(worksheet: WpsWorksheet, headerRow: number): number | undefined {
   const keywords = [
     // 序列号
     '序号',
@@ -561,7 +564,7 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
   const maxCols = 50
 
   for (let c = 1; c <= maxCols; c += 1) {
-    const value = ws.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
+    const value = worksheet.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
     if (value != null) {
       const text = String(value).trim().toLowerCase()
       if (keywords.some((kw) => text === kw || text.includes(kw))) {
@@ -574,27 +577,27 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
 
 /**
  * 获取工作表的最后有效数据行
- * @param ws            工作表对象（WpsWorksheet）
+ * @param worksheet            工作表对象（WpsWorksheet）
  * @param shouldForceRefresh  是否强制刷新（跳过缓存）
  * @param headerRow     可选：表头行号。若提供，则自动检测“序号/ID”列并用该列定位最后行；
  *                      若未找到或未提供，回退到原有逻辑（D列 → A列 → UsedRange）。
  * @returns 最后数据行号（1‑based），至少返回 1
  */
 export function getLastRow(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   shouldForceRefresh = false,
   headerRow?: number,
 ): number {
-  if (!ws) {
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, 'getLastRow: 工作表对象无效，返回默认值 50000')
     return 50_000
   }
 
-  const sheetName = ws.Name || ''
+  const sheetName = worksheet.Name || ''
   const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${String(headerRow)}` : ''}`
 
   if (shouldForceRefresh) {
-    clearSheetCache(ws)
+    clearSheetCache(worksheet)
     bgmLog(LOG_LEVELS.INFO, '缓存已清除，重新计算最后行')
   }
 
@@ -609,12 +612,12 @@ export function getLastRow(
 
     // 1. 如果提供了表头行，尝试自动选择锚定列
     if (headerRow != null && headerRow >= 1) {
-      const col = findAnchorColumn(ws, headerRow)
+      const col = findAnchorColumn(worksheet, headerRow)
       if (col) {
         try {
           // ✅ 修复点：使用 col 拼地址，而不是硬编码 D
           const colLetter = colNumberToLetter(col)
-          const cell = ws.Range(`${colLetter}${String(ws.Rows.Count)}`)
+          const cell = worksheet.Range(`${colLetter}${String(worksheet.Rows.Count)}`)
           const endCell = cell.End(-4162)
           if (endCell.Row > 0) {
             bgmLog(
@@ -634,7 +637,7 @@ export function getLastRow(
 
     // 2. 优先 D 列（常见序号列）
     try {
-      const cell = ws.Range(`D${String(ws.Rows.Count)}`)
+      const cell = worksheet.Range(`D${String(worksheet.Rows.Count)}`)
       const endCell = cell.End(-4162)
       if (endCell.Row > 0) {
         bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${String(endCell.Row)}`)
@@ -646,7 +649,7 @@ export function getLastRow(
 
     // 3. 尝试 A 列
     try {
-      const cell = ws.Range(`A${String(ws.Rows.Count)}`)
+      const cell = worksheet.Range(`A${String(worksheet.Rows.Count)}`)
       const endCell = cell.End(-4162)
       if (endCell.Row > 0) {
         bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${String(endCell.Row)}`)
@@ -658,7 +661,7 @@ export function getLastRow(
 
     // 4. UsedRange 兜底
     try {
-      const usedRange = ws.UsedRange
+      const usedRange = worksheet.UsedRange
       if (usedRange) {
         const last = usedRange.Row + usedRange.Rows.Count - 1
         if (last > 0) {
@@ -712,20 +715,20 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
         }
       }
 
-      const ws = targetWb.Worksheets.Item(BGM.sheet.lockedIndex)
-      return ws
+      const worksheet = targetWb.Worksheets.Item(BGM.sheet.lockedIndex)
+      return worksheet
     } catch (error: unknown) {
       bgmLog(LOG_LEVELS.WARN, `getDataSheet 锁定工作表失败: ${(error as Error).message}`)
     }
   }
 
-  const ws = app.ActiveWorkbook.ActiveSheet
-  return ws
+  const worksheet = app.ActiveWorkbook.ActiveSheet
+  return worksheet
 }
 
-export function safeActivate(ws: WpsWorksheet | null | undefined): void {
-  if (ws && typeof ws.Activate === 'function') {
-    ws.Activate()
+export function safeActivate(worksheet: WpsWorksheet | null | undefined): void {
+  if (worksheet && typeof worksheet.Activate === 'function') {
+    worksheet.Activate()
   } else {
     bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表')
   }
@@ -747,16 +750,16 @@ const HEADER_SCAN_COLUMNS = 64
  * 写入位置：第 1 行，按 STANDARD_HEADERS 顺序逐列写入。
  * 写入后清除缓存，确保后续 getColumnMap / findHeaderRow 能读到新表头。
  *
- * @param ws 工作表对象
+ * @param worksheet 工作表对象
  * @returns true 表示已填充表头（原为空表），false 表示已有表头 / 拒绝填充
  */
-export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean {
-  if (!ws) {
+export function ensureSheetHeaders(worksheet: WpsWorksheet | null | undefined): boolean {
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, '[ensureSheetHeaders] 工作表无效')
     return false
   }
 
-  const headerRow = findHeaderRow(ws)
+  const headerRow = findHeaderRow(worksheet)
   if (headerRow > 0) {
     bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 已有表头行 ${String(headerRow)}，无需填充`)
     return false
@@ -766,10 +769,8 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   // 若第 1 行已有内容（例如用户数据从第 1 行开始、表头写法不规范导致
   // findHeaderRow 认不出来），往下写 39 个标准表头会**覆盖用户第 1 行数据**。
   // 此时拒绝填充并告警，交由用户自行补表头。
-  const firstRowCells = readRangeValues(ws, 1, 1, 1, HEADER_SCAN_COLUMNS)
-  const hasFirstRowContent = firstRowCells.some((cells) =>
-    cells.some((cell) => cell.trim() !== ''),
-  )
+  const firstRowCells = readRangeValues(worksheet, 1, 1, 1, HEADER_SCAN_COLUMNS)
+  const hasFirstRowContent = firstRowCells.some((cells) => cells.some((cell) => cell.trim() !== ''))
   if (hasFirstRowContent) {
     bgmLog(
       LOG_LEVELS.WARN,
@@ -785,7 +786,7 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   let failCount = 0
   const failCols: number[] = []
   for (const [index, header] of STANDARD_HEADERS.entries()) {
-    const isOk = setCellValueDirect(ws, 1, index + 1, header)
+    const isOk = setCellValueDirect(worksheet, 1, index + 1, header)
     if (isOk) {
       writeCount += 1
     } else {
@@ -812,16 +813,16 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   }
 
   // 验证写入：读回第 25 列（Bangumi URL）确认写入成功
-  const verifyValue = getCellValue(ws, 1, 25)
+  const verifyValue = getCellValue(worksheet, 1, 25)
   bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 验证第25列读回: "${verifyValue}"`)
   if (!verifyValue) {
     bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 表头写入验证失败，第25列为空')
   }
 
   // 清除缓存，确保后续读取能拿到新表头
-  clearSheetCache(ws)
+  clearSheetCache(worksheet)
   // 验证 findHeaderRow 是否能识别新表头
-  const detectedHeaderRow = findHeaderRow(ws)
+  const detectedHeaderRow = findHeaderRow(worksheet)
   bgmLog(
     LOG_LEVELS.INFO,
     `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${String(detectedHeaderRow)}`,
@@ -850,14 +851,19 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
  *
  * @returns true 写入成功，false 写入失败
  */
-function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: string): boolean {
+function setCellValueDirect(
+  worksheet: WpsWorksheet,
+  row: number,
+  col: number,
+  value: string,
+): boolean {
   const address = colNumberToLetter(col) + String(row)
 
   // 方案 1: Cells.Item(row, col) + FormulaR1C1
   // 完全不同的 COM 路径（Cells.Item 而非 Range）+ 不同属性（FormulaR1C1 而非 Formula/Value/Value2），
   // 最大概率绕过 WPS COM 桥接层 Proxy 拦截。
   try {
-    const cell = ws.Cells.Item(row, col)
+    const cell = worksheet.Cells.Item(row, col)
     cell.FormulaR1C1 = value
     return true
   } catch (error: unknown) {
@@ -869,7 +875,7 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
 
   // 方案 2: Range + Formula（不同属性路径，不受 Value/Value2 拦截影响）
   try {
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     cell.Formula = value
     return true
   } catch (error: unknown) {
@@ -881,7 +887,7 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
 
   // 方案 3: Range + FormulaR1C1（不同属性路径）
   try {
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     cell.FormulaR1C1 = value
     return true
   } catch (error: unknown) {
@@ -893,7 +899,7 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
 
   // 方案 4: Range + Value2（回退）
   try {
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     cell.Value2 = value
     return true
   } catch (error: unknown) {
@@ -905,7 +911,7 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
 
   // 方案 5: Range + Value（最终回退）
   try {
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     cell.Value = value
     return true
   } catch (error: unknown) {

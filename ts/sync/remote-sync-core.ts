@@ -29,7 +29,12 @@ import {
   getDataSheet,
 } from '../tools/util/index.js'
 
-import { collectMissingColumns, collectRemoteEmptyFields, computeDiff, filterByTime } from './github-sync-diff.js'
+import {
+  collectMissingColumns,
+  collectRemoteEmptyFields,
+  computeDiff,
+  filterByTime,
+} from './github-sync-diff.js'
 import type { ConflictResolution, SyncStrategy, SyncTimeFilter } from './github-sync-diff.js'
 import { formatTimeFilterLabel } from './github-time-format.js'
 import {
@@ -180,9 +185,9 @@ export async function runRemoteSync(
 
   const applyRemoteEntries = async (): Promise<GithubSyncResult> => {
     // 3.5 空文档自动填充表头
-    const ws = getDataSheet()
-    if (ws) {
-      const isFilled = ensureSheetHeaders(ws)
+    const worksheet = getDataSheet()
+    if (worksheet) {
+      const isFilled = ensureSheetHeaders(worksheet)
       if (isFilled) {
         bgmLog(LOG_LEVELS.INFO, `[${logTag}] 空文档已自动填充标准表头`)
         onProgress?.(1, 3, '已自动填充表头，继续同步...')

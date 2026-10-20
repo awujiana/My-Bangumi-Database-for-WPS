@@ -20,10 +20,10 @@ import { state, safeGetElement } from './enrich-page-context.js'
 export function showSourceDetail(): void {
   const modalElement = safeGetElement('sourceDetailModal')
   const bodyElement = safeGetElement('sourceDetailBody')
-  const ws = state.animeSourceSheet
-  if (!modalElement || !bodyElement || !ws) return
+  const worksheet = state.animeSourceSheet
+  if (!modalElement || !bodyElement || !worksheet) return
 
-  bodyElement.innerHTML = renderSourceDetailTable(ws)
+  bodyElement.innerHTML = renderSourceDetailTable(worksheet)
   modalElement.style.display = 'flex'
 }
 
@@ -42,7 +42,7 @@ export function hideSourceDetail(): void {
  * 单元格复用数据预览的渲染（周几七色 / 集数徽章 / TAGS 彩色标签 / 首播与平台着色），
  * 保证弹窗与预览样式一致。
  */
-function renderSourceDetailTable(ws: WpsWorksheet): string {
+function renderSourceDetailTable(worksheet: WpsWorksheet): string {
   const maxCols = 50
   const { headerRow, dataStartRow } = state
   const mapping = state.columnMapping
@@ -68,7 +68,7 @@ function renderSourceDetailTable(ws: WpsWorksheet): string {
   }
   const columns: DetailColumn[] = []
   for (let col = 1; col <= maxCols; col += 1) {
-    const header = getCellValue(ws, headerRow, col).trim()
+    const header = getCellValue(worksheet, headerRow, col).trim()
     const field = fieldByCol.get(col)
     if (header || field) {
       const label = header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
@@ -81,14 +81,14 @@ function renderSourceDetailTable(ws: WpsWorksheet): string {
   }
 
   const maxRows = 100
-  const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
+  const lastRow = Math.min(getLastRow(worksheet), dataStartRow + maxRows - 1)
 
   const bodyRows: string[] = []
   for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
     let hasData = false
     for (const column of columns) {
-      const value = getCellValue(ws, row, column.col).trim()
+      const value = getCellValue(worksheet, row, column.col).trim()
       if (value) hasData = true
       if (column.field) {
         // 已映射字段复用预览渲染（空值时 renderPreviewCell 自会输出空 td）

@@ -247,7 +247,7 @@ export function refreshWorkbooks(): void {
   bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${String(workbooks.length)} 个`)
 }
 
-export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
+export function activateSheetIfNeeded(worksheet: WpsWorksheet): (() => void) | false {
   const app = getApp()
   // 确保工作簿存在
   if (!app?.ActiveWorkbook) return false
@@ -256,8 +256,8 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
     const active = app.ActiveWorkbook.ActiveSheet
 
     const activeName = active.Name || ''
-    if (activeName !== (ws.Name || '')) {
-      ws.Activate()
+    if (activeName !== (worksheet.Name || '')) {
+      worksheet.Activate()
       return function restore() {
         try {
           active.Activate()
@@ -283,7 +283,7 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
 // ========== 表头检测 ==========
 
 export function detectHeaderAndColumns(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   options: { visibleRowSet?: Set<number> | null; isFiltered?: boolean } = {},
 ): HeaderMeta {
   const { visibleRowSet = null, isFiltered = false } = options
@@ -298,10 +298,10 @@ export function detectHeaderAndColumns(
   // 原先仅第 1 步就是 10 行 × 60 列 = 600 次逐格读，连同表头名、续行、数据列采样合计约 2000 次/次刷新；矩形读不完整时回退逐格（行为不变）。采样区额外多读 22 行（数据列采样最多再向下看 20 行，留 2 行余量）。
   const SCAN_ROWS_EXTRA = 22
   const scanEndRow = PANEL_CONFIG.MAX_SCAN_ROWS + SCAN_ROWS_EXTRA
-  const block = readRangeValues(ws, 1, scanEndRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
+  const block = readRangeValues(worksheet, 1, scanEndRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
   const canBatch = block.length === scanEndRow
   const cellAt = (row: number, col: number): string =>
-    canBatch ? (block[row - 1]?.[col - 1] ?? '') : getCellValue(ws, row, col)
+    canBatch ? (block[row - 1]?.[col - 1] ?? '') : getCellValue(worksheet, row, col)
 
   // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
   const candidates: CandidateHeader[] = []
@@ -508,7 +508,7 @@ export function autoDetectSheet(): {
  * 收集活动筛选列描述（"列名(criteria)" 形式）；单列读取失败仅记录不中断。
  * （从 updateFilterStatus 的 try 块抽出，降低 try-complexity）
  */
-function collectActiveFilterCols(ws: WpsWorksheet, filters: WpsFilters): string[] {
+function collectActiveFilterCols(worksheet: WpsWorksheet, filters: WpsFilters): string[] {
   const activeCols: string[] = []
   // 筛选列数只读一次（COM 属性，写在循环条件里每轮都会多一次跨进程往返）
   const filterCount = filters.Count
@@ -518,7 +518,7 @@ function collectActiveFilterCols(ws: WpsWorksheet, filters: WpsFilters): string[
       if (f.On) {
         let colName = ''
         try {
-          const headerCell = ws.Range(`${colNumberToLetter(index)}1`)
+          const headerCell = worksheet.Range(`${colNumberToLetter(index)}1`)
           colName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
         } catch (error: unknown) {
           BGM.handleError(error, {
@@ -562,11 +562,11 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     return
   }
   // 现在 sheet 被收窄为 WpsWorksheet
-  const ws: WpsWorksheet = sheet
+  const worksheet: WpsWorksheet = sheet
 
   let isAutoFilterMode = false
   try {
-    isAutoFilterMode = !!ws.AutoFilterMode
+    isAutoFilterMode = !!worksheet.AutoFilterMode
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
@@ -575,7 +575,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     })
   }
   try {
-    if (!isAutoFilterMode && ws.AutoFilter) isAutoFilterMode = !!ws.AutoFilter.Mode
+    if (!isAutoFilterMode && worksheet.AutoFilter) isAutoFilterMode = !!worksheet.AutoFilter.Mode
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
@@ -591,7 +591,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   }
 
   try {
-    const autoFilter = ws.AutoFilter
+    const autoFilter = worksheet.AutoFilter
     if (!autoFilter) {
       element.textContent = '筛选已开启但无活动筛选'
       return
@@ -602,7 +602,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
       return
     }
 
-    const activeCols: string[] = collectActiveFilterCols(ws, filters)
+    const activeCols: string[] = collectActiveFilterCols(worksheet, filters)
 
     if (activeCols.length > 0) {
       const text = `✔ 筛选已开启（${String(activeCols.length)} 列），将同步筛选后的可见数据\n${activeCols.join('、')}`
@@ -629,7 +629,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
  * 返回是否有非空数据。（从预览构建的 try 块抽出，降低 try-complexity）
  */
 function isReadPreviewSegmentBatch(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   meta: HeaderMeta,
   segStart: number,
   segLength: number,
@@ -641,7 +641,7 @@ function isReadPreviewSegmentBatch(
   // 一次性读取整个矩形区域
   const startColLetter = colNumberToLetter(meta.previewColStartAbsolute)
   const endColLetter = colNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
-  const rangeAddr = ws.Range(
+  const rangeAddr = worksheet.Range(
     `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLength - 1)}`,
   )
   const raw = rangeAddr.Value2
@@ -661,7 +661,7 @@ function isReadPreviewSegmentBatch(
         } else if (segLength === 1 && displayColCount === 1) {
           v = raw == null ? '' : String(raw).trim()
         } else {
-          v = getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
+          v = getCellValue(worksheet, dr, meta.previewColStartAbsolute + ci).trim()
         }
         if (v) hasAny = true
         rowCols.push(v)
@@ -784,9 +784,9 @@ export function refreshData(): void {
     if (lockedWorkbook) workbook = lockedWorkbook
   }
 
-  let ws: WpsWorksheet | null | undefined = null
+  let worksheet: WpsWorksheet | null | undefined = null
   try {
-    ws = workbook.Worksheets.Item(sheetIndex)
+    worksheet = workbook.Worksheets.Item(sheetIndex)
   } catch (error: unknown) {
     if (previewBox)
       previewBox.innerHTML = sanitizeHtml(
@@ -797,7 +797,7 @@ export function refreshData(): void {
     return
   }
   // 检查工作表可访问性（WPS 桥接层可能返回不可用的代理对象）
-  if (typeof ws.Activate !== 'function') {
+  if (typeof worksheet.Activate !== 'function') {
     if (previewBox)
       previewBox.innerHTML = sanitizeHtml(
         `<p class="hint">无法访问工作表 ${String(sheetIndex)}</p>`,
@@ -811,17 +811,17 @@ export function refreshData(): void {
     return
   }
 
-  const sheetName = ws.Name || ''
+  const sheetName = worksheet.Name || ''
   // 清除该工作表所有缓存，确保获取到最新数据（§5.6 C3：barrel 已统一，去掉死守卫）
-  clearSheetCache(ws)
-  const needRestore = activateSheetIfNeeded(ws)
+  clearSheetCache(worksheet)
+  const needRestore = activateSheetIfNeeded(worksheet)
   const refreshDataCore = (): void => {
     // 获取最后数据行（强制刷新，不使用缓存）
-    const lastRow = getLastRow(ws, true)
+    const lastRow = getLastRow(worksheet, true)
     bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${String(lastRow)}`)
 
     // 使用统一的筛选状态检测
-    const filterStatus = getFilterStatus(ws, lastRow)
+    const filterStatus = getFilterStatus(worksheet, lastRow)
     const isFiltered = filterStatus.hasFilter
     const { visibleRows } = filterStatus
     const visibleRowSet = isFiltered ? new Set<number>(visibleRows) : null
@@ -835,11 +835,11 @@ export function refreshData(): void {
       bgmLog(LOG_LEVELS.INFO, `可见行列表(前10): ${visibleRows.slice(0, 10).join(',')}`)
     }
 
-    const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered })
+    const meta = detectHeaderAndColumns(worksheet, { visibleRowSet, isFiltered })
     // ✅ 保存供 previewSyncContent 使用
     BGM.dataPreview = {
       // 工作表引用
-      ws,
+      worksheet,
       // 筛选后可见行（含表头）
       visibleRows,
       headerRow: meta.headerRow,
@@ -898,7 +898,7 @@ export function refreshData(): void {
 
         try {
           const isBatchHasData = isReadPreviewSegmentBatch(
-            ws,
+            worksheet,
             meta,
             segStart,
             segLength,
@@ -917,7 +917,7 @@ export function refreshData(): void {
               let hasAny = false
               for (let ci = 0; ci < displayColCount; ci += 1) {
                 const col = meta.previewColStartAbsolute + ci
-                const v = getCellValue(ws, dr, col).trim()
+                const v = getCellValue(worksheet, dr, col).trim()
                 if (v) hasAny = true
                 rowCols.push(v)
               }
@@ -941,7 +941,7 @@ export function refreshData(): void {
           const cols: string[] = []
           let hasAny = false
           for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-            const v = getCellValue(ws, r, c).trim()
+            const v = getCellValue(worksheet, r, c).trim()
             if (v) {
               cols.push(v)
               hasAny = true
@@ -997,7 +997,7 @@ export function refreshData(): void {
       dataRowCount: previewRows.filter((row) => !row.isHeader).length,
       isFiltered,
     })
-    updateFilterStatus(ws)
+    updateFilterStatus(worksheet)
   }
   try {
     refreshDataCore()

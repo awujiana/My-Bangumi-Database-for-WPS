@@ -14,13 +14,13 @@ import { BGM, bgmLog, getApp } from './index.js'
 
 // ========== 单元格操作 ==========
 export function getCell(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   row: number,
   col: number,
 ): WpsRange | null {
-  if (!ws) return null
+  if (!worksheet) return null
   const address = colNumberToLetter(col) + String(row)
-  return ws.Range(address)
+  return worksheet.Range(address)
 }
 
 // 内部辅助函数，不导出
@@ -81,20 +81,20 @@ function getCellRawValue(cell: WpsRange | null | undefined): unknown {
 
 /**
  * 获取单元格的值
- * @param ws - 工作表对象，可能为 null 或 undefined
+ * @param worksheet - 工作表对象，可能为 null 或 undefined
  * @param row - 行号
  * @param col - 列号
  * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
  */
 export function getCellValue(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   row: number,
   col: number,
 ): string {
-  if (!ws) return ''
+  if (!worksheet) return ''
   try {
     const address = colNumberToLetter(col) + String(row)
-    const cell = ws.Range(address)
+    const cell = worksheet.Range(address)
     const raw = getCellRawValue(cell)
     if (raw == null) return ''
     // 单元格原始值通常为 string/number/boolean；罕见对象值沿用 String() 的默认转换语义
@@ -109,13 +109,13 @@ export function getCellValue(
  * 设置单元格值
  */
 export function setCellValue(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   row: number,
   col: number,
   value: unknown,
 ): boolean {
   try {
-    const cell = getCell(ws, row, col)
+    const cell = getCell(worksheet, row, col)
     if (!cell) {
       bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${String(row)}, ${String(col)})`)
       return false

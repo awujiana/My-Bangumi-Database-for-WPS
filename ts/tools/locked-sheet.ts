@@ -321,8 +321,8 @@ export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
     clearLockedSheet()
     return null
   }
-  const ws = resolveSheetInWorkbook(wb, BGM.sheet.lockedName, BGM.sheet.lockedIndex)
-  if (!ws) {
+  const worksheet = resolveSheetInWorkbook(wb, BGM.sheet.lockedName, BGM.sheet.lockedIndex)
+  if (!worksheet) {
     bgmLog(
       LOG_LEVELS.WARN,
       `[getLockedSheet] 锁定的工作表 "${BGM.sheet.lockedName ?? ''}" 已不存在`,
@@ -330,7 +330,7 @@ export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
     clearLockedSheet()
     return null
   }
-  return [wb, ws]
+  return [wb, worksheet]
 }
 
 // ========== 跨工作簿自动扫描 ==========
@@ -383,54 +383,54 @@ function isRowPopulatedCells(cells: string[]): boolean {
   return cells.some((v) => v.trim() !== '')
 }
 
-function countHeaderKeywordsInRow(ws: WpsWorksheet, row: number): number {
+function countHeaderKeywordsInRow(worksheet: WpsWorksheet, row: number): number {
   let count = 0
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-    const v = getCellValue(ws, row, col).toLowerCase()
+    const v = getCellValue(worksheet, row, col).toLowerCase()
     if (v && HEADER_KEYWORDS.some((header) => v.includes(header.toLowerCase()))) count += 1
   }
   return count
 }
 
 /** 判断某行「前 MAX_SCAN_COLUMNS 列中是否有任一列有值」 */
-export function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
+export function isRowPopulated(worksheet: WpsWorksheet, row: number): boolean {
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-    if (getCellValue(ws, row, col).trim()) return true
+    if (getCellValue(worksheet, row, col).trim()) return true
   }
   return false
 }
 
 /** 统计表头行后前 10 行中「任意列有值」的数据行数 */
-export function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
+export function countDataRowsAfter(worksheet: WpsWorksheet, headerRow: number): number {
   let count = 0
   for (let row = headerRow + 1; row <= headerRow + DATA_SCAN_ROWS; row += 1) {
-    if (isRowPopulated(ws, row)) count += 1
+    if (isRowPopulated(worksheet, row)) count += 1
   }
   return count
 }
 
 /** 构建单个工作表的候选；不满足判定规则时返回 null */
-function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean) {
-  let ws: WpsWorksheet
+function buildCandidate(wb: WpsWorkbook, worksheetIndex: number, isNameHitOnly: boolean) {
+  let worksheet: WpsWorksheet
   try {
-    ws = wb.Worksheets.Item(wsIndex)
+    worksheet = wb.Worksheets.Item(worksheetIndex)
   } catch {
     return null
   }
-  const sheetName = ws.Name
+  const sheetName = worksheet.Name
   if (isSystemSheet(sheetName)) return null
 
   const lowerName = sheetName.toLowerCase()
   const isNameHit = TARGET_SHEET_NAME_KEYWORDS.some((keyword) => lowerName.includes(keyword))
   if (isNameHitOnly && !isNameHit) return null
 
-  const headerRow = findHeaderRow(ws)
+  const headerRow = findHeaderRow(worksheet)
   if (headerRow <= 0) return null
   // 快路径：一次矩形读「表头行 + 其后 DATA_SCAN_ROWS 行」× MAX_SCAN_COLUMNS 列
   // （原先是 60 + 10×60 = 660 次逐格 COM 往返 / 每张表）。
   // 读回行数不足时回退逐格读，保证行为与改造前完全一致。
   const block = readRangeValues(
-    ws,
+    worksheet,
     headerRow,
     headerRow + DATA_SCAN_ROWS,
     1,
@@ -443,15 +443,15 @@ function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean
     headerMatchCount = countHeaderKeywordsInCells(block[0] ?? [])
     dataRowCount = block.slice(1).filter((cells) => isRowPopulatedCells(cells)).length
   } else {
-    headerMatchCount = countHeaderKeywordsInRow(ws, headerRow)
-    dataRowCount = countDataRowsAfter(ws, headerRow)
+    headerMatchCount = countHeaderKeywordsInRow(worksheet, headerRow)
+    dataRowCount = countDataRowsAfter(worksheet, headerRow)
   }
   if (headerMatchCount < 3) return null
   if (dataRowCount < 2) return null
 
   return {
     workbookName: wb.Name,
-    sheetIndex: wsIndex,
+    sheetIndex: worksheetIndex,
     sheetName,
     headerRow,
     headerMatchCount,
@@ -499,9 +499,9 @@ export function findBangumiTargetSheets(): TargetSheetCandidate[] {
           return 0
         }
       })()
-      for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
+      for (let worksheetIndex = 1; worksheetIndex <= sheetCount; worksheetIndex += 1) {
         try {
-          const candidate = buildCandidate(wb, wsIndex, isNameHitOnly)
+          const candidate = buildCandidate(wb, worksheetIndex, isNameHitOnly)
           if (candidate) collected.push(candidate)
         } catch {
           // 工作表在刷新期间失效时跳过当前项
@@ -542,13 +542,13 @@ export function findBangumiTargetSheets(): TargetSheetCandidate[] {
 export function findBangumiTargetSheetInWorkbook(wb: WpsWorkbook): WpsWorksheet | null {
   const sheetCount = wb.Worksheets.Count
 
-  for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
-    const candidate = buildCandidate(wb, wsIndex, false)
+  for (let worksheetIndex = 1; worksheetIndex <= sheetCount; worksheetIndex += 1) {
+    const candidate = buildCandidate(wb, worksheetIndex, false)
     if (candidate?.isNameHit) return wb.Worksheets.Item(candidate.sheetIndex)
   }
 
-  for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
-    const candidate = buildCandidate(wb, wsIndex, false)
+  for (let worksheetIndex = 1; worksheetIndex <= sheetCount; worksheetIndex += 1) {
+    const candidate = buildCandidate(wb, worksheetIndex, false)
     if (candidate) return wb.Worksheets.Item(candidate.sheetIndex)
   }
 

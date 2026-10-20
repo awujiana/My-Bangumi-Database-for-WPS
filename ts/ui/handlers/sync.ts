@@ -125,7 +125,7 @@ interface BangumiCollectionItem {
  * 同步准备结果：包含执行同步所需的全部上下文。
  */
 interface SyncPreparedData {
-  ws: WpsWorksheet
+  worksheet: WpsWorksheet
   colMap: Map<string, number>
   token: string
   lastRow: number
@@ -170,7 +170,7 @@ const FILL_BATCH_ROWS = 200
  * @returns 实际写入的数据行数（无单元格写失败的行数，与旧口径一致）
  */
 async function _fillSheetWithCollections(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   collections: BangumiCollectionItem[],
   headerRow: number,
   colMap: Map<string, number>,
@@ -249,7 +249,8 @@ async function _fillSheetWithCollections(
   // 2. 旧值基底：整个写入区间一次矩形读（保留原始类型，数字/日期列不被 String() 化）
   const firstRow = pending[0]?.row ?? 0
   const lastRow = pending.at(-1)?.row ?? 0
-  const oldRows = maxWriteCol > 0 ? readRangeCellValues(ws, firstRow, lastRow, 1, maxWriteCol) : []
+  const oldRows =
+    maxWriteCol > 0 ? readRangeCellValues(worksheet, firstRow, lastRow, 1, maxWriteCol) : []
   const oldValueAt = (row: number, col: number): WpsCellValue =>
     oldRows[row - firstRow]?.[col - 1] ?? null
 
@@ -280,7 +281,7 @@ async function _fillSheetWithCollections(
     let isBatchOk = false
     if (maxWriteCol > 0) {
       try {
-        const range = ws.Range(
+        const range = worksheet.Range(
           `${colNumberToLetter(1)}${String(batchFirstRow)}:${colNumberToLetter(maxWriteCol)}${String(batchLastRow)}`,
         )
         range.Value2 = values
@@ -303,7 +304,7 @@ async function _fillSheetWithCollections(
       for (const { row, writes } of batch) {
         let isRowOk = true
         for (const { col, value } of writes) {
-          if (!setCellValue(ws, row, col, value)) {
+          if (!setCellValue(worksheet, row, col, value)) {
             isRowOk = false
           }
         }
@@ -391,8 +392,8 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   }
 
   // 4. 获取数据工作表并激活（确保筛选检测正确）
-  const ws = getDataSheet()
-  if (!ws) {
+  const worksheet = getDataSheet()
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表')
     showAlert('未找到数据工作表，请先锁定工作表。')
     bgmLog(
@@ -404,21 +405,21 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 数据工作表获取成功')
 
   try {
-    ws.Activate()
-    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}（用于筛选检测）`)
+    worksheet.Activate()
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${worksheet.Name}（用于筛选检测）`)
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${(error as Error).message}`)
   }
 
   // 5. 解析表头和列映射
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤5: 解析表头和列映射')
-  const headerRow = findHeaderRow(ws)
+  const headerRow = findHeaderRow(worksheet)
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 表头行: ${String(headerRow)}`)
 
-  const lastRow = getLastRow(ws)
+  const lastRow = getLastRow(worksheet)
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 最后一行: ${String(lastRow)}`)
 
-  const colMap = getColumnMap(ws, headerRow)
+  const colMap = getColumnMap(worksheet, headerRow)
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 列映射完成，共 ${String(colMap.size)} 列`)
 
   if (!colMap.has('Bangumi_URL')) {
@@ -453,7 +454,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   }
 
   return {
-    ws,
+    worksheet,
     colMap,
     token,
     lastRow,
@@ -473,7 +474,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
  */
 async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolean> {
   const {
-    ws,
+    worksheet,
     colMap,
     token,
     lastRow,
@@ -487,7 +488,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
   // 7. 获取同步预览统计（传入增量同步选项）
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计')
-  const preview = getSyncPreview(ws, colMap, lastRow, headerRow, {
+  const preview = getSyncPreview(worksheet, colMap, lastRow, headerRow, {
     incremental,
     ...(fingerprintMap !== undefined && { fingerprintMap }),
   })
@@ -507,7 +508,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 开始检测冲突...')
     const { conflicts, conflictCount } = await detectConflicts(
-      ws,
+      worksheet,
       colMap,
       lastRow,
       headerRow,
@@ -595,7 +596,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...')
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
-    const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+    const result = await SyncToBangumiAsync(worksheet, colMap, token, lastRow, headerRow, {
       ...(conflictSids !== undefined && { skipSids: conflictSids }),
       incremental,
       onProgress: (current: number, total: number, statusMessage: string) => {
@@ -772,7 +773,7 @@ async function _doAPISync(
   const syncSheet: WpsWorksheet | null =
     typeof getOrCreateSyncRecordSheet === 'function' ? getOrCreateSyncRecordSheet() : null
 
-  const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
+  const worksheet = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
   // 1. 验证 Token 并获取收藏列表
   setStatus('正在验证 Token...', 'info')
@@ -797,9 +798,9 @@ async function _doAPISync(
   // §5.6 C3：barrel 已统一到 tools/util/index.js，不存在「另一条 specifier 拿到
   // undefined」的风险；此前的 typeof 死守卫（: 1 / : 200 / : new Map）会静默产出
   // 错误默认值，已删除。函数缺失的模块加载竞态由 syncFromPanel 入口的早退守卫兜住。
-  let headerRow = findHeaderRow(ws)
-  let colMap = getColumnMap(ws, headerRow)
-  let lastRow = getLastRow(ws)
+  let headerRow = findHeaderRow(worksheet)
+  let colMap = getColumnMap(worksheet, headerRow)
+  let lastRow = getLastRow(worksheet)
 
   // 空表时提供从 Bangumi API 自动填充
   if (headerRow === 0 || lastRow <= headerRow) {
@@ -819,13 +820,13 @@ async function _doAPISync(
 
     // 缺少表头时先写入标准表头
     if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
-      if (!ensureSheetHeaders(ws)) {
+      if (!ensureSheetHeaders(worksheet)) {
         showAlert('工作表为空且无法写入标准表头，请检查工作表状态。')
         return
       }
-      clearSheetCache(ws)
-      headerRow = findHeaderRow(ws)
-      colMap = getColumnMap(ws, headerRow)
+      clearSheetCache(worksheet)
+      headerRow = findHeaderRow(worksheet)
+      colMap = getColumnMap(worksheet, headerRow)
       if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
         showAlert('写入标准表头后仍未找到 Bangumi URL 列，请检查模板。')
         return
@@ -833,7 +834,12 @@ async function _doAPISync(
     }
 
     setStatus('正在填充收藏数据到 Excel...', 'info')
-    const filledCount = await _fillSheetWithCollections(ws, userCollections, headerRow, colMap)
+    const filledCount = await _fillSheetWithCollections(
+      worksheet,
+      userCollections,
+      headerRow,
+      colMap,
+    )
     if (filledCount === 0) {
       showAlert('未能写入任何收藏数据，请检查工作表是否可编辑。')
       return
@@ -844,10 +850,10 @@ async function _doAPISync(
     )
 
     // 重新计算待处理行（§5.6 C3：barrel 已统一，直接调用）
-    clearSheetCache(ws)
-    lastRow = getLastRow(ws, true, headerRow)
-    headerRow = findHeaderRow(ws)
-    colMap = getColumnMap(ws, headerRow)
+    clearSheetCache(worksheet)
+    lastRow = getLastRow(worksheet, true, headerRow)
+    headerRow = findHeaderRow(worksheet)
+    colMap = getColumnMap(worksheet, headerRow)
   }
 
   // 3. 必须有 Bangumi_URL 列
@@ -953,7 +959,7 @@ async function _doAPISync(
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
     try {
-      ws.Activate()
+      worksheet.Activate()
       bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 阶段2：已切回数据工作表进行标记`)
     } catch (error: unknown) {
       bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 切回数据工作表失败: ${(error as Error).message}`)
@@ -961,7 +967,7 @@ async function _doAPISync(
 
     const urlCol = colMap.get('Bangumi_URL')
     const seqColForLocate = colMap.get('序列号') ?? 9
-    BGM.sync.updatePosition(ws, 0, seqColForLocate)
+    BGM.sync.updatePosition(worksheet, 0, seqColForLocate)
 
     let matchedCount = 0
     for (const [index, row] of rowsToProcess.entries()) {
@@ -980,13 +986,13 @@ async function _doAPISync(
 
       BGM.sync.updatePosition(undefined, row)
 
-      const bgmUrlCell = urlCol === undefined ? null : getCell(ws, row, urlCol)
+      const bgmUrlCell = urlCol === undefined ? null : getCell(worksheet, row, urlCol)
       const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
       const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
       let isMatched = false
       if (sid && collectionMap.has(sid)) {
         const seqCol = colMap.get('序列号') ?? 9
-        const seqCell = getCell(ws, row, seqCol)
+        const seqCell = getCell(worksheet, row, seqCol)
         if (seqCell?.Interior) {
           const syncCount = syncCountMap.get(sid) ?? 0
           if (syncCount === 1) {

@@ -108,12 +108,12 @@ export function computeDateStatsFromSheet(): DateStats {
     totalCount: 0,
   }
 
-  const ws = getDataSheet()
-  if (!ws) return stats
+  const worksheet = getDataSheet()
+  if (!worksheet) return stats
 
-  const headerRow = findHeaderRow(ws) || 1
-  const lastRow = getLastRow(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const lastRow = getLastRow(worksheet)
+  const colMap = getColumnMap(worksheet, headerRow)
 
   const dateCol = colMap.get('开播日期')
   const urlCol = colMap.get('Bangumi_URL')
@@ -130,20 +130,22 @@ export function computeDateStatsFromSheet(): DateStats {
   // 性能：按列整列读（2 次 IPC），替代 2N 次逐格读（5000 行 ≈ 1 万次）。
   // 只读这两列本身，不扩到列包围盒（避免把无关列一起拉回来）。
   const rowCount = lastRow - startRow + 1
-  const urlColumn = readRangeValues(ws, startRow, lastRow, urlCol, urlCol)
-  const dateColumn = readRangeValues(ws, startRow, lastRow, dateCol, dateCol)
+  const urlColumn = readRangeValues(worksheet, startRow, lastRow, urlCol, urlCol)
+  const dateColumn = readRangeValues(worksheet, startRow, lastRow, dateCol, dateCol)
   const canBatch = urlColumn.length === rowCount && dateColumn.length === rowCount
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const index = row - startRow
-    const url = trim(canBatch ? (urlColumn[index]?.[0] ?? '') : getCellValue(ws, row, urlCol))
+    const url = trim(
+      canBatch ? (urlColumn[index]?.[0] ?? '') : getCellValue(worksheet, row, urlCol),
+    )
     if (url) {
       const sid = extractSubjectId(url)
       if (sid) {
         totalCount += 1
 
         const dateString = trim(
-          canBatch ? (dateColumn[index]?.[0] ?? '') : getCellValue(ws, row, dateCol),
+          canBatch ? (dateColumn[index]?.[0] ?? '') : getCellValue(worksheet, row, dateCol),
         )
         if (dateString) {
           datedCount += 1

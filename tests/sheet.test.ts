@@ -203,6 +203,7 @@ function createMockWorksheet(
     cellValues?: Record<string, unknown>
     cellOverrides?: Record<string, Record<string, unknown>>
     usedRange?: { Row: number; Rows: { Count: number } }
+
     // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
     hasEnd?: boolean
     endRow?: number
@@ -242,40 +243,40 @@ function createMockWorksheet(
 }
 
 describe('readRangeValues', () => {
-  it('应在 ws 为 null 时返回空数组', () => {
+  it('应在 worksheet 为 null 时返回空数组', () => {
     expect(readRangeValues(null, 1, 5, 1, 3)).toEqual([])
   })
 
-  it('应在 ws 为 undefined 时返回空数组', () => {
+  it('应在 worksheet 为 undefined 时返回空数组', () => {
     expect(readRangeValues(undefined, 1, 5, 1, 3)).toEqual([])
   })
 
   it('应读取单个值', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = { Value2: 'single', Interior: { Color: 0 } }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['single']])
   })
 
   it('Value2 为 null 时返回空数组', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = { Value2: null, Interior: { Color: 0 } }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 5, 1, 3)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 5, 1, 3)
     expect(result).toEqual([])
   })
 
   it('Value2 为 undefined 时返回空数组', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = { Value2: undefined, Interior: { Color: 0 } }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 5, 1, 3)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 5, 1, 3)
     expect(result).toEqual([])
   })
 
   it('应处理多值二维数组', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: [
         ['a1', 'b1', 'c1'],
@@ -283,8 +284,8 @@ describe('readRangeValues', () => {
       ],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 2, 1, 3)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 2, 1, 3)
     expect(result).toEqual([
       ['a1', 'b1', 'c1'],
       ['a2', 'b2', 'c2'],
@@ -292,65 +293,65 @@ describe('readRangeValues', () => {
   })
 
   it('应处理非数组行（单值行）', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: ['single_val', 'another_val'],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 2, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 2, 1, 1)
     expect(result).toEqual([['single_val'], ['another_val']])
   })
 
   it('单行多列：宿主返回一维数组时必须读成「1 行 N 列」而非「N 行 1 列」', () => {
     // WPS 对单行范围返回一维数组；旧实现逐标量 push([v]) 会读成 3 行 1 列，
     // 整行读-改-写时只拿得到第 1 个单元格，写回后 2..N 列被空值填满（静默清数据）。
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: ['a1', 'b1', 'c1'],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 3)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 3)
     expect(result).toEqual([['a1', 'b1', 'c1']])
   })
 
   it('请求多行多列却读回一维（形状不可信）时返回空数组，绝不猜形状', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: ['a1', 'b1', 'c1'],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    expect(readRangeValues(ws, 1, 2, 1, 3)).toEqual([])
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    expect(readRangeValues(worksheet, 1, 2, 1, 3)).toEqual([])
   })
 
   it('应在异常时返回空数组', () => {
-    const ws = {
+    const worksheet = {
       ...createMockWorksheet(),
       Range: vi.fn(() => {
         throw new Error('fail')
       }),
     }
-    expect(readRangeValues(ws, 1, 5, 1, 3)).toEqual([])
+    expect(readRangeValues(worksheet, 1, 5, 1, 3)).toEqual([])
   })
 
   it('应处理 safeCellValue 的 null 值', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: [[null, 'valid']],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 2)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 2)
     expect(result).toEqual([['', 'valid']])
   })
 })
 
 /** 造一个按请求范围返回二维 Value2 的工作表桩（readRowsCache 用例共用） */
 function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> {
-  const ws = createMockWorksheet()
-  ws.Range = createRangeMock((address: string) => {
+  const worksheet = createMockWorksheet()
+  worksheet.Range = createRangeMock((address: string) => {
     const parts = address.split(':', 2)
     const start = parts[0] ?? ''
     const end = parts[1] ?? start
@@ -362,24 +363,24 @@ function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> 
       Font: { Bold: false },
     }
   })
-  return ws
+  return worksheet
 }
 
 describe('readRowsCache', () => {
   it('行号为空 / maxCol < 1 时返回空 Map（不发起 COM 读）', () => {
-    const ws = createMockWorksheet()
-    expect(readRowsCache(ws, [], 3)).toEqual(new Map())
-    expect(readRowsCache(ws, [2], 0)).toEqual(new Map())
+    const worksheet = createMockWorksheet()
+    expect(readRowsCache(worksheet, [], 3)).toEqual(new Map())
+    expect(readRowsCache(worksheet, [2], 0)).toEqual(new Map())
   })
 
   it('应为离散行号建缓存：一次矩形读覆盖 1..maxCol', () => {
-    const ws = createGridWs([
+    const worksheet = createGridWs([
       ['r1c1', 'r1c2'],
       ['r2c1', 'r2c2'],
       ['r3c1', 'r3c2'],
       ['r4c1', 'r4c2'],
     ])
-    const cache = readRowsCache(ws, [4, 2], 2)
+    const cache = readRowsCache(worksheet, [4, 2], 2)
     expect(cache).not.toBeNull()
     expect(cache?.get(2)).toEqual(['r2c1', 'r2c2'])
     expect(cache?.get(4)).toEqual(['r4c1', 'r4c2'])
@@ -387,25 +388,22 @@ describe('readRowsCache', () => {
   })
 
   it('读回行数不足时返回 null（形状不可信，调用方须回退逐格读）', () => {
-    const ws = createGridWs([['r1c1', 'r1c2']])
-    expect(readRowsCache(ws, [1, 2], 2)).toBeNull()
+    const worksheet = createGridWs([['r1c1', 'r1c2']])
+    expect(readRowsCache(worksheet, [1, 2], 2)).toBeNull()
   })
 
   it('读回列宽不足时返回 null', () => {
-    const ws = createGridWs([
-      ['r1c1'],
-      ['r2c1'],
-    ])
-    expect(readRowsCache(ws, [1, 2], 2)).toBeNull()
+    const worksheet = createGridWs([['r1c1'], ['r2c1']])
+    expect(readRowsCache(worksheet, [1, 2], 2)).toBeNull()
   })
 
   it('首行缺失（minRow 起点偏移）时返回 null', () => {
-    const ws = createGridWs([['r1c1', 'r1c2']])
+    const worksheet = createGridWs([['r1c1', 'r1c2']])
     // 请求 2..3 行，只有 1 行数据 → block[1] 为 undefined
-    expect(readRowsCache(ws, [3], 2)).toBeNull()
+    expect(readRowsCache(worksheet, [3], 2)).toBeNull()
   })
 
-  it('ws 为空时返回 null（readRangeValues 返回空 ⇒ 行数不足）', () => {
+  it('worksheet 为空时返回 null（readRangeValues 返回空 ⇒ 行数不足）', () => {
     expect(readRowsCache(null, [1, 2], 2)).toBeNull()
     expect(readRowsCache(undefined, [1, 2], 2)).toBeNull()
   })
@@ -466,12 +464,12 @@ describe('createSheetCellCache', () => {
   })
 
   it('矩形读播种成功：读命中缓存，零次后备 IO；未播种的行列才回落', () => {
-    const ws = createGridWs([
+    const worksheet = createGridWs([
       ['a1', 'b1'],
       ['a2', 'b2'],
     ])
     const { io, stats } = makeIo()
-    const cache = createSheetCellCache(ws, [1, 2], 2, io)
+    const cache = createSheetCellCache(worksheet, [1, 2], 2, io)
 
     expect(cache.read(1, 1)).toBe('a1')
     expect(cache.read(2, 2)).toBe('b2')
@@ -487,9 +485,9 @@ describe('createSheetCellCache', () => {
 
   it('播种失败（形状不符）时读写全部回落，行为与不建缓存一致', () => {
     // 列宽不足 → readRowsCache 返回 null
-    const ws = createGridWs([['only-one-col']])
+    const worksheet = createGridWs([['only-one-col']])
     const { io, stats } = makeIo({ '1:1': 'fallback' })
-    const cache = createSheetCellCache(ws, [1], 2, io)
+    const cache = createSheetCellCache(worksheet, [1], 2, io)
 
     expect(cache.read(1, 1)).toBe('fallback')
     expect(stats.reads).toBe(1)
@@ -631,24 +629,24 @@ describe('getDataSheet', () => {
 
 describe('safeActivate', () => {
   it('应调用 Activate 方法', () => {
-    const ws = createMockWorksheet()
-    safeActivate(ws)
-    expect(ws.Activate).toHaveBeenCalled()
+    const worksheet = createMockWorksheet()
+    safeActivate(worksheet)
+    expect(worksheet.Activate).toHaveBeenCalled()
   })
 
-  it('应在 ws 为 null 时不报错', () => {
+  it('应在 worksheet 为 null 时不报错', () => {
     expect(() => safeActivate(null)).not.toThrow()
   })
 
-  it('应在 ws 为 undefined 时不报错', () => {
+  it('应在 worksheet 为 undefined 时不报错', () => {
     expect(() => safeActivate(undefined)).not.toThrow()
   })
 
   it('Activate 不是函数时应记录警告', () => {
     // 故意构造畸形 sheet（Activate 不是函数）以验证 safeActivate 的降级：
     // 这里的 `as unknown as WpsWorksheet` 是刻意的——现实的畸形对象本就违反接口
-    const ws = { ...createMockWorksheet(), Activate: undefined } as unknown as WpsWorksheet
-    safeActivate(ws)
+    const worksheet = { ...createMockWorksheet(), Activate: undefined } as unknown as WpsWorksheet
+    safeActivate(worksheet)
     expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('safeActivate'))
   })
 })
@@ -660,18 +658,18 @@ describe('getLastRow', () => {
     clearSheetCache(createMockWorksheet({ name: 'AnchorTest' }))
   })
 
-  it('应在 ws 为 null 时返回默认值 50000', () => {
+  it('应在 worksheet 为 null 时返回默认值 50000', () => {
     const result = getLastRow(null)
     expect(result).toBe(50_000)
   })
 
-  it('应在 ws 为 undefined 时返回默认值 50000', () => {
+  it('应在 worksheet 为 undefined 时返回默认值 50000', () => {
     const result = getLastRow(undefined)
     expect(result).toBe(50_000)
   })
 
   it('D 列 End 成功时返回正确行号', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Test',
       rows: 100,
       cellOverrides: {
@@ -685,13 +683,13 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 50 }),
     }
-    ws.Range = createRangeMock(() => mockCell)
-    const result = getLastRow(ws)
+    worksheet.Range = createRangeMock(() => mockCell)
+    const result = getLastRow(worksheet)
     expect(result).toBe(50)
   })
 
   it('D 列失败时回退到 A 列', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Test',
       rows: 100,
     })
@@ -709,13 +707,13 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 30 }),
     }
-    ws.Range = createRangeMock((addr: string) => (addr.startsWith('D') ? dCell : aCell))
-    const result = getLastRow(ws)
+    worksheet.Range = createRangeMock((addr: string) => (addr.startsWith('D') ? dCell : aCell))
+    const result = getLastRow(worksheet)
     expect(result).toBe(30)
   })
 
   it('所有列失败时使用 UsedRange 兜底', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Test',
       rows: 100,
       usedRange: { Row: 1, Rows: { Count: 25 } },
@@ -728,24 +726,24 @@ describe('getLastRow', () => {
         throw new Error('fail')
       }),
     }
-    ws.Range = createRangeMock(() => failCell)
-    const result = getLastRow(ws)
+    worksheet.Range = createRangeMock(() => failCell)
+    const result = getLastRow(worksheet)
     expect(result).toBe(25)
   })
 
   it('应使用 UsedRange 作为兜底', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Test',
       usedRange: { Row: 5, Rows: { Count: 25 } },
     })
-    const result = getLastRow(ws)
+    const result = getLastRow(worksheet)
     // Row + Count - 1 = 5 + 25 - 1 = 29
     expect(result).toBe(29)
   })
 
   it('UsedRange 失败时返回默认 50000', () => {
     // 故意去掉 UsedRange 以验证兜底路径（exactOptionalPropertyTypes 下不能写 undefined）
-    const ws = {
+    const worksheet = {
       ...createMockWorksheet({ name: 'Test' }),
       UsedRange: undefined,
     } as unknown as WpsWorksheet
@@ -757,20 +755,20 @@ describe('getLastRow', () => {
         throw new Error('fail')
       }),
     }
-    ws.Range = createRangeMock(() => failCell)
-    const result = getLastRow(ws)
+    worksheet.Range = createRangeMock(() => failCell)
+    const result = getLastRow(worksheet)
     expect(result).toBe(50_000)
   })
 
   it('forceRefresh 为 true 时应清除缓存', () => {
-    const ws = createMockWorksheet({ name: 'RefreshTest' })
-    getLastRow(ws, true)
-    const result2 = getLastRow(ws, true)
+    const worksheet = createMockWorksheet({ name: 'RefreshTest' })
+    getLastRow(worksheet, true)
+    const result2 = getLastRow(worksheet, true)
     expect(result2).toBeDefined()
   })
 
   it('有 headerRow 参数时应尝试锚定列查找', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'AnchorTest',
       rows: 100,
       cellOverrides: {
@@ -783,11 +781,11 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 40 }),
     }
-    ws.Range = createRangeMock(() => anchorCell)
+    worksheet.Range = createRangeMock(() => anchorCell)
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
       col === 1 ? '序列号' : '',
     )
-    const result = getLastRow(ws, false, 1)
+    const result = getLastRow(worksheet, false, 1)
     expect(result).toBeDefined()
   })
 })
@@ -800,8 +798,8 @@ describe('findHeaderRow', () => {
 
   it('应在未找到关键字时返回 0', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'Empty' })
-    const result = findHeaderRow(ws)
+    const worksheet = createMockWorksheet({ name: 'Empty' })
+    const result = findHeaderRow(worksheet)
     expect(result).toBe(0)
   })
 
@@ -817,8 +815,8 @@ describe('findHeaderRow', () => {
       }
       return ''
     })
-    const ws = createMockWorksheet({ name: 'Found' })
-    const result = findHeaderRow(ws)
+    const worksheet = createMockWorksheet({ name: 'Found' })
+    const result = findHeaderRow(worksheet)
     expect(result).toBe(1)
   })
 
@@ -828,9 +826,9 @@ describe('findHeaderRow', () => {
       callCount.count += 1
       return ''
     })
-    const ws = createMockWorksheet({ name: 'CacheTest' })
-    findHeaderRow(ws)
-    findHeaderRow(ws)
+    const worksheet = createMockWorksheet({ name: 'CacheTest' })
+    findHeaderRow(worksheet)
+    findHeaderRow(worksheet)
     // 第二次调用应使用缓存
     expect(callCount.count).toBeGreaterThan(0)
   })
@@ -846,8 +844,8 @@ describe('findHeaderRow', () => {
       }
       return ''
     })
-    const ws = createMockWorksheet({ name: 'StartRow' })
-    const result = findHeaderRow(ws, 3)
+    const worksheet = createMockWorksheet({ name: 'StartRow' })
+    const result = findHeaderRow(worksheet, 3)
     expect(result).toBe(3)
   })
 })
@@ -871,8 +869,8 @@ describe('getColumnMap', () => {
       if (c === 4) return '类型'
       return ''
     })
-    const ws = createMockWorksheet({ name: 'MapTest' })
-    const map = getColumnMap(ws, 1)
+    const worksheet = createMockWorksheet({ name: 'MapTest' })
+    const map = getColumnMap(worksheet, 1)
     expect(map.get('序列号')).toBe(1)
     expect(map.get('名称')).toBe(2)
     expect(map.get('Bangumi_URL')).toBe(3)
@@ -888,8 +886,8 @@ describe('getColumnMap', () => {
       if (c === 3) return 'Bangumi URL'
       return ''
     })
-    const ws = createMockWorksheet({ name: 'FallbackTest' })
-    const map = getColumnMap(ws, 1)
+    const worksheet = createMockWorksheet({ name: 'FallbackTest' })
+    const map = getColumnMap(worksheet, 1)
     // 序列号应回退到第一个非空列（列1）
     expect(map.get('序列号')).toBe(1)
   })
@@ -905,16 +903,16 @@ describe('getColumnMap', () => {
       if (c === 4) return '自定义字段'
       return ''
     })
-    const ws = createMockWorksheet({ name: 'Fallback2' })
-    const map = getColumnMap(ws, 1)
+    const worksheet = createMockWorksheet({ name: 'Fallback2' })
+    const map = getColumnMap(worksheet, 1)
     // 序列号应回退到第一个未被占用的非空列（列2 - "标题"不匹配任何规则）
     expect(map.get('序列号')).toBe(2)
   })
 
   it('空工作表应返回空 Map', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'Empty' })
-    const map = getColumnMap(ws, 1)
+    const worksheet = createMockWorksheet({ name: 'Empty' })
+    const map = getColumnMap(worksheet, 1)
     expect(map.size).toBe(0)
   })
 
@@ -924,9 +922,9 @@ describe('getColumnMap', () => {
       callCount.count += 1
       return ''
     })
-    const ws = createMockWorksheet({ name: 'CacheMap' })
-    getColumnMap(ws, 1)
-    getColumnMap(ws, 1)
+    const worksheet = createMockWorksheet({ name: 'CacheMap' })
+    getColumnMap(worksheet, 1)
+    getColumnMap(worksheet, 1)
     // 第二次调用应使用缓存
     expect(callCount.count).toBeGreaterThan(0)
   })
@@ -966,8 +964,8 @@ describe('cacheGet / clearSheetCache', () => {
       called += 1
       return 2
     })
-    const ws = createMockWorksheet({ name: 'clear-test' })
-    clearSheetCache(ws)
+    const worksheet = createMockWorksheet({ name: 'clear-test' })
+    clearSheetCache(worksheet)
     cacheGet('clear-test', () => {
       called += 1
       return 3
@@ -998,8 +996,8 @@ describe('cacheGet / clearSheetCache', () => {
   })
 
   it('清除不存在的 key 不应报错', () => {
-    const ws = createMockWorksheet({ name: 'nonexistent' })
-    expect(() => clearSheetCache(ws)).not.toThrow()
+    const worksheet = createMockWorksheet({ name: 'nonexistent' })
+    expect(() => clearSheetCache(worksheet)).not.toThrow()
   })
 })
 
@@ -1019,12 +1017,12 @@ describe('ensureSheetHeaders', () => {
     clearSheetCache(createMockWorksheet({ name: 'Sheet1' }))
   })
 
-  it('ws 为 null 时应返回 false', () => {
+  it('worksheet 为 null 时应返回 false', () => {
     const isResult = ensureSheetHeaders(null)
     expect(isResult).toBe(false)
   })
 
-  it('ws 为 undefined 时应返回 false', () => {
+  it('worksheet 为 undefined 时应返回 false', () => {
     const isResult = ensureSheetHeaders(undefined)
     expect(isResult).toBe(false)
   })
@@ -1037,24 +1035,24 @@ describe('ensureSheetHeaders', () => {
       if (r === 1 && c <= 3) return ['名称', '标题', 'bangumi'][c - 1] ?? ''
       return ''
     })
-    const ws = createMockWorksheet({ name: 'HasHeader' })
-    const isResult = ensureSheetHeaders(ws)
+    const worksheet = createMockWorksheet({ name: 'HasHeader' })
+    const isResult = ensureSheetHeaders(worksheet)
     expect(isResult).toBe(false)
   })
 
   it('空工作表应写入表头并返回 true', () => {
     // findHeaderRow returns 0 (no header found)
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'EmptySheet' })
-    ws.Range = createRangeMock((address: string) => {
+    const worksheet = createMockWorksheet({ name: 'EmptySheet' })
+    worksheet.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
       return createMockCell('')
     })
     // Mock Cells.Item to succeed
-    ws.Cells.Item = createCellItemMock(() => createMockCell(''))
-    const isResult = ensureSheetHeaders(ws)
+    worksheet.Cells.Item = createCellItemMock(() => createMockCell(''))
+    const isResult = ensureSheetHeaders(worksheet)
     expect(isResult).toBe(true)
   })
 
@@ -1062,8 +1060,8 @@ describe('ensureSheetHeaders', () => {
     // findHeaderRow 返回 0（表头认不出来），但第 1 行有用户数据
     vi.mocked(getCellValue).mockReturnValue('')
     const writtenCells: string[] = []
-    const ws = createMockWorksheet({ name: 'NoHeaderButHasData' })
-    ws.Range = createRangeMock((address: string) => {
+    const worksheet = createMockWorksheet({ name: 'NoHeaderButHasData' })
+    worksheet.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         // 单行多列区域：二维形状。宽度必须是 HEADER_SCAN_COLUMNS(64)——
         // 真实 COM 对 A1:BL1 会返回 64 个单元格，给 2 列会被「宽度不足 = 读失败」守卫拦掉。
@@ -1077,7 +1075,7 @@ describe('ensureSheetHeaders', () => {
       return createMockCell('')
     })
 
-    const isResult = ensureSheetHeaders(ws)
+    const isResult = ensureSheetHeaders(worksheet)
 
     expect(isResult).toBe(false)
     expect(writtenCells).toHaveLength(0)
@@ -1086,8 +1084,8 @@ describe('ensureSheetHeaders', () => {
   it('第 1 行有内容且 Value2 为一维数组（单行区域真实形状）时同样拒绝写入', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const writtenCells: string[] = []
-    const ws = createMockWorksheet({ name: 'NoHeader1D' })
-    ws.Range = createRangeMock((address: string) => {
+    const worksheet = createMockWorksheet({ name: 'NoHeader1D' })
+    worksheet.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         // Excel/WPS 对单行范围返回一维数组（真实形状），宽度同样是 64
         // 宽度同样是 HEADER_SCAN_COLUMNS(64)
@@ -1101,7 +1099,7 @@ describe('ensureSheetHeaders', () => {
       return createMockCell('')
     })
 
-    const isResult = ensureSheetHeaders(ws)
+    const isResult = ensureSheetHeaders(worksheet)
 
     expect(isResult).toBe(false)
     expect(writtenCells).toHaveLength(0)
@@ -1109,8 +1107,8 @@ describe('ensureSheetHeaders', () => {
 
   it('关键列写入失败时应返回 false', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'FailSheet' })
-    ws.Range = createRangeMock((address: string) => {
+    const worksheet = createMockWorksheet({ name: 'FailSheet' })
+    worksheet.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
@@ -1149,17 +1147,17 @@ describe('ensureSheetHeaders', () => {
       }
       return createMockCell('')
     })
-    ws.Cells.Item = createCellItemMock(() => {
+    worksheet.Cells.Item = createCellItemMock(() => {
       throw new Error('Cannot access')
     })
-    const isResult = ensureSheetHeaders(ws)
+    const isResult = ensureSheetHeaders(worksheet)
     expect(isResult).toBe(false)
   })
 
   it('非关键列写入失败仍应返回 true', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'PartialFail' })
-    ws.Range = createRangeMock((address: string) => {
+    const worksheet = createMockWorksheet({ name: 'PartialFail' })
+    worksheet.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
@@ -1197,8 +1195,8 @@ describe('ensureSheetHeaders', () => {
       }
       return createMockCell('')
     })
-    ws.Cells.Item = createCellItemMock(() => createMockCell(''))
-    const isResult = ensureSheetHeaders(ws)
+    worksheet.Cells.Item = createCellItemMock(() => createMockCell(''))
+    const isResult = ensureSheetHeaders(worksheet)
     expect(isResult).toBe(true)
   })
 })
@@ -1225,60 +1223,60 @@ function throwingFunction(): never {
 describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () => {
   it('native code function 应被 safeCellValue 转为空字符串', () => {
     // 通过 readRangeValues 间接测试
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const nativeFunction = createNativeValueFunction('function Value() { [native code] }')
     const rangeMock = {
       Value2: [[nativeFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
 
   it('function Value() 字符串模式应被识别为 native', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const valueFunction = createNativeValueFunction('function Value() {}')
     const rangeMock = {
       Value2: [[valueFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
 
   it('普通对象的 toString() 返回 native code 时应被识别', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const nativeObject = { toString: () => 'function [native code]() {}' }
     const rangeMock = {
       Value2: [[nativeObject]],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
 
   it('普通函数调用返回 native code 时应跳过', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: [[functionReturnsNative()]],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
 
   it('函数调用抛异常时应返回空字符串', () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     const rangeMock = {
       Value2: [[throwingFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = createRangeMock().mockReturnValue(rangeMock)
-    const result = readRangeValues(ws, 1, 1, 1, 1)
+    worksheet.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(worksheet, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
 })
@@ -1289,7 +1287,7 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
   })
 
   it('找到序号列时应返回正确列号', () => {
-    const ws = createMockWorksheet({ name: 'AnchorCol' })
+    const worksheet = createMockWorksheet({ name: 'AnchorCol' })
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
       const r = row as number
       const c = col as number
@@ -1308,13 +1306,13 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 50 }),
     }
-    ws.Range = createRangeMock(() => anchorCell)
-    const result = getLastRow(ws, false, 1)
+    worksheet.Range = createRangeMock(() => anchorCell)
+    const result = getLastRow(worksheet, false, 1)
     expect(result).toBe(50)
   })
 
   it('找到 Bangumi URL 列时应返回该列', () => {
-    const ws = createMockWorksheet({ name: 'UrlCol' })
+    const worksheet = createMockWorksheet({ name: 'UrlCol' })
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
       const r = row as number
       const c = col as number
@@ -1331,13 +1329,13 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 30 }),
     }
-    ws.Range = createRangeMock(() => anchorCell)
-    const result = getLastRow(ws, false, 1)
+    worksheet.Range = createRangeMock(() => anchorCell)
+    const result = getLastRow(worksheet, false, 1)
     expect(result).toBe(30)
   })
 
   it('未找到锚定列时应回退到 D 列查找', () => {
-    const ws = createMockWorksheet({ name: 'NoAnchor' })
+    const worksheet = createMockWorksheet({ name: 'NoAnchor' })
     // No header keywords found
     vi.mocked(getCellValue).mockReturnValue('')
     const dCell = {
@@ -1346,13 +1344,13 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 20 }),
     }
-    ws.Range = createRangeMock(() => dCell)
-    const result = getLastRow(ws, false, 1)
+    worksheet.Range = createRangeMock(() => dCell)
+    const result = getLastRow(worksheet, false, 1)
     expect(result).toBe(20)
   })
 
   it('锚定列定位异常时应回退', () => {
-    const ws = createMockWorksheet({ name: 'AnchorFail' })
+    const worksheet = createMockWorksheet({ name: 'AnchorFail' })
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, row: unknown, col: unknown) => {
       const r = row as number
       const c = col as number
@@ -1373,12 +1371,12 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 15 }),
     }
-    ws.Range = createRangeMock((addr: string) => {
+    worksheet.Range = createRangeMock((addr: string) => {
       if (addr.startsWith('A')) return failCell
       if (addr.startsWith('D')) return dCell
       return failCell
     })
-    const result = getLastRow(ws, false, 1)
+    const result = getLastRow(worksheet, false, 1)
     expect(result).toBe(15)
   })
 })
@@ -1391,7 +1389,7 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
 
   it('FormulaR1C1 路径成功时应写入', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'FormulaR1C1' })
+    const worksheet = createMockWorksheet({ name: 'FormulaR1C1' })
     const mockCell = {
       Text: '',
       Interior: { Color: 0 },
@@ -1412,15 +1410,15 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
         /* empty */
       },
     }
-    ws.Range = createRangeMock(() => mockCell)
-    ws.Cells.Item = createCellItemMock(() => mockCell)
-    ensureSheetHeaders(ws)
-    expect(ws.Cells.Item).toHaveBeenCalled()
+    worksheet.Range = createRangeMock(() => mockCell)
+    worksheet.Cells.Item = createCellItemMock(() => mockCell)
+    ensureSheetHeaders(worksheet)
+    expect(worksheet.Cells.Item).toHaveBeenCalled()
   })
 
   it('所有写入路径均失败时仍应返回 true（仅记录警告）', () => {
     vi.mocked(getCellValue).mockReturnValue('')
-    const ws = createMockWorksheet({ name: 'AllFail' })
+    const worksheet = createMockWorksheet({ name: 'AllFail' })
     const failCell = {
       get Value2() {
         throw new Error('blocked')
@@ -1449,9 +1447,9 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    ws.Range = createRangeMock(() => failCell)
-    ws.Cells.Item = createCellItemMock(() => failCell)
-    const isResult = ensureSheetHeaders(ws)
+    worksheet.Range = createRangeMock(() => failCell)
+    worksheet.Cells.Item = createCellItemMock(() => failCell)
+    const isResult = ensureSheetHeaders(worksheet)
     // 虽然所有列写入失败，但前5列全部失败 → 返回 false
     expect(isResult).toBe(false)
   })
@@ -1463,110 +1461,114 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
 // ============================================================
 
 describe('readRangeCellValues（保留原始类型，供「读-改-写整行」使用）', () => {
-  it('ws 为空时返回空数组（调用方必须据此放弃写入，否则会清空用户数据）', () => {
+  it('worksheet 为空时返回空数组（调用方必须据此放弃写入，否则会清空用户数据）', () => {
     expect(readRangeCellValues(null, 1, 5, 1, 3)).toEqual([])
     expect(readRangeCellValues(undefined, 1, 5, 1, 3)).toEqual([])
   })
 
   it('Value2 为 null / undefined（假值）时返回空数组', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: null })
-    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
-    ws.Range = createRangeMock().mockReturnValue({ Value2: undefined })
-    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: null })
+    expect(readRangeCellValues(worksheet, 1, 5, 1, 3)).toEqual([])
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: undefined })
+    expect(readRangeCellValues(worksheet, 1, 5, 1, 3)).toEqual([])
   })
 
   it('单个值（非数组）包装为 1x1 并保留类型', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: 42 })
-    expect(readRangeCellValues(ws, 1, 1, 1, 1)).toEqual([[42]])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: 42 })
+    expect(readRangeCellValues(worksheet, 1, 1, 1, 1)).toEqual([[42]])
   })
 
   it('二维数组保留 number / boolean / Date，其余一律归 null（避免数字列被写成文本列）', () => {
     const date = new Date('2026-01-02T03:04:05.000Z')
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({
       Value2: [
         [1, '壹', true, date],
         [null, '', () => 1, { a: 1 }],
       ],
     })
-    expect(readRangeCellValues(ws, 1, 2, 1, 4)).toEqual([
+    expect(readRangeCellValues(worksheet, 1, 2, 1, 4)).toEqual([
       [1, '壹', true, date],
       [null, '', null, null],
     ])
   })
 
   it('原生代码对象（WPS 内部 Proxy）与函数一律归 null', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({
       Value2: [
         [createNativeValueFunction('function Value() { [native code] }'), functionReturnsNative()],
       ],
     })
-    expect(readRangeCellValues(ws, 1, 1, 1, 2)).toEqual([[null, null]])
+    expect(readRangeCellValues(worksheet, 1, 1, 1, 2)).toEqual([[null, null]])
   })
 
   it('单列多行：一维数组按「每元素一行」处理（列向量）', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x'] })
-    expect(readRangeCellValues(ws, 1, 2, 1, 1)).toEqual([[7], ['x']])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x'] })
+    expect(readRangeCellValues(worksheet, 1, 2, 1, 1)).toEqual([[7], ['x']])
   })
 
   it('单行多列（读-改-写整行的唯一形状）必须读成「1 行 N 列」并保留类型', () => {
     // 同步记录整行更新走的就是这条路径：读错形状 ⇒ 只拿到第 1 个单元格 ⇒ 写回清空其余列。
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
-    expect(readRangeCellValues(ws, 1, 1, 1, 3)).toEqual([[7, 'x', true]])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
+    expect(readRangeCellValues(worksheet, 1, 1, 1, 3)).toEqual([[7, 'x', true]])
   })
 
   it('请求多行多列却读回一维时返回空数组（调用方据此放弃写入）', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
-    expect(readRangeCellValues(ws, 1, 2, 1, 3)).toEqual([])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
+    expect(readRangeCellValues(worksheet, 1, 2, 1, 3)).toEqual([])
   })
 
   it('单行读回宽度不足（读不全）时返回空数组：整行写回会把缺失列清成空值', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [['a', 'b']] })
-    expect(readRangeCellValues(ws, 1, 1, 1, 12)).toEqual([])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [['a', 'b']] })
+    expect(readRangeCellValues(worksheet, 1, 1, 1, 12)).toEqual([])
   })
 
   it('读取抛错时返回空数组', () => {
-    const ws = {
+    const worksheet = {
       ...createMockWorksheet(),
       Range: vi.fn(() => {
         throw new Error('读取失败')
       }),
     }
-    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
+    expect(readRangeCellValues(worksheet, 1, 5, 1, 3)).toEqual([])
   })
 })
 
 describe('safeStringify 的对象分支与函数返回值分支（间接 via readRangeValues）', () => {
   it('对象自带普通 toString 时按其 toString 序列化', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [[{ toString: () => 'plain-value' }]] })
-    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['plain-value']])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({
+      Value2: [[{ toString: () => 'plain-value' }]],
+    })
+    expect(readRangeValues(worksheet, 1, 1, 1, 1)).toEqual([['plain-value']])
   })
 
   it('对象没有可调用 toString 时返回空串', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [[Object.create(null) as object]] })
-    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({
+      Value2: [[Object.create(null) as object]],
+    })
+    expect(readRangeValues(worksheet, 1, 1, 1, 1)).toEqual([['']])
   })
 
   it('函数返回 null 时走「值为空」分支返回空串', () => {
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [[() => null]] })
-    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [[() => null]] })
+    expect(readRangeValues(worksheet, 1, 1, 1, 1)).toEqual([['']])
   })
 
   it('函数返回原生代码对象时走 isNativeCode 分支返回空串', () => {
     const nativeObject = { toString: () => 'function Value() { [native code] }' }
-    const ws = createMockWorksheet()
-    ws.Range = createRangeMock().mockReturnValue({ Value2: [[() => nativeObject]] })
-    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+    const worksheet = createMockWorksheet()
+    worksheet.Range = createRangeMock().mockReturnValue({ Value2: [[() => nativeObject]] })
+    expect(readRangeValues(worksheet, 1, 1, 1, 1)).toEqual([['']])
   })
 })
 
@@ -1578,7 +1580,7 @@ describe('getLastRow 的异常回退与缓存文案', () => {
   })
 
   it('锚定列定位抛错时记警告并回退到 D 列', () => {
-    const ws = createMockWorksheet({ name: 'AnchorThrow', rows: 100 })
+    const worksheet = createMockWorksheet({ name: 'AnchorThrow', rows: 100 })
     const anchorCell = {
       Value2: 'd',
       End: vi.fn(() => {
@@ -1586,12 +1588,12 @@ describe('getLastRow 的异常回退与缓存文案', () => {
       }),
     }
     const dCell = { Value2: 'd', End: vi.fn().mockReturnValue({ Row: 77 }) }
-    ws.Range = createRangeMock((address: string) => {
+    worksheet.Range = createRangeMock((address: string) => {
       if (address === 'A1') return { Value2: '序号' }
       return address.startsWith('A') ? anchorCell : dCell
     })
 
-    expect(getLastRow(ws, false, 1)).toBe(77)
+    expect(getLastRow(worksheet, false, 1)).toBe(77)
     expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('回退到原有逻辑'))
   })
 
@@ -1603,7 +1605,7 @@ describe('getLastRow 的异常回退与缓存文案', () => {
         throw new Error('无 End')
       }),
     }
-    const ws = {
+    const worksheet = {
       ...base,
       Range: createRangeMock(() => failCell),
       get UsedRange(): never {
@@ -1611,45 +1613,45 @@ describe('getLastRow 的异常回退与缓存文案', () => {
       },
     } as unknown as WpsWorksheet
 
-    expect(getLastRow(ws)).toBe(50_000)
+    expect(getLastRow(worksheet)).toBe(50_000)
     expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('UsedRange 失败'))
   })
 
   it('工作表名为空串时缓存键退化为空前缀，仍能定位最后行', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: '',
       rows: 10,
       usedRange: { Row: 1, Rows: { Count: 4 } },
     })
-    ws.Range = createRangeMock(() => ({
+    worksheet.Range = createRangeMock(() => ({
       Value2: '',
       End: vi.fn(() => {
         throw new Error('无 End')
       }),
     }))
 
-    expect(getLastRow(ws)).toBe(4)
+    expect(getLastRow(worksheet)).toBe(4)
   })
 
   it('「首次计算」与「来自缓存」两种日志文案可区分', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'LogText',
       rows: 10,
       usedRange: { Row: 1, Rows: { Count: 3 } },
     })
-    ws.Range = createRangeMock(() => ({
+    worksheet.Range = createRangeMock(() => ({
       Value2: '',
       End: vi.fn(() => {
         throw new Error('无 End')
       }),
     }))
-    clearSheetCache(ws)
+    clearSheetCache(worksheet)
 
-    getLastRow(ws)
+    getLastRow(worksheet)
     expect(bgmLog).toHaveBeenCalledWith('INFO', expect.stringContaining('(首次计算)'))
 
     // 不清空调用记录：第一次的「首次计算」必须留在历史里，第二次再叠加一条
-    getLastRow(ws)
+    getLastRow(worksheet)
     expect(bgmLog).toHaveBeenCalledWith('INFO', expect.stringContaining('(来自缓存)'))
   })
 })

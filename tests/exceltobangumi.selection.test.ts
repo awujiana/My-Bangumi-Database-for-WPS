@@ -76,7 +76,8 @@ const { bgmStub } = vi.hoisted(() => ({
       },
       checkPaused: (): boolean => {
         flags.pauseCheckCount += 1
-        if (flags.pauseAfterChecks > 0 && flags.pauseCheckCount > flags.pauseAfterChecks) return true
+        if (flags.pauseAfterChecks > 0 && flags.pauseCheckCount > flags.pauseAfterChecks)
+          return true
         return flags.paused
       },
       /** 等待恢复：解除暂停；若用例要求「暂停期间停止」则同时置位停止标志 */
@@ -165,7 +166,11 @@ vi.mock('../ts/sync/sync-config-summary.js', () => ({
   buildSyncConfig: () => ({}),
 }))
 
-import { getFilterStatus, syncSelectedRows, SyncToBangumiAsync } from '../ts/sync/exceltobangumi/index.js'
+import {
+  getFilterStatus,
+  syncSelectedRows,
+  SyncToBangumiAsync,
+} from '../ts/sync/exceltobangumi/index.js'
 
 /** 构造一个区间桩；`rowNumbers` 为该区覆盖的行号 */
 function createArea(rowNumbers: number[], onRowsCountRead?: () => void): WpsRange {
@@ -218,22 +223,24 @@ function createSelection(options: {
 }
 
 /** 构造工作表桩；筛选相关成员按开关提供 */
-function createWorksheet(options: {
-  name?: string
-  rowCount?: number
-  autoFilterMode?: boolean
-  hasAutoFilterRange?: boolean
-  visibleRowNumbers?: number[]
-  throwOnAutoFilterMode?: boolean
-  throwOnSpecialCells?: boolean
-  throwOnAreas?: boolean
-  /** 可见区域不提供 Areas 成员（覆盖「整体作为单一区间」分支） */
-  missingAreas?: boolean
-  throwOnRange?: boolean
-  visibleCount?: number
-  /** 传入后统计「按可见行扫描」时 `Rows.Count` 的读取次数（COM 往返次数回归断言用） */
-  onRowsCountRead?: () => void
-} = {}): WpsWorksheet {
+function createWorksheet(
+  options: {
+    name?: string
+    rowCount?: number
+    autoFilterMode?: boolean
+    hasAutoFilterRange?: boolean
+    visibleRowNumbers?: number[]
+    throwOnAutoFilterMode?: boolean
+    throwOnSpecialCells?: boolean
+    throwOnAreas?: boolean
+    /** 可见区域不提供 Areas 成员（覆盖「整体作为单一区间」分支） */
+    missingAreas?: boolean
+    throwOnRange?: boolean
+    visibleCount?: number
+    /** 传入后统计「按可见行扫描」时 `Rows.Count` 的读取次数（COM 往返次数回归断言用） */
+    onRowsCountRead?: () => void
+  } = {},
+): WpsWorksheet {
   const visibleRowNumbers = options.visibleRowNumbers ?? [1, 2, 3]
   const totalCount = options.visibleCount ?? 100
   return {
@@ -244,7 +251,7 @@ function createWorksheet(options: {
       return options.autoFilterMode ?? false
     },
     AutoFilter:
-      options.hasAutoFilterRange ?? true
+      (options.hasAutoFilterRange ?? true)
         ? {
             Range: {
               SpecialCells: () => {
@@ -301,7 +308,7 @@ function createApp(options: {
 }): unknown {
   return {
     ActiveWorkbook:
-      options.hasWorkbook ?? true
+      (options.hasWorkbook ?? true)
         ? { ActiveSheet: options.worksheet ?? createWorksheet(), Name: '工作簿1' }
         : null,
     Selection: options.selection ?? null,
@@ -331,9 +338,9 @@ function setupExecution(
     cellValue?: (row: number, col: number) => string
   } = {},
 ): void {
-  const ws = createWorksheet()
+  const worksheet = createWorksheet()
   mockGetApp.mockReturnValue(
-    createApp({ worksheet: ws, selection: createSelection({ rowNumbers: options.rows ?? [2] }) }),
+    createApp({ worksheet, selection: createSelection({ rowNumbers: options.rows ?? [2] }) }),
   )
   mockFindHeaderRow.mockReturnValue(1)
   mockGetColumnMap.mockReturnValue(options.colMap ?? new Map([['Bangumi_URL', 5]]))
@@ -425,10 +432,10 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('传入工作表时使用传入的表', () => {
-      const ws = createWorksheet({ name: '指定表', autoFilterMode: false })
+      const worksheet = createWorksheet({ name: '指定表', autoFilterMode: false })
       mockGetApp.mockReturnValue(createApp({ worksheet: createWorksheet() }))
 
-      getFilterStatus(ws, 10, 1, false)
+      getFilterStatus(worksheet, 10, 1, false)
 
       expect(loggedMessages().some((m) => m.includes('指定表'))).toBe(true)
     })
@@ -446,14 +453,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 7 个可见行就是 8 次往返。这条断言把「集合/属性提到循环外单次读取」锁成效率契约
       // （静态侧由 `scripts/check-com-in-loop.mjs` 门禁兜底，这里是运行时证据）。
       const countSpy = vi.fn()
-      const ws = createWorksheet({
+      const worksheet = createWorksheet({
         visibleRowNumbers: [2, 3, 4, 5, 6, 7, 8],
         autoFilterMode: true,
         onRowsCountRead: countSpy,
       })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const status = getFilterStatus(ws, 10, 1, false)
+      const status = getFilterStatus(worksheet, 10, 1, false)
 
       expect(status.hasFilter).toBe(true)
       // 先证明循环确实跑了 7 轮 —— 否则「只读 1 次」可能只是因为压根没进循环
@@ -484,43 +491,43 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('AutoFilter 模式：收集可见行并排除表头行', () => {
-      const ws = createWorksheet({
+      const worksheet = createWorksheet({
         autoFilterMode: true,
         visibleRowNumbers: [1, 2, 3, 4],
       })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, false)
+      const result = getFilterStatus(worksheet, 10, 1, false)
 
       expect(result.hasFilter).toBe(true)
       expect(result.visibleRows).toEqual([2, 3, 4])
     })
 
     it('AutoFilter 模式但 Range 缺失时判为无筛选', () => {
-      const ws = createWorksheet({ autoFilterMode: true, hasAutoFilterRange: false })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ autoFilterMode: true, hasAutoFilterRange: false })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, false)
+      const result = getFilterStatus(worksheet, 10, 1, false)
 
       expect(result.hasFilter).toBe(false)
       expect(loggedMessages().some((m) => m.includes('无筛选'))).toBe(true)
     })
 
     it('SpecialCells 抛错时记录错误并判为无筛选', () => {
-      const ws = createWorksheet({ autoFilterMode: true, throwOnSpecialCells: true })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ autoFilterMode: true, throwOnSpecialCells: true })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, false)
+      const result = getFilterStatus(worksheet, 10, 1, false)
 
       expect(result.hasFilter).toBe(false)
       expect(mockHandleError).toHaveBeenCalled()
     })
 
     it('AutoFilterMode 读取抛错时记录错误并继续', () => {
-      const ws = createWorksheet({ throwOnAutoFilterMode: true })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ throwOnAutoFilterMode: true })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      expect(() => getFilterStatus(ws, 10, 1, true)).not.toThrow()
+      expect(() => getFilterStatus(worksheet, 10, 1, true)).not.toThrow()
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
         expect.objectContaining({ context: 'getFilterStatus' }),
@@ -528,34 +535,34 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('deepCheck 模式：可见行数覆盖全量时判为无筛选', () => {
-      const ws = createWorksheet({ visibleCount: 3, visibleRowNumbers: [1, 2, 3] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ visibleCount: 3, visibleRowNumbers: [1, 2, 3] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 3, 1, true)
+      const result = getFilterStatus(worksheet, 3, 1, true)
 
       expect(result.hasFilter).toBe(false)
       expect(loggedMessages().some((m) => m.includes('均可见'))).toBe(true)
     })
 
     it('deepCheck 模式：存在隐藏行时标记筛选并收集可见行', () => {
-      const ws = createWorksheet({ visibleCount: 100, visibleRowNumbers: [1, 2, 5] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ visibleCount: 100, visibleRowNumbers: [1, 2, 5] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, true)
+      const result = getFilterStatus(worksheet, 10, 1, true)
 
       expect(result.hasFilter).toBe(true)
       expect(result.visibleRows).toEqual([2, 5])
     })
 
     it('Areas 读取抛错时降级为整体可见区间', () => {
-      const ws = createWorksheet({
+      const worksheet = createWorksheet({
         autoFilterMode: true,
         visibleRowNumbers: [1, 2, 3],
         throwOnAreas: true,
       })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, false)
+      const result = getFilterStatus(worksheet, 10, 1, false)
 
       expect(result.hasFilter).toBe(true)
       expect(result.visibleRows).toEqual([2, 3])
@@ -563,14 +570,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('可见区域未提供 Areas 成员时整体作为单一区间处理', () => {
-      const ws = createWorksheet({
+      const worksheet = createWorksheet({
         visibleCount: 100,
         visibleRowNumbers: [1, 2, 5],
         missingAreas: true,
       })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, true)
+      const result = getFilterStatus(worksheet, 10, 1, true)
 
       expect(result.hasFilter).toBe(true)
       expect(result.visibleRows).toEqual([2, 5])
@@ -579,20 +586,20 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('可见行超过 10 行时输出省略日志', () => {
       const many = Array.from({ length: 15 }, (_unused, index) => index + 1)
-      const ws = createWorksheet({ autoFilterMode: true, visibleRowNumbers: many })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ autoFilterMode: true, visibleRowNumbers: many })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 20, 1, false)
+      const result = getFilterStatus(worksheet, 20, 1, false)
 
       expect(result.visibleRows.length).toBe(14)
       expect(loggedMessages().some((m) => m.includes('省略'))).toBe(true)
     })
 
     it('核心逻辑抛错时外层兜底返回无筛选', () => {
-      const ws = createWorksheet({ throwOnRange: true })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ throwOnRange: true })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
 
-      const result = getFilterStatus(ws, 10, 1, true)
+      const result = getFilterStatus(worksheet, 10, 1, true)
 
       expect(result).toEqual({ hasFilter: false, visibleRows: [], hiddenRows: [] })
       expect(mockHandleError).toHaveBeenCalledWith(
@@ -637,9 +644,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('连续选区按起始行与行数收集', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3, 4] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3, 4] }) }),
       )
       mockFindHeaderRow.mockReturnValue(0)
 
@@ -649,11 +656,16 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('非连续选区遍历多个 Area 去重收集', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
         createApp({
-          worksheet: ws,
-          selection: createSelection({ areas: [[2, 3], [3, 5]] }),
+          worksheet,
+          selection: createSelection({
+            areas: [
+              [2, 3],
+              [3, 5],
+            ],
+          }),
         }),
       )
       mockFindHeaderRow.mockReturnValue(0)
@@ -665,10 +677,10 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('选区地址读取失败时降级仍继续收集', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
         createApp({
-          worksheet: ws,
+          worksheet,
           selection: createSelection({ rowNumbers: [2, 3], throwOnAddress: true }),
         }),
       )
@@ -680,10 +692,10 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('读取选区抛错时弹窗提示并返回', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
         createApp({
-          worksheet: ws,
+          worksheet,
           selection: createSelection({ throwOnRows: true }),
         }),
       )
@@ -694,9 +706,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('未找到表头行时弹窗提示', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3] }) }),
       )
       mockFindHeaderRow.mockReturnValue(0)
 
@@ -706,9 +718,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('排除表头后无数据行时提示', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [1] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [1] }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
 
@@ -720,9 +732,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     it('超过 10 行时弹确认框，用户取消则中止', async () => {
       const rows = Array.from({ length: 12 }, (_unused, index) => index + 2)
       flags.confirmResult = false
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: rows }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: rows }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
 
@@ -735,9 +747,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     it('超过 10 行且用户确认时继续执行', async () => {
       const rows = Array.from({ length: 12 }, (_unused, index) => index + 2)
       flags.confirmResult = true
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: rows }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: rows }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
       mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
@@ -749,9 +761,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('缺少 Bangumi_URL 列时弹窗提示', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3] }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
       mockGetColumnMap.mockReturnValue(new Map([['名称', 1]]))
@@ -762,9 +774,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('Token 未设置时弹窗提示', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3] }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
       mockLoadBgToken.mockReturnValue('')
@@ -776,9 +788,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('校验通过后进入执行阶段，状态机拒绝进入则直接返回', async () => {
       flags.enterRunning = false
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3] }) }),
       )
       mockFindHeaderRow.mockReturnValue(1)
 
@@ -789,9 +801,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('流程抛错时隐藏进度并记录错误', async () => {
-      const ws = createWorksheet()
+      const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(
-        createApp({ worksheet: ws, selection: createSelection({ rowNumbers: [2, 3] }) }),
+        createApp({ worksheet, selection: createSelection({ rowNumbers: [2, 3] }) }),
       )
       mockFindHeaderRow.mockImplementation(() => {
         throw new Error('表头读取炸了')
@@ -811,29 +823,35 @@ describe('exceltobangumi 选区与筛选链路', () => {
   describe('SyncToBangumiAsync 预处理分支', () => {
     it('无数据行时直接返回全零结果', async () => {
       // 可见行数覆盖全量 → 判为无筛选 → 走全量区间 [startRow, lastRow]（此处为空）
-      const ws = createWorksheet({ visibleCount: 3, visibleRowNumbers: [1, 2, 3] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ visibleCount: 3, visibleRowNumbers: [1, 2, 3] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockReadRangeValues.mockReturnValue([])
 
-      const result = await SyncToBangumiAsync(ws, new Map([['Bangumi_URL', 5]]), 'token', 1, 1)
+      const result = await SyncToBangumiAsync(
+        worksheet,
+        new Map([['Bangumi_URL', 5]]),
+        'token',
+        1,
+        1,
+      )
 
       expect(result).toEqual({ success: 0, fail: 0, skip: 0, stopped: false })
       expect(loggedMessages().some((m) => m.includes('开始批量同步'))).toBe(true)
     })
 
     it('筛选模式下只处理可见行', async () => {
-      const ws = createWorksheet({ autoFilterMode: true, visibleRowNumbers: [1, 2, 3] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ autoFilterMode: true, visibleRowNumbers: [1, 2, 3] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockReadRangeValues.mockReturnValue([])
 
-      await SyncToBangumiAsync(ws, new Map([['Bangumi_URL', 5]]), 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, new Map([['Bangumi_URL', 5]]), 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('筛选模式'))).toBe(true)
     })
 
     it('增量模式加载历史指纹', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockReadRangeValues.mockReturnValue([])
       mockGetAllSyncRecords.mockReturnValue([
         { sid: '1', fingerprint: 'fp-1' },
@@ -841,7 +859,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         { sid: '3', fingerprint: '' },
       ])
 
-      await SyncToBangumiAsync(ws, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, {
+      await SyncToBangumiAsync(worksheet, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, {
         incremental: true,
       })
 
@@ -849,12 +867,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('进度回调在阶段六被触发', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockReadRangeValues.mockReturnValue([])
       const onProgress = vi.fn()
 
-      await SyncToBangumiAsync(ws, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, { onProgress })
+      await SyncToBangumiAsync(worksheet, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, {
+        onProgress,
+      })
 
       expect(mockFinalize).toHaveBeenCalledTimes(1)
     })
@@ -1070,31 +1090,31 @@ describe('exceltobangumi 选区与筛选链路', () => {
     /** 批量取值实现见模块作用域 batchCellValue */
 
     it('非增量模式下已标记成功的行按颜色跳过', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetCell.mockReturnValue({ Interior: { Color: 0xccffcc } })
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('2 条跳过'))).toBe(true)
       expect(mockBgmRequestSync).not.toHaveBeenCalled()
     })
 
     it('未标记的行正常同步（颜色不匹配）', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetCell.mockReturnValue({ Interior: { Color: 0 } })
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
 
     it('颜色属性读取抛错时按未标记处理', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetCell.mockReturnValue({
         get Interior(): unknown {
@@ -1102,14 +1122,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
         },
       })
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
 
     it('单行预处理抛错 → 计入失败并调用 BGM.handleError', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       const skipSids = {
         size: 1,
@@ -1118,7 +1138,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
         },
       } as unknown as Set<string>
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { skipSids })
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { skipSids })
 
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
@@ -1128,36 +1148,36 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('章节标记抛错 → 记 WARN 不影响批量结果', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockMarkEpisodes.mockRejectedValue(new Error('章节接口不可用'))
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('章节标记异常: 章节接口不可用'))).toBe(true)
     })
 
     it('状态非「看过/在看」但有集数 → 记日志跳过章节标记', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue({ status: '1' }))
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('跳过章节标记'))).toBe(true)
       expect(mockMarkEpisodes).not.toHaveBeenCalled()
     })
 
     it('创建同步记录表抛错 → 记 WARN 后继续批量同步', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetOrCreateSyncRecordSheet.mockImplementation(() => {
         throw new Error('记录表创建失败')
       })
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
@@ -1167,12 +1187,12 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('阶段六的 reportProgress 会转调 options.onProgress', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       const onProgress = vi.fn()
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { onProgress })
 
       // finalizeSyncResults 被 mock，用例手动取出其 reportProgress 参数并调用
       const reportProgress = mockFinalize.mock.calls[0]?.[8] as (c: number, m: string) => void
@@ -1182,22 +1202,24 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('onProgress 回调抛错 → 记 WARN 不影响其余任务', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       const onProgress = vi.fn(() => {
         throw new Error('进度回调炸了')
       })
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { onProgress })
 
-      expect(loggedMessages().some((m) => m.includes('onProgress 回调异常: 进度回调炸了'))).toBe(true)
+      expect(loggedMessages().some((m) => m.includes('onProgress 回调异常: 进度回调炸了'))).toBe(
+        true,
+      )
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
 
     it('并发窗口内收到停止请求 → 等待在途任务后停止', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       // 第一个请求立即完成，第二个在宏任务后完成 → 让第二轮循环仍持有在途任务
       let requestCount = 0
@@ -1217,14 +1239,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 第一次检查放行，之后立即报告停止
       flags.stopAfterChecks = 1
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('检测到停止请求，正在停止'))).toBe(true)
     })
 
     it('并发窗口内暂停且恢复后立即停止 → 等待在途任务后停止', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       let requestCount = 0
       mockBgmRequestSync.mockImplementation(
@@ -1243,26 +1265,26 @@ describe('exceltobangumi 选区与筛选链路', () => {
       flags.pauseAfterChecks = 1
       flags.stopAfterResume = true
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('暂停期间收到停止请求，正在停止'))).toBe(true)
     })
 
     it('暂停后恢复继续处理 → 记恢复日志', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       flags.paused = true
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1)
 
       expect(loggedMessages().some((m) => m.includes('同步已恢复，继续处理'))).toBe(true)
       expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
     })
 
     it('批量缓存命中时直接取用行数据，不走逐格回退', async () => {
-      const ws = createWorksheet({ visibleRowNumbers: [1, 2] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ visibleRowNumbers: [1, 2] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       // 行 2 在批量缓存中的下标为 0；数组下标 i 对应第 i+1 列
       mockReadRangeValues.mockReturnValue([
         ['', '条目2', '2', '', 'https://bgm.tv/subject/1', '', '12'],
@@ -1270,7 +1292,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       // 逐格回退一律返回空值 → 只有命中缓存才可能产生同步任务
       mockGetCellValue.mockReturnValue('')
 
-      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 2, 1)
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 2, 1)
 
       expect(mockBgmRequestSync).toHaveBeenCalledWith(
         'POST',
@@ -1282,13 +1304,13 @@ describe('exceltobangumi 选区与筛选链路', () => {
     })
 
     it('增量模式下指纹未变化 → 整批跳过且不发请求', async () => {
-      const ws = createWorksheet()
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       mockGetAllSyncRecords.mockReturnValue([{ sid: '1', fingerprint: 'fp-1' }])
       mockCalcFingerprint.mockReturnValue('fp-1')
 
-      const result = await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, {
+      const result = await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, {
         incremental: true,
       })
 
@@ -1299,13 +1321,13 @@ describe('exceltobangumi 选区与筛选链路', () => {
 
     it('两批任务间隔不足最小请求间隔时执行节流等待', async () => {
       // 7 个可见行（去掉表头后 6 行）→ 并发窗口 5 + 1，第二批必然落在同一毫秒
-      const ws = createWorksheet({ visibleRowNumbers: [1, 2, 3, 4, 5, 6, 7] })
-      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      const worksheet = createWorksheet({ visibleRowNumbers: [1, 2, 3, 4, 5, 6, 7] })
+      mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
       // 固定 Date.now：首批 lastRequestTime=0 不等待，第二批 elapsed=0 必然等待
       const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5_000_000)
       try {
-        await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 7, 1)
+        await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 7, 1)
       } finally {
         nowSpy.mockRestore()
       }

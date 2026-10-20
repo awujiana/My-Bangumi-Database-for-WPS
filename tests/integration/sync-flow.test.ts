@@ -41,9 +41,9 @@ const mockState = vi.hoisted(() => ({
   findHeaderRow: vi.fn(() => 1),
   getLastRow: vi.fn(() => 1),
   getColumnMap: vi.fn(() => new Map<string, number>()),
-  getCellValue: vi.fn<(ws: unknown, row: number, col: number) => string>(() => ''),
+  getCellValue: vi.fn<(worksheet: unknown, row: number, col: number) => string>(() => ''),
   setCellValue: vi.fn(() => true),
-  // 生产签名为 (ws, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
+  // 生产签名为 (worksheet, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
   readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
   // 保留原始类型的矩形读：「读-改-写整行」基底。默认 []（读不到旧值），
   // 需要旧值基底的用例显式 mockReturnValue 二维数组

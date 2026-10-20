@@ -42,23 +42,23 @@ const MODAL_ID = 'bgmSyncMappingModal'
  *          读不到工作表时返回空配置（不阻塞同步，等价于「全部按默认」）。
  */
 export function showSyncMappingDialog(): Promise<SyncMappingConfig | null> {
-  const ws = getDataSheet()
-  if (!ws) {
+  const worksheet = getDataSheet()
+  if (!worksheet) {
     return Promise.resolve({ excludedColumns: [], columnOverrides: {} })
   }
 
-  const headerRow = findHeaderRow(ws) || 1
-  const colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const colMap = getColumnMap(worksheet, headerRow)
   const rows = buildSyncMappingRows([...colMap.keys()])
 
   return new Promise<SyncMappingConfig | null>((resolve) => {
-    renderDialog(ws, headerRow, colMap, rows, resolve)
+    renderDialog(worksheet, headerRow, colMap, rows, resolve)
   })
 }
 
 /** 渲染并绑定事件（resolve 只调用一次） */
 function renderDialog(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   headerRow: number,
   colMap: Map<string, number>,
   rows: SyncMappingRow[],
@@ -212,7 +212,7 @@ function renderDialog(
       return
     }
 
-    const { added, failed } = addHeaderColumns(ws, headerRow, colMap, missingNames)
+    const { added, failed } = addHeaderColumns(worksheet, headerRow, colMap, missingNames)
     for (const name of added) {
       const index = colMap.get(name)
       const affectedRows = rows.filter((candidate) => candidate.defaultColumn === name)
@@ -315,7 +315,7 @@ function buildTargetOptions(row: SyncMappingRow, localColumns: readonly string[]
  * 校验失败的列不并入映射，交由调用方提示用户。
  */
 function addHeaderColumns(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   headerRow: number,
   colMap: Map<string, number>,
   names: readonly string[],
@@ -329,7 +329,7 @@ function addHeaderColumns(
   let nextCol = maxCol
   for (const name of names) {
     nextCol += 1
-    if (setCellValue(ws, headerRow, nextCol, name)) {
+    if (setCellValue(worksheet, headerRow, nextCol, name)) {
       written.push({ name, col: nextCol })
     }
   }
@@ -337,7 +337,7 @@ function addHeaderColumns(
   const added: string[] = []
   const failed: string[] = []
   for (const { name, col } of written) {
-    const readBack = getCellValue(ws, headerRow, col)
+    const readBack = getCellValue(worksheet, headerRow, col)
     if (readBack === name) {
       colMap.set(name, col)
       added.push(name)

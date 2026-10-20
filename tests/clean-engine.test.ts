@@ -15,9 +15,9 @@ const mocks = vi.hoisted(() => ({
   readRangeValues: vi.fn(),
   setCellValue: vi.fn(),
   bgmLog: vi.fn(),
-  planDuplicateRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
-  planDuplicateUrlRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
-  planEmptyNameRows: vi.fn<(ws: unknown, options?: PlanCallOptions) => unknown>(),
+  planDuplicateRows: vi.fn<(worksheet: unknown, options?: PlanCallOptions) => unknown>(),
+  planDuplicateUrlRows: vi.fn<(worksheet: unknown, options?: PlanCallOptions) => unknown>(),
+  planEmptyNameRows: vi.fn<(worksheet: unknown, options?: PlanCallOptions) => unknown>(),
   applyRowPlan: vi.fn(),
   readSheetLayout: vi.fn(),
 }))
@@ -48,7 +48,12 @@ vi.mock('../ts/sync/sheet-cleaning.js', () => ({
   readSheetLayout: mocks.readSheetLayout,
 }))
 
-import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS, ROW_BYTES_FALLBACK } from '../ts/panel/clean-rules.js'
+import {
+  CLEAN_EXCLUDES,
+  CLEAN_RULES,
+  CLEAN_TARGETS,
+  ROW_BYTES_FALLBACK,
+} from '../ts/panel/clean-rules.js'
 import type { CleanRule } from '../ts/panel/clean-rules.js'
 import {
   listCleanTargets,
@@ -118,7 +123,7 @@ function mockWorkbookSheet(
   path = 'D:/books/数据表.xlsx',
   options: { usedRangeLastRow?: number } = {},
 ): unknown {
-  const ws = {
+  const worksheet = {
     Name: sheetName,
     // 引擎优先读 UsedRange 计算末行（未提供时回退 getLastRow）
     ...(options.usedRangeLastRow !== undefined && {
@@ -131,13 +136,13 @@ function mockWorkbookSheet(
   const wb = {
     Name: '数据表.xlsx',
     FullName: path,
-    Worksheets: { Count: 1, Item: () => ws },
+    Worksheets: { Count: 1, Item: () => worksheet },
   }
   mocks.getOpenWorkbooks.mockReturnValue([wb])
   mocks.findHeaderRow.mockReturnValue(1)
   mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
   mocks.getLastRow.mockReturnValue(4)
-  return ws
+  return worksheet
 }
 
 // 每个用例前把矩形读桩复位为「未实现 ⇒ 空数组」：
@@ -160,7 +165,7 @@ function fakeTarget(key: string, label: string, sheetName = '动画'): CleanTarg
     headerRow: 1,
     lastRow: 5,
     colMap: new Map(DEFAULT_COL_MAP),
-    ws: { Name: sheetName } as CleanTargetInfo['ws'],
+    worksheet: { Name: sheetName } as CleanTargetInfo['worksheet'],
   }
 }
 
@@ -571,7 +576,7 @@ describe('inspectWorksheet', () => {
 
   it('标准数据表：表头行 / 行数 / 名称列 / 可清理', () => {
     mockWorkbookSheet('动画')
-    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['worksheet'])
     expect(info.headerRow).toBe(1)
     expect(info.lastRow).toBe(4)
     expect(info.dataRows).toBe(3)
@@ -582,8 +587,8 @@ describe('inspectWorksheet', () => {
   })
 
   it('优先用 UsedRange 计算末行（真实数据行数）', () => {
-    const ws = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 120 })
-    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    const worksheet = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 120 })
+    const info = inspectWorksheet(worksheet as CleanTargetInfo['worksheet'])
     expect(info.lastRow).toBe(120)
     expect(info.dataRows).toBe(119)
     expect(info.eligible).toBe(true)
@@ -592,7 +597,7 @@ describe('inspectWorksheet', () => {
   it('未命中特征列：eligible=false 且给出原因', () => {
     mockWorkbookSheet('参数表')
     mocks.getColumnMap.mockReturnValue(new Map([['序号', 1]]))
-    const info = inspectWorksheet({ Name: '参数表' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '参数表' } as CleanTargetInfo['worksheet'])
     expect(info.hasNameColumn).toBe(false)
     expect(info.isBangumiSheet).toBe(false)
     expect(info.eligible).toBe(false)
@@ -600,7 +605,7 @@ describe('inspectWorksheet', () => {
   })
 
   it('仅有 Bangumi_URL 而无「名称」列：仍判定为 Bangumi 数据表且可清理', () => {
-    const ws = mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', {
+    const worksheet = mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', {
       usedRangeLastRow: 30,
     })
     mocks.getColumnMap.mockReturnValue(
@@ -609,7 +614,7 @@ describe('inspectWorksheet', () => {
         ['Bangumi_URL', 9],
       ]),
     )
-    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    const info = inspectWorksheet(worksheet as CleanTargetInfo['worksheet'])
     expect(info.hasNameColumn).toBe(false)
     expect(info.isBangumiSheet).toBe(true)
     expect(info.eligible).toBe(true)
@@ -622,7 +627,7 @@ describe('inspectWorksheet', () => {
     // 无标准表头，且新番表签名也不命中（所有单元格为空）
     mocks.findHeaderRow.mockReturnValue(0)
     mocks.getCellValue.mockReturnValue('')
-    const info = inspectWorksheet({ Name: '空白表' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '空白表' } as CleanTargetInfo['worksheet'])
     expect(info.headerRow).toBe(0)
     expect(info.eligible).toBe(false)
     expect(info.reason).toBe('未识别到表头行')
@@ -632,7 +637,7 @@ describe('inspectWorksheet', () => {
     mockWorkbookSheet('空数据表')
     mocks.findHeaderRow.mockReturnValue(3)
     mocks.getLastRow.mockReturnValue(3)
-    const info = inspectWorksheet({ Name: '空数据表' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '空数据表' } as CleanTargetInfo['worksheet'])
     expect(info.dataRows).toBe(0)
     expect(info.reason).toBe('无数据行')
   })
@@ -716,7 +721,7 @@ describe('runCleanPlans', () => {
       progress.push(`${String(done)}/${String(total)}:${message}`)
     })
 
-    expect(mocks.setCellValue).toHaveBeenCalledWith(target.ws, 2, 3, '')
+    expect(mocks.setCellValue).toHaveBeenCalledWith(target.worksheet, 2, 3, '')
     expect(mocks.applyRowPlan).toHaveBeenCalledTimes(1)
     expect(runResult.deletedRows).toBe(1)
     expect(runResult.changedCells).toBe(1)
@@ -751,8 +756,8 @@ describe('runCleanPlans', () => {
       ],
       [t1, t2],
     )
-    mocks.applyRowPlan.mockImplementation((ws: { Name: string }) => {
-      if (ws.Name === '动画') throw new Error('COM 异常')
+    mocks.applyRowPlan.mockImplementation((worksheet: { Name: string }) => {
+      if (worksheet.Name === '动画') throw new Error('COM 异常')
       return 1
     })
     const runResult = await runCleanPlans(result)
@@ -827,14 +832,14 @@ describe('listCleanTargets · COM 读取异常兜底', () => {
   })
 
   it('FullName 读取抛错时回退 Name（退化路径不阻断清理）', () => {
-    const ws = { Name: '动画' }
+    const worksheet = { Name: '动画' }
     mocks.getOpenWorkbooks.mockReturnValue([
       {
         Name: '数据表.xlsx',
         get FullName(): string {
           throw new Error('COM 未就绪')
         },
-        Worksheets: { Count: 1, Item: () => ws },
+        Worksheets: { Count: 1, Item: () => worksheet },
       },
     ])
     mocks.findHeaderRow.mockReturnValue(1)
@@ -859,10 +864,7 @@ describe('listCleanTargets · COM 读取异常兜底', () => {
       },
     ])
     expect(listCleanTargets()).toHaveLength(0)
-    expect(mocks.bgmLog).toHaveBeenCalledWith(
-      'WARN',
-      expect.stringContaining('枚举工作表失败'),
-    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('枚举工作表失败'))
   })
 
   it('工作表名读取抛错时该表被跳过（不误伤其他表）', () => {
@@ -1037,7 +1039,7 @@ describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
       throw new Error('COM 失败')
     })
 
-    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['worksheet'])
     expect(info.headerRow).toBe(0)
     expect(info.isBangumiSheet).toBe(false)
     expect(info.reason).toBe('未识别到表头行')
@@ -1049,7 +1051,7 @@ describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
       throw new Error('COM 失败')
     })
 
-    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['worksheet'])
     expect(info.headerRow).toBe(1)
     expect(info.hasNameColumn).toBe(false)
     expect(info.reason).toContain('特征列')
@@ -1061,15 +1063,17 @@ describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
       throw new Error('COM 失败')
     })
 
-    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['worksheet'])
     expect(info.lastRow).toBe(0)
     expect(info.dataRows).toBe(0)
     expect(info.reason).toBe('无数据行')
   })
 
   it('数据行数超过 maxDataRows 护栏时给出原因', () => {
-    const ws = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 60_000 })
-    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    const worksheet = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', {
+      usedRangeLastRow: 60_000,
+    })
+    const info = inspectWorksheet(worksheet as CleanTargetInfo['worksheet'])
     expect(info.dataRows).toBe(59_999)
     expect(info.eligible).toBe(false)
     expect(info.reason).toContain('数据行超过护栏')
@@ -1078,7 +1082,7 @@ describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
   it('表头行有文本时用于展示（前 8 个非空值）', () => {
     mockWorkbookSheet('动画')
     setCellGrid({ 1: { 1: '名称', 2: 'Bangumi_URL' } })
-    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['worksheet'])
     expect(info.headers).toEqual(['名称', 'Bangumi_URL'])
   })
 })
@@ -1284,7 +1288,7 @@ describe('runCleanPlans · 多行删除排序', () => {
 
     const runResult = await runCleanPlans(result)
     expect(runResult.deletedRows).toBe(2)
-    expect(mocks.applyRowPlan).toHaveBeenCalledWith(target.ws, {
+    expect(mocks.applyRowPlan).toHaveBeenCalledWith(target.worksheet, {
       deleteRows: [3, 4],
       changes: [],
       groups: 0,

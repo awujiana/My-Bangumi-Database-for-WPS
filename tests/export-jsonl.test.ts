@@ -152,16 +152,16 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('无 Bangumi_URL 列时应返回空字符串', () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockGetColumnMap.mockReturnValue(new Map())
     const result = buildJsonlFromSheet()
     expect(result).toBe('')
   })
 
   it('本地「别名 / 评分 / 排名」列应被导出（此前映射表缺这三条，静默丢弃）', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(2)
 
@@ -182,8 +182,8 @@ describe('buildJsonlFromSheet', () => {
       return ''
     })
 
-    mockExtractSubjectId.mockImplementation((url: string) =>
-      /subject\/(\d+)/.exec(url)?.[1] ?? null,
+    mockExtractSubjectId.mockImplementation(
+      (url: string) => /subject\/(\d+)/.exec(url)?.[1] ?? null,
     )
 
     const result = buildJsonlFromSheet()
@@ -198,8 +198,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('有数据时应返回 JSONL 字符串', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -222,8 +222,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('空行应跳过', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -237,8 +237,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('有完整字段数据时应生成包含所有字段的 JSONL', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -306,8 +306,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('多条记录时应共用同一行表头，字段名不随记录重复', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(4)
 
@@ -349,8 +349,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('标签字段应按 | 分割并过滤空值', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -374,8 +374,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('名称字段为空时应补空字符串（值数组长度必须与表头一致）', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -399,8 +399,8 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('日期字段为空时应补空字符串（值数组长度必须与表头一致）', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -424,13 +424,13 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('getCellText 应优先使用单元格 Text 属性', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       usedRange: 5,
       cellOverrides: {
         B2: { Value2: 45_382, Text: '2024年01月01日' },
       },
     })
-    mockGetDataSheet.mockReturnValue(ws)
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -455,8 +455,8 @@ describe('buildJsonlFromSheet', () => {
   it('getCellText 在 Text 属性异常时应回退到 getCellValue', () => {
     // 不设置 cellOverrides，getCellText 会因 cell.Text 为 undefined 走 try 块，
     // 然后 getCellValue 会被调用
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -548,11 +548,11 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('findHeaderRow 返回 0 时应回退到默认值 1', () => {
-    // Line 70: const headerRow = findHeaderRow(ws) || 1
+    // Line 70: const headerRow = findHeaderRow(worksheet) || 1
     mockFindHeaderRow.mockReturnValue(0)
 
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockGetLastRow.mockReturnValue(5)
 
     const colMap = new Map<string, number>([
@@ -578,8 +578,8 @@ describe('buildJsonlFromSheet', () => {
 
   it('URL 有效但 extractSubjectId 返回 null 时应跳过该行', () => {
     // Line 86: if (!sid) continue
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -616,8 +616,8 @@ describe('exportSheetToJsonlFile', () => {
   })
 
   it('有数据时应返回 true', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -648,8 +648,8 @@ describe('exportSheetToJsonlFile', () => {
   })
 
   it('buildJsonlFromSheet 返回空字符串时应返回 false', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
@@ -659,8 +659,8 @@ describe('exportSheetToJsonlFile', () => {
   })
 
   it('document.createElement 抛出异常时应返回 false', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -683,8 +683,8 @@ describe('exportSheetToJsonlFile', () => {
   })
 
   it('Blob 创建抛出异常时应返回 false', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -721,8 +721,8 @@ describe('exportSheetToJsonlFile', () => {
   })
 
   it('应在导出日志中包含文件名和字节数', () => {
-    const ws = createMockWorksheet({ usedRange: 5 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
@@ -760,8 +760,8 @@ describe('exportSheetToJsonlFile', () => {
   it('Blob URL 延迟 10 秒才释放（下载是异步的，立即 revoke 会让文件失效）', () => {
     vi.useFakeTimers()
     try {
-      const ws = createMockWorksheet({ usedRange: 5 })
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWorksheet({ usedRange: 5 })
+      mockGetDataSheet.mockReturnValue(worksheet)
       mockFindHeaderRow.mockReturnValue(1)
       mockGetLastRow.mockReturnValue(3)
       mockGetColumnMap.mockReturnValue(new Map<string, number>([['Bangumi_URL', 1]]))

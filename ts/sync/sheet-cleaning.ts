@@ -105,7 +105,7 @@ export interface RowPlanOptions {
    * （`findHeaderRow` + `getLastRow` + `getColumnMap`）。传 `null` 表示
    * 「已解析且失败」，直接返回空计划，不再重复解析。
    *
-   * ⚠️ 语义契约：调用方须传 `readSheetLayout(ws)` 的**同一结果**。新番表无标准
+   * ⚠️ 语义契约：调用方须传 `readSheetLayout(worksheet)` 的**同一结果**。新番表无标准
    * 「名称」表头时解析结果为 `null`——与不传时各计划自行解析的结果一致，
    * 因此新番表不会因共享而突然获得行级清理能力（推导 colMap 只在
    * `buildTarget` 的新番表专属签名路径内使用，不进本选项）。
@@ -155,22 +155,24 @@ function emptyPlan(skippedReason?: string): RowPlan {
 /**
  * 解析工作表结构。失败（无表头 / 无数据行）时返回 null，由调用方记日志。
  */
-export function readSheetLayout(ws: WpsWorksheet): SheetLayout | null {
-  const headerRow = findHeaderRow(ws)
+export function readSheetLayout(worksheet: WpsWorksheet): SheetLayout | null {
+  const headerRow = findHeaderRow(worksheet)
   if (!headerRow) return null
-  const lastRow = getLastRow(ws)
+  const lastRow = getLastRow(worksheet)
   if (lastRow <= headerRow) return null
   return {
     headerRow,
     lastRow,
-    colMap: getColumnMap(ws, headerRow),
+    colMap: getColumnMap(worksheet, headerRow),
     dataStartRow: headerRow + 1,
   }
 }
 
 /** 读取单列数据（返回按数据行顺序排列的一维数组） */
-function readColumn(ws: WpsWorksheet, layout: SheetLayout, col: number): string[] {
-  return readRangeValues(ws, layout.dataStartRow, layout.lastRow, col, col).map((row) => row[0] ?? '')
+function readColumn(worksheet: WpsWorksheet, layout: SheetLayout, col: number): string[] {
+  return readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, col, col).map(
+    (row) => row[0] ?? '',
+  )
 }
 
 /** 数据索引 → Excel 行号 */
@@ -275,10 +277,10 @@ function hasDistinctValues(
  * 按「名称」分组，保留组内首个含 Bangumi_URL 的行，删除组内无 URL 的重复行，
  * 并把被删行的「标签/分级」合并进保留行（去重）。
  */
-export function planDuplicateRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
+export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   // 表结构优先用调用方解析好的（scanTarget 每目标一次、多规则共用）；
   // 未提供时才自行解析（plan* 可独立调用）。null = 已解析且失败，直接空计划。
-  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
+  const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
 
   const nameCol = layout.colMap.get('名称')
@@ -290,11 +292,11 @@ export function planDuplicateRows(ws: WpsWorksheet, options?: RowPlanOptions): R
   const episodesCol = layout.colMap.get('集数')
 
   const excluded = options?.excludedRows
-  const names = readColumn(ws, layout, nameCol)
-  const urls = readColumn(ws, layout, urlCol)
-  const tags = tagsCol ? readColumn(ws, layout, tagsCol) : null
-  const dates = dateCol ? readColumn(ws, layout, dateCol) : null
-  const episodes = episodesCol ? readColumn(ws, layout, episodesCol) : null
+  const names = readColumn(worksheet, layout, nameCol)
+  const urls = readColumn(worksheet, layout, urlCol)
+  const tags = tagsCol ? readColumn(worksheet, layout, tagsCol) : null
+  const dates = dateCol ? readColumn(worksheet, layout, dateCol) : null
+  const episodes = episodesCol ? readColumn(worksheet, layout, episodesCol) : null
 
   // 1. 按名称分组（空名称与排除行不参与）
   const groups = new Map<string, number[]>()
@@ -380,19 +382,19 @@ function resolveUrlGroup(
  * 扫描「同一 Bangumi_URL 出现在多行」的重复行（含跨名称场景）：
  * 保留行号最大的一行，合并其余行的「标签/分级」后删除其余行。
  */
-export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
-  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
+export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
+  const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
   const urlCol = layout.colMap.get('Bangumi_URL')
   if (!urlCol) return emptyPlan('未找到「Bangumi_URL」列')
   const tagsCol = layout.colMap.get('标签/分级')
 
   const excluded = options?.excludedRows
-  const urls = readColumn(ws, layout, urlCol)
-  const tags = tagsCol ? readColumn(ws, layout, tagsCol) : null
+  const urls = readColumn(worksheet, layout, urlCol)
+  const tags = tagsCol ? readColumn(worksheet, layout, tagsCol) : null
   // 同 URL 组内各行名称不同，diff 对比视图需要名称列（一次矩形读）
   const nameCol = layout.colMap.get('名称')
-  const names = nameCol ? readColumn(ws, layout, nameCol) : null
+  const names = nameCol ? readColumn(worksheet, layout, nameCol) : null
 
   const groups = new Map<string, number[]>()
   for (const [index, rawUrl] of urls.entries()) {
@@ -458,8 +460,8 @@ export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions)
  * 扫描数据区内部的空白行：「名称」为空，且所有已识别列均无数据。
  * 只清理数据区内部（表头行 +1 ~ 最后数据行）的空洞，不动表尾。
  */
-export function planEmptyNameRows(ws: WpsWorksheet, options?: RowPlanOptions): RowPlan {
-  const layout = options?.layout === undefined ? readSheetLayout(ws) : options.layout
+export function planEmptyNameRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
+  const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
   if (!layout) return emptyPlan('未找到表头行或无数据行')
   const nameCol = layout.colMap.get('名称')
   if (!nameCol) return emptyPlan('未找到「名称」列')
@@ -468,7 +470,7 @@ export function planEmptyNameRows(ws: WpsWorksheet, options?: RowPlanOptions): R
   // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
   // 语义不变——仍只检查 colMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
   const maxCol = Math.max(...layout.colMap.values())
-  const block = readRangeValues(ws, layout.dataStartRow, layout.lastRow, 1, maxCol)
+  const block = readRangeValues(worksheet, layout.dataStartRow, layout.lastRow, 1, maxCol)
   const otherCols = [...layout.colMap.values()].filter((col) => col !== nameCol)
 
   const rowsToDelete: number[] = []
@@ -496,7 +498,7 @@ export function planEmptyNameRows(ws: WpsWorksheet, options?: RowPlanOptions): R
  * 批量删除行：从大到小删除，并把连续行合并为单个 Range 调用，减少 COM 次数。
  * @returns 实际发生的 Range.Delete 调用次数
  */
-export function deleteRowsBatched(ws: WpsWorksheet, rows: readonly number[]): number {
+export function deleteRowsBatched(worksheet: WpsWorksheet, rows: readonly number[]): number {
   if (rows.length === 0) return 0
   const sorted = [...rows].sort((a, b) => b - a)
   let callCount = 0
@@ -508,7 +510,9 @@ export function deleteRowsBatched(ws: WpsWorksheet, rows: readonly number[]): nu
     }
     const from = sorted[end] ?? 0
     const to = sorted[index] ?? 0
-    ws.Range(from === to ? `${String(from)}:${String(from)}` : `${String(from)}:${String(to)}`).Delete()
+    worksheet
+      .Range(from === to ? `${String(from)}:${String(from)}` : `${String(from)}:${String(to)}`)
+      .Delete()
     callCount += 1
     index = end + 1
   }
@@ -520,15 +524,15 @@ export function deleteRowsBatched(ws: WpsWorksheet, rows: readonly number[]): nu
  * 变更所在行若同时处于待删除列表则跳过，避免写入即将删除的行。
  * @returns 实际删除的行数
  */
-export function applyRowPlan(ws: WpsWorksheet, plan: RowPlan): number {
+export function applyRowPlan(worksheet: WpsWorksheet, plan: RowPlan): number {
   const removedRows = new Set(plan.deleteRows)
   for (const change of plan.changes) {
     if (!removedRows.has(change.row)) {
-      setCellValue(ws, change.row, change.col, change.value)
+      setCellValue(worksheet, change.row, change.col, change.value)
     }
   }
   if (plan.deleteRows.length === 0) return 0
-  deleteRowsBatched(ws, plan.deleteRows)
+  deleteRowsBatched(worksheet, plan.deleteRows)
   return plan.deleteRows.length
 }
 
@@ -540,11 +544,11 @@ export function applyRowPlan(ws: WpsWorksheet, plan: RowPlan): number {
  * 3. 把被删除行的「标签/分级」合并到保留行（去重，` | ` 连接）；
  * 4. 合并连续行为范围删除，减少 COM 调用。
  */
-export function cleanSheetDuplicates(ws: WpsWorksheet): CleanDuplicatesResult {
+export function cleanSheetDuplicates(worksheet: WpsWorksheet): CleanDuplicatesResult {
   const startTime = Date.now()
   bgmLog(LOG_LEVELS.INFO, '[cleanSheetDuplicates] ======== 开始清洗重复行 ========')
 
-  const plan = planDuplicateRows(ws)
+  const plan = planDuplicateRows(worksheet)
   if (plan.deleteRows.length === 0) {
     bgmLog(
       LOG_LEVELS.INFO,
@@ -558,7 +562,7 @@ export function cleanSheetDuplicates(ws: WpsWorksheet): CleanDuplicatesResult {
     `[cleanSheetDuplicates] 统计: 重复名称=${String(plan.groups)}个, 待删除行=${String(plan.deleteRows.length)}, 合并标签组=${String(plan.mergedGroups)}`,
   )
 
-  const deleted = applyRowPlan(ws, plan)
+  const deleted = applyRowPlan(worksheet, plan)
 
   bgmLog(
     LOG_LEVELS.INFO,

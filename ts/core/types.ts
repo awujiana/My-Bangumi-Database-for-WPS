@@ -72,7 +72,7 @@ export interface BGMSync {
   /** 定位到当前正在处理的单元格 */
   locateCurrentCell: () => boolean
   /** 更新当前位置 */
-  updatePosition: (ws: WpsWorksheet | null | undefined, row: number, col?: number) => void
+  updatePosition: (worksheet: WpsWorksheet | null | undefined, row: number, col?: number) => void
   /** 重置停止标志 */
   resetStopFlag: () => void
 }

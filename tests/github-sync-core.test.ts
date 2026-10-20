@@ -22,7 +22,7 @@ const mockReadRowsCache = vi.hoisted(() =>
 const mockReadRangeValues = vi.hoisted(() =>
   vi.fn(
     (
-      ws: unknown,
+      worksheet: unknown,
       startRow: number,
       endRow: number,
       startCol: number,
@@ -33,7 +33,7 @@ const mockReadRangeValues = vi.hoisted(() =>
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
           for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)
@@ -48,7 +48,7 @@ const mockReadRangeValues = vi.hoisted(() =>
 const mockReadRangeCellValues = vi.hoisted(() =>
   vi.fn(
     (
-      ws: unknown,
+      worksheet: unknown,
       startRow: number,
       endRow: number,
       startCol: number,
@@ -61,7 +61,7 @@ const mockReadRangeCellValues = vi.hoisted(() =>
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
           for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
             line.push(value ?? null)
           }
           rows.push(line)
@@ -294,6 +294,7 @@ import type { GithubSyncDiff, ConflictResolution } from '../ts/sync/github-sync-
 function createMockSheet(
   options: {
     rows?: unknown[][]
+
     // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
     colMap?: Map<string, number>
   } = {},

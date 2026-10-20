@@ -46,10 +46,10 @@ export function getSelectedRowSids(): Set<string> {
     )
 
     // 获取工作表和列映射
-    const ws = app.ActiveSheet
-    if (!ws) return sids
-    const headerRow = findHeaderRow(ws) || 1
-    const colMap = getColumnMap(ws, headerRow)
+    const worksheet = app.ActiveSheet
+    if (!worksheet) return sids
+    const headerRow = findHeaderRow(worksheet) || 1
+    const colMap = getColumnMap(worksheet, headerRow)
     const urlCol = colMap.get('Bangumi_URL')
     if (!urlCol) {
       bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 未找到 Bangumi_URL 列')
@@ -61,7 +61,7 @@ export function getSelectedRowSids(): Set<string> {
       // 跳过表头行：提取条件变量使循环体含多条语句，消除 no-continue 与 prefer-continue 冲突
       const isNotHeaderRow = row !== headerRow
       if (isNotHeaderRow) {
-        const url = trim(getCellValue(ws, row, urlCol))
+        const url = trim(getCellValue(worksheet, row, urlCol))
         if (url) {
           const sid = extractSubjectId(url)
           if (sid) {

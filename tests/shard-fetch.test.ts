@@ -16,7 +16,7 @@ const mockBgmlog = vi.hoisted(() => vi.fn())
 const mockGetDataSheet = vi.hoisted(() => vi.fn())
 const mockFindHeaderRow = vi.hoisted(() => vi.fn())
 const mockGetColumnMap = vi.hoisted(() =>
-  vi.fn<(ws?: unknown, headerRow?: number) => Map<string, number>>(),
+  vi.fn<(worksheet?: unknown, headerRow?: number) => Map<string, number>>(),
 )
 
 vi.mock('../ts/core/constants.js', () => ({

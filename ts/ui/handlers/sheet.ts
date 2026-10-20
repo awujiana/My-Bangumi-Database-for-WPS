@@ -36,12 +36,12 @@ export function selectFailedRowsFromLastSync(): void {
   }
 
   const app = getApp()
-  const ws: WpsWorksheet | null = app?.ActiveWorkbook?.ActiveSheet ?? null
-  if (!ws) {
+  const worksheet: WpsWorksheet | null = app?.ActiveWorkbook?.ActiveSheet ?? null
+  if (!worksheet) {
     showToast('无法获取当前工作表', 'error')
     return
   }
-  if (record.sheetName && ws.Name !== record.sheetName) {
+  if (record.sheetName && worksheet.Name !== record.sheetName) {
     showToast(`失败行属于「${record.sheetName}」表，请先切回该表`, 'warn')
     return
   }
@@ -53,7 +53,7 @@ export function selectFailedRowsFromLastSync(): void {
   }
 
   try {
-    ws.Range(address).Select()
+    worksheet.Range(address).Select()
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     BGM.handleError(error, { context: 'selectFailedRows', showAlert: false })
@@ -84,9 +84,9 @@ export function cleanLockedDataSheet(targetWs?: WpsWorksheet): void {
   const startTime = Date.now()
   bgmLog(LOG_LEVELS.INFO, '[cleanLockedDataSheet] ======== 开始清洗锁定数据表 ========')
 
-  let ws: WpsWorksheet | null = targetWs ?? null
+  let worksheet: WpsWorksheet | null = targetWs ?? null
 
-  if (!ws) {
+  if (!worksheet) {
     const app = getApp()
     if (!app?.ActiveWorkbook) {
       bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 无法获取工作簿，终止')
@@ -101,17 +101,14 @@ export function cleanLockedDataSheet(targetWs?: WpsWorksheet): void {
     }
 
     const wb = app.ActiveWorkbook
-    ws = wb.Sheets.Item(BGM.sheet.lockedIndex)
+    worksheet = wb.Sheets.Item(BGM.sheet.lockedIndex)
   }
 
-  const sheetName = ws.Name || '未知'
+  const sheetName = worksheet.Name || '未知'
   const lockedIndex = targetWs ? '' : ` (索引: ${String(BGM.sheet.lockedIndex ?? '')})`
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 清洗工作表: "${sheetName}"${lockedIndex}`,
-  )
+  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 清洗工作表: "${sheetName}"${lockedIndex}`)
 
-  const result = cleanSheetDuplicates(ws)
+  const result = cleanSheetDuplicates(worksheet)
 
   if (result.skippedReason) {
     showToast(result.skippedReason, result.skippedReason === '未发现重复数据' ? 'info' : 'error')
@@ -122,8 +119,5 @@ export function cleanLockedDataSheet(targetWs?: WpsWorksheet): void {
     `清洗完成：删除 ${String(result.deletedRows)} 行，合并 ${String(result.mergedTagGroups)} 个名称组的标签`,
     'success',
   )
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 完成，耗时: ${String(Date.now() - startTime)}ms`,
-  )
+  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 完成，耗时: ${String(Date.now() - startTime)}ms`)
 }

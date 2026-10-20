@@ -427,7 +427,7 @@ describe('getFilterStatus', () => {
     setMockApp({
       ActiveWorkbook: { ActiveSheet: mockWs },
     })
-    // wsOrLastRow 为数字 → 使用 ActiveSheet；后两参为 headerRow / shouldDeepCheck
+    // worksheetOrLastRow 为数字 → 使用 ActiveSheet；后两参为 headerRow / shouldDeepCheck
     const result = getFilterStatus(100, 1, 1, false)
     expect(result.hasFilter).toBe(false)
     expect(result.visibleRows).toEqual([])

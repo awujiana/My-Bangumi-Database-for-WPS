@@ -74,12 +74,12 @@ const mocks = vi.hoisted(() => ({
   ),
   /** 1 → A；测试列数远小于 26，故只需覆盖单字母区间 */
   colNumberToLetter: vi.fn((index: number) => String.fromCodePoint(64 + index)),
-  getCellValue: vi.fn<(ws: FakeWorksheet, row: number, col: number) => string>(),
+  getCellValue: vi.fn<(worksheet: FakeWorksheet, row: number, col: number) => string>(),
   // 矩形读必须与逐格读来自同一份数据源（都是 `__cells`）：矩形读只是逐格读的
   // 批量形态，两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
   readRangeValues: vi.fn(
-    (ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
-      const cells = (ws as { __cells?: Record<string, string> }).__cells ?? {}
+    (worksheet: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+      const cells = (worksheet as { __cells?: Record<string, string> }).__cells ?? {}
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
@@ -185,10 +185,9 @@ import {
  * 生产签名要求完整 WpsWorksheet（Rows/Columns/Cells 等宿主属性），此处集中断言放宽。
  * 泛型 T 由调用处的参数类型推断，兼容可选/必选两种宿主签名。
  */
-function asWs(ws: FakeWorksheet | null | undefined): WpsWorksheet {
-  return ws as WpsWorksheet
+function asWs(worksheet: FakeWorksheet | null | undefined): WpsWorksheet {
+  return worksheet as WpsWorksheet
 }
-
 
 function makeSheet(name: string, cells: Record<string, string> = {}): FakeWorksheet {
   const sheet: FakeWorksheet = {
@@ -288,7 +287,8 @@ beforeEach(() => {
   mocks.getLastRow.mockReturnValue(0)
   mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [] })
   mocks.getCellValue.mockImplementation(
-    (ws: FakeWorksheet, row: number, col: number) => ws.__cells?.[`${String(row)}:${String(col)}`] ?? '',
+    (worksheet: FakeWorksheet, row: number, col: number) =>
+      worksheet.__cells?.[`${String(row)}:${String(col)}`] ?? '',
   )
   mocks.findWorkbookByName.mockReturnValue(null)
   mocks.findBangumiTargetSheets.mockReturnValue([])
@@ -432,7 +432,10 @@ describe('panel-lifecycle · refreshSheets', () => {
     const select = mountSelect('sheetSelect')
     refreshSheets()
     expect(select.options).toHaveLength(0)
-    expect(mocks.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('ActiveWorkbook'))
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('ActiveWorkbook'),
+    )
   })
 
   it('渲染工作表列表；未传 autoSelectActive 且未锁定时不预选', () => {
@@ -686,7 +689,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('关键字少于 3 个的行不算表头', () => {
     const meta = detectHeaderAndColumns(
-        asWs(makeSheet('动画', { '1:1': '序列号', '1:2': '名称', '2:1': 'x' })),
+      asWs(makeSheet('动画', { '1:1': '序列号', '1:2': '名称', '2:1': 'x' })),
     )
     expect(meta.headerRow).toBe(0)
   })
@@ -709,14 +712,14 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('单个单元格读取失败 → 记录后继续扫描其余列', () => {
     let hasThrown = false
-    mocks.getCellValue.mockImplementation((ws: FakeWorksheet, row: number, col: number) => {
+    mocks.getCellValue.mockImplementation((worksheet: FakeWorksheet, row: number, col: number) => {
       // 每个坐标只抛一次：表头扫描阶段有 try/catch 能兜住并继续；
       // 表头名回读阶段（第二遍逐列读，无 try/catch）必须正常返回，否则错误会冒泡。
       if (row === 1 && col === 2 && !hasThrown) {
         hasThrown = true
         throw new Error('该单元格不可读')
       }
-      return ws.__cells?.[`${String(row)}:${String(col)}`] ?? ''
+      return worksheet.__cells?.[`${String(row)}:${String(col)}`] ?? ''
     })
 
     // 本用例覆盖的是「单格读取失败 → 记 handleError 后继续」：矩形读可用时整块读
@@ -748,12 +751,14 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
 
   it('重要列被标记（名称 / bangumi url 等）', () => {
     const meta = detectHeaderAndColumns(
-        asWs(makeSheet('动画', {
-        '1:1': '名称',
-        '1:2': '序列号',
-        '1:3': '打分',
-        '2:1': '动画A',
-      })),
+      asWs(
+        makeSheet('动画', {
+          '1:1': '名称',
+          '1:2': '序列号',
+          '1:3': '打分',
+          '2:1': '动画A',
+        }),
+      ),
     )
     // 表头切片后的第一列是「名称」→ 应为重要列
     expect(meta.isImportant[0]).toBe(true)
@@ -1044,8 +1049,7 @@ describe('panel-lifecycle · updateFilterStatus', () => {
     sheet.AutoFilter = {
       Filters: {
         Count: 2,
-        Item: (index: number) =>
-          index === 1 ? { On: true, Criteria1: '动画A' } : { On: false },
+        Item: (index: number) => (index === 1 ? { On: true, Criteria1: '动画A' } : { On: false }),
       },
     }
 
@@ -1504,7 +1508,7 @@ describe('panel-lifecycle · refreshData', () => {
     refreshData()
 
     expect(sheetState.dataPreview).toEqual(
-      expect.objectContaining({ ws: sheet, headerRow: 1, dataStartRow: 2 }),
+      expect.objectContaining({ worksheet: sheet, headerRow: 1, dataStartRow: 2 }),
     )
   })
 })

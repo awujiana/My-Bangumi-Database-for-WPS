@@ -19,7 +19,7 @@ const mockReadRowsCache = vi.hoisted(() =>
 const mockReadRangeValues = vi.hoisted(() =>
   vi.fn(
     (
-      ws: unknown,
+      worksheet: unknown,
       startRow: number,
       endRow: number,
       startCol: number,
@@ -30,7 +30,7 @@ const mockReadRangeValues = vi.hoisted(() =>
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
           for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)
@@ -608,7 +608,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('ensureSheetHeaders 返回 true 时记录日志 (line 149-151)', async () => {
-    // 先设置 getDataSheet 返回非空 ws 和 ensureSheetHeaders 返回 true
+    // 先设置 getDataSheet 返回非空 worksheet 和 ensureSheetHeaders 返回 true
     mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
     mockEnsureSheetHeaders.mockReturnValue(true)
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])

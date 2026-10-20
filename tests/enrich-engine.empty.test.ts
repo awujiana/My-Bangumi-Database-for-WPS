@@ -30,24 +30,24 @@ const mockReferences = vi.hoisted(() => ({
 
 const store = new Map<string, string>()
 
-function sheetNameOf(ws: unknown): string {
-  return (ws as { Name?: string } | null | undefined)?.Name ?? 'ws'
+function sheetNameOf(worksheet: unknown): string {
+  return (worksheet as { Name?: string } | null | undefined)?.Name ?? 'worksheet'
 }
 
 function cellKey(sheetName: string, row: number, col: number): string {
   return `${sheetName}_${String(row)}_${String(col)}`
 }
 
-function mockGetCellValue(ws: unknown, row: number, col: number): string {
-  return store.get(cellKey(sheetNameOf(ws), row, col)) ?? ''
+function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
+  return store.get(cellKey(sheetNameOf(worksheet), row, col)) ?? ''
 }
 
-function mockSetCellValue(ws: unknown, row: number, col: number, value: unknown): void {
-  store.set(cellKey(sheetNameOf(ws), row, col), String(value))
+function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
+  store.set(cellKey(sheetNameOf(worksheet), row, col), String(value))
 }
 
-function mockFindHeaderRow(ws: unknown, startRow = 1): number {
-  const sheetName = sheetNameOf(ws)
+function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
+  const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
     for (let col = 1; col <= 12; col += 1) {
       const value = (store.get(cellKey(sheetName, row, col)) ?? '').trim()
@@ -57,8 +57,8 @@ function mockFindHeaderRow(ws: unknown, startRow = 1): number {
   return 0
 }
 
-function mockGetColumnMap(ws: unknown, headerRow: number): Map<string, number> {
-  const sheetName = sheetNameOf(ws)
+function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, number> {
+  const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
   for (let col = 1; col <= 12; col += 1) {
     const value = (store.get(cellKey(sheetName, headerRow, col)) ?? '').trim()
@@ -74,9 +74,13 @@ function hasRowValue(sheetName: string, row: number): boolean {
   return false
 }
 
-function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: number): number {
-  const sheetName = sheetNameOf(ws)
-  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(ws)
+function mockGetLastRow(
+  worksheet: unknown,
+  _shouldForceRefresh = false,
+  headerRow?: number,
+): number {
+  const sheetName = sheetNameOf(worksheet)
+  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(worksheet)
   if (resolvedHeaderRow <= 0) return 1
   let lastRow = resolvedHeaderRow
   for (let row = resolvedHeaderRow + 1; row <= 500; row += 1) {
@@ -87,13 +91,13 @@ function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: nu
 
 /** 矩形批量读取（生产接口）：按行/列区间从内存 store 取值 */
 function mockReadRangeValues(
-  ws: unknown,
+  worksheet: unknown,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
 ): string[][] {
-  const sheetName = sheetNameOf(ws)
+  const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []

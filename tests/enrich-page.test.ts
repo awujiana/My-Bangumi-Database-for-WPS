@@ -142,7 +142,9 @@ vi.mock('../ts/sync/enrich-lock.js', () => ({
   initEnrichLock: m.initEnrichLock,
   autoSelectEnrichTarget: m.autoSelectEnrichTarget,
 }))
-vi.mock('../ts/sync/enrich-record.js', () => ({ getOrCreateEnrichRecordSheet: m.getOrCreateEnrichRecordSheet }))
+vi.mock('../ts/sync/enrich-record.js', () => ({
+  getOrCreateEnrichRecordSheet: m.getOrCreateEnrichRecordSheet,
+}))
 vi.mock('../ts/sync/workbook-auto-detect.js', () => ({
   ANIME_SOURCE_DETECTOR: { name: 'anime' },
   BANGUMI_TARGET_DETECTOR: { name: 'bangumi' },
@@ -388,7 +390,12 @@ describe('enrich-page · initEnrichPage', () => {
 
     initEnrichPage()
 
-    expect(m.initEnrichLock).toHaveBeenCalledWith('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    expect(m.initEnrichLock).toHaveBeenCalledWith(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
     expect(m.loadRecentRecords).toHaveBeenCalled()
     expect(m.bindConflictDialogButtons).toHaveBeenCalled()
     expect(m.refreshEnrichWorkbooks).toHaveBeenCalledWith('workbookSelect')
@@ -442,7 +449,12 @@ describe('enrich-page · initEnrichPage', () => {
 
     initEnrichPage()
 
-    expect(m.autoSelectEnrichTarget).toHaveBeenCalledWith('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    expect(m.autoSelectEnrichTarget).toHaveBeenCalledWith(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
     // selectTargetSheet：sheetSelect 默认选中首个 option → applyTargetSheet 分支
     expect(m.refreshMatchHintText).toHaveBeenCalled()
   })
@@ -486,7 +498,10 @@ describe('enrich-page · 绑定路由', () => {
     const ws2 = makeWs('追踪')
     stubApp({
       Workbooks: { Count: 1 },
-      ActiveWorkbook: { Name: 'BGM.xlsx', Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) } },
+      ActiveWorkbook: {
+        Name: 'BGM.xlsx',
+        Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) },
+      },
     })
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
     sheetSelect.value = '2'
@@ -526,14 +541,22 @@ describe('enrich-page · 绑定路由', () => {
     const ws2 = makeWs('追踪')
     stubApp({
       Workbooks: { Count: 1 },
-      ActiveWorkbook: { Name: 'BGM.xlsx', Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) } },
+      ActiveWorkbook: {
+        Name: 'BGM.xlsx',
+        Worksheets: { Count: 2, Item: (index: number) => (index === 2 ? ws2 : makeWs('动画')) },
+      },
     })
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
     sheetSelect.value = '2'
 
     click(document.getElementById('lockSheetBtn') as HTMLButtonElement)
 
-    expect(m.toggleEnrichWorkbookLock).toHaveBeenCalledWith('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
+    expect(m.toggleEnrichWorkbookLock).toHaveBeenCalledWith(
+      'sheetSelect',
+      'workbookSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
     expect(sheetSelect.disabled).toBe(true)
     expect(state.bangumiSheet).toBe(ws2)
   })
@@ -556,7 +579,10 @@ describe('enrich-page · 绑定路由', () => {
 
   it('startEnrichBtn → 无源表 → 提示先选择文件并识别表头', () => {
     click(document.getElementById('startEnrichBtn') as HTMLButtonElement)
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('请先选择新番表文件'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('请先选择新番表文件'),
+    )
   })
 
   it('previewMatchBtn / viewSourceDetailBtn / 关闭按钮 / 记录按钮 → 各自分发', () => {
@@ -609,7 +635,10 @@ describe('enrich-page · 绑定路由', () => {
 
   it('batchStartBtn → 无文件 → 提示先选择文件', () => {
     click(document.getElementById('batchStartBtn') as HTMLButtonElement)
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('请先选择至少一个新番表文件'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('请先选择至少一个新番表文件'),
+    )
   })
 })
 
@@ -680,10 +709,7 @@ describe('enrich-page · selectNewAnimeFile', () => {
       FileDialog: () => {
         throw new Error('桥接失效')
       },
-      GetOpenFilename: vi
-        .fn()
-        .mockReturnValueOnce('D:/动画A.xlsx')
-        .mockReturnValueOnce(false),
+      GetOpenFilename: vi.fn().mockReturnValueOnce('D:/动画A.xlsx').mockReturnValueOnce(false),
     })
     // 第一次确认继续、第二次取消（由 dialogConfirm 逐次回调控制）
     let confirmCount = 0
@@ -702,7 +728,9 @@ describe('enrich-page · selectNewAnimeFile', () => {
   it('回退路径选择重复文件 → 提示已在列表中', () => {
     state.batchFiles = ['D:/动画A.xlsx']
     // 第二次返回 false 模拟用户取消，否则生产 for(;;) 循环永远拿不到终止信号
-    stubApp({ GetOpenFilename: vi.fn().mockReturnValueOnce('D:/动画A.xlsx').mockReturnValueOnce(false) })
+    stubApp({
+      GetOpenFilename: vi.fn().mockReturnValueOnce('D:/动画A.xlsx').mockReturnValueOnce(false),
+    })
 
     selectNewAnimeFile()
 
@@ -780,12 +808,15 @@ describe('enrich-page · autoDetectHeader', () => {
   })
 
   it('未选文件 → 回落到当前活动工作表识别', () => {
-    const ws = makeWs('动画')
-    stubApp({ Workbooks: { Count: 1 }, ActiveWorkbook: { Name: 'BGM.xlsx', ActiveSheet: ws } })
+    const worksheet = makeWs('动画')
+    stubApp({
+      Workbooks: { Count: 1 },
+      ActiveWorkbook: { Name: 'BGM.xlsx', ActiveSheet: worksheet },
+    })
 
     autoDetectHeader()
 
-    expect(m.detectHeaderOnSheet).toHaveBeenCalledWith(ws, '活动工作表')
+    expect(m.detectHeaderOnSheet).toHaveBeenCalledWith(worksheet, '活动工作表')
   })
 
   it('未选文件且活动表为空 → 提示先打开文件', () => {
@@ -793,7 +824,10 @@ describe('enrich-page · autoDetectHeader', () => {
 
     autoDetectHeader()
 
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('请先打开新番表文件'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('请先打开新番表文件'),
+    )
   })
 })
 
@@ -826,8 +860,19 @@ describe('enrich-page · startEnrichment', () => {
   it('正常路径 → 调 enrichEntries、显示详细按钮、渲染摘要与进度', () => {
     primeHappyPath()
     m.enrichEntries.mockImplementation(
-      (_ws: unknown, _target: unknown, _matches: unknown, _config: unknown, onProgress: (p: unknown) => void) => {
-        onProgress({ current: 1, total: 2, currentName: '动画A', stats: { enriched: 1, skipped: 0, failed: 0 } })
+      (
+        _ws: unknown,
+        _target: unknown,
+        _matches: unknown,
+        _config: unknown,
+        onProgress: (p: unknown) => void,
+      ) => {
+        onProgress({
+          current: 1,
+          total: 2,
+          currentName: '动画A',
+          stats: { enriched: 1, skipped: 0, failed: 0 },
+        })
         return [
           { kind: 'matched', enrichedFields: ['名称'] },
           { kind: 'unmatched', enrichedFields: [] },
@@ -845,7 +890,7 @@ describe('enrich-page · startEnrichment', () => {
     const startButton = document.getElementById('startEnrichBtn') as HTMLButtonElement
     expect(startButton.textContent).toBe('🚀 开始富化')
     expect(state.isEnriching).toBe(false)
-    expect((document.getElementById('enrichedCount')!).textContent).toBe('1')
+    expect(document.getElementById('enrichedCount')!.textContent).toBe('1')
   })
 
   it('用户取消 → 保留结果并提示，不弹冲突对话框', () => {
@@ -853,16 +898,26 @@ describe('enrich-page · startEnrichment', () => {
     m.collectAllConflicts.mockReturnValue([{ kind: 'conflict' }])
     let isCancelRequested = false
     m.enrichEntries.mockImplementation(
-      (_ws: unknown, _target: unknown, _matches: unknown, _config: unknown, _onProgress: unknown, _intro: unknown, _isCancelled: () => boolean) => {
+      (
+        _ws: unknown,
+        _target: unknown,
+        _matches: unknown,
+        _config: unknown,
+        _onProgress: unknown,
+        _intro: unknown,
+        _isCancelled: () => boolean,
+      ) => {
         isCancelRequested = true
         return [{ kind: 'matched', enrichedFields: [] }]
       },
     )
-    m.createInlineProgress.mockImplementation((_host: string, _title: string, _icon: string, onCancel: () => void) => {
-      // 富化期间模拟用户点击「停止」
-      onCancel()
-      return { update: vi.fn(), hide: vi.fn() }
-    })
+    m.createInlineProgress.mockImplementation(
+      (_host: string, _title: string, _icon: string, onCancel: () => void) => {
+        // 富化期间模拟用户点击「停止」
+        onCancel()
+        return { update: vi.fn(), hide: vi.fn() }
+      },
+    )
 
     startEnrichment()
 
@@ -908,14 +963,20 @@ describe('enrich-page · startEnrichment', () => {
     state.bangumiSheet = null
 
     startEnrichment()
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('请先选择新番表文件'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('请先选择新番表文件'),
+    )
 
     primeHappyPath()
     m.ensureSourceSheet.mockReturnValue(animeSheet)
     state.bangumiSheet = null
     m.getLockedEnrichSheet.mockReturnValue(null)
     startEnrichment()
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('目标 Bangumi 工作表'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('目标 Bangumi 工作表'),
+    )
   })
 
   it('state 无目标表时 → 从锁定状态恢复', () => {
@@ -995,10 +1056,10 @@ describe('enrich-page · batchStartEnrichment', () => {
       Workbooks: {
         Count: 0,
         Open: vi.fn(() => {
-          const ws = makeWs('动画')
+          const worksheet = makeWs('动画')
           const wb = {
             Name: '源.xlsx',
-            Worksheets: { Count: 1, Item: () => ws },
+            Worksheets: { Count: 1, Item: () => worksheet },
             Close: vi.fn(),
           }
           return Object.assign(wb, { parent: null })
@@ -1027,7 +1088,9 @@ describe('enrich-page · batchStartEnrichment', () => {
 
   it('确认取消 → 复位状态并恢复按钮', () => {
     primeBatch(['D:/a.xlsx'])
-    m.dialogConfirm.mockImplementation((_message: string, callback: (isOk: boolean) => void) => callback(false))
+    m.dialogConfirm.mockImplementation((_message: string, callback: (isOk: boolean) => void) =>
+      callback(false),
+    )
     const startButton = document.getElementById('batchStartBtn') as HTMLButtonElement
 
     batchStartEnrichment()
@@ -1057,7 +1120,7 @@ describe('enrich-page · batchStartEnrichment', () => {
     expect(state.enrichDetailGroups).toHaveLength(2)
     const summaryElement = document.getElementById('batchSummary')!
     expect(summaryElement.style.display).toBe('')
-    expect((document.getElementById('batchSummaryContent')!).innerHTML).toContain('动画A.xlsx')
+    expect(document.getElementById('batchSummaryContent')!.innerHTML).toContain('动画A.xlsx')
     expect(state.enrichDetailGroups[0]?.fileName).toBe('动画A.xlsx')
   })
 
@@ -1104,7 +1167,10 @@ describe('enrich-page · batchStartEnrichment', () => {
 
     batchStartEnrichment()
 
-    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('目标 Bangumi 工作表'))
+    expect(m.dialogAlert).toHaveBeenCalledWith(
+      '提示',
+      expect.stringContaining('目标 Bangumi 工作表'),
+    )
     expect(state.isBatchEnriching).toBe(false)
   })
 
@@ -1183,7 +1249,10 @@ describe('enrich-page · batchStartEnrichment', () => {
       expect(state.isBatchEnriching).toBe(false)
     })
     expect(state.batchResults[0]?.success).toBe(true)
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('关闭文件时警告'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('关闭文件时警告'),
+    )
   })
 
   it('批量模式刻意不回调进度 → 进度函数被调用也不影响结果统计', async () => {
@@ -1393,7 +1462,10 @@ describe('enrich-page · 兜底分支与边界补测', () => {
     selectNewAnimeFile()
 
     expect(state.batchFiles).toEqual(['D:/动画A.xlsx', 'D:/动画B.xlsx'])
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('跳过重复文件'))
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('跳过重复文件'),
+    )
   })
 
   it('宿主桥接整体抛错 → 交给 BGM.handleError 兜底', () => {

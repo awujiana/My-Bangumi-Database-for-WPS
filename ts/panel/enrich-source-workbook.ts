@@ -113,8 +113,8 @@ export function ensureSourceSheet(): WpsWorksheet | null {
     return null
   }
 
-  const ws = opened.wb.Worksheets.Item(1) as WpsWorksheet | null
-  if (!ws) {
+  const worksheet = opened.wb.Worksheets.Item(1) as WpsWorksheet | null
+  if (!worksheet) {
     if (opened.isOpenedByUs) closeWorkbook(opened.wb)
     bgmLog(
       LOG_LEVELS.ERROR,
@@ -123,9 +123,9 @@ export function ensureSourceSheet(): WpsWorksheet | null {
     return null
   }
 
-  state.animeSourceSheet = ws
+  state.animeSourceSheet = worksheet
   state.sourceWorkbook = opened.wb
   state.isSourceWorkbookOpenedByUs = opened.isOpenedByUs
   bgmLog(LOG_LEVELS.INFO, `[enrich] 已重开源工作簿: ${opened.wb.Name}`)
-  return ws
+  return worksheet
 }

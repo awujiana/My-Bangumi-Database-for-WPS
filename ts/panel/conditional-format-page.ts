@@ -84,7 +84,7 @@ interface SheetEntry {
   key: string
   workbook: string
   sheet: string
-  ws: WpsWorksheet
+  worksheet: WpsWorksheet
 }
 
 interface PageState {
@@ -145,9 +145,9 @@ interface WorkbookLike {
   Worksheets?: { Count: number; Item(index: number): unknown }
 }
 
-function readSheetName(ws: unknown): string {
+function readSheetName(worksheet: unknown): string {
   try {
-    return (ws as { Name?: string }).Name ?? ''
+    return (worksheet as { Name?: string }).Name ?? ''
   } catch {
     return ''
   }
@@ -169,10 +169,10 @@ function collectSheets(): SheetEntry[] {
     if (sheets) {
       const sheetCount = sheets.Count
       for (let sheetIndex = 1; sheetIndex <= sheetCount; sheetIndex += 1) {
-        const ws = sheets.Item(sheetIndex) as WpsWorksheet
-        const sheet = readSheetName(ws)
+        const worksheet = sheets.Item(sheetIndex) as WpsWorksheet
+        const sheet = readSheetName(worksheet)
         if (sheet) {
-          entries.push({ key: `${wb.Name}::${sheet}`, workbook: wb.Name, sheet, ws })
+          entries.push({ key: `${wb.Name}::${sheet}`, workbook: wb.Name, sheet, worksheet })
         }
       }
     }
@@ -241,7 +241,7 @@ function loadExistingRules(): void {
     renderExistingRules()
     return
   }
-  const unreadable = checkFormatConditionsReadable(entry.ws)
+  const unreadable = checkFormatConditionsReadable(entry.worksheet)
   if (unreadable !== null) {
     state.existing = []
     state.existingError = `${unreadable}（既有规则读不到）`
@@ -249,7 +249,7 @@ function loadExistingRules(): void {
     return
   }
   try {
-    state.existing = readForeignRules(entry.ws)
+    state.existing = readForeignRules(entry.worksheet)
     state.existingError = null
   } catch (error: unknown) {
     state.existing = []
@@ -576,8 +576,8 @@ function saveEditor(): void {
 function detectColumns(): { seasonCol: string; nameCol: string; firstRow: number } | null {
   const entry = selectedSheet()
   if (!entry) return null
-  const headerRow = findHeaderRow(entry.ws)
-  const colMap = getColumnMap(entry.ws, headerRow)
+  const headerRow = findHeaderRow(entry.worksheet)
+  const colMap = getColumnMap(entry.worksheet, headerRow)
   const seasonColNumber = colMap.get('开播季度')
   const nameColNumber = colMap.get('名称')
   if (seasonColNumber === undefined || nameColNumber === undefined) return null
@@ -617,7 +617,7 @@ function runApply(strategy: ApplyStrategy): void {
     showToast('请先选择目标工作表', 'warn')
     return
   }
-  if (!isFormatConditionsSupported(entry.ws)) {
+  if (!isFormatConditionsSupported(entry.worksheet)) {
     showToast('当前 WPS 版本不支持条件格式 API，该功能不可用', 'error')
     return
   }
@@ -627,10 +627,10 @@ function runApply(strategy: ApplyStrategy): void {
     return
   }
 
-  const foreign = readForeignRules(entry.ws)
+  const foreign = readForeignRules(entry.worksheet)
   setConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, strategy)
   const plan = planApply(state.rules, foreign, strategy)
-  const result = applyConditionalFormatPlan(entry.ws, plan)
+  const result = applyConditionalFormatPlan(entry.worksheet, plan)
   if (result.failed > 0) {
     showToast(
       `写入 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`,
@@ -689,7 +689,7 @@ function applyFlow(): void {
     showToast('请先选择目标工作表', 'warn')
     return
   }
-  if (!isFormatConditionsSupported(entry.ws)) {
+  if (!isFormatConditionsSupported(entry.worksheet)) {
     showToast('当前 WPS 版本不支持条件格式 API，该功能不可用', 'error')
     return
   }
@@ -699,7 +699,7 @@ function applyFlow(): void {
     return
   }
 
-  const foreign = readForeignRules(entry.ws)
+  const foreign = readForeignRules(entry.worksheet)
   if (foreign.length === 0) {
     runApply(lastStrategy())
     return
@@ -715,11 +715,11 @@ function importForeign(): void {
     showToast('请先选择目标工作表', 'warn')
     return
   }
-  if (!isFormatConditionsSupported(entry.ws)) {
+  if (!isFormatConditionsSupported(entry.worksheet)) {
     showToast('当前 WPS 版本不支持条件格式 API', 'error')
     return
   }
-  const foreign = readForeignRules(entry.ws)
+  const foreign = readForeignRules(entry.worksheet)
   const expressible = foreign.filter((rule) => rule.kind === 'expression' && rule.formula)
   if (expressible.length === 0) {
     showToast(

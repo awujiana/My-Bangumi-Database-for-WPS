@@ -7,7 +7,9 @@ const mockGetDataSheet = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockFindHeaderRow = vi.hoisted(() => vi.fn().mockReturnValue(1))
 const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(5))
 const mockGetColumnMap = vi.hoisted(() =>
-  vi.fn<(ws?: unknown, headerRow?: number) => Map<string, number>>().mockReturnValue(new Map()),
+  vi
+    .fn<(worksheet?: unknown, headerRow?: number) => Map<string, number>>()
+    .mockReturnValue(new Map()),
 )
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 
@@ -23,7 +25,7 @@ const mockReadRowsCache = vi.hoisted(() =>
 const mockReadRangeValues = vi.hoisted(() =>
   vi.fn(
     (
-      ws: unknown,
+      worksheet: unknown,
       startRow: number,
       endRow: number,
       startCol: number,
@@ -34,7 +36,7 @@ const mockReadRangeValues = vi.hoisted(() =>
         for (let row = startRow; row <= endRow; row += 1) {
           const line: string[] = []
           for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
             line.push(value == null ? '' : String(value))
           }
           rows.push(line)
@@ -49,7 +51,7 @@ const mockReadRangeValues = vi.hoisted(() =>
 const mockReadRangeCellValues = vi.hoisted(() =>
   vi.fn(
     (
-      ws: unknown,
+      worksheet: unknown,
       startRow: number,
       endRow: number,
       startCol: number,
@@ -57,14 +59,14 @@ const mockReadRangeCellValues = vi.hoisted(() =>
     ): (string | number | boolean | Date | null)[][] => {
       // 默认实现与 mockReadRangeValues 同源（走 mockGetCellValue），但**保留原始
       // 类型**：与真实宿主「读到什么返什么」一致，宽度自动等于请求列数，
-      // 因此「读-改-写」用例无需再逐个 stub ws.Range 的区域 Value2。
+      // 因此「读-改-写」用例无需再逐个 stub worksheet.Range 的区域 Value2。
       // 「读失败」场景的用例用 mockReturnValueOnce([]) 覆盖本默认实现。
       try {
         const rows: (string | number | boolean | Date | null)[][] = []
         for (let row = startRow; row <= endRow; row += 1) {
           const line: (string | number | boolean | Date | null)[] = []
           for (let col = startCol; col <= endCol; col += 1) {
-            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            const value = mockGetCellValue(worksheet, row, col) as string | number | boolean | null
             line.push(value ?? null)
           }
           rows.push(line)
@@ -1077,7 +1079,7 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
     // 调用 applyDiffToSheet，内部会通过 batchWriteNewRows 处理日期字段
     const result = await applyDiffToSheet(diffs, 'add-update', undefined, 'test')
     expect(result.added).toBe(1)
-    // 验证 Range 被调用（batchWriteNewRows 使用 ws.Range().Value2 批量写入）
+    // 验证 Range 被调用（batchWriteNewRows 使用 worksheet.Range().Value2 批量写入）
     expect(mockWs.Range).toHaveBeenCalled()
   })
 
@@ -1273,7 +1275,7 @@ describe('readLocalEntries 批量读取路径', () => {
 
     const mockWs = createMockWorksheet()
     // readLocalEntries 已改走统一入口 readRangeValues（含形状守卫），
-    // 区域读由该入口的 mock 供给——ws.Range 不再是本地读取的数据源。
+    // 区域读由该入口的 mock 供给——worksheet.Range 不再是本地读取的数据源。
     mockReadRangeValues.mockReturnValueOnce(batchData)
 
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -1484,7 +1486,7 @@ describe('applyDiffToSheet', () => {
     const result = await applyDiffToSheet(diffs, 'add-update')
 
     expect(result.added).toBe(1)
-    // batchWriteNewRows 使用 ws.Range().Value2 写入
+    // batchWriteNewRows 使用 worksheet.Range().Value2 写入
     expect(mockWs.Range).toHaveBeenCalled()
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
   })
@@ -1525,7 +1527,7 @@ describe('applyDiffToSheet', () => {
 
     const result = await applyDiffToSheet(diffs, 'add-update')
 
-    // batchUpdateRows 使用 ws.Range().Value2 批量更新
+    // batchUpdateRows 使用 worksheet.Range().Value2 批量更新
     expect(result.updated).toBe(1)
   })
 
@@ -1655,8 +1657,8 @@ describe('syncFromGithub selectedRowsOnly', () => {
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['名称', 1]]))
@@ -1669,7 +1671,7 @@ describe('syncFromGithub selectedRowsOnly', () => {
   })
 
   it('selectedRowsOnly 时成功获取选区 SIDs 并过滤远程数据', async () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       cellValues: new Map<string, string>([
         ['A2', 'https://bgm.tv/subject/111'],
         ['A3', 'https://bgm.tv/subject/222'],
@@ -1677,12 +1679,12 @@ describe('syncFromGithub selectedRowsOnly', () => {
     })
     const mockApp = {
       Selection: { Row: 2, Rows: { Count: 2 } },
-      ActiveSheet: ws,
+      ActiveSheet: worksheet,
       ScreenUpdating: true,
       Calculation: 1,
     }
     mockGetApp.mockReturnValue(mockApp)
-    mockGetDataSheet.mockReturnValue(ws)
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -1871,8 +1873,8 @@ describe('syncFromGithub 时间过滤', () => {
   })
 
   it('timeFilter 为 week 时应按时间过滤远程数据', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -1913,8 +1915,8 @@ describe('syncFromGithub 时间过滤', () => {
   })
 
   it('timeFilter 为 month 时应按更长时间范围过滤', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -1960,8 +1962,8 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
   })
 
   it('成功同步后应恢复 ScreenUpdating 和 Calculation', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2000,8 +2002,8 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
   })
 
   it('同步异常后 finally 块应恢复 ScreenUpdating 和 Calculation', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2047,8 +2049,8 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
   })
 
   it('finally 块恢复失败时不应抛出', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2095,17 +2097,17 @@ describe('getSelectedRowSids 分支覆盖', () => {
   })
 
   it('无 Bangumi_URL 列时应记录警告并返回空集合', async () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       cellValues: new Map<string, string>([['A2', 'https://bgm.tv/subject/111']]),
     })
     const mockApp = {
       Selection: { Row: 2, Rows: { Count: 1 } },
-      ActiveSheet: ws,
+      ActiveSheet: worksheet,
       ScreenUpdating: true,
       Calculation: 1,
     }
     mockGetApp.mockReturnValue(mockApp)
-    mockGetDataSheet.mockReturnValue(ws)
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     // 有列但没有 Bangumi_URL
@@ -2130,9 +2132,9 @@ describe('getSelectedRowSids 分支覆盖', () => {
   })
 
   it('getSelectedRowSids 中发生异常时应记录 ERROR', async () => {
-    const ws = createMockWorksheet()
+    const worksheet = createMockWorksheet()
     // 让 Range 调用抛异常，在 getSelectedRowSids 的循环中触发 try-catch
-    ws.Range = asRangeMock((address: string) => {
+    worksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
@@ -2141,12 +2143,12 @@ describe('getSelectedRowSids 分支覆盖', () => {
 
     const mockApp = {
       Selection: { Row: 2, Rows: { Count: 3 } },
-      ActiveSheet: ws,
+      ActiveSheet: worksheet,
       ScreenUpdating: true,
       Calculation: 1,
     }
     mockGetApp.mockReturnValue(mockApp)
-    mockGetDataSheet.mockReturnValue(ws)
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2165,8 +2167,8 @@ describe('getSelectedRowSids 分支覆盖', () => {
   })
 
   it('时间筛选路径应记录日志和调用 onProgress', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2226,8 +2228,8 @@ describe('getSelectedRowSids 分支覆盖', () => {
   })
 
   it('关闭 ScreenUpdating 抛异常时不应中断同步', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2299,8 +2301,8 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
   })
 
   it('传入 conflictResolution 时应调用 applyConflictResolutions 并记录日志', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2365,8 +2367,8 @@ describe('syncFromGithub ensureSheetHeaders 返回 true (lines 1350-1351)', () =
   })
 
   it('ensureSheetHeaders 返回 true 时应记录日志并调用 onProgress', async () => {
-    const ws = createMockWorksheet()
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2425,7 +2427,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
   })
 
   it('删除操作超过 10 条时应触发 yieldToEventLoop', async () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       cellValues: new Map<string, string>([
         ['A1', 'Bangumi_URL'],
         ['B1', '名称'],
@@ -2455,7 +2457,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     })
 
     // 模拟删除操作所需的方法
-    ws.Range = asRangeMock((address: string) => {
+    worksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
@@ -2468,7 +2470,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
       }
     })
 
-    mockGetDataSheet.mockReturnValue(ws)
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(12)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
@@ -2535,8 +2537,8 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
   })
 
   it('超过 500 条 add diffs 时应触发 yieldToEventLoop (line 1060)', async () => {
-    const ws = createMockWorksheet({ usedRange: 10 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 10 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
@@ -2565,7 +2567,7 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
     expect(result.added).toBeGreaterThan(0)
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
     // 验证批量写入至少被调用了一次
-    expect(ws.Range).toHaveBeenCalled()
+    expect(worksheet.Range).toHaveBeenCalled()
   })
 })
 
@@ -2588,8 +2590,8 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
   })
 
   it('超过 50 条 update diffs 时应触发 yieldToEventLoop (line 1113)', async () => {
-    const ws = createMockWorksheet({ usedRange: 60 })
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = createMockWorksheet({ usedRange: 60 })
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(60)
 
@@ -2618,7 +2620,7 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
 
     expect(result.updated).toBeGreaterThan(0)
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
-    expect(ws.Range).toHaveBeenCalled()
+    expect(worksheet.Range).toHaveBeenCalled()
   })
 })
 
@@ -5341,8 +5343,8 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
 
 describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
   it('501 条 add diff 应触发两批写入，并通过 onProgress 覆盖 formatEta ms>0', async () => {
-    const ws = { Range: vi.fn().mockReturnValue({ Value2: null }) }
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = { Range: vi.fn().mockReturnValue({ Value2: null }) }
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(
@@ -5401,13 +5403,13 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     expect(lastCall).toBeDefined()
     expect(lastCall!.eta).toBeDefined()
 
-    // 验证 ws.Range 被调用（批量写入）
-    expect(ws.Range).toHaveBeenCalled()
+    // 验证 worksheet.Range 被调用（批量写入）
+    expect(worksheet.Range).toHaveBeenCalled()
   })
 
   it('onProgress 不传时不应出错', async () => {
-    const ws = { Range: vi.fn().mockReturnValue({ Value2: null }) }
-    mockGetDataSheet.mockReturnValue(ws)
+    const worksheet = { Range: vi.fn().mockReturnValue({ Value2: null }) }
+    mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(
@@ -5443,7 +5445,7 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     const result = await applyDiffToSheet(diffs, 'add-update')
 
     expect(result.added).toBeGreaterThan(0)
-    expect(ws.Range).toHaveBeenCalled()
+    expect(worksheet.Range).toHaveBeenCalled()
   })
 })
 
@@ -5597,7 +5599,7 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
 
   it('读取旧值失败且没有任何可写值 → 直接返回 0（line 727）', async () => {
     const mockWs = createMockWorksheet()
-    // readRect 读失败返 []（旧内联实现里对应 `ws.Range` 抛错 / Value2 为 null）
+    // readRect 读失败返 []（旧内联实现里对应 `worksheet.Range` 抛错 / Value2 为 null）
     // → 宽度不足，range 保持 null，走「回退逐字段写入」分支
     mockReadRangeCellValues.mockReturnValueOnce([])
     mockGetDataSheet.mockReturnValue(mockWs)

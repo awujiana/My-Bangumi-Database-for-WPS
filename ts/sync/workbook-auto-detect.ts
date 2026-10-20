@@ -72,24 +72,24 @@ export function monthLabelFromWorkbookName(name: string): string {
 
 /** 读取并校验单个工作表是否为新番表布局（表头 ≥3 关键字 + ≥2 数据行）；不满足返回 null */
 function inspectAnimeSourceWorksheet(wb: WpsWorkbook, index: number): WpsWorksheet | null {
-  let ws: WpsWorksheet
+  let worksheet: WpsWorksheet
   try {
-    ws = wb.Worksheets.Item(index)
+    worksheet = wb.Worksheets.Item(index)
   } catch {
     return null
   }
-  const layout = detectAnimeSourceLayout(ws)
+  const layout = detectAnimeSourceLayout(worksheet)
   if (!layout) return null
-  if (countDataRowsAfter(ws, layout.headerRow) < 2) return null
-  return ws
+  if (countDataRowsAfter(worksheet, layout.headerRow) < 2) return null
+  return worksheet
 }
 
 /** 在指定工作簿中查找首个满足「新番表布局 + ≥2 数据行」的工作表；未命中返回 null */
 export function findAnimeSourceSheetInWorkbook(wb: WpsWorkbook): WpsWorksheet | null {
   const sheetCount = wb.Worksheets.Count
   for (let index = 1; index <= sheetCount; index += 1) {
-    const ws = inspectAnimeSourceWorksheet(wb, index)
-    if (ws) return ws
+    const worksheet = inspectAnimeSourceWorksheet(wb, index)
+    if (worksheet) return worksheet
   }
   return null
 }
@@ -396,7 +396,7 @@ export function initWorkbookAutoDetection(): void {
   const app = getApp() as {
     WorkbookOpen?: (wb: WpsWorkbook) => void
     WorkbookActivate?: (wb: WpsWorkbook) => void
-    SheetActivate?: (ws: WpsWorksheet) => void
+    SheetActivate?: (worksheet: WpsWorksheet) => void
   } | null
   if (!app) return
 

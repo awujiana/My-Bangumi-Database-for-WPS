@@ -271,7 +271,7 @@ export interface AnimeSourceLayout {
  * 缓存（§5.6 A2）：布局探测是单表最重的扫描（矩形读 10 行 × 50 列 + `detectColumns`），
  * 而反复切换源工作表 / 重扫工作簿列表时会重复探测同一张表。缓存键与
  * `findHeaderRow` / `getLastRow` 同族（表名前缀），**失效复用同一入口**
- * `clearSheetCache(ws)`（`refreshData` 等刷新点即清，见 `panel-lifecycle.ts`）——
+ * `clearSheetCache(worksheet)`（`refreshData` 等刷新点即清，见 `panel-lifecycle.ts`）——
  * 与既有缓存同等的失效窗口，不引入新的失效协议。负结果（null）同样缓存，
  * 与 `findHeaderRow` 缓存 0 一致。
  *
@@ -287,9 +287,7 @@ export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout 
     return detectAnimeSourceLayoutUncached(sheet)
   }
   if (!sheetName) return detectAnimeSourceLayoutUncached(sheet)
-  return cacheGet(`${sheetName}:animeSourceLayout`, () =>
-    detectAnimeSourceLayoutUncached(sheet),
-  )
+  return cacheGet(`${sheetName}:animeSourceLayout`, () => detectAnimeSourceLayoutUncached(sheet))
 }
 
 /**
@@ -418,7 +416,6 @@ export function readScanBlock(
 ): readonly string[][] | null {
   const block = readRangeValues(sheet, startRow, endRow, 1, colCount)
   const rowCount = endRow - startRow + 1
-  const isShapeOk =
-    block.length === rowCount && block.every((line) => line.length >= colCount)
+  const isShapeOk = block.length === rowCount && block.every((line) => line.length >= colCount)
   return isShapeOk ? block : null
 }

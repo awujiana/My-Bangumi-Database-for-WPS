@@ -33,7 +33,7 @@ interface MockWs {
 }
 
 function createMockWs(): MockWs {
-  const ws: MockWs = {
+  const worksheet: MockWs = {
     Range: vi.fn((addr: string) => {
       if (addr.includes(':')) {
         return { Insert: vi.fn() }
@@ -41,7 +41,7 @@ function createMockWs(): MockWs {
       return {}
     }),
   }
-  return ws
+  return worksheet
 }
 
 describe('UndoStack', () => {
@@ -131,19 +131,19 @@ describe('UndoStack', () => {
 
   describe('undoLastSync - 行删除恢复', () => {
     it('恢复被删除的行', (): void => {
-      const ws = createMockWs()
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWs()
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 5, values: { '1': 'name', '2': 'value' } })
       endUndoSession()
       undoLastSync()
       // 应调用 Range.Insert() 在 row=5 处插入
-      expect(ws.Range).toHaveBeenCalledWith('5:5')
+      expect(worksheet.Range).toHaveBeenCalledWith('5:5')
     })
 
     it('按行号从大到小恢复多行删除', (): void => {
-      const ws = createMockWs()
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWs()
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 3, values: { '1': 'a' } })
       recordRowDeleteEntry({ row: 7, values: { '1': 'b' } })
@@ -151,14 +151,14 @@ describe('UndoStack', () => {
       endUndoSession()
       undoLastSync()
       // 应按 7, 5, 3 顺序插入
-      expect(ws.Range).toHaveBeenNthCalledWith(1, '7:7')
-      expect(ws.Range).toHaveBeenNthCalledWith(2, '5:5')
-      expect(ws.Range).toHaveBeenNthCalledWith(3, '3:3')
+      expect(worksheet.Range).toHaveBeenNthCalledWith(1, '7:7')
+      expect(worksheet.Range).toHaveBeenNthCalledWith(2, '5:5')
+      expect(worksheet.Range).toHaveBeenNthCalledWith(3, '3:3')
     })
 
     it('行恢复时设置单元格值', (): void => {
-      const ws = createMockWs()
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWs()
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 1, values: { '1': 'name', '3': 'value' } })
       endUndoSession()
@@ -169,8 +169,8 @@ describe('UndoStack', () => {
     })
 
     it('行恢复时跳过 NaN 列索引', (): void => {
-      const ws = createMockWs()
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWs()
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       // 使用非数字字符串作为 key
       // 刻意传入非数字键（模拟运行时脏数据），验证 NaN 列索引被跳过
@@ -186,7 +186,7 @@ describe('UndoStack', () => {
     })
 
     it('Range.Insert 失败时记录警告并继续', (): void => {
-      const ws = {
+      const worksheet = {
         Range: vi.fn((addr: string) => {
           if (addr.includes(':')) {
             return {
@@ -198,7 +198,7 @@ describe('UndoStack', () => {
           return {}
         }),
       }
-      mockGetDataSheet.mockReturnValue(ws)
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 1, values: { '1': 'val' } })
       endUndoSession()
@@ -207,7 +207,7 @@ describe('UndoStack', () => {
     })
 
     it('Range.Insert 抛出非 Error 对象时也能处理', (): void => {
-      const ws = {
+      const worksheet = {
         Range: vi.fn((addr: string) => {
           if (addr.includes(':')) {
             return {
@@ -219,7 +219,7 @@ describe('UndoStack', () => {
           return {}
         }),
       }
-      mockGetDataSheet.mockReturnValue(ws)
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('test')
       recordRowDeleteEntry({ row: 1, values: { '1': 'val' } })
       endUndoSession()
@@ -228,8 +228,8 @@ describe('UndoStack', () => {
     })
 
     it('混合单元格变更和行删除的会话', (): void => {
-      const ws = createMockWs()
-      mockGetDataSheet.mockReturnValue(ws)
+      const worksheet = createMockWs()
+      mockGetDataSheet.mockReturnValue(worksheet)
       beginUndoSession('mixed')
       recordUndoEntry({ row: 10, col: 1, oldValue: 'old', updatedValue: 'new' })
       recordRowDeleteEntry({ row: 5, values: { '1': 'deleted' } })

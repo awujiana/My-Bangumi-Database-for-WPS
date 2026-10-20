@@ -130,14 +130,14 @@ export interface ApplyMappingOptions {
 
 /**
  * 读取本地 Excel 工作表的所有条目（按 SID 索引）
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列映射
  * @param headerRow 表头行
  * @param lastRow 最后数据行
  * @returns SID → 本地行条目 的映射
  */
 function readLocalEntries(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   headerRow: number,
   lastRow: number,
@@ -196,7 +196,7 @@ function readLocalEntries(
   // `readRangeValues` 无法区分「真空区域」与「读失败」（两者都返回 []），因此以
   // **读回行数 === 请求行数** 作为可用判据：不符即回退逐单元格读（空表逐格读
   // 同样得到空串，最终结果与旧行为一致）。
-  const rect = readRangeValues(ws, startRow, lastRow, minCol, maxCol)
+  const rect = readRangeValues(worksheet, startRow, lastRow, minCol, maxCol)
   const rawData: string[][] | null = rect.length === rowCount ? rect : null
   if (!rawData) {
     // readRangeValues 读失败（COM 异常/形状不可信）时返回 []，与「真空区域」
@@ -226,7 +226,7 @@ function readLocalEntries(
   const getFieldFromCell = (row: number, key: string): string => {
     const col = colMap.get(key)
     if (!col) return ''
-    return trim(getCellValue(ws, row, col))
+    return trim(getCellValue(worksheet, row, col))
   }
 
   for (let index = 0; index < rowCount; index += 1) {
@@ -276,7 +276,7 @@ function readLocalEntries(
  * 内部读取本地条目（供外部调用，封装为纯函数入口）
  *
  * 边界情况处理：
- * - 工作表无效（ws 为 null）：返回 null，调用方应抛出错误
+ * - 工作表无效（worksheet 为 null）：返回 null，调用方应抛出错误
  * - 无 Bangumi_URL 列（空文档或表头未识别）：返回空 entries + lastRow=0
  *   调用方 computeDiff 会将所有远程条目视为新增
  */
@@ -284,11 +284,11 @@ export function readLocalEntriesForSync(): {
   entries: Map<string, LocalRowEntry>
   lastRow: number
 } | null {
-  const ws = getDataSheet()
-  if (!ws) return null
-  const headerRow = findHeaderRow(ws) || 1
-  const lastRow = getLastRow(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  const worksheet = getDataSheet()
+  if (!worksheet) return null
+  const headerRow = findHeaderRow(worksheet) || 1
+  const lastRow = getLastRow(worksheet)
+  const colMap = getColumnMap(worksheet, headerRow)
   if (!colMap.has('Bangumi_URL')) {
     bgmLog(
       LOG_LEVELS.WARN,
@@ -297,7 +297,7 @@ export function readLocalEntriesForSync(): {
     // 返回空 entries，让 computeDiff 将所有远程条目视为新增
     return { entries: new Map(), lastRow: headerRow }
   }
-  const entries = readLocalEntries(ws, colMap, headerRow, lastRow)
+  const entries = readLocalEntries(worksheet, colMap, headerRow, lastRow)
   return { entries, lastRow }
 }
 
@@ -310,7 +310,7 @@ export function readLocalEntriesForSync(): {
  * - 标签/分级：远程标签追加到本地后面，使用 ` | ` 分隔
  * - 名称：远程名称追加到「别名」列，使用 ` | ` 分隔（保留本地名称列不变）
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列映射
  * @param row 行号
  * @param remote 远程条目
@@ -318,7 +318,7 @@ export function readLocalEntriesForSync(): {
  * @param shouldForceOverwrite 是否强制覆盖（true 时远程空值也清空本地；false 时远程空值跳过）
  */
 function writeRemoteEntryToRow(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   row: number,
   remote: GithubRemoteEntry,
@@ -337,7 +337,7 @@ function writeRemoteEntryToRow(
     if (!col) return
     if (!shouldForceOverwrite && !value) return
     // 记录 undo 条目（旧值 → 新值），便于撤销时恢复
-    const oldValue = getCellValue(ws, row, col)
+    const oldValue = getCellValue(worksheet, row, col)
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
     if (oldValue === value) return
 
@@ -348,7 +348,7 @@ function writeRemoteEntryToRow(
       const localDate = formatDateToLocal(value)
       if (localDate !== null) {
         recordUndoEntry({ row, col, oldValue, updatedValue: localDate })
-        if (setCellValue(ws, row, col, localDate)) {
+        if (setCellValue(worksheet, row, col, localDate)) {
           isAnySucceeded = true
         }
         return
@@ -357,7 +357,7 @@ function writeRemoteEntryToRow(
 
     // 非日期列或日期解析失败：写入字符串
     recordUndoEntry({ row, col, oldValue, updatedValue: value })
-    if (setCellValue(ws, row, col, value)) {
+    if (setCellValue(worksheet, row, col, value)) {
       isAnySucceeded = true
     }
   }
@@ -373,13 +373,13 @@ function writeRemoteEntryToRow(
     if (!col) return
     if (!appendValue) return
 
-    const oldValue = getCellValue(ws, row, col)
+    const oldValue = getCellValue(worksheet, row, col)
     const updatedValue = appendValueWithSeparator(oldValue, appendValue)
     if (updatedValue === oldValue) return
 
     isAnyAttempted = true
     recordUndoEntry({ row, col, oldValue, updatedValue })
-    if (setCellValue(ws, row, col, updatedValue)) {
+    if (setCellValue(worksheet, row, col, updatedValue)) {
       isAnySucceeded = true
     }
   }
@@ -412,7 +412,7 @@ function writeRemoteEntryToRow(
       } else {
         // 更新模式：合并本地和远程标签
         const col = colMap.get('标签/分级')
-        const localTags = col ? getCellValue(ws, row, col) : ''
+        const localTags = col ? getCellValue(worksheet, row, col) : ''
         const mergedTags = appendValueWithSeparator(localTags, remoteTags)
         safeSet('标签/分级', mergedTags)
       }
@@ -479,7 +479,7 @@ function yieldToEventLoop(): Promise<void> {
  * @returns 1 表示该行写入成功（计入 successCount），0 表示失败或无需写入
  */
 function writeRowValuesWithUndo(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   u: { sid: string },
   row: number,
@@ -563,7 +563,7 @@ function writeRowValuesWithUndo(
   }
 
   const outcome = fallbackWriteRemoteEntry({
-    ws,
+    worksheet,
     colMap,
     row,
     remote,
@@ -611,7 +611,7 @@ function writeRowValuesWithUndo(
  *          抛异常时 `ok` 为 false 并带上 `errorMessage`
  */
 function fallbackWriteRemoteEntry(parameters: {
-  ws: WpsWorksheet
+  worksheet: WpsWorksheet
   colMap: Map<string, number>
   row: number
   remote: GithubRemoteEntry
@@ -633,7 +633,7 @@ function fallbackWriteRemoteEntry(parameters: {
   records: UpdateRecordParameters[]
 }): { ok: boolean; errorMessage?: string | undefined } {
   const {
-    ws,
+    worksheet,
     colMap,
     row,
     remote,
@@ -651,7 +651,7 @@ function fallbackWriteRemoteEntry(parameters: {
   } = parameters
 
   try {
-    const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
+    const result = writeRemoteEntryToRow(worksheet, colMap, row, remote, fields, forceOverwrite)
     if (result.success || !result.attempted) {
       // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
       details?.push({
@@ -745,7 +745,7 @@ function collectWriteCols(colMap: Map<string, number>, names: Iterable<string>):
  * 一次独立 COM 调用。Range.Value2 接受二维数组后，WPS 内部批量处理，
  * 一次 COM 调用即可完成整个矩形区域的写入。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列映射（列名 → 列号）
  * @param startRow 起始行号
  * @param rows 要写入的行数据（GithubRemoteEntry 格式）
@@ -753,7 +753,7 @@ function collectWriteCols(colMap: Map<string, number>, names: Iterable<string>):
  * @returns 成功写入的行数
  */
 function batchWriteNewRows(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   startRow: number,
   rows: { remote: GithubRemoteEntry; sid: string }[],
@@ -796,7 +796,7 @@ function batchWriteNewRows(
   //    通常为空，读失败的影响面与原手工 catch 分支一致（oldRows = []）。
   // 必须保留单元格原始类型（preserveCellValue）：基底列可能是数字/日期，
   // String() 化后整行写回会把用户的数据列变成文本列。
-  const oldRows = readRangeCellValues(ws, startRow, endRow, minCol, maxCol)
+  const oldRows = readRangeCellValues(worksheet, startRow, endRow, minCol, maxCol)
 
   const values: WpsCellValue[][] = []
   for (const [rowIndex, entry] of rows.entries()) {
@@ -814,7 +814,7 @@ function batchWriteNewRows(
   // 3. 批量写入 Range.Value2
   try {
     const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
-    const range = ws.Range(rangeAddr)
+    const range = worksheet.Range(rangeAddr)
     range.Value2 = values
   } catch (error: unknown) {
     bgmLog(
@@ -855,7 +855,7 @@ function batchWriteNewRows(
  * - 标签/分级：远程标签追加到本地后面，使用 ` | ` 分隔
  * - 名称：远程名称追加到「别名」列，使用 ` | ` 分隔（保留本地名称列不变）
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param colMap 列映射
  * @param updates 要更新的行列表（row=行号, remote=远程数据, fields=要更新的字段）
  * @param shouldForceOverwrite 是否强制覆盖
@@ -864,7 +864,7 @@ function batchWriteNewRows(
  * @returns 成功更新的行数
  */
 function batchUpdateRows(
-  ws: WpsWorksheet,
+  worksheet: WpsWorksheet,
   colMap: Map<string, number>,
   updates: { row: number; remote: GithubRemoteEntry; sid: string; fields: string[] }[],
   shouldForceOverwrite: boolean,
@@ -931,7 +931,8 @@ function batchUpdateRows(
     // 返回**一维**数组时由 normalizeValue2Shape 按请求形状升维，读失败返回 []
     // （旧值全空）——旧内联实现遇到 `Value2` 为 null 时 oldArray 为空数组，
     // 由下方宽度守卫回退逐字段写入，语义一致。
-    const oldArray: WpsCellValue[] = readRangeCellValues(ws, row, row, minCol, maxCol)[0] ?? []
+    const oldArray: WpsCellValue[] =
+      readRangeCellValues(worksheet, row, row, minCol, maxCol)[0] ?? []
 
     // 旧值读不全（读失败返回 []、或列数不足 colCount）时放弃批量路径：
     // 批量路径用 oldArray 做「本地 | 远程」合并，空旧值会使用户已有的标签/别名
@@ -950,7 +951,7 @@ function batchUpdateRows(
     } else {
       try {
         const rangeAddr = `${colNumberToLetter(minCol)}${String(row)}:${colNumberToLetter(maxCol)}${String(row)}`
-        range = ws.Range(rangeAddr)
+        range = worksheet.Range(rangeAddr)
       } catch {
         bgmLog(
           LOG_LEVELS.WARN,
@@ -991,7 +992,7 @@ function batchUpdateRows(
     // 3. 写入该行（一次 COM 调用写入整行）
     try {
       successCount += writeRowValuesWithUndo(
-        ws,
+        worksheet,
         colMap,
         u,
         row,
@@ -1013,7 +1014,7 @@ function batchUpdateRows(
       )
       // 回退到逐字段写入（失败时不额外打日志，与原实现一致）
       const outcome = fallbackWriteRemoteEntry({
-        ws,
+        worksheet,
         colMap,
         row,
         remote,
@@ -1049,13 +1050,13 @@ function batchUpdateRows(
  * 删除是倒序逐行执行的，但**在任何删除发生之前**所有待删行都还在原始行号上，
  * 因此可以在循环外一次读回整段（见 `readRowsCache`），再按需要的列抽成快照。
  *
- * @param ws 工作表
+ * @param worksheet 工作表
  * @param rows 待删行号（原始行号，尚未发生任何删除）
  * @param cols 需要快照的列号
  * @returns 行号 → (列号 → 单元格文本)；`null` 表示批量读不可用，调用方须回退逐格读
  */
 function buildRemovalSnapshot(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   rows: readonly number[],
   cols: readonly number[],
 ): Map<number, ReadonlyMap<number, string>> | null {
@@ -1064,7 +1065,7 @@ function buildRemovalSnapshot(
   for (const col of cols) {
     if (col > maxCol) maxCol = col
   }
-  const cache = readRowsCache(ws, rows, maxCol)
+  const cache = readRowsCache(worksheet, rows, maxCol)
   if (!cache) return null
   const snapshot = new Map<number, ReadonlyMap<number, string>>()
   for (const row of rows) {
@@ -1113,16 +1114,16 @@ export async function applyDiffToSheet(
     details,
   }
 
-  const ws = getDataSheet()
-  if (!ws) {
+  const worksheet = getDataSheet()
+  if (!worksheet) {
     bgmLog(LOG_LEVELS.ERROR, '[githubSync] applyDiffToSheet: 未找到数据工作表')
     result.failed = diffs.length
     return result
   }
 
-  const headerRow = findHeaderRow(ws) || 1
-  const lastRow = getLastRow(ws)
-  let colMap = getColumnMap(ws, headerRow)
+  const headerRow = findHeaderRow(worksheet) || 1
+  const lastRow = getLastRow(worksheet)
+  let colMap = getColumnMap(worksheet, headerRow)
   // 同步前列映射（2026-10-17）：用户取消同步的列从 colMap 摘除、改映射的列把默认
   // 列号换成目标列号。下游所有写入点（批量写 / writeRowValuesWithUndo /
   // writeRemoteEntryToRow / fallback）都经 colMap 寻址，在此一层变换即全覆盖，
@@ -1212,7 +1213,13 @@ export async function applyDiffToSheet(
     const batchEntries = batch.map((d) => ({ remote: d.remote, sid: d.sid }))
 
     // 尝试批量写入
-    const batchWritten = batchWriteNewRows(ws, colMap, nextAppendRow, batchEntries, syncRecords)
+    const batchWritten = batchWriteNewRows(
+      worksheet,
+      colMap,
+      nextAppendRow,
+      batchEntries,
+      syncRecords,
+    )
 
     if (batchWritten > 0) {
       result.added += batchWritten
@@ -1233,7 +1240,7 @@ export async function applyDiffToSheet(
       // 批量写入失败，回退到逐行写入
       for (const diff of batch) {
         const outcome = fallbackWriteRemoteEntry({
-          ws,
+          worksheet,
           colMap,
           row: nextAppendRow,
           remote: diff.remote,
@@ -1319,7 +1326,7 @@ export async function applyDiffToSheet(
     }))
 
     const batchUpdated = batchUpdateRows(
-      ws,
+      worksheet,
       colMap,
       batchUpdates,
       isForceOverwrite,
@@ -1359,7 +1366,7 @@ export async function applyDiffToSheet(
   const removalStartTime = Date.now()
   // 快照必须在任何删除发生之前取：此刻所有待删行仍在原始行号上（新增是追加、更新不移动行）
   const removalSnapshot = buildRemovalSnapshot(
-    ws,
+    worksheet,
     deletedDiffs.map((d) => d.localRow),
     [...colMap.values()],
   )
@@ -1373,11 +1380,11 @@ export async function applyDiffToSheet(
       const rowValues: Record<number, string> = {}
       const snapshotCells = removalSnapshot?.get(diff.localRow)
       for (const col of colMap.values()) {
-        rowValues[col] = snapshotCells?.get(col) ?? getCellValue(ws, diff.localRow, col)
+        rowValues[col] = snapshotCells?.get(col) ?? getCellValue(worksheet, diff.localRow, col)
       }
       recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
       try {
-        ws.Range(`${String(diff.localRow)}:${String(diff.localRow)}`).Delete()
+        worksheet.Range(`${String(diff.localRow)}:${String(diff.localRow)}`).Delete()
         result.deleted += 1
         details.push({
           kind: 'delete',

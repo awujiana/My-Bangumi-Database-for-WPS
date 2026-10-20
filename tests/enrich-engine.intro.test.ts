@@ -28,12 +28,12 @@ const mocks = vi.hoisted(() => ({
 /** 单元格存储：`表名_行_列` → 值 */
 const store = new Map<string, string>()
 
-function sheetNameOf(ws: unknown): string {
+function sheetNameOf(worksheet: unknown): string {
   try {
-    return (ws as { Name?: string } | null | undefined)?.Name ?? 'ws'
+    return (worksheet as { Name?: string } | null | undefined)?.Name ?? 'worksheet'
   } catch {
     // Name 读取抛错的工作表（COM 异常）按空名处理
-    return 'ws'
+    return 'worksheet'
   }
 }
 
@@ -57,16 +57,16 @@ function hasAnyValue(sheetName: string, row: number): boolean {
   return false
 }
 
-function mockGetCellValue(ws: unknown, row: number, col: number): string {
-  return getCell(sheetNameOf(ws), row, col)
+function mockGetCellValue(worksheet: unknown, row: number, col: number): string {
+  return getCell(sheetNameOf(worksheet), row, col)
 }
 
-function mockSetCellValue(ws: unknown, row: number, col: number, value: unknown): void {
-  setCell(sheetNameOf(ws), row, col, String(value))
+function mockSetCellValue(worksheet: unknown, row: number, col: number, value: unknown): void {
+  setCell(sheetNameOf(worksheet), row, col, String(value))
 }
 
-function mockFindHeaderRow(ws: unknown, startRow = 1): number {
-  const sheetName = sheetNameOf(ws)
+function mockFindHeaderRow(worksheet: unknown, startRow = 1): number {
+  const sheetName = sheetNameOf(worksheet)
   for (let row = startRow; row <= startRow + 9; row += 1) {
     for (let col = 1; col <= 12; col += 1) {
       const value = getCell(sheetName, row, col).trim()
@@ -76,8 +76,8 @@ function mockFindHeaderRow(ws: unknown, startRow = 1): number {
   return 0
 }
 
-function mockGetColumnMap(ws: unknown, headerRow: number): Map<string, number> {
-  const sheetName = sheetNameOf(ws)
+function mockGetColumnMap(worksheet: unknown, headerRow: number): Map<string, number> {
+  const sheetName = sheetNameOf(worksheet)
   const map = new Map<string, number>()
   for (let col = 1; col <= 50; col += 1) {
     const value = getCell(sheetName, headerRow, col).trim()
@@ -86,9 +86,13 @@ function mockGetColumnMap(ws: unknown, headerRow: number): Map<string, number> {
   return map
 }
 
-function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: number): number {
-  const sheetName = sheetNameOf(ws)
-  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(ws)
+function mockGetLastRow(
+  worksheet: unknown,
+  _shouldForceRefresh = false,
+  headerRow?: number,
+): number {
+  const sheetName = sheetNameOf(worksheet)
+  const resolvedHeaderRow = headerRow ?? mockFindHeaderRow(worksheet)
   if (resolvedHeaderRow <= 0) return 1
   let lastRow = resolvedHeaderRow
   for (let row = resolvedHeaderRow + 1; row <= 500; row += 1) {
@@ -99,13 +103,13 @@ function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: nu
 
 /** 矩形批量读取（生产接口）：按行/列区间从内存 store 取值 */
 function mockReadRangeValues(
-  ws: unknown,
+  worksheet: unknown,
   startRow: number,
   endRow: number,
   startCol: number,
   endCol: number,
 ): string[][] {
-  const sheetName = sheetNameOf(ws)
+  const sheetName = sheetNameOf(worksheet)
   const result: string[][] = []
   for (let row = startRow; row <= endRow; row += 1) {
     const rowValues: string[] = []
@@ -148,15 +152,15 @@ vi.mock('../ts/tools/util/index.js', () => ({
   findHeaderRow: mockFindHeaderRow,
   getColumnMap: mockGetColumnMap,
   readRangeValues: (
-    ws: unknown,
+    worksheet: unknown,
     startRow: number,
     endRow: number,
     startCol: number,
     endCol: number,
   ): string[][] => {
-    areaRead.calls.push([sheetNameOf(ws), startRow, endRow, startCol, endCol])
+    areaRead.calls.push([sheetNameOf(worksheet), startRow, endRow, startCol, endCol])
     if (areaRead.failAreaRead) return []
-    return mockReadRangeValues(ws, startRow, endRow, startCol, endCol)
+    return mockReadRangeValues(worksheet, startRow, endRow, startCol, endCol)
   },
   isEmptyValue,
 }))
@@ -536,7 +540,9 @@ describe('enrichIntroData 逻辑', () => {
 
       runIntro({ 简介: '好作品', OP: '主题曲', ED: '片尾曲', PV: '预告' }, colMap)
 
-      expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('简介:好作品 | OP:主题曲 | ED:片尾曲 | PV:预告')
+      expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe(
+        '简介:好作品 | OP:主题曲 | ED:片尾曲 | PV:预告',
+      )
     })
   })
 
@@ -880,7 +886,6 @@ function makeConflict(overrides: Partial<ConflictInfo> = {}): ConflictInfo {
 }
 
 describe('resolveConflictField 冲突解决', () => {
-
   it('keep 模式：保留原值，只记录 skip', () => {
     const enriched: EnrichedField[] = []
 
@@ -1147,10 +1152,10 @@ describe('findIntroSheetInWorkbook 工作簿内查找', () => {
   })
 
   it('Name 读取抛错的工作表按空名处理且仍可识别为简介表', () => {
-    // Name getter 抛错时 sheetNameOf 回退到 'ws'，故单元格播种在 'ws' 名下
-    setCell('ws', 1, 1, '名称')
-    setCell('ws', 1, 2, '导演')
-    setCell('ws', 1, 3, '编剧')
+    // Name getter 抛错时 sheetNameOf 回退到 'worksheet'，故单元格播种在 'worksheet' 名下
+    setCell('worksheet', 1, 1, '名称')
+    setCell('worksheet', 1, 2, '导演')
+    setCell('worksheet', 1, 3, '编剧')
     const hostile = {
       get Name(): string {
         throw new Error('COM 读取失败')
@@ -1349,9 +1354,7 @@ describe('简介工作表富化综合场景', () => {
     const enriched: EnrichedField[] = []
     enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: '主题曲A', ED: '片尾曲B' }, colMap, enriched)
 
-    expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe(
-      '简介:这是一部好作品 | OP:主题曲A | ED:片尾曲B',
-    )
+    expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('简介:这是一部好作品 | OP:主题曲A | ED:片尾曲B')
   })
 
   it('别名富化与简介富化的组合', () => {

@@ -34,9 +34,9 @@ export interface ConditionalFormatApplyResult {
  * 判据是 UsedRange 上能拿到 FormatConditions 且 Add 是函数——只读属性、
  * 不创建任何规则。部分 WPS 版本 / 只读代理下为 false。
  */
-export function isFormatConditionsSupported(ws: WpsWorksheet | null | undefined): boolean {
-  if (!ws?.UsedRange) return false
-  return typeof ws.UsedRange.FormatConditions?.Add === 'function'
+export function isFormatConditionsSupported(worksheet: WpsWorksheet | null | undefined): boolean {
+  if (!worksheet?.UsedRange) return false
+  return typeof worksheet.UsedRange.FormatConditions?.Add === 'function'
 }
 
 /**
@@ -45,9 +45,11 @@ export function isFormatConditionsSupported(ws: WpsWorksheet | null | undefined)
  * @returns 能枚举返回 null；否则返回**原因**（页面据此区分「这张表没有规则」和
  *   「根本读不到规则」——后者曾被静默当成前者，用户看到的是误导性的空列表）
  */
-export function checkFormatConditionsReadable(ws: WpsWorksheet | null | undefined): string | null {
-  if (!isFormatConditionsSupported(ws)) return '当前 WPS 版本不支持条件格式 API'
-  const formatConditions = ws?.UsedRange?.FormatConditions
+export function checkFormatConditionsReadable(
+  worksheet: WpsWorksheet | null | undefined,
+): string | null {
+  if (!isFormatConditionsSupported(worksheet)) return '当前 WPS 版本不支持条件格式 API'
+  const formatConditions = worksheet?.UsedRange?.FormatConditions
   if (typeof formatConditions?.Item !== 'function') {
     return '宿主未提供 FormatConditions.Item，无法枚举既有规则'
   }
@@ -85,8 +87,10 @@ function readFontColor(fc: WpsFormatCondition): string | undefined {
  * 完全在 UsedRange 之外的规则本就不生效，收不到也可接受）。
  * Count 提到循环外单次读取（com-in-loop 铁律：循环条件里不读 COM 属性）。
  */
-export function readForeignRules(ws: WpsWorksheet | null | undefined): ForeignRuleSnapshot[] {
-  const formatConditions = ws?.UsedRange?.FormatConditions
+export function readForeignRules(
+  worksheet: WpsWorksheet | null | undefined,
+): ForeignRuleSnapshot[] {
+  const formatConditions = worksheet?.UsedRange?.FormatConditions
   if (!formatConditions?.Count || !formatConditions.Item) return []
 
   const count = formatConditions.Count
@@ -152,11 +156,11 @@ function applyEntryFormat(fc: WpsFormatCondition, entry: ConditionalFormatApplyE
  * @returns 成功 / 失败条数（失败进 WARN 日志，不中断整批）
  */
 export function applyConditionalFormatPlan(
-  ws: WpsWorksheet | null | undefined,
+  worksheet: WpsWorksheet | null | undefined,
   plan: ConditionalFormatApplyPlan,
 ): ConditionalFormatApplyResult {
-  const sheetConditions = ws?.UsedRange?.FormatConditions
-  if (!ws || !sheetConditions?.Add) return { added: 0, failed: plan.entries.length }
+  const sheetConditions = worksheet?.UsedRange?.FormatConditions
+  if (!worksheet || !sheetConditions?.Add) return { added: 0, failed: plan.entries.length }
 
   // 1. 清空（快照已由调用方读过并按策略确认；含插件旧规则，保证幂等）
   try {
@@ -172,7 +176,7 @@ export function applyConditionalFormatPlan(
   for (const entry of plan.entries) {
     const label = entry.source === 'plugin' ? entry.rule.name : entry.range
     try {
-      const target = ws.Range(entryRange(entry))
+      const target = worksheet.Range(entryRange(entry))
       const fc = target.FormatConditions?.Add?.({
         Type: XL_EXPRESSION,
         Formula1: entryFormula(entry),

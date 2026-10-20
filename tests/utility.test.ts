@@ -9,7 +9,7 @@
  *   - cacheGet：缓存命中 / 未命中调用 factory
  *   - clearSheetCache：按工作表名前缀清除
  *   - isEmptyValue：null/undefined/空字符串/null 字符串
- *   - safeActivate：调用 ws.Activate / 无效 ws 不抛错
+ *   - safeActivate：调用 worksheet.Activate / 无效 worksheet 不抛错
  *
  * 模块依赖说明：
  *   - sheet.ts 导入 './index.js'（util/index.ts）与 './cell.js'。
@@ -69,13 +69,13 @@ vi.clearAllTimers()
 // ========== WPS Mock 工具 ==========
 interface MockWorksheetOptions {
   name: string
-  /** 返回 ws.Range(address).End(xlUp).Row，用于 getLastRow */
+  /** 返回 worksheet.Range(address).End(xlUp).Row，用于 getLastRow */
   rangeEndRow?: (address: string) => number | null
-  /** ws.UsedRange 对象 */
+  /** worksheet.UsedRange 对象 */
   usedRange?: { Row: number; Rows: { Count: number } } | null
-  /** ws.Rows.Count，默认 100000 */
+  /** worksheet.Rows.Count，默认 100000 */
   rowsCount?: number
-  /** ws.Range(address).Value2，用于 readRangeValues */
+  /** worksheet.Range(address).Value2，用于 readRangeValues */
   rangeValue2?: (address: string) => unknown
   /** 自定义 Activate 实现 */
   activate?: () => void
@@ -100,6 +100,7 @@ function createMockWorksheet(options: MockWorksheetOptions): unknown {
 function createMockApp(options: {
   // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
   activeSheet?: unknown
+
   // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
   worksheets?: { Item: (index: number) => unknown }
   activeWorkbook?: { ActiveSheet: unknown; Worksheets: { Item: (index: number) => unknown } } | null
@@ -267,7 +268,7 @@ describe('getDataSheet', () => {
 // ========== findHeaderRow ==========
 describe('findHeaderRow', () => {
   it('识别含 3+ 个表头关键字的行', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-FHR-1' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-FHR-1' })
     // 表头行（row 1）含：序列号、名称、Bangumi URL、是否看完 4 个关键字
     mockState.getCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
       if (row === 1) {
@@ -281,25 +282,25 @@ describe('findHeaderRow', () => {
       }
       return ''
     })
-    const headerRow = findHeaderRow(ws as never, 1)
+    const headerRow = findHeaderRow(worksheet as never, 1)
     expect(headerRow).toBe(1)
   })
 
   it('未找到匹配行返回 0', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-FHR-2' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-FHR-2' })
     // 所有单元格都返回普通数据，不含表头关键字
     mockState.getCellValue.mockReturnValue('普通数据')
-    const headerRow = findHeaderRow(ws as never, 1)
+    const headerRow = findHeaderRow(worksheet as never, 1)
     expect(headerRow).toBe(0)
   })
 
-  it('null/undefined ws 返回 0', () => {
+  it('null/undefined worksheet 返回 0', () => {
     const headerRow = findHeaderRow(null, 1)
     expect(headerRow).toBe(0)
   })
 
   it('缓存命中：第二次调用不重新扫描', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-FHR-Cache' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-FHR-Cache' })
     let callCount = 0
     mockState.getCellValue.mockImplementation(() => {
       callCount += 1
@@ -310,9 +311,9 @@ describe('findHeaderRow', () => {
       }
       return 'whatever'
     })
-    const first = findHeaderRow(ws as never, 1)
+    const first = findHeaderRow(worksheet as never, 1)
     const initialCallCount = callCount
-    const second = findHeaderRow(ws as never, 1)
+    const second = findHeaderRow(worksheet as never, 1)
     expect(first).toBe(second)
     // 第二次不应再调用 getCellValue（命中缓存）
     expect(callCount).toBe(initialCallCount)
@@ -322,7 +323,7 @@ describe('findHeaderRow', () => {
 // ========== getColumnMap ==========
 describe('getColumnMap', () => {
   it('通过表头规则映射列', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-GCM-1' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1' })
     mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
       const headers: Record<number, string> = {
         1: '序列号',
@@ -333,7 +334,7 @@ describe('getColumnMap', () => {
       }
       return headers[col] ?? ''
     })
-    const colMap = getColumnMap(ws as never, 1)
+    const colMap = getColumnMap(worksheet as never, 1)
     expect(colMap.has('序列号')).toBe(true)
     expect(colMap.has('名称')).toBe(true)
     expect(colMap.has('是否看完')).toBe(true)
@@ -347,7 +348,7 @@ describe('getColumnMap', () => {
   })
 
   it('「打分」与「评分」是相互独立的两个 key，互不抢占', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-GCM-1b' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-GCM-1b' })
     mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
       const headers: Record<number, string> = {
         1: '打分',
@@ -356,7 +357,7 @@ describe('getColumnMap', () => {
       }
       return headers[col] ?? ''
     })
-    const colMap = getColumnMap(ws as never, 1)
+    const colMap = getColumnMap(worksheet as never, 1)
 
     expect(colMap.get('打分')).toBe(1)
     expect(colMap.get('评分')).toBe(2)
@@ -364,7 +365,7 @@ describe('getColumnMap', () => {
   })
 
   it('未匹配到序列号列时使用第一个非空列作为回退', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-GCM-2' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-GCM-2' })
     mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
       // 第一列是 "名称"，没有显式的序列号
       const headers: Record<number, string> = {
@@ -373,7 +374,7 @@ describe('getColumnMap', () => {
       }
       return headers[col] ?? ''
     })
-    const colMap = getColumnMap(ws as never, 1)
+    const colMap = getColumnMap(worksheet as never, 1)
     // 名称映射到列 1，Bangumi URL 映射到列 2
     expect(colMap.has('名称')).toBe(true)
     expect(colMap.has('Bangumi_URL')).toBe(true)
@@ -383,13 +384,13 @@ describe('getColumnMap', () => {
   })
 
   it('空表头返回空 Map 或仅含回退序列号', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-GCM-3' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-GCM-3' })
     mockState.getCellValue.mockReturnValue('')
-    const colMap = getColumnMap(ws as never, 1)
+    const colMap = getColumnMap(worksheet as never, 1)
     expect(colMap.size).toBe(0)
   })
 
-  it('null/undefined ws 返回空 Map', () => {
+  it('null/undefined worksheet 返回空 Map', () => {
     // 必须显式让 getCellValue 返回空字符串，否则默认 undefined 会被 String() 转为 'undefined'
     mockState.getCellValue.mockReturnValue('')
     const colMap = getColumnMap(null, 1)
@@ -397,15 +398,15 @@ describe('getColumnMap', () => {
   })
 
   it('缓存命中：第二次调用不重新扫描', () => {
-    const ws = createMockWorksheet({ name: 'Sheet-GCM-Cache' })
+    const worksheet = createMockWorksheet({ name: 'Sheet-GCM-Cache' })
     let callCount = 0
     mockState.getCellValue.mockImplementation(() => {
       callCount += 1
       return ''
     })
-    getColumnMap(ws as never, 1)
+    getColumnMap(worksheet as never, 1)
     const initialCallCount = callCount
-    getColumnMap(ws as never, 1)
+    getColumnMap(worksheet as never, 1)
     expect(callCount).toBe(initialCallCount)
   })
 })
@@ -413,7 +414,7 @@ describe('getColumnMap', () => {
 // ========== getLastRow ==========
 describe('getLastRow', () => {
   it('通过 D 列 End(xlUp) 定位最后行', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-1',
       rangeEndRow: (address: string) => {
         // 仅 D 列请求的 End(xlUp) 返回有效行号
@@ -421,12 +422,12 @@ describe('getLastRow', () => {
         return null
       },
     })
-    const lastRow = getLastRow(ws as never)
+    const lastRow = getLastRow(worksheet as never)
     expect(lastRow).toBe(100)
   })
 
   it('D 列失败时回退到 A 列', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-2',
       rangeEndRow: (address: string) => {
         if (address.startsWith('A')) return 50
@@ -434,80 +435,80 @@ describe('getLastRow', () => {
         return null
       },
     })
-    const lastRow = getLastRow(ws as never)
+    const lastRow = getLastRow(worksheet as never)
     expect(lastRow).toBe(50)
   })
 
   it('D 列与 A 列都失败时回退到 UsedRange', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-3',
       rangeEndRow: () => null,
       usedRange: { Row: 10, Rows: { Count: 30 } },
     })
-    const lastRow = getLastRow(ws as never)
+    const lastRow = getLastRow(worksheet as never)
     // UsedRange.Row + Rows.Count - 1 = 10 + 30 - 1 = 39
     expect(lastRow).toBe(39)
   })
 
   it('所有方法失败时返回默认值 50000', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-4',
       rangeEndRow: () => null,
       usedRange: null,
     })
-    const lastRow = getLastRow(ws as never)
+    const lastRow = getLastRow(worksheet as never)
     expect(lastRow).toBe(50_000)
   })
 
-  it('ws 为 null 时返回默认值 50000', () => {
+  it('worksheet 为 null 时返回默认值 50000', () => {
     const lastRow = getLastRow(null)
     expect(lastRow).toBe(50_000)
   })
 
   it('提供 headerRow 时尝试自动选择锚定列', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-5',
       rangeEndRow: (address: string) => {
         // 模拟：通过表头扫描找到 C 列为 "序列号" 列，C 列 End(xlUp) 返回 200
         if (address.startsWith('C')) return 200
         return null
       },
-      // findAnchorColumn 直接访问 ws.Range(addr).Value2，不走 getCellValue
+      // findAnchorColumn 直接访问 worksheet.Range(addr).Value2，不走 getCellValue
       rangeValue2: (address: string) => {
         if (address === 'C1') return '序列号'
         return null
       },
     })
-    const lastRow = getLastRow(ws as never, false, 1)
+    const lastRow = getLastRow(worksheet as never, false, 1)
     // findAnchorColumn 找到列 3（C），Range('C' + Rows.Count).End(xlUp).Row = 200
     expect(lastRow).toBe(200)
   })
 
   it('缓存命中：第二次调用返回相同结果且不重新计算', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-Cache',
       rangeEndRow: () => 75,
     })
-    const first = getLastRow(ws as never)
+    const first = getLastRow(worksheet as never)
     // 修改 mock 使其返回不同值
-    const _rangeEndRow = ws as {
+    const _rangeEndRow = worksheet as {
       Range: (a: string) => { End: (d: number) => { Row: number } | null }
     }
     // mock 不会改变已缓存的结果
-    const second = getLastRow(ws as never)
+    const second = getLastRow(worksheet as never)
     expect(second).toBe(first)
     expect(second).toBe(75)
   })
 
   it('forceRefresh=true 时清除缓存并重新计算', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-GLR-Force',
       rangeEndRow: () => 80,
     })
-    const first = getLastRow(ws as never)
+    const first = getLastRow(worksheet as never)
     expect(first).toBe(80)
     // 即使修改 mock，缓存也应返回原值；forceRefresh=true 时才会重新计算
-    const second = getLastRow(ws as never, true)
+    const second = getLastRow(worksheet as never, true)
     // 重新计算后仍是 80（mock 未变）
     expect(second).toBe(80)
   })
@@ -515,23 +516,23 @@ describe('getLastRow', () => {
 
 // ========== readRangeValues ==========
 describe('readRangeValues', () => {
-  it('null ws 返回空数组', () => {
+  it('null worksheet 返回空数组', () => {
     expect(readRangeValues(null, 1, 10, 1, 5)).toEqual([])
   })
 
-  it('undefined ws 返回空数组', () => {
+  it('undefined worksheet 返回空数组', () => {
     expect(readRangeValues(undefined, 1, 10, 1, 5)).toEqual([])
   })
 
   it('Range 返回二维数组时正确转换', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-RRV-1',
       rangeValue2: () => [
         ['a', 'b'],
         ['c', 'd'],
       ],
     })
-    const result = readRangeValues(ws as never, 1, 2, 1, 2)
+    const result = readRangeValues(worksheet as never, 1, 2, 1, 2)
     expect(result).toEqual([
       ['a', 'b'],
       ['c', 'd'],
@@ -539,31 +540,31 @@ describe('readRangeValues', () => {
   })
 
   it('Range 返回单值时包装为二维数组', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-RRV-2',
       rangeValue2: () => 'single',
     })
-    const result = readRangeValues(ws as never, 1, 1, 1, 1)
+    const result = readRangeValues(worksheet as never, 1, 1, 1, 1)
     expect(result).toEqual([['single']])
   })
 
   it('Range 返回 null/undefined 时返回空数组', () => {
-    const ws = createMockWorksheet({
+    const worksheet = createMockWorksheet({
       name: 'Sheet-RRV-3',
       rangeValue2: () => null,
     })
-    const result = readRangeValues(ws as never, 1, 10, 1, 5)
+    const result = readRangeValues(worksheet as never, 1, 10, 1, 5)
     expect(result).toEqual([])
   })
 
   it('Range 抛错时返回空数组（不传播异常）', () => {
-    const ws = {
+    const worksheet = {
       Name: 'Sheet-RRV-4',
       Range: () => {
         throw new Error('range error')
       },
     }
-    const result = readRangeValues(ws as never, 1, 10, 1, 5)
+    const result = readRangeValues(worksheet as never, 1, 10, 1, 5)
     expect(result).toEqual([])
   })
 })
@@ -590,31 +591,31 @@ describe('clearSheetCache', () => {
     expect(factory1).toHaveBeenCalledTimes(1)
   })
 
-  it('null ws 不抛错（前缀为空字符串，不匹配任何缓存）', () => {
+  it('null worksheet 不抛错（前缀为空字符串，不匹配任何缓存）', () => {
     expect(() => clearSheetCache(null)).not.toThrow()
   })
 })
 
 // ========== safeActivate ==========
 describe('safeActivate', () => {
-  it('调用 ws.Activate()', () => {
+  it('调用 worksheet.Activate()', () => {
     const activateFunction = vi.fn()
-    const ws = createMockWorksheet({ name: 'Sheet-SA-1', activate: activateFunction })
-    safeActivate(ws as never)
+    const worksheet = createMockWorksheet({ name: 'Sheet-SA-1', activate: activateFunction })
+    safeActivate(worksheet as never)
     expect(activateFunction).toHaveBeenCalledTimes(1)
   })
 
-  it('null ws 不抛错', () => {
+  it('null worksheet 不抛错', () => {
     expect(() => safeActivate(null)).not.toThrow()
   })
 
-  it('undefined ws 不抛错', () => {
+  it('undefined worksheet 不抛错', () => {
     expect(() => safeActivate(undefined)).not.toThrow()
   })
 
-  it('ws 无 Activate 方法时不抛错', () => {
+  it('worksheet 无 Activate 方法时不抛错', () => {
     // 无 Activate 方法
-    const ws = { Name: 'Sheet-SA-2' }
-    expect(() => safeActivate(ws as never)).not.toThrow()
+    const worksheet = { Name: 'Sheet-SA-2' }
+    expect(() => safeActivate(worksheet as never)).not.toThrow()
   })
 })

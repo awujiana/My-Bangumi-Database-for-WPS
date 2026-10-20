@@ -232,9 +232,9 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
     return false
   }
 
-  let ws: WpsWorksheet
+  let worksheet: WpsWorksheet
   try {
-    ws = wb.Worksheets.Item(sheetIndex)
+    worksheet = wb.Worksheets.Item(sheetIndex)
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
@@ -243,7 +243,7 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
     return false
   }
 
-  const sheetName = ws.Name
+  const sheetName = worksheet.Name
   applyLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
   saveLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
   bgmLog(

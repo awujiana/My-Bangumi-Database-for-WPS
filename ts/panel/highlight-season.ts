@@ -369,7 +369,7 @@ function attemptRangeGroup(
 /**
  * 区域地址分块：每个块拼成一条逗号连接的区域串
  *
- * 调用方对每个块做一次 `ws.Range(块)` 属性设置。需要「失败再拆」时用
+ * 调用方对每个块做一次 `worksheet.Range(块)` 属性设置。需要「失败再拆」时用
  * {@link splitRangeAddresses} 拿数组，别把字符串再拆回去。
  */
 export function chunkRangeAddresses(

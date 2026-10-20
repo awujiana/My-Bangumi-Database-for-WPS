@@ -60,7 +60,10 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
   it('直接传 targetWs 且清洗成功：提示成功', () => {
     cleanLockedDataSheet(fakeWs as never)
     expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWs)
-    expect(m.showToast).toHaveBeenCalledWith('清洗完成：删除 1 行，合并 0 个名称组的标签', 'success')
+    expect(m.showToast).toHaveBeenCalledWith(
+      '清洗完成：删除 1 行，合并 0 个名称组的标签',
+      'success',
+    )
   })
 
   it('skippedReason 为「未发现重复数据」时按 info 提示', () => {
@@ -96,7 +99,10 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
     m.bgm.sheet.lockedIndex = 2
     cleanLockedDataSheet()
     expect(m.cleanSheetDuplicates).toHaveBeenCalledWith(fakeWs)
-    expect(m.showToast).toHaveBeenCalledWith('清洗完成：删除 1 行，合并 0 个名称组的标签', 'success')
+    expect(m.showToast).toHaveBeenCalledWith(
+      '清洗完成：删除 1 行，合并 0 个名称组的标签',
+      'success',
+    )
   })
 })
 
@@ -109,24 +115,24 @@ const makeSelectableWs = (name: string, selectImpl?: () => void) => ({
 describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
   it('没有失败记录 → 提示「上次同步没有失败行」且不碰选区', () => {
     m.getLastFailedRows.mockReturnValue(null)
-    const ws = makeSelectableWs('动画')
-    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: ws } })
+    const worksheet = makeSelectableWs('动画')
+    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
 
     expect(m.showToast).toHaveBeenCalledWith('上次同步没有失败行', 'info')
-    expect(ws.Range).not.toHaveBeenCalled()
+    expect(worksheet.Range).not.toHaveBeenCalled()
   })
 
   it('失败行属于另一张表 → 拒绝选中（换表后行号就错位了）', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3, 5], sheetName: '动画' })
-    const ws = makeSelectableWs('漫画')
-    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: ws } })
+    const worksheet = makeSelectableWs('漫画')
+    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
 
     expect(m.showToast).toHaveBeenCalledWith('失败行属于「动画」表，请先切回该表', 'warn')
-    expect(ws.Range).not.toHaveBeenCalled()
+    expect(worksheet.Range).not.toHaveBeenCalled()
   })
 
   it('拿不到当前工作表 → 提示错误并早退', () => {
@@ -144,24 +150,24 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
       sheetName: '动画',
     })
     m.buildFailedRowsAddress.mockReturnValue(null)
-    const ws = makeSelectableWs('动画')
-    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: ws } })
+    const worksheet = makeSelectableWs('动画')
+    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
 
     expect(m.showToast).toHaveBeenCalledWith('失败行过多（200 行），请分批手动选择重试', 'warn')
-    expect(ws.Range).not.toHaveBeenCalled()
+    expect(worksheet.Range).not.toHaveBeenCalled()
   })
 
   it('正常路径：按拼出的地址选中并提示「接着点选中行同步」', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3, 4, 9], sheetName: '动画' })
     m.buildFailedRowsAddress.mockReturnValue('A3:A4,A9')
-    const ws = makeSelectableWs('动画')
-    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: ws } })
+    const worksheet = makeSelectableWs('动画')
+    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     selectFailedRowsFromLastSync()
 
-    expect(ws.Range).toHaveBeenCalledWith('A3:A4,A9')
+    expect(worksheet.Range).toHaveBeenCalledWith('A3:A4,A9')
     expect(m.showToast).toHaveBeenCalledWith(
       '已选中 3 个失败行（3, 4, 9），点「👆 选中行同步」重试',
       'success',
@@ -171,10 +177,10 @@ describe('ui/handlers/sheet · selectFailedRowsFromLastSync', () => {
   it('Select 抛错 → 提示失败原因，不让异常冒泡', () => {
     m.getLastFailedRows.mockReturnValue({ rows: [3], sheetName: '动画' })
     m.buildFailedRowsAddress.mockReturnValue('A3')
-    const ws = makeSelectableWs('动画', () => {
+    const worksheet = makeSelectableWs('动画', () => {
       throw new Error('只读工作簿')
     })
-    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: ws } })
+    m.getApp.mockReturnValue({ ActiveWorkbook: { ActiveSheet: worksheet } })
 
     expect(() => {
       selectFailedRowsFromLastSync()
