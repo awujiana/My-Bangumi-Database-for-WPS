@@ -443,8 +443,8 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
     const allRecords = getAllSyncRecords()
     fingerprintMap = new Map()
     for (const r of allRecords) {
-      if (r.sid && r.fingerprint) {
-        fingerprintMap.set(r.sid, r.fingerprint)
+      if (r.subjectId && r.fingerprint) {
+        fingerprintMap.set(r.subjectId, r.fingerprint)
       }
     }
     bgmLog(
@@ -517,7 +517,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     if (conflictCount > 0) {
       bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 检测到 ${String(conflictCount)} 条冲突`)
       if (conflictStrategy === 'skip') {
-        conflictSids = new Set(conflicts.map((c) => c.sid))
+        conflictSids = new Set(conflicts.map((c) => c.subjectId))
         conflictMessage = `检测到 ${String(conflictCount)} 条冲突，已选择【跳过冲突】。\n\n`
         bgmLog(
           LOG_LEVELS.INFO,
@@ -597,7 +597,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
     const result = await SyncToBangumiAsync(worksheet, columnMap, token, lastRow, headerRow, {
-      ...(conflictSids !== undefined && { skipSids: conflictSids }),
+      ...(conflictSids !== undefined && { skipSubjectIds: conflictSids }),
       incremental,
       onProgress: (current: number, total: number, statusMessage: string) => {
         updateSyncProgressDialog(current, total, statusMessage)
@@ -888,7 +888,7 @@ async function _doAPISync(
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
   for (const r of syncRecords)
-    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1)
+    syncCountMap.set(r.subjectId ?? '', (syncCountMap.get(r.subjectId ?? '') ?? 0) + 1)
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -927,7 +927,7 @@ async function _doAPISync(
       pendingSyncRecords.push({
         name: itemName,
         url: `https://bgm.tv/subject/${String(item.subject_id)}`,
-        sid: String(item.subject_id),
+        subjectId: String(item.subject_id),
         type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
         content: '标记同步',
         status: '成功',
@@ -954,7 +954,7 @@ async function _doAPISync(
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
     for (const r of syncRecords)
-      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1)
+      syncCountMap.set(r.subjectId ?? '', (syncCountMap.get(r.subjectId ?? '') ?? 0) + 1)
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
@@ -988,13 +988,13 @@ async function _doAPISync(
 
       const bgmUrlCell = urlCol === undefined ? null : getCell(worksheet, row, urlCol)
       const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
-      const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
+      const subjectId = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
       let isMatched = false
-      if (sid && collectionMap.has(sid)) {
+      if (subjectId && collectionMap.has(subjectId)) {
         const seqCol = columnMap.get('序列号') ?? 9
         const seqCell = getCell(worksheet, row, seqCol)
         if (seqCell?.Interior) {
-          const syncCount = syncCountMap.get(sid) ?? 0
+          const syncCount = syncCountMap.get(subjectId) ?? 0
           if (syncCount === 1) {
             seqCell.Interior.Color = BGM_COLOR.BGM_SYNC
           } else if (syncCount === 2) {
@@ -1012,7 +1012,7 @@ async function _doAPISync(
         totalCombined,
         `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
         isMatched
-          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
+          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${subjectId ?? ''}`
           : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
       )
     }

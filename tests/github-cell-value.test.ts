@@ -13,11 +13,11 @@ import { resolveNewRowCellValue, resolveUpdateCellValue } from '../ts/sync/githu
 import type { GithubRemoteEntry } from '../ts/sync/github-sync-diff.js'
 
 function makeRemote(overrides: Partial<GithubRemoteEntry> = {}): GithubRemoteEntry {
-  return { sid: '12345', ...overrides }
+  return { subjectId: '12345', ...overrides }
 }
 
 describe('resolveNewRowCellValue', () => {
-  it('Bangumi_URL 列由 sid 构造完整 URL', () => {
+  it('Bangumi_URL 列由 subjectId 构造完整 URL', () => {
     expect(resolveNewRowCellValue({ name: 'Bangumi_URL' }, { remote: makeRemote() })).toBe(
       'https://bgm.tv/subject/12345',
     )
@@ -68,7 +68,7 @@ describe('resolveNewRowCellValue', () => {
   it('扩展字段为数字时统一转字符串', () => {
     // 越界输入：GithubRemoteEntry 的扩展字段声明为 string，此处刻意注入数字
     // 以覆盖 typeof === 'number' 分支（该分支用于兜底远程 JSON 字段类型漂移）
-    const remote = { sid: '1', date: 2024 } as unknown as GithubRemoteEntry
+    const remote = { subjectId: '1', date: 2024 } as unknown as GithubRemoteEntry
     expect(resolveNewRowCellValue({ name: '开播日期' }, { remote })).toBe('2024')
   })
 
@@ -279,10 +279,16 @@ describe('扩展字段的值类型兜底', () => {
 
   it('新增行：远程字段为 null / 布尔等非字符串非数字时返回 null', () => {
     expect(
-      resolveNewRowCellValue({ name: '时长' }, { remote: makeRemote({ 片长: null as unknown as string }) }),
+      resolveNewRowCellValue(
+        { name: '时长' },
+        { remote: makeRemote({ 片长: null as unknown as string }) },
+      ),
     ).toBeNull()
     expect(
-      resolveNewRowCellValue({ name: '时长' }, { remote: makeRemote({ 片长: true as unknown as string }) }),
+      resolveNewRowCellValue(
+        { name: '时长' },
+        { remote: makeRemote({ 片长: true as unknown as string }) },
+      ),
     ).toBeNull()
   })
 

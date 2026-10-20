@@ -10,7 +10,7 @@
  *                GitLab: https://gitlab.com/{owner}/{repo}/-/raw/{branch}/{path}
  *
  *              复用 githubConfig 的 owner/repo/branch/path 字段（与 GitHub 共享配置 UI），
- *              复用 githubSyncDiff.ts 的 parseJsonl / isGithubRemoteEntry 解析逻辑，
+ *              复用 githubSyncDiff.ts 的 parseJsonl / isWireRemoteEntry 解析逻辑，
  *              不重复解析实现。
  *
  * 数据格式（远程 JSONL 文件，采用「表头 + 值数组」两段式）与 GitHub 一致：
@@ -18,7 +18,7 @@
  *   其后每行        ["12345","...","2026-07-21","2024-01-01",["标签1","标签2"],false,"12", ...]
  *   值数组按表头顺序排列，字段名只在表头出现一次（省去每行重复的键名）。
  *
- * URL 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * URL 字段从 subjectId 构造：https://bgm.tv/subject/{subjectId}
  * type 字段默认为 2（动漫），用于同步记录显示。
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
@@ -87,7 +87,7 @@ export const fetchGitlabText = createRawTextFetcher({
  *
  * @param signal 可选 AbortSignal，用于取消请求
  * @param neededFields 本次同步会用到的字段；undefined 表示全量下载
- * @param stats 可选出参：回填缺合法 sid 被跳过的条数（供同步结果弹窗展示）
+ * @param stats 可选出参：回填缺合法 subjectId 被跳过的条数（供同步结果弹窗展示）
  * @returns 解析后的条目数组
  * @throws 网络错误、配置错误、解析失败时抛出 Error
  */

@@ -152,7 +152,7 @@ export const BGM: {
     userId: null,
     username: null,
     avatarUrl: null,
-    sidCache: new Map(),
+    subjectIdCache: new Map(),
     listCache: [],
   },
   // 工作表状态

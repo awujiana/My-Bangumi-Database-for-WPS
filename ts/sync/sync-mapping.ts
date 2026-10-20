@@ -54,7 +54,7 @@ export const UNMAPPED_REMOTE_FIELDS: readonly (readonly [string, string])[] = [
 export interface SyncMappingRow {
   /** 行 id = 默认 Excel 列名（派生字段用字段名，如 Bangumi_URL） */
   id: string
-  /** 远程字段键（jsonl 字段名；Bangumi_URL 为由 sid 构造的派生字段） */
+  /** 远程字段键（jsonl 字段名；Bangumi_URL 为由 subjectId 构造的派生字段） */
   remoteField: string
   /** 展示分组 */
   group: SyncMappingGroup
@@ -83,7 +83,7 @@ const GROUP_ORDER: readonly SyncMappingGroup[] = ['basic', 'meta', 'stats', 'rel
 
 /** 派生字段行（不走 EXTENDED_FIELD_MAP / CORE_FIELD_COLUMNS 的独立逻辑字段） */
 const DERIVED_ROWS: readonly (readonly [string, string, SyncMappingGroup])[] = [
-  ['Bangumi_URL', 'sid（构造 https://bgm.tv/subject/{sid}）', 'basic'],
+  ['Bangumi_URL', 'sid（构造 https://bgm.tv/subject/{subjectId}）', 'basic'],
   ['标签/分级', 'meta_tags', 'basic'],
   ['集数', '话数', 'meta'],
 ] as const
@@ -288,7 +288,7 @@ export function remapColumnIndices(
  *
  * neededFields 驱动选片：剔除后整片无所需字段时该分片不再下载
  * （用户手动勾选的分片除外——那种情况下仍会下载，只是不写入）。
- * Bangumi_URL 由 sid 派生（sid 恒随 base 片下载），不产生剔除项。
+ * Bangumi_URL 由 subjectId 派生（subjectId 恒随 base 片下载），不产生剔除项。
  */
 export function excludedJsonlFields(excludedColumns: readonly string[]): Set<string> {
   const inverse = new Map<string, string>()

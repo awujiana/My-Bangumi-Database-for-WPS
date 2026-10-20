@@ -147,7 +147,7 @@ describe('findOverrideConflicts', () => {
 describe('applyColumnOverrides', () => {
   it('应把 override 列的值复制到默认列名键下（消费方零改动）', () => {
     const entries = new Map<string, LocalRowEntry>([
-      ['1', { row: 2, sid: '1', fields: { 监督: 'XXX', 名称: 'A' } }],
+      ['1', { row: 2, subjectId: '1', fields: { 监督: 'XXX', 名称: 'A' } }],
     ])
     applyColumnOverrides(entries, { 导演: '监督' })
     expect(entries.get('1')?.fields['导演']).toBe('XXX')
@@ -157,7 +157,7 @@ describe('applyColumnOverrides', () => {
 
   it('override 列不存在时应落空串（diff 视为空本地值，随后写入走 remap）', () => {
     const entries = new Map<string, LocalRowEntry>([
-      ['1', { row: 2, sid: '1', fields: { 名称: 'A' } }],
+      ['1', { row: 2, subjectId: '1', fields: { 名称: 'A' } }],
     ])
     applyColumnOverrides(entries, { 导演: '监督' })
     expect(entries.get('1')?.fields['导演']).toBe('')
@@ -165,7 +165,7 @@ describe('applyColumnOverrides', () => {
 
   it('空 overrides 或 from === to 时应为无操作', () => {
     const entries = new Map<string, LocalRowEntry>([
-      ['1', { row: 2, sid: '1', fields: { 导演: 'X' } }],
+      ['1', { row: 2, subjectId: '1', fields: { 导演: 'X' } }],
     ])
     applyColumnOverrides(entries, {})
     applyColumnOverrides(entries, { 导演: '导演' })
@@ -181,7 +181,7 @@ describe('excludedJsonlFields', () => {
     expect(excluded.has('name')).toBe(true)
   })
 
-  it('Bangumi_URL 与未知列不应产生剔除项（sid 恒随 base 片下载）', () => {
+  it('Bangumi_URL 与未知列不应产生剔除项（subjectId 恒随 base 片下载）', () => {
     const excluded = excludedJsonlFields(['Bangumi_URL', '不存在的列'])
     expect(excluded.size).toBe(0)
   })

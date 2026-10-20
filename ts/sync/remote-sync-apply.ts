@@ -92,10 +92,10 @@ export interface GithubSyncResult {
    * 这里把这类字段挑出来，由结果弹窗提示用户自行添加对应列。
    */
   missingColumns?: string[] /**
-   * 分片拼接后因**缺少合法 sid** 被跳过的记录条数（>0 才出现）
+   * 分片拼接后因**缺少合法 subjectId** 被跳过的记录条数（>0 才出现）
    *
    * 与 `missingColumns` 同口径：链路内部原本只进 WARN 日志，用户看到的是
-   * 「下载了 N 条、只同步了一部分」却说不出原因。缺合法 sid 的记录
+   * 「下载了 N 条、只同步了一部分」却说不出原因。缺合法 subjectId 的记录
    * （如数据文件混入表头行以外的坏行）会被静默跳过，这里显式计数
    * 由结果弹窗提示，数字大于 0 即说明数据源本身有脏数据。
    */
@@ -235,8 +235,8 @@ function readLocalEntries(
       rawData ? getFieldFromBatch(index, key) : getFieldFromCell(row, key)
     const url = getField('Bangumi_URL')
     if (url) {
-      const sid = extractSubjectId(url)
-      if (sid) {
+      const subjectId = extractSubjectId(url)
+      if (subjectId) {
         const extensionFields: Record<string, string> = {}
         for (const [, excelField] of EXTENDED_FIELD_MAP) {
           extensionFields[excelField] = getField(excelField)
@@ -248,9 +248,9 @@ function readLocalEntries(
           }
         }
 
-        result.set(sid, {
+        result.set(subjectId, {
           row,
-          sid,
+          subjectId,
           fields: {
             Bangumi_URL: url,
             名称: getField('名称'),
@@ -386,9 +386,9 @@ function writeRemoteEntryToRow(
 
   const isWriteAll = fieldsToWrite.includes('*')
 
-  // URL（从 sid 构造）
+  // URL（从 subjectId 构造）
   if (isWriteAll || fieldsToWrite.includes('Bangumi_URL')) {
-    safeSet('Bangumi_URL', `https://bgm.tv/subject/${remote.sid}`)
+    safeSet('Bangumi_URL', `https://bgm.tv/subject/${remote.subjectId}`)
   }
   // 名称处理：
   // - 新增条目（writeAll）：直接写入「名称」列
@@ -481,7 +481,7 @@ function yieldToEventLoop(): Promise<void> {
 function writeRowValuesWithUndo(
   worksheet: WpsWorksheet,
   columnMap: Map<string, number>,
-  u: { sid: string },
+  u: { subjectId: string },
   row: number,
   remote: GithubRemoteEntry,
   fields: string[],
@@ -537,15 +537,15 @@ function writeRowValuesWithUndo(
     }
     details?.push({
       kind: 'update',
-      sid: u.sid,
+      subjectId: u.subjectId,
       name: remote.name,
       row,
       fields: fields.includes('*') ? ['全部字段'] : [...fields],
     })
     records.push({
-      sid: u.sid,
+      subjectId: u.subjectId,
       name: remote.name ?? '',
-      url: `https://bgm.tv/subject/${u.sid}`,
+      url: `https://bgm.tv/subject/${u.subjectId}`,
       type: BGM_SUBJECT_TYPES[2] ?? '',
       source: 'repo',
       content: '仓库同步-更新',
@@ -569,7 +569,7 @@ function writeRowValuesWithUndo(
     remote,
     fields,
     forceOverwrite: shouldForceOverwrite,
-    sid: u.sid,
+    subjectId: u.subjectId,
     kind: 'update',
     content: '仓库同步-更新',
     failContent: '仓库同步-更新失败',
@@ -617,7 +617,7 @@ function fallbackWriteRemoteEntry(parameters: {
   remote: GithubRemoteEntry
   fields: string[]
   forceOverwrite: boolean
-  sid: string
+  subjectId: string
   /** 明细类型：更新写 'update'，新增写 'add' */
   kind: 'update' | 'add'
   /** 成功时同步记录的 content */
@@ -639,7 +639,7 @@ function fallbackWriteRemoteEntry(parameters: {
     remote,
     fields,
     forceOverwrite,
-    sid,
+    subjectId,
     kind,
     content,
     failContent,
@@ -656,15 +656,15 @@ function fallbackWriteRemoteEntry(parameters: {
       // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
       details?.push({
         kind,
-        sid,
+        subjectId,
         name: remote.name,
         row,
         fields: fields.includes('*') ? ['全部字段'] : [...fields],
       })
       records.push({
-        sid,
+        subjectId,
         name: remote.name ?? '',
-        url: `https://bgm.tv/subject/${sid}`,
+        url: `https://bgm.tv/subject/${subjectId}`,
         type: BGM_SUBJECT_TYPES[2] ?? '',
         source,
         content,
@@ -678,13 +678,13 @@ function fallbackWriteRemoteEntry(parameters: {
     // 尝试了写入但全部失败
     details?.push({
       kind: 'fail',
-      sid,
+      subjectId,
       name: remote.name,
       ...(failRow !== undefined && { row: failRow }),
       message: '逐字段写入失败',
     })
     records.push({
-      sid,
+      subjectId,
       source,
       content: failContent,
       status: '失败',
@@ -696,13 +696,13 @@ function fallbackWriteRemoteEntry(parameters: {
     const errorMessage = error instanceof Error ? error.message : String(error)
     details?.push({
       kind: 'fail',
-      sid,
+      subjectId,
       name: remote.name,
       ...(failRow !== undefined && { row: failRow }),
       message: errorMessage,
     })
     records.push({
-      sid,
+      subjectId,
       source,
       content: failContent,
       status: '失败',
@@ -756,7 +756,7 @@ function batchWriteNewRows(
   worksheet: WpsWorksheet,
   columnMap: Map<string, number>,
   startRow: number,
-  rows: { remote: GithubRemoteEntry; sid: string }[],
+  rows: { remote: GithubRemoteEntry; subjectId: string }[],
   records: UpdateRecordParameters[],
 ): number {
   if (rows.length === 0) return 0
@@ -834,9 +834,9 @@ function batchWriteNewRows(
       recordUndoEntry({ row, column: wc.column, oldValue: '', updatedValue: value })
     }
     records.push({
-      sid: rowRecord.sid,
+      subjectId: rowRecord.subjectId,
       name: rowRecord.remote.name ?? '',
-      url: `https://bgm.tv/subject/${rowRecord.sid}`,
+      url: `https://bgm.tv/subject/${rowRecord.subjectId}`,
       type: BGM_SUBJECT_TYPES[2] ?? '',
       source: 'repo',
       content: '仓库同步-新增',
@@ -866,7 +866,7 @@ function batchWriteNewRows(
 function batchUpdateRows(
   worksheet: WpsWorksheet,
   columnMap: Map<string, number>,
-  updates: { row: number; remote: GithubRemoteEntry; sid: string; fields: string[] }[],
+  updates: { row: number; remote: GithubRemoteEntry; subjectId: string; fields: string[] }[],
   shouldForceOverwrite: boolean,
   records: UpdateRecordParameters[],
   details?: GithubSyncDetailItem[],
@@ -1023,7 +1023,7 @@ function batchUpdateRows(
         remote,
         fields,
         forceOverwrite: shouldForceOverwrite,
-        sid: u.sid,
+        subjectId: u.subjectId,
         kind: 'update',
         content: '仓库同步-更新',
         failContent: '仓库同步-更新失败',
@@ -1213,7 +1213,7 @@ export async function applyDiffToSheet(
       break
     }
     const batch = addedDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
-    const batchEntries = batch.map((d) => ({ remote: d.remote, sid: d.sid }))
+    const batchEntries = batch.map((d) => ({ remote: d.remote, subjectId: d.subjectId }))
 
     // 尝试批量写入
     const batchWritten = batchWriteNewRows(
@@ -1231,7 +1231,7 @@ export async function applyDiffToSheet(
         if (entry?.remote) {
           details.push({
             kind: 'add',
-            sid: entry.sid,
+            subjectId: entry.subjectId,
             name: entry.remote.name,
             row: nextAppendRow + index,
             fields: ['全部字段'],
@@ -1249,7 +1249,7 @@ export async function applyDiffToSheet(
           remote: diff.remote,
           fields: ['*'],
           forceOverwrite: isForceOverwrite,
-          sid: diff.sid,
+          subjectId: diff.subjectId,
           kind: 'add',
           content: '仓库同步-新增',
           failContent: '仓库同步-新增失败',
@@ -1264,7 +1264,7 @@ export async function applyDiffToSheet(
           result.failed += 1
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[githubSync] 逐行写入失败 sid=${diff.sid}: ${outcome.errorMessage ?? '写入全部失败'}`,
+            `[githubSync] 逐行写入失败 subjectId=${diff.subjectId}: ${outcome.errorMessage ?? '写入全部失败'}`,
           )
         }
       }
@@ -1324,7 +1324,7 @@ export async function applyDiffToSheet(
     const batchUpdates = batch.map((d) => ({
       row: d.localRow,
       remote: d.remote,
-      sid: d.sid,
+      subjectId: d.subjectId,
       fields: d.changedFields,
     }))
 
@@ -1392,12 +1392,12 @@ export async function applyDiffToSheet(
         result.deleted += 1
         details.push({
           kind: 'delete',
-          sid: diff.sid,
+          subjectId: diff.subjectId,
           row: diff.localRow,
           message: `删除行 ${String(diff.localRow)}`,
         })
         syncRecords.push({
-          sid: diff.sid,
+          subjectId: diff.subjectId,
           source,
           content: '仓库同步-删除',
           status: '成功',
@@ -1413,12 +1413,12 @@ export async function applyDiffToSheet(
         result.failed += 1
         details.push({
           kind: 'fail',
-          sid: diff.sid,
+          subjectId: diff.subjectId,
           row: diff.localRow,
           message: errorMessage,
         })
         syncRecords.push({
-          sid: diff.sid,
+          subjectId: diff.subjectId,
           source,
           content: '仓库同步-删除失败',
           status: '失败',
@@ -1429,15 +1429,18 @@ export async function applyDiffToSheet(
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       result.failed += 1
-      bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errorMessage}`)
+      bgmLog(
+        LOG_LEVELS.ERROR,
+        `[githubSync] 删除处理失败 subjectId=${diff.subjectId}: ${errorMessage}`,
+      )
       details.push({
         kind: 'fail',
-        sid: diff.sid,
+        subjectId: diff.subjectId,
         row: diff.localRow,
         message: errorMessage,
       })
       syncRecords.push({
-        sid: diff.sid,
+        subjectId: diff.subjectId,
         source,
         content: '仓库同步-失败',
         status: '失败',
@@ -1540,7 +1543,7 @@ export async function applyDiffToSheet(
  *
  * 处理规则：
  * - 仅作用于 kind === 'update' 且 changedFields 不为 ['*'] 的 diff（字段级更新）
- * - 对每个 resolution，找到 sid 与 field 匹配的 update diff：
+ * - 对每个 resolution，找到 subjectId 与 field 匹配的 update diff：
  *   - chosenValue === 'local'：从 changedFields 中移除该 field（保留本地值）
  *   - chosenValue === 'remote'：保留该 field 在 changedFields 中（采用远程值）
  * - 若 update diff 的 changedFields 被清空，则从 diffs 中移除该 diff（无字段需更新）
@@ -1560,10 +1563,10 @@ export function applyConflictResolutions(
     return diffs
   }
 
-  // 按 sid 索引 resolutions，便于 O(1) 查找
+  // 按 subjectId 索引 resolutions，便于 O(1) 查找
   const resolutionByKey = new Map<string, ConflictResolution>()
   for (const r of resolutions) {
-    resolutionByKey.set(`${r.sid}\u{0}${r.field}`, r)
+    resolutionByKey.set(`${r.subjectId}\u{0}${r.field}`, r)
   }
 
   // 倒序遍历，便于安全移除元素
@@ -1574,7 +1577,7 @@ export function applyConflictResolutions(
       !(diff.changedFields.length === 1 && diff.changedFields[0] === '*')
     ) {
       diff.changedFields = diff.changedFields.filter((field) => {
-        const key = `${diff.sid}\u{0}${field}`
+        const key = `${diff.subjectId}\u{0}${field}`
         const r = resolutionByKey.get(key)
         // 若存在 resolution 且选择 local，则移除该字段；否则保留
         return r?.chosenValue !== 'local'

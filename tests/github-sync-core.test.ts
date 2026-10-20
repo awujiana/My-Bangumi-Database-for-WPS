@@ -479,8 +479,8 @@ describe('fetchGithubJson', () => {
 
   it('返回 loadEntriesFromPath 解析出的条目', async () => {
     const entries = [
-      { sid: '1', name: 'A', meta_tags: [] },
-      { sid: '2', name: 'B', meta_tags: [] },
+      { subjectId: '1', name: 'A', meta_tags: [] },
+      { subjectId: '2', name: 'B', meta_tags: [] },
     ]
     mockLoadEntriesFromPath.mockResolvedValue({
       entries,
@@ -555,7 +555,7 @@ describe('GithubSyncSource', () => {
 
   it('fetchRemoteEntries 应调用 fetchGithubJson', async () => {
     mockLoadEntriesFromPath.mockResolvedValue({
-      entries: [{ sid: '1', name: 'Test' }],
+      entries: [{ subjectId: '1', name: 'Test' }],
       shards: ['base'],
       updatedAt: '2026-09-08',
     })
@@ -637,8 +637,18 @@ describe('applyDiffToSheet', () => {
   it('getDataSheet 返回 null 时应将所有 diff 计为失败', async () => {
     mockGetDataSheet.mockReturnValue(null)
     const diffs: GithubSyncDiff[] = [
-      { kind: 'add', sid: '1', remote: { sid: '1', name: 'Test' }, changedFields: ['*'] },
-      { kind: 'add', sid: '2', remote: { sid: '2', name: 'Test2' }, changedFields: ['*'] },
+      {
+        kind: 'add',
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test' },
+        changedFields: ['*'],
+      },
+      {
+        kind: 'add',
+        subjectId: '2',
+        remote: { subjectId: '2', name: 'Test2' },
+        changedFields: ['*'],
+      },
     ]
     const result = await applyDiffToSheet(diffs, 'add-update')
     expect(result.failed).toBe(2)
@@ -671,7 +681,12 @@ describe('applyDiffToSheet', () => {
     mockTagsToString.mockReturnValue('标签1')
 
     const diffs: GithubSyncDiff[] = [
-      { kind: 'add', sid: '1', remote: { sid: '1', name: '新增' }, changedFields: ['*'] },
+      {
+        kind: 'add',
+        subjectId: '1',
+        remote: { subjectId: '1', name: '新增' },
+        changedFields: ['*'],
+      },
     ]
     const result = await applyDiffToSheet(diffs, 'add-update')
     expect(result.added).toBeGreaterThanOrEqual(0)
@@ -694,9 +709,9 @@ describe('applyDiffToSheet', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         localRow: 3,
-        remote: { sid: '1', name: '新名称' },
+        remote: { subjectId: '1', name: '新名称' },
         changedFields: ['名称'],
       },
     ]
@@ -718,7 +733,9 @@ describe('applyDiffToSheet', () => {
     mockGetApp.mockReturnValue(null)
     mockGetCellValue.mockReturnValue('http://bgm.tv/subject/1')
 
-    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 3, changedFields: [] }]
+    const diffs: GithubSyncDiff[] = [
+      { kind: 'delete', subjectId: '1', localRow: 3, changedFields: [] },
+    ]
     const result = await applyDiffToSheet(diffs, 'mirror')
     expect(result.deleted).toBeGreaterThanOrEqual(0)
   })
@@ -731,7 +748,12 @@ describe('applyDiffToSheet', () => {
     mockGetApp.mockReturnValue(null)
 
     const diffs: GithubSyncDiff[] = [
-      { kind: 'add', sid: '1', remote: { sid: '1', name: 'Test' }, changedFields: ['*'] },
+      {
+        kind: 'add',
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test' },
+        changedFields: ['*'],
+      },
     ]
     const result = await applyDiffToSheet(diffs, 'force-overwrite')
     expect(result).toBeDefined()
@@ -763,7 +785,12 @@ describe('applyDiffToSheet', () => {
     mockTagsToString.mockReturnValue('标签')
 
     const diffs: GithubSyncDiff[] = [
-      { kind: 'add', sid: '1', remote: { sid: '1', name: 'Test' }, changedFields: ['*'] },
+      {
+        kind: 'add',
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test' },
+        changedFields: ['*'],
+      },
     ]
     await applyDiffToSheet(diffs, 'add-update')
     // addSyncRecords 会被调用（如果有同步记录需要写入）
@@ -777,10 +804,10 @@ describe('applyConflictResolutions', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['名称'],
         localRow: 2,
-        remote: { sid: '1', name: '新' },
+        remote: { subjectId: '1', name: '新' },
       },
     ]
     const result = applyConflictResolutions(diffs, [])
@@ -792,13 +819,15 @@ describe('applyConflictResolutions', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['名称', '集数'],
         localRow: 2,
-        remote: { sid: '1', name: '新', 话数: '12' },
+        remote: { subjectId: '1', name: '新', 话数: '12' },
       },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result[0]?.changedFields).not.toContain('名称')
     expect(result[0]?.changedFields).toContain('集数')
@@ -808,13 +837,15 @@ describe('applyConflictResolutions', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['名称', '集数'],
         localRow: 2,
-        remote: { sid: '1', name: '新', 话数: '12' },
+        remote: { subjectId: '1', name: '新', 话数: '12' },
       },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'remote' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'remote' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result[0]?.changedFields).toContain('名称')
   })
@@ -823,29 +854,37 @@ describe('applyConflictResolutions', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['名称'],
         localRow: 2,
-        remote: { sid: '1', name: '新' },
+        remote: { subjectId: '1', name: '新' },
       },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(0)
   })
 
   it('add diff 不应受影响', () => {
     const diffs: GithubSyncDiff[] = [
-      { kind: 'add', sid: '1', changedFields: ['*'], remote: { sid: '1', name: '新' } },
+      { kind: 'add', subjectId: '1', changedFields: ['*'], remote: { subjectId: '1', name: '新' } },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
   })
 
   it('delete diff 不应受影响', () => {
-    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 2, changedFields: [] }]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const diffs: GithubSyncDiff[] = [
+      { kind: 'delete', subjectId: '1', localRow: 2, changedFields: [] },
+    ]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
   })
@@ -854,39 +893,43 @@ describe('applyConflictResolutions', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['*'],
         localRow: 2,
-        remote: { sid: '1', name: '新' },
+        remote: { subjectId: '1', name: '新' },
       },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
     expect(result[0]?.changedFields).toEqual(['*'])
   })
 
-  it('按 sid+field 精确匹配', () => {
+  it('按 subjectId+field 精确匹配', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         changedFields: ['名称'],
         localRow: 2,
-        remote: { sid: '1', name: '新' },
+        remote: { subjectId: '1', name: '新' },
       },
       {
         kind: 'update',
-        sid: '2',
+        subjectId: '2',
         changedFields: ['名称'],
         localRow: 3,
-        remote: { sid: '2', name: '新' },
+        remote: { subjectId: '2', name: '新' },
       },
     ]
-    const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
+    const resolutions: ConflictResolution[] = [
+      { subjectId: '1', field: '名称', chosenValue: 'local' },
+    ]
     const result = applyConflictResolutions(diffs, resolutions)
-    // sid=1 的 diff 应被移除（字段被清空）
-    // sid=2 的 diff 应保留
+    // subjectId=1 的 diff 应被移除（字段被清空）
+    // subjectId=2 的 diff 应保留
     expect(result.length).toBeLessThanOrEqual(2)
   })
 })

@@ -140,8 +140,8 @@ export function computeDateStatsFromSheet(): DateStats {
       canBatch ? (urlColumn[index]?.[0] ?? '') : getCellValue(worksheet, row, urlCol),
     )
     if (url) {
-      const sid = extractSubjectId(url)
-      if (sid) {
+      const subjectId = extractSubjectId(url)
+      if (subjectId) {
         totalCount += 1
 
         const dateString = trim(
@@ -300,7 +300,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
       </div>`
       : ''
 
-  // 脏数据提示：分片拼接时缺合法 sid 的记录被跳过（与 parseJsonl 的「非法行
+  // 脏数据提示：分片拼接时缺合法 subjectId 的记录被跳过（与 parseJsonl 的「非法行
   // 不中断整体解析」同口径）。不提示的话用户只会看到「下载了 N 条、只同步了
   // 一部分」却说不出原因——这里显式给出跳过条数，指向数据源本身有脏数据。
   const skippedInvalidLines = result.skippedInvalidLines ?? 0
@@ -309,7 +309,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
       ? `
       <div class="bgm-result-section">
         <div class="bgm-result-section-title">⚠️ 数据源含非法记录</div>
-        <div class="bgm-result-date-label">远程数据中有 ${String(skippedInvalidLines)} 条记录缺少合法 sid，已跳过。这不是你表格的问题，请检查数据源（仓库 / 文件）的 JSONL 内容。</div>
+        <div class="bgm-result-date-label">远程数据中有 ${String(skippedInvalidLines)} 条记录缺少合法 subjectId，已跳过。这不是你表格的问题，请检查数据源（仓库 / 文件）的 JSONL 内容。</div>
       </div>`
       : ''
 

@@ -17,7 +17,7 @@
 /** 远程 JSON 单条记录结构 */
 export interface GithubRemoteEntry {
   /** Bangumi subject ID（主键） */
-  sid: string
+  subjectId: string
   /** 条目名称 */
   name?: string
   /** 远程更新时间戳 */
@@ -102,7 +102,7 @@ export interface GithubRemoteEntry {
  */
 export interface ConflictResolution {
   /** Bangumi subject ID（主键） */
-  sid: string
+  subjectId: string
   /** 冲突字段名（与 Conflict.field 对应） */
   field: string
   /** 用户选择的值来源 */
@@ -204,7 +204,7 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
   return result
 }
 
-/** 本地 Bangumi URL 列名（columnMap key，由 sid 构造写入，非远程字段） */
+/** 本地 Bangumi URL 列名（columnMap key，由 subjectId 构造写入，非远程字段） */
 const BANGUMI_URL_COLUMN = 'Bangumi_URL'
 
 /**
@@ -270,7 +270,7 @@ export function collectRemoteEmptyFields(
 
   for (const remote of remotes) {
     // 新增行不算：那是「本地还没这条」，不是「远程没数据」
-    const local = remote.sid ? localEntries.get(remote.sid) : undefined
+    const local = remote.subjectId ? localEntries.get(remote.subjectId) : undefined
     // 用嵌套 if 而非 continue：本文件的 lint 规则禁 continue（含嵌套循环场景）
     if (local) {
       for (const [jsonlField] of EXTENDED_FIELD_MAP) {
@@ -336,7 +336,7 @@ export function collectMissingColumns(
     missing.push(header)
   }
 
-  // 2. Bangumi URL 列由 sid 构造（远程条目本身不含该字段），
+  // 2. Bangumi URL 列由 subjectId 构造（远程条目本身不含该字段），
   //    只要有条目参与同步而本地缺此列，就无法按 SID 定位行（会被整表当作新增）。
   const isUrlColumnMissing = remotes.length > 0 && !columnMap.has(BANGUMI_URL_COLUMN)
   if (isUrlColumnMissing) {
@@ -390,7 +390,7 @@ export interface GithubSyncDiff {
   /** 差异类型 */
   kind: 'add' | 'update' | 'delete'
   /** 主键 SID */
-  sid: string
+  subjectId: string
   /** 远程条目数据（delete 时为 undefined） */
   remote?: GithubRemoteEntry
   /** 本地行号（update/delete 时有值，add 时为 undefined） */
@@ -404,7 +404,7 @@ export interface GithubSyncDetailItem {
   /** 操作类型 */
   kind: 'add' | 'update' | 'delete' | 'fail'
   /** 主键 SID */
-  sid: string
+  subjectId: string
   /** 条目名称 */
   name?: string | undefined
   /** 本地行号（add 成功后可回填） */
@@ -420,7 +420,7 @@ export interface LocalRowEntry {
   /** 行号 */
   row: number
   /** SID（主键） */
-  sid: string
+  subjectId: string
   /** 各字段值 */
   fields: Record<string, string>
 }
@@ -436,10 +436,26 @@ export function tagsToString(tags: string[] | undefined): string {
 /**
  * 类型守卫：判断未知值是否为 GithubRemoteEntry
  */
-export function isGithubRemoteEntry(value: unknown): value is GithubRemoteEntry {
+/** 线上条目形状：键名即 dump / Excel 列名（`sid` 是线上键，规范名见 FIELD_NAME_MAP） */
+export type WireRemoteEntry = Record<string, unknown> & { sid: string }
+
+/**
+ * 判断未知值是否为合法的**线上**条目
+ *
+ * 键名双轨：线上是 `sid`，模型（{@link GithubRemoteEntry}）是 `subjectId`。
+ * 两个解析边界（parseJsonl 的 buildEntry、shard-fetch）用完本守卫后必须再过一道
+ * {@link toRemoteEntry} 归一——漏了那一步不报错，只会静默丢数据。
+ */
+export function isWireRemoteEntry(value: unknown): value is WireRemoteEntry {
   return (
     typeof value === 'object' && value !== null && 'sid' in value && typeof value.sid === 'string'
   )
+}
+
+/** 线上条目 → 模型条目：`sid` 归一成 `subjectId`，其余字段原样带过去 */
+export function toRemoteEntry(wire: WireRemoteEntry): GithubRemoteEntry {
+  const { sid, ...fields } = wire
+  return { ...fields, subjectId: sid }
 }
 
 /**
@@ -496,10 +512,11 @@ function buildEntry(
   const object: Record<string, unknown> = Object.fromEntries(
     header.map((field, column): [string, unknown] => [field, row.at(column)]),
   )
-  if (!isGithubRemoteEntry(object)) {
+  if (!isWireRemoteEntry(object)) {
     return { reason: '对象缺少 sid 字段或 sid 不是字符串' }
   }
-  return { entry: object }
+  // 线上键名 sid → 规范名 subjectId；线上格式本身不变
+  return { entry: toRemoteEntry(object) }
 }
 
 /**
@@ -769,10 +786,10 @@ export function computeDiff(
   const remoteSids = new Set<string>()
 
   for (const remote of remoteEntries) {
-    const hasRemoteSid = Boolean(remote.sid)
-    if (hasRemoteSid) {
-      remoteSids.add(remote.sid)
-      const local = localEntries.get(remote.sid)
+    const hasRemoteSubjectId = Boolean(remote.subjectId)
+    if (hasRemoteSubjectId) {
+      remoteSids.add(remote.subjectId)
+      const local = localEntries.get(remote.subjectId)
 
       // 新增：本地无对应 SID
       if (!local) {
@@ -780,7 +797,7 @@ export function computeDiff(
         if (strategy !== 'update-only') {
           diffs.push({
             kind: 'add',
-            sid: remote.sid,
+            subjectId: remote.subjectId,
             remote,
             changedFields: ['*'],
           })
@@ -789,7 +806,7 @@ export function computeDiff(
         if (strategy === 'force-overwrite') {
           diffs.push({
             kind: 'update',
-            sid: remote.sid,
+            subjectId: remote.subjectId,
             remote,
             localRow: local.row,
             changedFields: ['*'],
@@ -797,9 +814,9 @@ export function computeDiff(
         } else {
           const changedFields: string[] = []
 
-          // 比对 Bangumi_URL（从 sid 构造的派生字段，确保 URL 列总是被正确更新）
+          // 比对 Bangumi_URL（从 subjectId 构造的派生字段，确保 URL 列总是被正确更新）
           // 仅当本地存在 Bangumi_URL 字段时才比对（列映射中包含该列）
-          const expectedUrl = `https://bgm.tv/subject/${remote.sid}`
+          const expectedUrl = `https://bgm.tv/subject/${remote.subjectId}`
           if ('Bangumi_URL' in local.fields) {
             const localUrl = local.fields.Bangumi_URL
             if (localUrl !== expectedUrl) {
@@ -851,7 +868,7 @@ export function computeDiff(
           if (changedFields.length > 0) {
             diffs.push({
               kind: 'update',
-              sid: remote.sid,
+              subjectId: remote.subjectId,
               remote,
               localRow: local.row,
               changedFields,
@@ -864,8 +881,8 @@ export function computeDiff(
 
   // mirror 策略：本地存在但远程不存在的 SID 标记为 delete
   if (strategy === 'mirror') {
-    for (const [sid, local] of localEntries) {
-      const isMissingRemote = !remoteSids.has(sid)
+    for (const [subjectId, local] of localEntries) {
+      const isMissingRemote = !remoteSids.has(subjectId)
       if (isMissingRemote) {
         // 时间筛选启用时：本地条目的开播日期不在筛选范围内的，跳过 delete
         // 避免因时间筛选过滤了远程数据，导致本地其他时间段的数据被误删
@@ -878,7 +895,7 @@ export function computeDiff(
         if (isInTimeRange) {
           diffs.push({
             kind: 'delete',
-            sid,
+            subjectId,
             localRow: local.row,
             changedFields: ['*'],
           })

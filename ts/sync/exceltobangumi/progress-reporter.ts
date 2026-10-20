@@ -16,7 +16,7 @@ import type { UpdateRecordParameters } from '../sync-record.js'
  */
 export interface SyncTask {
   rowNum: number
-  sid: string
+  subjectId: string
   bgmUrl: string
   name: string
   jsonBody: string
@@ -91,9 +91,9 @@ export function applySyncSuccessResults(
 
     // 记录同步日志（先累积，循环外一次性写入）
     records.push({
-      name: task.name || `SID:${task.sid}`,
+      name: task.name || `SID:${task.subjectId}`,
       url: task.bgmUrl,
-      sid: task.sid,
+      subjectId: task.subjectId,
       type: COLLECTION_TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.SUCCESS,
@@ -135,9 +135,9 @@ export function applySyncFailResults(
     markSyncResultColor(worksheet, task.rowNum, false, seqCol)
 
     records.push({
-      name: task.name || `SID:${task.sid}`,
+      name: task.name || `SID:${task.subjectId}`,
       url: task.bgmUrl,
-      sid: task.sid,
+      subjectId: task.subjectId,
       type: COLLECTION_TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.FAIL,
@@ -176,7 +176,7 @@ export function handleStoppedRemainingTasks(
   const remainingTasks = syncTasks.slice(executedCount)
   for (const task of remainingTasks) {
     result.skip += 1
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`)
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.subjectId}`)
   }
   bgmLog(
     LOG_LEVELS.INFO,

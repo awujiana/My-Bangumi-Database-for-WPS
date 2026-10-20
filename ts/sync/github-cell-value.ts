@@ -23,7 +23,7 @@ export function resolveNewRowCellValue(
 ): string | number | null {
   switch (wc.name) {
     case 'Bangumi_URL': {
-      return `https://bgm.tv/subject/${entry.remote.sid}`
+      return `https://bgm.tv/subject/${entry.remote.subjectId}`
     }
     case '名称': {
       return entry.remote.name ?? null
@@ -70,7 +70,7 @@ export function resolveUpdateCellValue(
   switch (wc.name) {
     case 'Bangumi_URL': {
       if (isWriteAll || fields.includes('Bangumi_URL')) {
-        return { value: `https://bgm.tv/subject/${remote.sid}`, shouldWrite: true }
+        return { value: `https://bgm.tv/subject/${remote.subjectId}`, shouldWrite: true }
       }
       return { value: null, shouldWrite: false }
     }

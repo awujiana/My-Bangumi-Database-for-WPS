@@ -571,7 +571,7 @@ describe('同步详情预览弹窗', () => {
   it('有明细时渲染明细表', async () => {
     await openPreview({
       result: makeResult({
-        details: [{ kind: 'add', sid: '400602', name: '芙莉莲' }],
+        details: [{ kind: 'add', subjectId: '400602', name: '芙莉莲' }],
       }),
     })
 

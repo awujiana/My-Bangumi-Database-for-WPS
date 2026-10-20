@@ -226,7 +226,7 @@ export interface SyncOptions {
     result: { code: number; message: string },
   ) => void
   /** 需要跳过的SID集合（冲突处理） */
-  skipSids?: Set<string>
+  skipSubjectIds?: Set<string>
   /** 是否启用增量同步（基于指纹） */
   incremental?: boolean
 }
@@ -270,7 +270,7 @@ function fetchVisibleRowsForSync(
  * 构建历史指纹映射（数据获取层 - 步骤3）
  * 增量同步模式下从同步记录加载历史指纹，用于后续对比跳过未变更项。
  * @param incremental 是否启用增量同步
- * @returns 指纹映射（sid -> fingerprint）；未启用增量时返回 undefined
+ * @returns 指纹映射（subjectId -> fingerprint）；未启用增量时返回 undefined
  */
 function buildFingerprintMap(incremental: boolean | undefined): Map<string, string> | undefined {
   if (!incremental) return undefined
@@ -278,8 +278,8 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
   const allRecords = getAllSyncRecords()
   const fingerprintMap = new Map<string, string>()
   for (const r of allRecords) {
-    if (r.sid && r.fingerprint) {
-      fingerprintMap.set(r.sid, r.fingerprint)
+    if (r.subjectId && r.fingerprint) {
+      fingerprintMap.set(r.subjectId, r.fingerprint)
     }
   }
   bgmLog(
@@ -296,7 +296,7 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  * @param worksheet 工作表
  * @param rowNumber 当前行号
  * @param getField 字段访问器（基于批量缓存）
- * @param skipSids 需跳过的 SID 集合（冲突处理）
+ * @param skipSubjectIds 需跳过的 SID 集合（冲突处理）
  * @param fingerprintMap 历史指纹映射（增量同步用）
  * @param seqCol 序列号列索引（用于颜色检查）
  * @returns 处理结果：task 有值表示需要同步
@@ -305,7 +305,7 @@ function processRowToSyncTask(
   worksheet: WpsWorksheet,
   rowNumber: number,
   getField: (row: number, key: string) => string,
-  skipSids: Set<string> | undefined,
+  skipSubjectIds: Set<string> | undefined,
   fingerprintMap: Map<string, string> | undefined,
   seqCol: number,
 ): RowProcessOutcome {
@@ -314,7 +314,7 @@ function processRowToSyncTask(
       worksheet,
       rowNumber,
       getField,
-      skipSids,
+      skipSubjectIds,
       fingerprintMap,
       seqCol,
     )
@@ -331,18 +331,18 @@ function processRowToSyncTaskInner(
   worksheet: WpsWorksheet,
   rowNumber: number,
   getField: (row: number, key: string) => string,
-  skipSids: Set<string> | undefined,
+  skipSubjectIds: Set<string> | undefined,
   fingerprintMap: Map<string, string> | undefined,
   seqCol: number,
 ): RowProcessOutcome {
   const bgmUrl = getField(rowNumber, 'Bangumi_URL')
   if (!bgmUrl) return { task: null, skipped: true, failed: false }
 
-  const sid = extractSubjectId(bgmUrl)
-  if (!sid) return { task: null, skipped: true, failed: false }
+  const subjectId = extractSubjectId(bgmUrl)
+  if (!subjectId) return { task: null, skipped: true, failed: false }
 
   // 冲突跳过
-  if (skipSids?.has(sid)) {
+  if (skipSubjectIds?.has(subjectId)) {
     return { task: null, skipped: true, failed: false }
   }
 
@@ -363,7 +363,7 @@ function processRowToSyncTaskInner(
   if (fingerprintMap) {
     currentFingerprint = calcSyncRowFingerprint((key) => getField(rowNumber, key), watchType)
 
-    const storedFingerprint = fingerprintMap.get(sid)
+    const storedFingerprint = fingerprintMap.get(subjectId)
     if (storedFingerprint === currentFingerprint) {
       return { task: null, skipped: true, failed: false }
     }
@@ -382,7 +382,7 @@ function processRowToSyncTaskInner(
 
   const task: _SyncTask = {
     rowNum: rowNumber,
-    sid,
+    subjectId,
     bgmUrl,
     name,
     jsonBody,
@@ -436,14 +436,14 @@ function prepareSyncTasks(
   // 步骤4：预处理收集同步任务（业务处理）
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤4: 预处理收集同步任务')
   const syncTasks: _SyncTask[] = []
-  const skipSids = options?.skipSids
+  const skipSubjectIds = options?.skipSubjectIds
 
   for (const rowNumber of rowsToProcess) {
     const outcome = processRowToSyncTask(
       worksheet,
       rowNumber,
       getField,
-      skipSids,
+      skipSubjectIds,
       fingerprintMap,
       seqCol,
     )
@@ -484,23 +484,23 @@ async function markEpisodesByType(task: _SyncTask, token: string): Promise<void>
     try {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[batchSyncRequests] SID ${task.sid} 状态${task.type === 2 ? '"看过"' : '"在看"'}(type=${String(task.type)})，集数: ${String(task.epCount)}，开始标记章节...`,
+        `[batchSyncRequests] SID ${task.subjectId} 状态${task.type === 2 ? '"看过"' : '"在看"'}(type=${String(task.type)})，集数: ${String(task.epCount)}，开始标记章节...`,
       )
-      const epResult = await _markEpisodesComplete(task.sid, task.epCount, token)
+      const epResult = await _markEpisodesComplete(task.subjectId, task.epCount, token)
       bgmLog(
         LOG_LEVELS.INFO,
-        `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`,
+        `[batchSyncRequests] SID ${task.subjectId} 章节标记结果: ${epResult.message}`,
       )
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
+        `[batchSyncRequests] SID ${task.subjectId} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
   } else if (task.epCount && task.epCount > 0) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[batchSyncRequests] SID ${task.sid} 状态非"看过/在看"(type=${String(task.type)})，跳过章节标记`,
+      `[batchSyncRequests] SID ${task.subjectId} 状态非"看过/在看"(type=${String(task.type)})，跳过章节标记`,
     )
   }
 }
@@ -568,7 +568,7 @@ async function batchSyncRequests(
 
           const apiResult = await _bgmRequestSync(
             'POST',
-            `/v0/users${userIdPath}/collections/${task.sid}`,
+            `/v0/users${userIdPath}/collections/${task.subjectId}`,
             task.jsonBody,
             token,
           )
@@ -578,7 +578,7 @@ async function batchSyncRequests(
             success.push(task)
             bgmLog(
               LOG_LEVELS.INFO,
-              `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${String(apiResult.code)}`,
+              `[batchSyncRequests] SID ${task.subjectId} 同步成功，HTTP ${String(apiResult.code)}`,
             )
 
             // 按收藏类型处理章节标记（"看过" type=2 和 "在看" type=3 均需标记）
@@ -587,14 +587,14 @@ async function batchSyncRequests(
             fail.push(task)
             bgmLog(
               LOG_LEVELS.WARN,
-              `[batchSyncRequests] SID ${task.sid} 同步失败，HTTP ${String(apiResult.code)}，消息: ${apiResult.message}`,
+              `[batchSyncRequests] SID ${task.subjectId} 同步失败，HTTP ${String(apiResult.code)}，消息: ${apiResult.message}`,
             )
           }
         } catch (error: unknown) {
           fail.push(task)
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[batchSyncRequests] SID ${task.sid} 同步异常: ${error instanceof Error ? error.message : String(error)}`,
+            `[batchSyncRequests] SID ${task.subjectId} 同步异常: ${error instanceof Error ? error.message : String(error)}`,
           )
         } finally {
           entry.done = true
@@ -696,7 +696,7 @@ export async function SyncToBangumiAsync(
   )
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync]   - 跳过冲突数量: ${String(options?.skipSids?.size ?? 0)}`,
+    `[SyncToBangumiAsync]   - 跳过冲突数量: ${String(options?.skipSubjectIds?.size ?? 0)}`,
   )
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 表头行: ${String(headerRow)}`)
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${String(lastRow)}`)
@@ -999,17 +999,17 @@ async function executeSelectedSync(
 
         if (bgmUrl)
           if (isBangumiUrl(bgmUrl)) {
-            const sid = extractSubjectId(bgmUrl)
-            if (sid) {
+            const subjectId = extractSubjectId(bgmUrl)
+            if (subjectId) {
               bgmLog(
                 LOG_LEVELS.INFO,
-                `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
+                `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${subjectId}, URL=${bgmUrl}`,
               )
               getSyncProgressApi().update(
                 index + 1,
                 rows.length,
-                `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
-                `⏳️ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
+                `${rowProgress} 行${String(rowNumber)} "${name || subjectId}" 同步中...`,
+                `⏳️ ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" SID=${subjectId} 开始同步`,
               )
 
               const finishCol = columnMap.get('完播日')
@@ -1018,10 +1018,10 @@ async function executeSelectedSync(
               const jsonBody = buildJsonPayload((key) => readField(rowNumber, key), finishedDate)
 
               if (jsonBody === '{}') {
-                const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
+                const message = `行${String(rowNumber)} "${name || subjectId}" 请求体为空，跳过`
                 bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
                 getNotifyApi().toast(message, 'warn')
-                details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
+                details.push(`⊘ 行${String(rowNumber)} ${name || subjectId} 跳过: 请求体为空`)
                 counters.skip += 1
                 getSyncProgressApi().update(
                   index + 1,
@@ -1035,23 +1035,23 @@ async function executeSelectedSync(
                   `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
                 )
 
-                const endpoint = `/v0/users${userPath}/collections/${sid}`
+                const endpoint = `/v0/users${userPath}/collections/${subjectId}`
                 const result = await _bgmRequestSync('POST', endpoint, jsonBody, token)
 
                 if (result.code >= 200 && result.code < 300) {
                   counters.success += 1
                   details.push(
-                    `✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`,
+                    `✓ 行${String(rowNumber)} ${name || subjectId} HTTP:${String(result.code)}`,
                   )
                   bgmLog(
                     LOG_LEVELS.INFO,
-                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
+                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" 同步成功！HTTP: ${String(result.code)}`,
                   )
                   getSyncProgressApi().update(
                     index + 1,
                     rows.length,
-                    `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
-                    `✓ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 成功 HTTP:${String(result.code)}`,
+                    `${rowProgress} 行${String(rowNumber)} "${name || subjectId}" ✓ HTTP:${String(result.code)}`,
+                    `✓ ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" 成功 HTTP:${String(result.code)}`,
                   )
 
                   // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
@@ -1077,7 +1077,7 @@ async function executeSelectedSync(
                       LOG_LEVELS.INFO,
                       `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
                     )
-                    const epResult = await _markEpisodesComplete(sid, epCount, token)
+                    const epResult = await _markEpisodesComplete(subjectId, epCount, token)
                     counters.episodeMark += 1
                     bgmLog(
                       LOG_LEVELS.INFO,
@@ -1093,17 +1093,17 @@ async function executeSelectedSync(
                   counters.fail += 1
                   failedRows.push(rowNumber)
                   details.push(
-                    `✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`,
+                    `✗ 行${String(rowNumber)} ${name || subjectId} HTTP:${String(result.code)}`,
                   )
                   bgmLog(
                     LOG_LEVELS.WARN,
-                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
+                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
                   )
                   getSyncProgressApi().update(
                     index + 1,
                     rows.length,
-                    `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
-                    `✗ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
+                    `${rowProgress} 行${String(rowNumber)} "${name || subjectId}" ✗ HTTP:${String(result.code)}`,
+                    `✗ ${rowProgress} 行${String(rowNumber)} "${name || subjectId}" 失败 HTTP:${String(result.code)} ${result.message}`,
                   )
                 }
               }

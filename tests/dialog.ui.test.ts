@@ -78,7 +78,7 @@ function makeStats(overrides: Partial<SyncProgressStats> = {}): SyncProgressStat
 
 /** 构造一条同步明细 */
 function makeDetail(overrides: Partial<GithubSyncDetailItem> = {}): GithubSyncDetailItem {
-  return { kind: 'add', sid: '123', name: '葬送的芙莉莲', ...overrides }
+  return { kind: 'add', subjectId: '123', name: '葬送的芙莉莲', ...overrides }
 }
 
 /** 取 mock 进度组件最近一次创建参数里的某个回调 */

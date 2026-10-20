@@ -970,7 +970,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
   })
 
   it('打开结果详情 → 以同步记录表末行作为滚动目标', async () => {
-    mocks.syncFromRemote.mockResolvedValueOnce({ ...result, details: [{ sid: 1 }] })
+    mocks.syncFromRemote.mockResolvedValueOnce({ ...result, details: [{ subjectId: 1 }] })
     mocks.getSyncRecordSheetIfExists.mockReturnValueOnce({})
     mocks.getLastRow.mockReturnValueOnce(42)
 

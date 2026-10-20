@@ -398,7 +398,7 @@ describe('syncRecord', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecord({
-        sid: 'test-sid',
+        subjectId: 'test-sid',
         name: '测试',
         url: 'https://bgm.tv/subject/123',
         type: '看',
@@ -410,7 +410,7 @@ describe('syncRecord', () => {
     it('应添加新记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecord({
-        sid: 'test-sid',
+        subjectId: 'test-sid',
         name: '测试',
         url: 'https://bgm.tv/subject/123',
         type: '看',
@@ -425,7 +425,7 @@ describe('syncRecord', () => {
       mockGetCellValue.mockReturnValue('3')
       // Add first record
       addSyncRecord({
-        sid: 'update-sid',
+        subjectId: 'update-sid',
         name: '第一次',
         url: 'http://example.com/1',
         type: '看',
@@ -433,7 +433,7 @@ describe('syncRecord', () => {
       })
       // Add second record with same SID → should update
       const isResult = addSyncRecord({
-        sid: 'update-sid',
+        subjectId: 'update-sid',
         name: '第二次',
         url: 'http://example.com/2',
         type: '看',
@@ -450,10 +450,10 @@ describe('syncRecord', () => {
       })
       mockGetCellValue.mockReturnValue('1')
       // First add to build cache
-      addSyncRecord({ sid: 'fail-sid', name: '测试', url: 'http://fail.com', type: '看' })
+      addSyncRecord({ subjectId: 'fail-sid', name: '测试', url: 'http://fail.com', type: '看' })
       // Second add → may update or add → could fail
       const isResult = addSyncRecord({
-        sid: 'fail-sid',
+        subjectId: 'fail-sid',
         name: '更新',
         url: 'http://fail.com/2',
         type: '看',
@@ -464,7 +464,7 @@ describe('syncRecord', () => {
     it('空 SID 时仍应添加新记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecord({
-        sid: '',
+        subjectId: '',
         name: '无SID记录',
         url: 'http://example.com',
         type: '看',
@@ -483,9 +483,9 @@ describe('syncRecord', () => {
     it('应批量添加记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecords([
-        { sid: '1', name: 'one', url: 'http://a.com' },
-        { sid: '2', name: 'two', url: 'http://b.com' },
-        { sid: '3', name: 'three', url: 'http://c.com' },
+        { subjectId: '1', name: 'one', url: 'http://a.com' },
+        { subjectId: '2', name: 'two', url: 'http://b.com' },
+        { subjectId: '3', name: 'three', url: 'http://c.com' },
       ])
       expect(isResult).toBe(true)
     })
@@ -496,8 +496,8 @@ describe('syncRecord', () => {
         (_ws: unknown, _r: unknown, _c: unknown, _v: unknown) => true,
       )
       const isResult = addSyncRecords([
-        { sid: '1', name: 'one', url: 'http://a.com' },
-        { sid: '2', name: 'two', url: 'http://b.com' },
+        { subjectId: '1', name: 'one', url: 'http://a.com' },
+        { subjectId: '2', name: 'two', url: 'http://b.com' },
       ])
       expect(isResult).toBe(true)
     })
@@ -597,7 +597,7 @@ describe('syncRecord', () => {
     it('成功状态应设置 SUCCESS 颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       addSyncRecord({
-        sid: 'color-success',
+        subjectId: 'color-success',
         name: '成功记录',
         url: 'http://c.com',
         type: '看',
@@ -611,7 +611,7 @@ describe('syncRecord', () => {
     it('失败状态应设置 FAIL 颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       addSyncRecord({
-        sid: 'color-fail',
+        subjectId: 'color-fail',
         name: '失败记录',
         url: 'http://c.com',
         type: '看',
@@ -624,7 +624,7 @@ describe('syncRecord', () => {
     it('跳过状态应设置 SKIP 颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       addSyncRecord({
-        sid: 'color-skip',
+        subjectId: 'color-skip',
         name: '跳过记录',
         url: 'http://c.com',
         type: '看',
@@ -637,7 +637,7 @@ describe('syncRecord', () => {
     it('多次同步应设置更深颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       addSyncRecord({
-        sid: 'color-multi',
+        subjectId: 'color-multi',
         name: '多次同步',
         url: 'http://c.com',
         type: '看',
@@ -650,7 +650,7 @@ describe('syncRecord', () => {
     it('类型颜色应根据类型名设置', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       addSyncRecord({
-        sid: 'type-color',
+        subjectId: 'type-color',
         name: '类型颜色',
         url: 'http://c.com',
         type: '想',
@@ -664,9 +664,9 @@ describe('syncRecord', () => {
     it('缓存有效时不应重建', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       // First add builds cache
-      addSyncRecord({ sid: 'cache-1', name: '缓存测试1', url: 'http://c.com' })
+      addSyncRecord({ subjectId: 'cache-1', name: '缓存测试1', url: 'http://c.com' })
       // Second add should use cache
-      addSyncRecord({ sid: 'cache-2', name: '缓存测试2', url: 'http://c.com' })
+      addSyncRecord({ subjectId: 'cache-2', name: '缓存测试2', url: 'http://c.com' })
       // readRangeValues should have been called for cache building
     })
 
@@ -676,7 +676,7 @@ describe('syncRecord', () => {
       mockReadRangeValues.mockReturnValue([])
       // Should not throw
       expect(() =>
-        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),
+        addSyncRecord({ subjectId: 'empty-cache', name: '空缓存', url: 'http://c.com' }),
       ).not.toThrow()
     })
 
@@ -687,7 +687,7 @@ describe('syncRecord', () => {
         ['', '', '', '', '', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', '', '', '', '', ''],
       ])
-      addSyncRecord({ sid: 'empty-data', name: '空数据行', url: 'http://c.com' })
+      addSyncRecord({ subjectId: 'empty-data', name: '空数据行', url: 'http://c.com' })
       // Should not throw
     })
   })
@@ -722,7 +722,7 @@ describe('syncRecord', () => {
         const c = column as number
         if (r === 2) {
           // 旧结构 SID 在第5列
-          if (c === 5) return 'migrate-sid-1'
+          if (c === 5) return 'migrate-subjectId-1'
           // URL 在第4列
           if (c === 4) return 'http://migrate1.com'
           // 条目类型
@@ -768,7 +768,7 @@ describe('syncRecord', () => {
         const c = column as number
         if (r === 2) {
           // SID 在第1列
-          if (c === 1) return 'migrate-sid-2'
+          if (c === 1) return 'migrate-subjectId-2'
           // URL 在第4列
           if (c === 4) return 'http://migrate2.com'
           // 条目类型
@@ -928,8 +928,20 @@ describe('syncRecord', () => {
     it('新行应批量写入并设置颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecords([
-        { sid: 'batch-1', name: '批量1', url: 'http://b1.com', type: '看', status: 'success' },
-        { sid: 'batch-2', name: '批量2', url: 'http://b2.com', type: '想', status: 'success' },
+        {
+          subjectId: 'batch-1',
+          name: '批量1',
+          url: 'http://b1.com',
+          type: '看',
+          status: 'success',
+        },
+        {
+          subjectId: 'batch-2',
+          name: '批量2',
+          url: 'http://b2.com',
+          type: '想',
+          status: 'success',
+        },
       ])
       expect(isResult).toBe(true)
     })
@@ -939,10 +951,16 @@ describe('syncRecord', () => {
       // 现有 count=5
       mockGetCellValue.mockReturnValue('5')
       // 先添加一个记录建立缓存
-      addSyncRecord({ sid: 'merge-sid', name: '初始', url: 'http://m.com', type: '看', count: 5 })
+      addSyncRecord({
+        subjectId: 'merge-sid',
+        name: '初始',
+        url: 'http://m.com',
+        type: '看',
+        count: 5,
+      })
       // 批量添加相同 SID 应合并
       const isResult = addSyncRecords([
-        { sid: 'merge-sid', name: '更新', url: 'http://m2.com', type: '看', count: 3 },
+        { subjectId: 'merge-sid', name: '更新', url: 'http://m2.com', type: '看', count: 3 },
       ])
       expect(isResult).toBe(true)
     })
@@ -976,7 +994,7 @@ describe('syncRecord', () => {
       // 用相同 SID 批量添加，buildCache 会从 readRangeValues 中找到该 SID
       // 然后走更新路径时 writeSheetRows 抛出异常
       const isResult = addSyncRecords([
-        { sid: 'fail-batch', name: '更新', url: 'http://fail.com/2', type: '看', count: 2 },
+        { subjectId: 'fail-batch', name: '更新', url: 'http://fail.com/2', type: '看', count: 2 },
       ])
       expect(isResult).toBe(false)
     })
@@ -991,7 +1009,7 @@ describe('syncRecord', () => {
       mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, column: unknown) => {
         const r = row as number
         const c = column as number
-        if (c === 1) return `unique-sid-${String(r)}`
+        if (c === 1) return `unique-subjectId-${String(r)}`
         return ''
       })
       const isResult = deduplicateSyncRecords()
@@ -1043,7 +1061,7 @@ describe('syncRecord', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecord({
-        sid: 'disabled-sid',
+        subjectId: 'disabled-sid',
         name: '禁用测试',
         url: 'http://disabled.com',
         type: '看',
@@ -1268,7 +1286,7 @@ describe('syncRecord', () => {
       ])
 
       const isResult = addSyncRecord({
-        sid: 'existing-sid',
+        subjectId: 'existing-sid',
         status: 'success',
         count: 2,
         name: '新名称',
@@ -1309,7 +1327,7 @@ describe('syncRecord', () => {
       ])
 
       const isResult = addSyncRecord({
-        sid: 'minimal-sid',
+        subjectId: 'minimal-sid',
         status: 'success',
         count: 1,
       })
@@ -1355,8 +1373,8 @@ describe('syncRecord', () => {
     it('isSyncRecordEnabled 返回 false 时 addSyncRecords 应返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       const isResult = addSyncRecords([
-        { sid: 'disabled-1', name: '禁用测试1', url: 'http://d1.com' },
-        { sid: 'disabled-2', name: '禁用测试2', url: 'http://d2.com' },
+        { subjectId: 'disabled-1', name: '禁用测试1', url: 'http://d1.com' },
+        { subjectId: 'disabled-2', name: '禁用测试2', url: 'http://d2.com' },
       ])
       expect(isResult).toBe(false)
       // 不应调用任何 WPS 操作
@@ -1404,7 +1422,7 @@ describe('syncRecord', () => {
       })
 
       const isResult = addSyncRecord({
-        sid: 'new-sid-fallback',
+        subjectId: 'new-subjectId-fallback',
         name: '回退测试',
         url: 'http://fallback.com',
         status: 'success',
@@ -1415,7 +1433,7 @@ describe('syncRecord', () => {
       // 验证 newRow 使用了 2（Rows.Count > 1 ? 2 : 1）：整行一次写入地址为 A2:L2
       expect(getWrittenRows('A2:L2')).toEqual([
         [
-          'new-sid-fallback',
+          'new-subjectId-fallback',
           expect.any(String),
           '回退测试',
           'http://fallback.com',
@@ -1453,7 +1471,7 @@ describe('syncRecord', () => {
       })
 
       const isResult = addSyncRecord({
-        sid: 'new-sid-row1',
+        subjectId: 'new-subjectId-row1',
         name: '单行测试',
         url: 'http://row1.com',
         status: 'success',
@@ -1517,7 +1535,7 @@ describe('syncRecord', () => {
       // 批量添加带全量可选字段的记录 → 走更新路径
       const isResult = addSyncRecords([
         {
-          sid: 'upd-sid',
+          subjectId: 'upd-sid',
           name: '新名称',
           url: 'http://new.com',
           type: 'movie',
@@ -1574,7 +1592,7 @@ describe('syncRecord', () => {
       // 只传部分可选字段
       const isResult = addSyncRecords([
         {
-          sid: 'partial-sid',
+          subjectId: 'partial-sid',
           url: 'http://new.com',
           count: 1,
           status: 'success',
@@ -1598,7 +1616,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockGetLastRow.mockReturnValue(10)
 
     const isResult = addSyncRecord({
-      sid: 'color-default',
+      subjectId: 'color-default',
       status: 'unknown-status',
       content: '测试默认颜色',
     })
@@ -1616,7 +1634,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockGetLastRow.mockReturnValue(10)
 
     const isResult = addSyncRecord({
-      sid: 'color-success',
+      subjectId: 'color-success',
       status: 'success',
       content: '测试成功颜色',
     })
@@ -1632,7 +1650,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockGetLastRow.mockReturnValue(10)
 
     const isResult = addSyncRecord({
-      sid: 'color-fail',
+      subjectId: 'color-fail',
       status: 'fail',
       content: '测试失败颜色',
     })
@@ -1648,7 +1666,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockGetLastRow.mockReturnValue(10)
 
     const isResult = addSyncRecord({
-      sid: 'color-skip',
+      subjectId: 'color-skip',
       status: 'skip',
       content: '测试跳过颜色',
     })
@@ -1669,7 +1687,7 @@ describe('buildCache 异常路径 (line 343)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'cache-err',
+      subjectId: 'cache-err',
       content: '测试缓存异常',
     })
 
@@ -1711,13 +1729,13 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     addSyncRecord({
-      sid: 'update-sid',
+      subjectId: 'update-sid',
       name: '旧名称',
       count: 2,
     })
 
     const isResult = addSyncRecord({
-      sid: 'update-sid',
+      subjectId: 'update-sid',
       name: '新名称',
       url: 'http://new.com',
       type: 'movie',
@@ -1760,7 +1778,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'partial-sid',
+      subjectId: 'partial-sid',
       url: 'http://new.com',
       count: 1,
       status: 'success',
@@ -1796,7 +1814,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'coll-sid',
+      subjectId: 'coll-sid',
       count: 1,
       status: 'success',
     })
@@ -1829,7 +1847,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'fp-sid',
+      subjectId: 'fp-sid',
       count: 1,
       status: 'success',
     })
@@ -1848,7 +1866,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockSetCellValue.mockClear()
 
     const isResult = addSyncRecord({
-      sid: 'new-sid-1',
+      subjectId: 'new-subjectId-1',
       name: '新条目',
       url: 'http://example.com',
       count: 1,
@@ -1861,7 +1879,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     // P1-C：新建行改为一次 Range.Value2 写入整行（UsedRange Row1 + Count10 → nextRow 11）
     expect(getWrittenRows('A11:L11')).toEqual([
       [
-        'new-sid-1',
+        'new-subjectId-1',
         expect.any(String),
         '新条目',
         'http://example.com',
@@ -1885,7 +1903,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockSetCellValue.mockClear()
 
     const isResult = addSyncRecord({
-      sid: 'new-fp-1',
+      subjectId: 'new-fp-1',
       fingerprint: 'test-fingerprint',
       count: 1,
       status: 'success',
@@ -1902,7 +1920,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockSetCellValue.mockClear()
 
     const isResult = addSyncRecord({
-      sid: 'new-coll-1',
+      subjectId: 'new-coll-1',
       collType: '想',
       count: 1,
       status: 'success',
@@ -1921,7 +1939,7 @@ describe('addSyncRecords 异常路径', () => {
 
   it('同步记录未启用时应返回 false', () => {
     mockGetSyncRecordEnabled.mockReturnValue(false)
-    const isResult = addSyncRecords([{ sid: 'test' }])
+    const isResult = addSyncRecords([{ subjectId: 'test' }])
     expect(isResult).toBe(false)
     mockGetSyncRecordEnabled.mockReturnValue(true)
   })
@@ -1940,7 +1958,7 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'cache-err-343',
+      subjectId: 'cache-err-343',
       content: '测试缓存异常路径',
     })
 
@@ -1970,7 +1988,7 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
     ])
 
     const isResult = addSyncRecord({
-      sid: 'cache-valid',
+      subjectId: 'cache-valid',
       content: '有效缓存测试',
     })
 
@@ -1991,7 +2009,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
     mockReadRangeValues.mockReturnValue([])
 
     const isResult = addSyncRecord({
-      sid: 'all-fields',
+      subjectId: 'all-fields',
       name: '全字段',
       url: 'http://all.com',
       type: 'movie',
@@ -2048,10 +2066,10 @@ describe('addSyncRecord 完整字段覆盖', () => {
       return ''
     })
 
-    addSyncRecord({ sid: 'upd-all', count: 2 })
+    addSyncRecord({ subjectId: 'upd-all', count: 2 })
 
     const isResult = addSyncRecord({
-      sid: 'upd-all',
+      subjectId: 'upd-all',
       name: '新名称',
       url: 'http://new.com',
       type: 'movie',
@@ -2103,14 +2121,14 @@ describe('addSyncRecords 成功路径', () => {
 
     const isResult = addSyncRecords([
       {
-        sid: 'existing-sid',
+        subjectId: 'existing-sid',
         name: '更新条目',
         count: 3,
         status: 'success',
         source: '更新',
       },
       {
-        sid: 'new-sid-batch',
+        subjectId: 'new-subjectId-batch',
         name: '新建条目',
         count: 1,
         status: 'success',
@@ -2127,7 +2145,7 @@ describe('addSyncRecords 成功路径', () => {
 
     const isResult = addSyncRecords([
       {
-        sid: 'no-fp',
+        subjectId: 'no-fp',
         name: '无指纹',
         count: 1,
         status: 'success',
@@ -2158,7 +2176,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
     ])
 
     const isResult = addSyncRecord({
-      sid: 'inner-catch',
+      subjectId: 'inner-catch',
       content: '测试内层 catch',
       count: 1,
       status: 'success',
@@ -2189,7 +2207,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
     ])
 
     const isResult = addSyncRecord({
-      sid: 'valid-sid',
+      subjectId: 'valid-sid',
       name: '正常名称',
       count: 1,
       status: 'success',
@@ -2233,7 +2251,7 @@ describe('buildCache message 字段 (line 337)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'msg-sid',
+      subjectId: 'msg-sid',
       name: '测试名称',
       count: 1,
       status: 'success',
@@ -2267,7 +2285,7 @@ describe('buildCache message 字段 (line 337)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'no-msg-sid',
+      subjectId: 'no-msg-sid',
       name: '测试名称',
       count: 1,
       status: 'success',
@@ -2301,7 +2319,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
 
     mockGetCellValue.mockImplementation((_sheet: unknown, row: number, column: number) => {
       if (row === 2) {
-        if (column === 1) return 'old-sid-1'
+        if (column === 1) return 'old-subjectId-1'
         if (column === 7) return '3'
       }
       return ''
@@ -2317,7 +2335,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
     })
 
     const isResult = addSyncRecord({
-      sid: 'old-sid-1',
+      subjectId: 'old-subjectId-1',
       name: '迁移测试',
       count: 1,
       status: 'success',
@@ -2352,7 +2370,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
         '',
         '',
         'http://migrate2.com',
-        'migrate-sid-2',
+        'migrate-subjectId-2',
         'TV',
         '3',
         '内容2',
@@ -2366,7 +2384,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
         '',
         '',
         'http://migrate3.com',
-        'migrate-sid-3',
+        'migrate-subjectId-3',
         '电影',
         '1',
         '内容3',
@@ -2398,7 +2416,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     })
 
     const isResult = addSyncRecord({
-      sid: 'new-sid',
+      subjectId: 'new-sid',
       name: '新记录',
       count: 1,
       status: 'success',
@@ -2409,7 +2427,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     expect(getWrittenRows('A1:L1')).toEqual([SYNC_RECORD_COLUMNS])
     expect(getWrittenRows('A2:L3')).toEqual([
       [
-        'migrate-sid-2',
+        'migrate-subjectId-2',
         '',
         '',
         'http://migrate2.com',
@@ -2423,7 +2441,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
         'fp-2',
       ],
       [
-        'migrate-sid-3',
+        'migrate-subjectId-3',
         '',
         '',
         'http://migrate3.com',
@@ -2464,7 +2482,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     })
 
     const isResult = addSyncRecord({
-      sid: 'empty-migrate',
+      subjectId: 'empty-migrate',
       name: '空迁移',
       count: 1,
       status: 'success',
@@ -2496,7 +2514,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       throwingProxy,
       // 正常行数据
       [
-        'valid-sid-343',
+        'valid-subjectId-343',
         '2024-01-01T00:00:00',
         '正常名称',
         'http://valid343.com',
@@ -2514,7 +2532,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     // 否则 readRangeCellValues 返回 Proxy 会在 buildUpdatedSyncRow 读列时再次抛错。
     mockReadRangeCellValues.mockReturnValue([
       [
-        'valid-sid-343',
+        'valid-subjectId-343',
         '2024-01-01T00:00:00',
         '正常名称',
         'http://valid343.com',
@@ -2530,13 +2548,13 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     ])
 
     mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
-      if (column === 1) return 'valid-sid-343'
+      if (column === 1) return 'valid-subjectId-343'
       if (column === 7) return '1'
       return ''
     })
 
     const isResult = addSyncRecord({
-      sid: 'valid-sid-343',
+      subjectId: 'valid-subjectId-343',
       name: '正常名称',
       count: 1,
       status: 'success',
@@ -2567,7 +2585,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       throwingProxy1,
       throwingProxy2,
       [
-        'valid-sid-343b',
+        'valid-subjectId-343b',
         '2024-01-01T00:00:00',
         '正常名称B',
         'http://valid343b.com',
@@ -2584,7 +2602,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     // 更新路径整行读-改-写需要「已存在行」的原始整行：用正常行（跳过抛异常的 Proxy 行）。
     mockReadRangeCellValues.mockReturnValue([
       [
-        'valid-sid-343b',
+        'valid-subjectId-343b',
         '2024-01-01T00:00:00',
         '正常名称B',
         'http://valid343b.com',
@@ -2600,13 +2618,13 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     ])
 
     mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, column: number) => {
-      if (column === 1) return 'valid-sid-343b'
+      if (column === 1) return 'valid-subjectId-343b'
       if (column === 7) return '1'
       return ''
     })
 
     const isResult = addSyncRecord({
-      sid: 'valid-sid-343b',
+      subjectId: 'valid-subjectId-343b',
       name: '正常名称B',
       count: 1,
       status: 'success',
@@ -2647,7 +2665,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
 
     // 即使查找工作表抛异常，getOrCreateSyncRecordSheet 应该继续尝试创建新表
     const isResult = addSyncRecord({
-      sid: 'catch-line-116',
+      subjectId: 'catch-line-116',
       name: '异常捕获测试',
       count: 1,
       status: 'success',
@@ -2680,7 +2698,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
     const isResult = addSyncRecord({
-      sid: 'catch-line-137',
+      subjectId: 'catch-line-137',
       name: 'Move异常测试',
       count: 1,
       status: 'success',
@@ -2714,7 +2732,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
 
     // 即使 Add 也失败，addSyncRecord 应返回 false 而非崩溃
     const isResult = addSyncRecord({
-      sid: 'both-fail',
+      subjectId: 'both-fail',
       name: '双重失败测试',
       count: 1,
       status: 'success',
@@ -2827,7 +2845,7 @@ describe('buildCache count 字段回退 (line 334)', () => {
         '',
       ],
     ])
-    addSyncRecord({ sid: 'sid-1', name: '测试', url: 'http://test.com', type: '看' })
+    addSyncRecord({ subjectId: 'sid-1', name: '测试', url: 'http://test.com', type: '看' })
     const records = getAllSyncRecords()
     expect(records.length).toBeGreaterThan(0)
   })
@@ -2852,7 +2870,7 @@ describe('buildCache count 字段回退 (line 334)', () => {
         '',
       ],
     ])
-    addSyncRecord({ sid: 'sid-2', name: '测试2', url: 'http://test2.com', type: '想' })
+    addSyncRecord({ subjectId: 'sid-2', name: '测试2', url: 'http://test2.com', type: '想' })
     const records = getAllSyncRecords()
     expect(records.length).toBeGreaterThan(0)
   })
@@ -2960,7 +2978,13 @@ describe('addSyncRecords UsedRange 为 null (line 560)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
     const isResult = addSyncRecords([
-      { sid: 'null-range', name: '测试', url: 'http://test.com', type: '看', status: 'success' },
+      {
+        subjectId: 'null-range',
+        name: '测试',
+        url: 'http://test.com',
+        type: '看',
+        status: 'success',
+      },
     ])
     expect(isResult).toBe(true)
   })
@@ -2973,7 +2997,13 @@ describe('addSyncRecords UsedRange 为 null (line 560)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
     const isResult = addSyncRecords([
-      { sid: 'undef-range', name: '测试', url: 'http://test.com', type: '看', status: 'success' },
+      {
+        subjectId: 'undef-range',
+        name: '测试',
+        url: 'http://test.com',
+        type: '看',
+        status: 'success',
+      },
     ])
     expect(isResult).toBe(true)
   })
@@ -3014,7 +3044,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
 
     // 不传 fingerprint → 走 parameters.fingerprint !== undefined ? ... : ''
     const isResult = addSyncRecord({
-      sid: 'no-fingerprint',
+      subjectId: 'no-fingerprint',
       name: '无指纹测试',
       url: 'http://test.com',
       count: 1,
@@ -3032,8 +3062,8 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
 
     // 批量添加，均不传 fingerprint
     const isResult = addSyncRecords([
-      { sid: 'batch-no-fp-1', name: '批量1', count: 1, status: 'success' },
-      { sid: 'batch-no-fp-2', name: '批量2', count: 1, status: 'success' },
+      { subjectId: 'batch-no-fp-1', name: '批量1', count: 1, status: 'success' },
+      { subjectId: 'batch-no-fp-2', name: '批量2', count: 1, status: 'success' },
     ])
 
     expect(isResult).toBe(true)
@@ -3051,7 +3081,7 @@ describe('addSyncRecords 批量写入 null 数据跳过 (line 573)', () => {
     // 使用 addSyncRecord 添加单条记录来触发批量写入路径
     // batchWriteNewRows 中若 newRows 含有 null 项，line 573 会跳过
     const isResult = addSyncRecord({
-      sid: 'null-data-test',
+      subjectId: 'null-data-test',
       name: 'null 数据测试',
       url: 'http://test.com',
       count: 2,
@@ -3140,7 +3170,7 @@ describe('getAllSyncRecords 异常路径', () => {
 
 // ========== 补充测试：addSyncRecordSummary ==========
 describe('addSyncRecordSummary 行为', () => {
-  it('应委托给 addSyncRecord 并强制 sid 为空、count 为 1', () => {
+  it('应委托给 addSyncRecord 并强制 subjectId 为空、count 为 1', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)

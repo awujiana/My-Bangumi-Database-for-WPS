@@ -630,7 +630,7 @@ describe('SyncToBangumiAsync', () => {
     expect(callArguments?.[0]).toBe('POST')
     // token
     expect(callArguments?.[3]).toBe('test-token')
-    // endpoint 应包含 sid
+    // endpoint 应包含 subjectId
     expect(callArguments?.[1]).toContain('12345')
     // 应有成功计数（可能为 0 或 1，取决于 mock 设置）
     expect(result.success).toBeGreaterThanOrEqual(0)
@@ -836,7 +836,7 @@ describe('SyncToBangumiAsync', () => {
     expect(result).toHaveProperty('skip')
   })
 
-  it('skipSids 集合中的 SID 应被跳过', async () => {
+  it('skipSubjectIds 集合中的 SID 应被跳过', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
     const mockWs = createMockWorksheet({
@@ -855,9 +855,9 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const skipSids = new Set<string>(['12345'])
+    const skipSubjectIds = new Set<string>(['12345'])
     const result = await SyncToBangumiAsync(mockWs, columnMap, 'test-token', 2, 1, {
-      skipSids,
+      skipSubjectIds,
     })
 
     // SID 在跳过集合中 → bgmRequestSync 不应被调用

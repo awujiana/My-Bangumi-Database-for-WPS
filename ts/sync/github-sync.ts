@@ -19,7 +19,7 @@
  *   其后每行        ["12345","...","2026-07-21","2024-01-01",["标签1","标签2"],false,"12", ...]
  *   值数组按表头顺序排列，字段名只在表头出现一次（省去每行重复的键名）。
  *
- * URL 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * URL 字段从 subjectId 构造：https://bgm.tv/subject/{subjectId}
  * type 字段默认为 2（动漫），用于同步记录显示。
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
@@ -62,7 +62,8 @@ export {
   computeDiff,
   tagsToString,
   parseJsonl,
-  isGithubRemoteEntry,
+  isWireRemoteEntry,
+  toRemoteEntry,
   filterByTime,
   SYNC_STRATEGY_LABELS,
   EXTENDED_FIELD_MAP,

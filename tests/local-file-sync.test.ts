@@ -411,9 +411,9 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
     const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
 
     expect(entries).toHaveLength(2)
-    expect(entries[0]?.sid).toBe('111')
+    expect(entries[0]?.subjectId).toBe('111')
     expect(entries[0]?.name).toBe('条目A')
-    expect(entries[1]?.sid).toBe('222')
+    expect(entries[1]?.subjectId).toBe('222')
   })
 
   it('按 neededFields 带出 summary 片并按行拼接', async () => {
@@ -512,7 +512,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
     await expect(promise).rejects.toThrow(/请求被取消/)
   })
 
-  it('缺合法 sid 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
+  it('缺合法 subjectId 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
     mockLocalPath(MANIFEST_FILE)
     responseQueue = [
       makeManifestText(),

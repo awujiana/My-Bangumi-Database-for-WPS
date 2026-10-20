@@ -327,7 +327,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
     ).rejects.toThrow(/分片拼接失败：.*行数不一致/)
   })
 
-  it('拼接后全部缺 sid 时报错', async () => {
+  it('拼接后全部缺 subjectId 时报错', async () => {
     const { fetchText } = makeFetcher({
       [MANIFEST_PATH]: manifestText([SIX_SHARDS[0]]),
       'data/anime.base.jsonlines.gz': shardText(
@@ -346,7 +346,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
     ).rejects.toThrow(/分片拼接后没有可用记录/)
   })
 
-  it('部分记录缺 sid 时跳过并记 WARN', async () => {
+  it('部分记录缺 subjectId 时跳过并记 WARN', async () => {
     const { fetchText } = makeFetcher({
       [MANIFEST_PATH]: manifestText([SIX_SHARDS[0]]),
       'data/anime.base.jsonlines.gz': shardText(
@@ -389,7 +389,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
     expect(result.skippedInvalidRecords).toBe(0)
     expect(result.entries).toEqual([
       {
-        sid: '1',
+        subjectId: '1',
         name: 'A',
         name_original: 'エー',
         updatedAt: '2026-09-01',
@@ -399,7 +399,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
         summary: '简介 A',
       },
       {
-        sid: '2',
+        subjectId: '2',
         name: 'B',
         name_original: 'ビー',
         updatedAt: '2026-09-02',

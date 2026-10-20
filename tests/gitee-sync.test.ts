@@ -57,7 +57,7 @@ const BASE_FILE = 'data/anime.base.jsonlines.gz'
 /**
  * 构造一份最小分片清单：base（必选）+ summary（可选）
  *
- * 字段刻意与真实清单同形（每片都带 sid，其余字段不重叠），这样「连接键不参与
+ * 字段刻意与真实清单同形（每片都带 subjectId，其余字段不重叠），这样「连接键不参与
  * 选片匹配」的逻辑也在这一层被测到。
  */
 function makeManifestText(): string {
@@ -460,7 +460,7 @@ describe('fetchGiteeJson', () => {
 
     expect(responseQueue).toHaveLength(0)
     expect(entries).toHaveLength(1)
-    expect(entries[0]!.sid).toBe('1')
+    expect(entries[0]!.subjectId).toBe('1')
     expect(entries[0]!.name).toBe('条目1')
   })
 
@@ -528,7 +528,7 @@ describe('fetchGiteeJson', () => {
     await expect(fetchGiteeJson(undefined, new Set(['summary']))).rejects.toThrow(/分片拼接失败/)
   })
 
-  it('拼接后全部缺少合法 sid 时报错', async () => {
+  it('拼接后全部缺少合法 subjectId 时报错', async () => {
     responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n[null,"条目1","2026-09-08"]']
 
     await expect(fetchGiteeJson(undefined, new Set())).rejects.toThrow(/没有可用记录/)
@@ -555,7 +555,7 @@ describe('GiteeSyncSource.fetchRemoteEntries', () => {
     const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
 
     expect(entries).toHaveLength(1)
-    expect(entries[0]!.sid).toBe('1')
+    expect(entries[0]!.subjectId).toBe('1')
   })
 
   it('把 neededFields 透传给选片逻辑', async () => {
@@ -573,7 +573,7 @@ describe('GiteeSyncSource.fetchRemoteEntries', () => {
     expect(entries[0]!.summary).toBe('简介1')
   })
 
-  it('缺合法 sid 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
+  it('缺合法 subjectId 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
     const source = new GiteeSyncSource()
     responseQueue = [
       makeManifestText(),

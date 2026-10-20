@@ -269,13 +269,13 @@ afterEach(() => {
 
 /** 远程条目工厂（`detectGithubConflicts` 用例共用） */
 const remoteEntry = (over: Partial<GithubRemoteEntry>): GithubRemoteEntry => ({
-  sid: '100',
+  subjectId: '100',
   ...over,
 })
 
 /** 本地行条目工厂（`detectGithubConflicts` 用例共用） */
 const localEntry = (fields: Record<string, string>, row = 2): LocalRowEntry => ({
-  sid: '100',
+  subjectId: '100',
   row,
   fields,
 })
@@ -314,7 +314,7 @@ const installExecCommand = (result: boolean | (() => never)): void => {
 describe('ribbon-service · detectGithubConflicts', () => {
   it('远程无 SID → 跳过该条目', () => {
     const conflicts = detectGithubConflicts(
-      [remoteEntry({ sid: '', name: '动画A' })],
+      [remoteEntry({ subjectId: '', name: '动画A' })],
       new Map([['100', localEntry({ 名称: '动画A' })]]),
     )
 
@@ -348,7 +348,7 @@ describe('ribbon-service · detectGithubConflicts', () => {
 
     expect(conflicts).toEqual([
       {
-        sid: '100',
+        subjectId: '100',
         field: '名称',
         localValue: '本地名称',
         remoteValue: '远程名称',
@@ -375,7 +375,7 @@ describe('ribbon-service · detectGithubConflicts', () => {
 
     expect(conflicts).toEqual([
       {
-        sid: '100',
+        subjectId: '100',
         field: '标签/分级',
         localValue: 'TV|漫改',
         remoteValue: 'TV|原创',
@@ -634,7 +634,7 @@ describe('ribbon-service · detectConflicts', () => {
     expect(result.conflictCount).toBe(1)
     expect(result.conflicts[0]).toEqual({
       row: 2,
-      sid: '100',
+      subjectId: '100',
       name: '动画A',
       existingType: 1,
       incomingType: 2,
@@ -710,7 +710,7 @@ describe('ribbon-service · detectConflicts', () => {
     const result = await detectConflicts(asSheet(sheet), columnMap, 2, HEADER_ROW, 't0ken')
 
     expect(result.conflicts).toEqual([
-      { row: 2, sid: '100', name: '', existingType: 1, incomingType: 2 },
+      { row: 2, subjectId: '100', name: '', existingType: 1, incomingType: 2 },
     ])
   })
 })
@@ -810,11 +810,11 @@ describe('ribbon-service · syncWithConfirmation', () => {
     expect(confirmMessage).toContain('增量同步：开启')
     // 冲突策略 skip + 检测到冲突 → 把冲突 SID 传给同步层
     const options = m.syncToBangumiAsync.mock.calls[0]?.[5] as {
-      skipSids?: Set<string>
+      skipSubjectIds?: Set<string>
       incremental: boolean
     }
     expect(options.incremental).toBe(true)
-    expect(options.skipSids).toEqual(new Set(['100']))
+    expect(options.skipSubjectIds).toEqual(new Set(['100']))
     expect(app.StatusBar).toBe(false)
     expect(m.exitRunningState).toHaveBeenCalled()
   })

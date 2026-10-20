@@ -269,7 +269,7 @@ describe('selectShards', () => {
   })
 
   // 连接键陷阱（实际踩过两次，各写一条钉住）：
-  // 每片都带 sid，任何拿 sid 当「需要这个字段 / 这是必选片」判据的写法都会让选片失效。
+  // 每片都带 sid（线上键），任何拿 sid 当「需要这个字段 / 这是必选片」判据的写法都会让选片失效。
   it('neededFields 里含 sid 时不得把所有片都选中', () => {
     const picked = selectShards(makeManifest(), ['sid', 'updatedAt', 'name'])
 

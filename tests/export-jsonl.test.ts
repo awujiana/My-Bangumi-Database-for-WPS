@@ -297,6 +297,7 @@ describe('buildJsonlFromSheet', () => {
     expect(header).toContain('sid')
     expect(row).toHaveLength(header.length)
     const parsed = parseRecord(result)
+    // 导出的是线上格式：第一列键名是 sid（模型里的 subjectId 只在归一后出现）
     expect(parsed.sid).toBe('99999')
     expect(parsed.name).toBe('完整动漫')
     expect(parsed['话数']).toBe('24')
@@ -577,7 +578,7 @@ describe('buildJsonlFromSheet', () => {
   })
 
   it('URL 有效但 extractSubjectId 返回 null 时应跳过该行', () => {
-    // Line 86: if (!sid) continue
+    // Line 86: if (!subjectId) continue
     const worksheet = createMockWorksheet({ usedRange: 5 })
     mockGetDataSheet.mockReturnValue(worksheet)
     mockFindHeaderRow.mockReturnValue(1)

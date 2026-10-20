@@ -68,7 +68,7 @@ const createStats = (): SyncResultStats => ({ success: 0, fail: 0, skip: 0, stop
 
 const createTask = (overrides: Partial<SyncTask> = {}): SyncTask => ({
   rowNum: 2,
-  sid: '100',
+  subjectId: '100',
   bgmUrl: 'https://bgm.tv/subject/100',
   name: '测试条目',
   jsonBody: '{"type":2}',
@@ -119,7 +119,7 @@ describe('markSyncResultColor', () => {
 describe('applySyncSuccessResults', () => {
   it('批量写入：N 个任务只调用一次 addSyncRecords（P1-B 回归锁）', () => {
     const tasks = Array.from({ length: 50 }, (_, index) =>
-      createTask({ rowNum: index + 2, sid: String(1000 + index) }),
+      createTask({ rowNum: index + 2, subjectId: String(1000 + index) }),
     )
     const result = createStats()
 
@@ -138,7 +138,7 @@ describe('applySyncSuccessResults', () => {
     expect(getWrittenRecords()[0]).toMatchObject({
       name: '测试条目',
       url: 'https://bgm.tv/subject/100',
-      sid: '100',
+      subjectId: '100',
       type: TYPE_NAMES[2],
       content: '{"type":2}',
       status: SYNC_STATUS.SUCCESS,
@@ -161,7 +161,7 @@ describe('applySyncSuccessResults', () => {
     applySyncSuccessResults(
       createStubWorksheet(),
       9,
-      [createTask({ sid: '1', fingerprint: 'fp-1' }), createTask({ sid: '2' })],
+      [createTask({ subjectId: '1', fingerprint: 'fp-1' }), createTask({ subjectId: '2' })],
       createStats(),
     )
     const records = getWrittenRecords()
@@ -173,7 +173,7 @@ describe('applySyncSuccessResults', () => {
     applySyncSuccessResults(
       createStubWorksheet(),
       9,
-      [createTask({ rowNum: 2 }), createTask({ rowNum: 3, sid: '101' })],
+      [createTask({ rowNum: 2 }), createTask({ rowNum: 3, subjectId: '101' })],
       createStats(),
     )
     expect(mockState.getCell).toHaveBeenCalledTimes(2)
@@ -191,7 +191,7 @@ describe('applySyncSuccessResults', () => {
 describe('applySyncFailResults', () => {
   it('批量写入：多任务只调用一次 addSyncRecords（P1-B 回归锁）', () => {
     const tasks = Array.from({ length: 20 }, (_, index) =>
-      createTask({ rowNum: index + 2, sid: String(2000 + index) }),
+      createTask({ rowNum: index + 2, subjectId: String(2000 + index) }),
     )
     const result = createStats()
 
@@ -245,8 +245,8 @@ describe('写入失败必须让用户看见（P1-E）', () => {
 describe('handleStoppedRemainingTasks', () => {
   it('停止时把未执行任务计入 skip 并置 stopped', () => {
     const result = createStats()
-    const executed = createTask({ sid: '1' })
-    const all = [executed, createTask({ sid: '2' }), createTask({ sid: '3' })]
+    const executed = createTask({ subjectId: '1' })
+    const all = [executed, createTask({ subjectId: '2' }), createTask({ subjectId: '3' })]
     handleStoppedRemainingTasks(all, [executed], [], result)
 
     expect(result.skip).toBe(2)
@@ -257,8 +257,8 @@ describe('handleStoppedRemainingTasks', () => {
 describe('finalizeSyncResults', () => {
   it('协调成功/失败分支并汇总，不重复写入', () => {
     const result = createStats()
-    const success = [createTask({ sid: '1' }), createTask({ sid: '2', rowNum: 3 })]
-    const fail = [createTask({ sid: '3', rowNum: 4 })]
+    const success = [createTask({ subjectId: '1' }), createTask({ subjectId: '2', rowNum: 3 })]
+    const fail = [createTask({ subjectId: '3', rowNum: 4 })]
     const reportProgress = vi.fn()
 
     finalizeSyncResults(
@@ -285,8 +285,8 @@ describe('finalizeSyncResults', () => {
 
   it('被停止时统计剩余任务为跳过', () => {
     const result = createStats()
-    const executed = createTask({ sid: '1' })
-    const all = [executed, createTask({ sid: '2' }), createTask({ sid: '3' })]
+    const executed = createTask({ subjectId: '1' })
+    const all = [executed, createTask({ subjectId: '2' }), createTask({ subjectId: '3' })]
     const reportProgress = vi.fn()
 
     finalizeSyncResults(

@@ -521,14 +521,14 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
     .map((item) => {
       const { kind } = item
       const name = item.name ?? '--'
-      const { sid } = item
+      const { subjectId } = item
       const row = item.row === undefined ? '--' : String(item.row)
       const fields = item.fields && item.fields.length > 0 ? item.fields.join(', ') : '--'
       const message = item.message ?? ''
       return `
         <tr>
           <td><span class="bgm-detail-kind ${kindClasses[kind]}">${sanitizeHtml(kindLabels[kind])}</span></td>
-          <td>${sanitizeHtml(sid)}</td>
+          <td>${sanitizeHtml(subjectId)}</td>
           <td>${sanitizeHtml(name)}</td>
           <td>${sanitizeHtml(row)}</td>
           <td>${sanitizeHtml(fields)}</td>

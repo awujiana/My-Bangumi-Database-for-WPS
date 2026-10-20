@@ -20,7 +20,7 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import { bgmLog, findHeaderRow, getColumnMap, getDataSheet } from '../tools/util/index.js'
 
-import { isGithubRemoteEntry } from './github-sync-diff.js'
+import { isWireRemoteEntry, toRemoteEntry } from './github-sync-diff.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 import {
   isManifestPath,
@@ -71,7 +71,7 @@ export interface LoadEntriesResult {
   /** 数据期次（清单的 updatedAt） */
   updatedAt: string
   /**
-   * 拼接后因**缺少合法 sid** 被跳过的记录条数
+   * 拼接后因**缺少合法 sid**（线上键，见 FIELD_NAME_MAP）被跳过的记录条数
    *
    * 与 `parseJsonl` 的「非法行不中断整体解析」同一口径：分片表头合法、
    * 单条记录却不合法（如 sid 为空/非字符串）时静默跳过。此前只进 WARN
@@ -88,7 +88,7 @@ export interface LoadEntriesResult {
  * 不改这些函数的返回类型（`GithubRemoteEntry[]` 是既定契约）。
  */
 export interface FetchLoadStats {
-  /** 拼接后因缺少合法 sid 被跳过的条数 */
+  /** 拼接后因缺少合法 sid（线上键）被跳过的条数 */
   skippedInvalidLines: number
 }
 
@@ -160,8 +160,8 @@ export async function loadEntriesFromPath(options: LoadEntriesOptions): Promise<
   const entries: GithubRemoteEntry[] = []
   let invalid = 0
   for (const record of records) {
-    if (isGithubRemoteEntry(record)) {
-      entries.push(record)
+    if (isWireRemoteEntry(record)) {
+      entries.push(toRemoteEntry(record))
     } else {
       invalid += 1
     }

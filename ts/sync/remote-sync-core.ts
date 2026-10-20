@@ -43,7 +43,7 @@ import {
   readLocalEntriesForSync,
 } from './remote-sync-apply.js'
 import type { ApplyMappingOptions, GithubSyncResult } from './remote-sync-apply.js'
-import { getSelectedRowSids } from './selected-rows.js'
+import { getSelectedRowSubjectIds } from './selected-rows.js'
 import { collectNeededFieldsFromSheet } from './shard-fetch.js'
 import { applyColumnOverrides, excludedColumnClosure, excludedJsonlFields } from './sync-mapping.js'
 import type { SyncMappingConfig } from './sync-mapping.js'
@@ -148,7 +148,7 @@ export async function runRemoteSync(
   }
   // 列映射确认：用户取消同步的字段不进入下载集（整片无所需字段时该片不再下载；
   // 用户手动勾选的分片除外——那种情况下仍会下载，只是不写入）。
-  // base 片恒下载（REQUIRED_SHARD_ANCHORS），sid / date 等锚点字段不受影响。
+  // base 片恒下载（REQUIRED_SHARD_ANCHORS），subjectId / date 等锚点字段不受影响。
   if (neededFields && mapping && mapping.excludedColumns.length > 0) {
     const excludedFields = excludedJsonlFields(mapping.excludedColumns)
     for (const field of excludedFields) {
@@ -197,11 +197,11 @@ export async function runRemoteSync(
     // 3.6 仅同步选中行：从 WPS Selection 提取 SID 集合，过滤远程条目
     let effectiveRemoteEntries = remoteEntries
     if (shouldUseSelectedRowsOnly) {
-      const selectedSids = getSelectedRowSids()
+      const selectedSids = getSelectedRowSubjectIds()
       if (selectedSids.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
       }
-      effectiveRemoteEntries = remoteEntries.filter((entry) => selectedSids.has(entry.sid))
+      effectiveRemoteEntries = remoteEntries.filter((entry) => selectedSids.has(entry.subjectId))
       bgmLog(
         LOG_LEVELS.INFO,
         `[${logTag}] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
@@ -375,7 +375,7 @@ export async function runRemoteSync(
       )
     }
 
-    // 脏数据体检：分片拼接时缺合法 sid 的记录被静默跳过（与 parseJsonl 的
+    // 脏数据体检：分片拼接时缺合法 subjectId 的记录被静默跳过（与 parseJsonl 的
     // 「非法行不中断整体解析」同口径），提示后用户能区分「本来就是这么多」
     // 与「下载了一部分」。未提供该统计的源（loadStats 缺省）跳过本段。
     const skippedInvalid = source.loadStats?.skippedInvalidLines ?? 0
@@ -383,7 +383,7 @@ export async function runRemoteSync(
       result.skippedInvalidLines = skippedInvalid
       bgmLog(
         LOG_LEVELS.WARN,
-        `[${logTag}] ${String(skippedInvalid)} 条远程记录缺少合法 sid 已跳过，数据源本身有脏数据`,
+        `[${logTag}] ${String(skippedInvalid)} 条远程记录缺少合法 subjectId 已跳过，数据源本身有脏数据`,
       )
     }
 

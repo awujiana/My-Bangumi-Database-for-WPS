@@ -312,11 +312,11 @@ function createMockSyncSource(entries: GithubRemoteEntry[]): SyncSource {
 
 /** 构造本地行条目映射 */
 function createLocalEntries(
-  entries: { row: number; sid: string; fields: Record<string, string> }[],
+  entries: { row: number; subjectId: string; fields: Record<string, string> }[],
 ): Map<string, LocalRowEntry> {
   const map = new Map<string, LocalRowEntry>()
   for (const entry of entries) {
-    map.set(entry.sid, { row: entry.row, sid: entry.sid, fields: entry.fields })
+    map.set(entry.subjectId, { row: entry.row, subjectId: entry.subjectId, fields: entry.fields })
   }
   return map
 }
@@ -706,7 +706,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     const localEntries = createLocalEntries([
       {
         row: 2,
-        sid: '10002',
+        subjectId: '10002',
         fields: {
           名称: '旧名称',
           是否看完: '看过',
@@ -721,9 +721,9 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     const addedDiff = diffs.find((d) => d.kind === 'add')
     const updateDiff = diffs.find((d) => d.kind === 'update')
     expect(addedDiff).toBeDefined()
-    expect(addedDiff?.sid).toBe('10001')
+    expect(addedDiff?.subjectId).toBe('10001')
     expect(updateDiff).toBeDefined()
-    expect(updateDiff?.sid).toBe('10002')
+    expect(updateDiff?.subjectId).toBe('10002')
     expect(updateDiff?.changedFields).toContain('名称')
 
     // 5. applyDiffToSheet（使用 mock worksheet）
@@ -745,8 +745,8 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(mockState.addSyncRecords).toHaveBeenCalled()
     const records = mockState.addSyncRecords.mock.calls[0]?.[0] as Record<string, unknown>[]
     expect(records).toHaveLength(2)
-    expect(records.some((r) => r.content === '仓库同步-新增' && r.sid === '10001')).toBe(true)
-    expect(records.some((r) => r.content === '仓库同步-更新' && r.sid === '10002')).toBe(true)
+    expect(records.some((r) => r.content === '仓库同步-新增' && r.subjectId === '10001')).toBe(true)
+    expect(records.some((r) => r.content === '仓库同步-更新' && r.subjectId === '10002')).toBe(true)
 
     // 验证汇总行
     expect(mockState.addSyncRecordSummary).toHaveBeenCalled()
@@ -762,16 +762,16 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
   })
 
   it('mirror 策略应删除本地多余行', async () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '20001', name: '保留' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '20001', name: '保留' }]
     const local = createLocalEntries([
-      { row: 2, sid: '20001', fields: { 名称: '保留', 是否看完: '看过' } },
-      { row: 3, sid: '20002', fields: { 名称: '应删除', 是否看完: '看过' } },
+      { row: 2, subjectId: '20001', fields: { 名称: '保留', 是否看完: '看过' } },
+      { row: 3, subjectId: '20002', fields: { 名称: '应删除', 是否看完: '看过' } },
     ])
 
     const diffs = computeDiff(remote, local, 'mirror')
     const deletedDiff = diffs.find((d) => d.kind === 'delete')
     expect(deletedDiff).toBeDefined()
-    expect(deletedDiff?.sid).toBe('20002')
+    expect(deletedDiff?.subjectId).toBe('20002')
     expect(deletedDiff?.localRow).toBe(3)
 
     // applyDiffToSheet 处理 delete
@@ -788,9 +788,9 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
   })
 
   it('force-overwrite 策略应强制更新所有字段', async () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '30001', name: '新名' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '30001', name: '新名' }]
     const local = createLocalEntries([
-      { row: 2, sid: '30001', fields: { 名称: '旧名', 是否看完: '看过', 打分: '5' } },
+      { row: 2, subjectId: '30001', fields: { 名称: '旧名', 是否看完: '看过', 打分: '5' } },
     ])
 
     const diffs = computeDiff(remote, local, 'force-overwrite')
@@ -804,7 +804,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
   it('syncFromRemote 端到端：下载 → diff → apply', async () => {
     // 构造 mock SyncSource
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '40001', name: '远程条目' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '40001', name: '远程条目' }]
     const mockSource = createMockSyncSource(remoteEntries)
     mockState.getSyncSource.mockReturnValue(mockSource)
 
@@ -879,7 +879,7 @@ describe('parseJsonl 集成解析', () => {
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
     expect(errors).toHaveLength(0)
-    expect(entries[0]?.sid).toBe('1')
+    expect(entries[0]?.subjectId).toBe('1')
     expect(entries[1]?.['话数']).toBe('12')
     expect(entries[2]?.name).toBe('C')
   })

@@ -10,16 +10,16 @@ import { bgmRequestSync } from './api.js'
 
 /**
  * 获取条目的所有章节 ID（按集号排序）
- * @param sid 条目 ID
+ * @param subjectId 条目 ID
  * @param token API Token
  * @param signal 可选 AbortSignal，用于取消请求
  */
 export async function fetchEpisodeIds(
-  sid: string | number,
+  subjectId: string | number,
   token: string,
   signal?: AbortSignal,
 ): Promise<number[]> {
-  const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${String(sid)}&limit=1000`
+  const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${String(subjectId)}&limit=1000`
   return new Promise((resolve, reject) => {
     // 如果 signal 已 aborted，立即 reject
     if (signal?.aborted) {
@@ -66,19 +66,19 @@ export async function fetchEpisodeIds(
 
 /**
  * 标记前 N 集为已完成
- * @param sid 条目 ID
+ * @param subjectId 条目 ID
  * @param epCount 集数
  * @param token API Token
  * @param signal 可选 AbortSignal，用于取消请求
  */
 export async function markEpisodesComplete(
-  sid: string | number,
+  subjectId: string | number,
   epCount: number,
   token: string,
   signal?: AbortSignal,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const allIds = await fetchEpisodeIds(sid, token, signal)
+    const allIds = await fetchEpisodeIds(subjectId, token, signal)
     if (allIds.length === 0) {
       return { success: false, message: '该条目没有章节数据' }
     }
@@ -89,7 +89,7 @@ export async function markEpisodesComplete(
     const body = JSON.stringify({ episode_id: targetIds, type: 2 })
     const result = await bgmRequestSync(
       'PATCH',
-      `/v0/users/-/collections/${String(sid)}/episodes`,
+      `/v0/users/-/collections/${String(subjectId)}/episodes`,
       body,
       token,
       signal,

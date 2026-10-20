@@ -57,7 +57,7 @@ export interface DetailItem {
   row: number
   name: string
   bgmUrl: string
-  sid: string
+  subjectId: string
   status: string
   rate: string
   tagsRaw: string
@@ -176,7 +176,7 @@ function getRowData(
     row: rowNumber,
     name: '',
     bgmUrl: '',
-    sid: '',
+    subjectId: '',
     status: '',
     rate: '',
     tagsRaw: '',
@@ -206,9 +206,9 @@ function getRowData(
   data.finishedDate = readCol('完播日')
 
   if (data.bgmUrl) {
-    data.sid = extractSubjectId(data.bgmUrl) ?? ''
+    data.subjectId = extractSubjectId(data.bgmUrl) ?? ''
   }
-  if (data.sid) {
+  if (data.subjectId) {
     data.typeNum = mapWatchStatus(data.status)
   }
 
@@ -254,7 +254,7 @@ function renderDetailItemHtml(
 
   // 返回完整的HTML模板字符串
   return `
-    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${String(rowData.typeNum)}" data-row="${String(rowData.row)}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
+    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${String(rowData.typeNum)}" data-row="${String(rowData.row)}" data-subjectId="${rowData.subjectId}" data-status="${escapeHtml(rowData.status)}">
       <div class="detail-item-header">
         <div class="detail-item-title">
           <span class="detail-item-row">行 ${String(rowData.row)}</span>
@@ -268,7 +268,7 @@ function renderDetailItemHtml(
       <div class="detail-item-body">
         <div class="detail-row">
           <span class="detail-label">Subject ID</span>
-          <span class="detail-value sid ${rowData.sid ? 'valid' : ''}">${rowData.sid || '✘ 无法提取'}</span>
+          <span class="detail-value subjectId ${rowData.subjectId ? 'valid' : ''}">${rowData.subjectId || '✘ 无法提取'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">观看状态</span>
@@ -465,7 +465,7 @@ export async function previewSyncContent(): Promise<void> {
         const rowData = getRowData(worksheet, rowNumber, columnMap, headerRow, 9, rowCells)
 
         // 过滤无效行
-        if (!rowData.bgmUrl || !rowData.sid) {
+        if (!rowData.bgmUrl || !rowData.subjectId) {
           bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
           skippedCount += 1
           updateSyncProgressDialog(
@@ -761,7 +761,7 @@ export async function uploadSingleRow(
     if (!columnMap.has('Bangumi_URL')) throw new Error('未找到 Bangumi URL 列')
 
     const rowData = getRowData(worksheet, rowNumber, columnMap, headerRow, 9)
-    if (!rowData.sid) throw new Error('无法提取 Subject ID')
+    if (!rowData.subjectId) throw new Error('无法提取 Subject ID')
 
     const jsonBody = buildJsonPayload((key) => {
       const column = columnMap.get(key)
@@ -771,7 +771,7 @@ export async function uploadSingleRow(
 
     const result = await bgmRequestSync(
       'POST',
-      `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`,
+      `/v0/users/${_getUserApiPath()}/collections/${rowData.subjectId}`,
       jsonBody,
       token,
     )
@@ -808,7 +808,7 @@ export async function uploadSingleRow(
       writeSyncRecord({
         name: rowData.name || '(无名称)',
         url: rowData.bgmUrl,
-        sid: rowData.sid,
+        subjectId: rowData.subjectId,
         type: '',
         content: jsonBody,
         status: '成功',
@@ -828,7 +828,7 @@ export async function uploadSingleRow(
       writeSyncRecord({
         name: rowData.name || '(无名称)',
         url: rowData.bgmUrl,
-        sid: rowData.sid,
+        subjectId: rowData.subjectId,
         type: '',
         content: jsonBody,
         status: '失败',
@@ -876,13 +876,13 @@ export function closeDetailModal(): void {
   if (modal) modal.style.display = 'none'
 }
 
-export function viewSyncRecordDetail(sid: string): void {
+export function viewSyncRecordDetail(subjectId: string): void {
   if (typeof getAllSyncRecords !== 'function') {
     safeAlert('同步记录功能不可用！')
     return
   }
   const records = getAllSyncRecords()
-  const record = records.find((r: SyncRecord) => String(r.sid) === sid)
+  const record = records.find((r: SyncRecord) => String(r.subjectId) === subjectId)
   if (!record) {
     safeAlert('未找到该同步记录')
     return
@@ -897,7 +897,7 @@ export function viewSyncRecordDetail(sid: string): void {
       context: 'ViewSyncRecordDetail',
     })
   }
-  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.sid ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.subjectId ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
   safeAlert(detail, '同步记录详情')
 }
 
@@ -969,8 +969,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
       // 使用 Ribbon 的统一策略：默认以 Excel 覆盖，所以只需记录，不跳过
       conflictInfo = `检测到 ${String(conflictCount)} 条冲突，将以 Excel 数据覆盖。`
       bgmLog(LOG_LEVELS.WARN, conflictInfo)
-      // 如需跳过冲突，可在 detectConflicts 后收集冲突 sid 集合，
-      // 并通过 skipSids 选项传给 SyncToBangumiAsync
+      // 如需跳过冲突，可在 detectConflicts 后收集冲突 subjectId 集合，
+      // 并通过 skipSubjectIds 选项传给 SyncToBangumiAsync
     }
   } catch (error: unknown) {
     const bgmError = BGM.handleError(error, { showAlert: false })

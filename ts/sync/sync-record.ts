@@ -37,7 +37,7 @@ export interface SyncRecord {
   time?: string
   name?: string
   url?: string
-  sid?: string
+  subjectId?: string
   type?: string
   source?: string | undefined
   count?: number
@@ -52,7 +52,7 @@ export interface SyncRecord {
 export interface UpdateRecordParameters {
   name?: string
   url?: string
-  sid?: string
+  subjectId?: string
   type?: string
   source?: string | undefined
   content?: string
@@ -345,15 +345,15 @@ function buildCache(sheet: WpsWorksheet): void {
  * 缓存单行同步记录（自 buildCache 的 try 块抽离，降低 unicorn/try-complexity 计数）
  */
 function cacheRecordRow(rowData: string[], row: number): void {
-  const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
+  const subjectId = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
   const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
-  if (url || sid) {
-    _syncRecordSidCache.set(sid, row)
+  if (url || subjectId) {
+    _syncRecordSidCache.set(subjectId, row)
     _syncRecordListCache.push({
       time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
       name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
       url,
-      sid,
+      subjectId,
       type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
       source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
       count: Math.trunc(Number(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1,
@@ -379,15 +379,15 @@ function setSyncRecordColors(
   }
 
   // SID列（A列）- 根据同步次数或状态设置颜色（if/else 替代嵌套三元，消除 no-nested-ternary）
-  let sidColor: number
+  let subjectIdColor: number
   if (status === SYNC_STATUS.FAIL) {
-    sidColor = BGM_COLOR.FAIL
+    subjectIdColor = BGM_COLOR.FAIL
   } else if (status === SYNC_STATUS.SKIP) {
-    sidColor = BGM_COLOR.SKIP
+    subjectIdColor = BGM_COLOR.SKIP
   } else {
-    sidColor = getCountColor(count)
+    subjectIdColor = getCountColor(count)
   }
-  setColor(SYNC_RECORD_COL.SID, sidColor)
+  setColor(SYNC_RECORD_COL.SID, subjectIdColor)
 
   // 状态列（I列）- 根据状态设置颜色
   setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status))
@@ -450,7 +450,7 @@ export function addSyncRecords(records: UpdateRecordParameters[]): boolean {
 export function addSyncRecordSummary(parameters: UpdateRecordParameters): boolean {
   return addSyncRecord({
     ...parameters,
-    sid: '',
+    subjectId: '',
     count: 1,
   })
 }
@@ -479,29 +479,35 @@ export function getAllSyncRecords(): SyncRecord[] {
  * 返回空分组（本次不做去重，下次写入时重试）。
  */
 function groupRowsBySid(sheet: WpsWorksheet, lastRow: number): Map<string, number[]> {
-  const sidRows = new Map<string, number[]>()
-  const sidColumn = readRangeValues(sheet, 2, lastRow, SYNC_RECORD_COL.SID, SYNC_RECORD_COL.SID)
+  const subjectIdRows = new Map<string, number[]>()
+  const subjectIdColumn = readRangeValues(
+    sheet,
+    2,
+    lastRow,
+    SYNC_RECORD_COL.SID,
+    SYNC_RECORD_COL.SID,
+  )
 
-  for (const [index, rowData] of sidColumn.entries()) {
-    const sid = (rowData[0] ?? '').trim()
-    if (sid) {
+  for (const [index, rowData] of subjectIdColumn.entries()) {
+    const subjectId = (rowData[0] ?? '').trim()
+    if (subjectId) {
       const row = index + 2
-      const rows = sidRows.get(sid) ?? []
+      const rows = subjectIdRows.get(subjectId) ?? []
       rows.push(row)
-      sidRows.set(sid, rows)
+      subjectIdRows.set(subjectId, rows)
     }
   }
-  return sidRows
+  return subjectIdRows
 }
 
 /** 合并重复 SID 组：COUNT 求和写入首行，其余行逆序删除；返回删除行数与是否发生重复 */
 function mergeDuplicateSidGroups(
   sheet: WpsWorksheet,
-  sidRows: Map<string, number[]>,
+  subjectIdRows: Map<string, number[]>,
 ): { removedCount: number; hasDuplicates: boolean } {
   let removedCount = 0
   let hasDuplicates = false
-  for (const [, rows] of sidRows) {
+  for (const [, rows] of subjectIdRows) {
     const hasDuplicateRows = rows.length > 1
     if (hasDuplicateRows) {
       hasDuplicates = true
@@ -538,8 +544,8 @@ export function deduplicateSyncRecords(): boolean {
     if (lastRow <= 1) return true
 
     // 按 SID 分组，找出并合并重复 SID
-    const sidRows = groupRowsBySid(sheet, lastRow)
-    const { removedCount, hasDuplicates } = mergeDuplicateSidGroups(sheet, sidRows)
+    const subjectIdRows = groupRowsBySid(sheet, lastRow)
+    const { removedCount, hasDuplicates } = mergeDuplicateSidGroups(sheet, subjectIdRows)
 
     if (hasDuplicates) {
       bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${String(removedCount)} 条重复记录`)
@@ -756,10 +762,10 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
 
   if (!_isSyncRecordCacheValid) buildCache(sheet)
 
-  const sid = parameters.sid ?? ''
+  const subjectId = parameters.subjectId ?? ''
   const now = new Date().toLocaleString('zh-CN')
 
-  const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+  const existingRow = subjectId ? _syncRecordSidCache.get(subjectId) : undefined
   if (existingRow === undefined) {
     // 两个分支均会赋值 nextRow，无需初始化为 1（消除 no-useless-assignment）
     let nextRow: number
@@ -779,7 +785,7 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
     rowValues[SYNC_RECORD_COL.TIME - 1] = now
     rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name ?? ''
     rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url ?? ''
-    rowValues[SYNC_RECORD_COL.SID - 1] = sid
+    rowValues[SYNC_RECORD_COL.SID - 1] = subjectId
     rowValues[SYNC_RECORD_COL.TYPE - 1] = parameters.type ?? ''
     rowValues[SYNC_RECORD_COL.SOURCE - 1] = parameters.source ?? ''
     rowValues[SYNC_RECORD_COL.COUNT - 1] = finalCount
@@ -794,11 +800,11 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
 
     setSyncRecordColors(sheet, nextRow, finalStatus, finalCount)
 
-    _syncRecordSidCache.set(sid, nextRow)
+    _syncRecordSidCache.set(subjectId, nextRow)
     _syncRecordListCache.push({
       id: nextRow,
       time: now,
-      sid,
+      subjectId,
       count: finalCount,
       status: finalStatus,
       message: parameters.message ?? '',
@@ -839,7 +845,7 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
     setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
 
     // 更新缓存
-    const cacheItem = _syncRecordListCache.find((item) => item.sid === sid)
+    const cacheItem = _syncRecordListCache.find((item) => item.subjectId === subjectId)
     if (cacheItem) {
       cacheItem.time = now
       cacheItem.count = updatedCount
@@ -867,17 +873,17 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
 
   const now = new Date().toLocaleString('zh-CN')
   const pendingRows: string[][] = []
-  const sidToUpdate = new Map<
+  const subjectIdsToUpdate = new Map<
     string,
     { row: number; updatedCount: number; status: string; parameters: UpdateRecordParameters }
   >()
 
   for (const parameters of records) {
-    const sid = parameters.sid ?? ''
-    const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+    const subjectId = parameters.subjectId ?? ''
+    const existingRow = subjectId ? _syncRecordSidCache.get(subjectId) : undefined
     if (existingRow === undefined) {
       pendingRows.push([
-        sid,
+        subjectId,
         now,
         parameters.name ?? '',
         parameters.url ?? '',
@@ -893,9 +899,9 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
     } else {
       const existingCount =
         Math.trunc(Number(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT))) || 0
-      const existing = sidToUpdate.get(sid)
+      const existing = subjectIdsToUpdate.get(subjectId)
       const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count ?? 1)
-      sidToUpdate.set(sid, {
+      subjectIdsToUpdate.set(subjectId, {
         row: existingRow,
         updatedCount: totalCount,
         status: parameters.status ?? SYNC_STATUS.SUCCESS,
@@ -920,7 +926,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
   }
 
   // 更新已有 SID 的时间、次数、状态及其他字段（整行读-改-写，替代逐单元格 setCellValue）
-  for (const [sid, { row, updatedCount, status, parameters }] of sidToUpdate) {
+  for (const [subjectId, { row, updatedCount, status, parameters }] of subjectIdsToUpdate) {
     const existingRows = readRangeCellValues(sheet, row, row, 1, SYNC_RECORD_COLUMNS.length)
     const existing = existingRows[0]
     // 读回失败（形状归一化失败）或读回宽度不足时放弃该行的更新并记录日志：
@@ -929,20 +935,20 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
     if (!existing || existing.length < SYNC_RECORD_COLUMNS.length) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[addSyncRecords] 第 ${String(row)} 行旧值读取失败或宽度不足，放弃更新（SID=${sid}）`,
+        `[addSyncRecords] 第 ${String(row)} 行旧值读取失败或宽度不足，放弃更新（SID=${subjectId}）`,
       )
     } else {
       const rowValues = buildUpdatedSyncRow(existing, parameters, now, updatedCount, status)
       writeSheetRows(sheet, row, [rowValues])
       setSyncRecordColors(sheet, row, status, updatedCount)
-      _syncRecordSidCache.set(sid, row)
+      _syncRecordSidCache.set(subjectId, row)
     }
   }
 
   invalidateCache()
   bgmLog(
     LOG_LEVELS.INFO,
-    `[addSyncRecords] 批量写入完成：新增 ${String(pendingRows.length)} 条，更新 ${String(sidToUpdate.size)} 条`,
+    `[addSyncRecords] 批量写入完成：新增 ${String(pendingRows.length)} 条，更新 ${String(subjectIdsToUpdate.size)} 条`,
   )
   return true
 }

@@ -106,7 +106,7 @@ const remoteEntriesState = vi.hoisted(() => ({
   entries: [] as unknown[],
   shards: [] as string[],
   updatedAt: '',
-  // 分片拼接后缺合法 sid 被跳过的条数（供 skippedInvalidLines 透传测试）
+  // 分片拼接后缺合法 subjectId 被跳过的条数（供 skippedInvalidLines 透传测试）
   skippedInvalidRecords: 0,
 }))
 const mockLoadEntriesFromPath = vi.hoisted(() =>
@@ -143,10 +143,10 @@ const mockParseJsonl = vi.hoisted(() =>
             typeof parsed === 'object' && parsed !== null
               ? (parsed as Record<string, unknown>)
               : null
-          if (record && typeof record.sid === 'string' && record.sid) {
+          if (record && typeof record.subjectId === 'string' && record.subjectId) {
             entries.push(record)
           } else {
-            errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
+            errors.push({ line: index + 1, message: '缺少有效的 subjectId 字段' })
           }
         } catch {
           errors.push({ line: index + 1, message: '无效的 JSON' })
@@ -160,7 +160,7 @@ const mockComputeDiff = vi.hoisted(() =>
   vi.fn().mockImplementation(
     (
       remote: {
-        sid: string
+        subjectId: string
         name?: string
         updatedAt?: string
         date?: string
@@ -168,7 +168,7 @@ const mockComputeDiff = vi.hoisted(() =>
         nsfw?: boolean
         [key: string]: unknown
       }[],
-      local: Map<string, { row: number; sid: string; fields: Record<string, string> }>,
+      local: Map<string, { row: number; subjectId: string; fields: Record<string, string> }>,
       strategy?: string,
       timeFilter?: unknown,
     ) => {
@@ -328,7 +328,7 @@ import {
   computeDiff,
   parseJsonl,
   filterByTime,
-  isGithubRemoteEntry,
+  isWireRemoteEntry,
   SYNC_STRATEGY_LABELS,
 } from '../ts/sync/github-sync-diff.js'
 import type {
@@ -563,23 +563,23 @@ function asRangeMock(impl: (address: string) => unknown): MockRange {
 
 describe('computeDiff', () => {
   it('远程有本地无 → 标记为 add', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '111', name: '条目A' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '111', name: '条目A' }]
     const local = new Map<string, LocalRowEntry>()
     const diffs = computeDiff(remote, local)
     expect(diffs).toHaveLength(1)
     expect(diffs[0]?.kind).toBe('add')
-    expect(diffs[0]?.sid).toBe('111')
+    expect(diffs[0]?.subjectId).toBe('111')
     expect(diffs[0]?.changedFields).toEqual(['*'])
   })
 
   it('远程与本地完全一致 → 无差异', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '222', name: '相同名称' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '222', name: '相同名称' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '222',
         {
           row: 2,
-          sid: '222',
+          subjectId: '222',
           fields: {
             名称: '相同名称',
             是否看完: '看过',
@@ -592,13 +592,13 @@ describe('computeDiff', () => {
   })
 
   it('名称变更 → 标记为 update，仅含名称字段', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '333', name: '新名称' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '333', name: '新名称' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '333',
         {
           row: 3,
-          sid: '333',
+          subjectId: '333',
           fields: {
             名称: '旧名称',
             是否看完: '看过',
@@ -614,13 +614,15 @@ describe('computeDiff', () => {
   })
 
   it('多个字段变更 → 全部列入 changedFields', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '444', name: '新名', meta_tags: ['Tag1', 'Tag2'] }]
+    const remote: GithubRemoteEntry[] = [
+      { subjectId: '444', name: '新名', meta_tags: ['Tag1', 'Tag2'] },
+    ]
     const local = new Map<string, LocalRowEntry>([
       [
         '444',
         {
           row: 4,
-          sid: '444',
+          subjectId: '444',
           fields: {
             名称: '旧名',
             是否看完: '看过',
@@ -636,13 +638,13 @@ describe('computeDiff', () => {
 
   it('远程字段为空 → 不视为差异（保留本地）', () => {
     // name 缺失（运行时与显式 undefined 等价）→ 不应视为差异
-    const remote: GithubRemoteEntry[] = [{ sid: '555' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '555' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '555',
         {
           row: 5,
-          sid: '555',
+          subjectId: '555',
           fields: {
             名称: '本地名称',
             是否看完: '在看',
@@ -654,14 +656,14 @@ describe('computeDiff', () => {
     expect(diffs).toHaveLength(0)
   })
 
-  it('仅含 sid 时无字段可比对，不产生差异', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '666' }]
+  it('仅含 subjectId 时无字段可比对，不产生差异', () => {
+    const remote: GithubRemoteEntry[] = [{ subjectId: '666' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '666',
         {
           row: 6,
-          sid: '666',
+          subjectId: '666',
           fields: {
             是否看完: '在看',
           },
@@ -669,7 +671,7 @@ describe('computeDiff', () => {
       ],
     ])
     const diffs = computeDiff(remote, local)
-    // 仅含 sid，无 name/meta_tags/话数 等可比对字段 → 无差异
+    // 仅含 subjectId，无 name/meta_tags/话数 等可比对字段 → 无差异
     expect(diffs).toHaveLength(0)
   })
 })
@@ -677,18 +679,18 @@ describe('computeDiff', () => {
 // ========== 同步策略测试 ==========
 
 describe('computeDiff 策略修饰', () => {
-  // 公共测试数据：远程 3 条（sid=1 新增，sid=2 需更新，sid=3 无变化），本地 3 条（sid=2、3、4，sid=4 远程不存在）
+  // 公共测试数据：远程 3 条（subjectId=1 新增，subjectId=2 需更新，subjectId=3 无变化），本地 3 条（subjectId=2、3、4，subjectId=4 远程不存在）
   const remote: GithubRemoteEntry[] = [
-    { sid: '1', name: '远程新增' },
-    // 本地 sid=2 名称不同
-    { sid: '2', name: '远程改名' },
-    // 本地 sid=3 完全一致
-    { sid: '3', name: '一致' },
+    { subjectId: '1', name: '远程新增' },
+    // 本地 subjectId=2 名称不同
+    { subjectId: '2', name: '远程改名' },
+    // 本地 subjectId=3 完全一致
+    { subjectId: '3', name: '一致' },
   ]
   const local = new Map<string, LocalRowEntry>([
-    ['2', { row: 10, sid: '2', fields: { 名称: '本地名', 是否看完: '在看' } }],
-    ['3', { row: 11, sid: '3', fields: { 名称: '一致', 是否看完: '看过' } }],
-    ['4', { row: 12, sid: '4', fields: { 名称: '本地多余', 是否看完: '想看' } }],
+    ['2', { row: 10, subjectId: '2', fields: { 名称: '本地名', 是否看完: '在看' } }],
+    ['3', { row: 11, subjectId: '3', fields: { 名称: '一致', 是否看完: '看过' } }],
+    ['4', { row: 12, subjectId: '4', fields: { 名称: '本地多余', 是否看完: '想看' } }],
   ])
 
   it('SYNC_STRATEGY_LABELS 应包含 5 种策略', () => {
@@ -706,7 +708,7 @@ describe('computeDiff 策略修饰', () => {
     const addedCount = diffs.filter((d) => d.kind === 'add').length
     const updateCount = diffs.filter((d) => d.kind === 'update').length
     const deletedCount = diffs.filter((d) => d.kind === 'delete').length
-    // sid=1 新增，sid=2 更新（名称），sid=3 无变化，sid=4 不处理
+    // subjectId=1 新增，subjectId=2 更新（名称），subjectId=3 无变化，subjectId=4 不处理
     expect(addedCount).toBe(1)
     expect(updateCount).toBe(1)
     expect(deletedCount).toBe(0)
@@ -718,7 +720,7 @@ describe('computeDiff 策略修饰', () => {
     const updates = diffs.filter((d) => d.kind === 'update')
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(adds).toHaveLength(1)
-    expect(adds[0]?.sid).toBe('1')
+    expect(adds[0]?.subjectId).toBe('1')
     expect(updates).toHaveLength(0)
     expect(deletes).toHaveLength(0)
   })
@@ -728,12 +730,12 @@ describe('computeDiff 策略修饰', () => {
     const adds = diffs.filter((d) => d.kind === 'add')
     const updates = diffs.filter((d) => d.kind === 'update')
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // sid=1 远程有但本地无 → 跳过（update-only 不新增）
-    // sid=2 需更新 → 1 个 update
-    // sid=3 无变化 → 不在 diffs 中
+    // subjectId=1 远程有但本地无 → 跳过（update-only 不新增）
+    // subjectId=2 需更新 → 1 个 update
+    // subjectId=3 无变化 → 不在 diffs 中
     expect(adds).toHaveLength(0)
     expect(updates).toHaveLength(1)
-    expect(updates[0]?.sid).toBe('2')
+    expect(updates[0]?.subjectId).toBe('2')
     expect(deletes).toHaveLength(0)
   })
 
@@ -744,9 +746,9 @@ describe('computeDiff 策略修饰', () => {
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(adds).toHaveLength(1)
     expect(updates).toHaveLength(1)
-    // sid=4 本地有远程无 → delete
+    // subjectId=4 本地有远程无 → delete
     expect(deletes).toHaveLength(1)
-    expect(deletes[0]?.sid).toBe('4')
+    expect(deletes[0]?.subjectId).toBe('4')
     expect(deletes[0]?.localRow).toBe(12)
   })
 
@@ -755,8 +757,8 @@ describe('computeDiff 策略修饰', () => {
     const adds = diffs.filter((d) => d.kind === 'add')
     const updates = diffs.filter((d) => d.kind === 'update')
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // sid=1 本地无 → add
-    // sid=2、sid=3 本地有 → 强制 update（即使 sid=3 字段一致）
+    // subjectId=1 本地无 → add
+    // subjectId=2、subjectId=3 本地有 → 强制 update（即使 subjectId=3 字段一致）
     expect(adds).toHaveLength(1)
     expect(updates).toHaveLength(2)
     expect(deletes).toHaveLength(0)
@@ -766,9 +768,9 @@ describe('computeDiff 策略修饰', () => {
 
   it('策略 mirror 在远程=本地时无 delete', () => {
     // 远程与本地完全一致（SID 集合相同）
-    const r: GithubRemoteEntry[] = [{ sid: '1', name: 'A' }]
+    const r: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A' }]
     const l = new Map<string, LocalRowEntry>([
-      ['1', { row: 5, sid: '1', fields: { 名称: 'A', 是否看完: '看过' } }],
+      ['1', { row: 5, subjectId: '1', fields: { 名称: 'A', 是否看完: '看过' } }],
     ])
     const diffs = computeDiff(r, l, 'mirror')
     expect(diffs.filter((d) => d.kind === 'delete')).toHaveLength(0)
@@ -794,7 +796,7 @@ describe('parseJsonl', () => {
     const text = `${HEADER}\n["123","测试"]`
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(1)
-    expect(entries[0]?.sid).toBe('123')
+    expect(entries[0]?.subjectId).toBe('123')
     expect(entries[0]?.name).toBe('测试')
     expect(errors).toHaveLength(0)
   })
@@ -803,7 +805,7 @@ describe('parseJsonl', () => {
     const text = [HEADER, '["1","A"]', '["2","B"]', '["3","C"]'].join('\n')
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
-    expect(entries.map((entry) => entry.sid)).toEqual(['1', '2', '3'])
+    expect(entries.map((entry) => entry.subjectId)).toEqual(['1', '2', '3'])
     expect(errors).toHaveLength(0)
   })
 
@@ -827,14 +829,14 @@ describe('parseJsonl', () => {
     )
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(2)
-    expect(entries[0]?.sid).toBe('1')
-    expect(entries[1]?.sid).toBe('2')
+    expect(entries[0]?.subjectId).toBe('1')
+    expect(entries[1]?.subjectId).toBe('2')
     expect(errors).toHaveLength(2)
     expect(errors[0]?.line).toBe(3)
     expect(errors[1]?.line).toBe(5)
   })
 
-  it('表头缺少 sid 字段 → 每条数据行都视为错误', () => {
+  it('表头缺少 subjectId 字段 → 每条数据行都视为错误', () => {
     const text = '["name"]\n["无sid"]'
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(0)
@@ -864,7 +866,7 @@ describe('parseJsonl', () => {
     expect(entries).toHaveLength(1)
     expect(errors).toHaveLength(0)
     const entry = entries[0]!
-    expect(entry.sid).toBe('12345')
+    expect(entry.subjectId).toBe('12345')
     expect(entry.name).toBe('测试')
     expect(entry.updatedAt).toBe('2026-07-21')
     expect(entry.meta_tags).toEqual(['标签1', '标签2'])
@@ -872,29 +874,29 @@ describe('parseJsonl', () => {
   })
 })
 
-describe('isGithubRemoteEntry', () => {
-  it('有字符串 sid 的对象 → true', () => {
-    expect(isGithubRemoteEntry({ sid: '1', name: 'A' })).toBe(true)
+describe('isWireRemoteEntry', () => {
+  it('有字符串 subjectId 的对象 → true', () => {
+    expect(isWireRemoteEntry({ sid: '1', name: 'A' })).toBe(true)
   })
 
-  it('无 sid 字段 → false', () => {
-    expect(isGithubRemoteEntry({ name: 'A' })).toBe(false)
+  it('无 subjectId 字段 → false', () => {
+    expect(isWireRemoteEntry({ name: 'A' })).toBe(false)
   })
 
   it('sid 为数字 → false', () => {
-    expect(isGithubRemoteEntry({ sid: 123 })).toBe(false)
+    expect(isWireRemoteEntry({ sid: 123 })).toBe(false)
   })
 
   it('null → false', () => {
-    expect(isGithubRemoteEntry(null)).toBe(false)
+    expect(isWireRemoteEntry(null)).toBe(false)
   })
 
   it('字符串 → false', () => {
-    expect(isGithubRemoteEntry('not an object')).toBe(false)
+    expect(isWireRemoteEntry('not an object')).toBe(false)
   })
 })
 
-// ========== getSelectedRowSids 测试 ==========
+// ========== getSelectedRowSubjectIds 测试 ==========
 
 function createMockSheetForSelection(
   options: {
@@ -927,7 +929,7 @@ function createMockSheetForSelection(
   }
 }
 
-describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
+describe('getSelectedRowSubjectIds (通过 syncFromGithub selectedRowsOnly)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
@@ -945,7 +947,7 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     mockGetLastRow.mockReturnValue(5)
 
     // 返回一些远程条目
-    const mockEntries = [{ sid: '1', name: 'Test' }]
+    const mockEntries = [{ subjectId: '1', name: 'Test' }]
     const xhrMock = (
       XMLHttpRequest as unknown as { mock?: { responseText: string; status: number } }
     ).mock
@@ -968,10 +970,10 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     mockParseJsonl.mockImplementation(() => ({ entries: [], errors: [] }))
     mockComputeDiff.mockReturnValue([])
 
-    // 直接测试：getApp 返回 null 时 getSelectedRowSids 返回空集合 我们可以通过导入内部函数或通过 syncFromGithub 来测试 由于 getSelectedRowSids 是私有的，我们测试 syncFromGithub 的 selectedRowsOnly 分支
+    // 直接测试：getApp 返回 null 时 getSelectedRowSubjectIds 返回空集合 我们可以通过导入内部函数或通过 syncFromGithub 来测试 由于 getSelectedRowSubjectIds 是私有的，我们测试 syncFromGithub 的 selectedRowsOnly 分支
 
     // 首先确保 fetchGithubJson 正常返回数据
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
 
     // 让 XMLHttpRequest 正常工作
     interface XhrLike {
@@ -993,8 +995,8 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     // 当没有选区时 selectedRowsOnly 会抛错
   })
 
-  it('无选区时 getSelectedRowSids 应返回空集合并记录日志', () => {
-    // 直接测试 getSelectedRowSids 需要通过 syncFromGithub 间接触发
+  it('无选区时 getSelectedRowSubjectIds 应返回空集合并记录日志', () => {
+    // 直接测试 getSelectedRowSubjectIds 需要通过 syncFromGithub 间接触发
     // 这里我们验证：当 getApp 返回有 Selection 但无 ActiveSheet 时
     // 函数应返回空集合并记录日志
     const mockSheet = createMockSheetForSelection({
@@ -1025,7 +1027,7 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
       return null
     })
 
-    // 我们无法直接调用 getSelectedRowSids（私有函数）
+    // 我们无法直接调用 getSelectedRowSubjectIds（私有函数）
     // 但可以验证 syncFromGithub 在 selectedRowsOnly 为 true 时的行为
     // 此测试用于验证 mock 设置正确
     expect(mockGetApp()).toBe(mockApp)
@@ -1064,8 +1066,8 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: '1',
-        remote: { sid: '1', name: 'Test', date: '2024-01-15' },
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test', date: '2024-01-15' },
         changedFields: ['*'],
       },
     ]
@@ -1106,8 +1108,8 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: '1',
-        remote: { sid: '1', name: 'Test', date: 'invalid-date' },
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test', date: 'invalid-date' },
         changedFields: ['*'],
       },
     ]
@@ -1353,7 +1355,9 @@ describe('readLocalEntries 批量读取路径', () => {
 
 describe('applyConflictResolutions', () => {
   it('无 resolutions 时应原样返回 diffs', () => {
-    const diffs = [{ kind: 'update' as const, sid: '1', changedFields: ['名称'], localRow: 5 }]
+    const diffs = [
+      { kind: 'update' as const, subjectId: '1', changedFields: ['名称'], localRow: 5 },
+    ]
     const result = applyConflictResolutions(diffs, [])
     expect(result).toBe(diffs)
     expect(result).toHaveLength(1)
@@ -1361,51 +1365,65 @@ describe('applyConflictResolutions', () => {
 
   it('选择 local 应移除对应字段', () => {
     const diffs = [
-      { kind: 'update' as const, sid: '1', changedFields: ['名称', '标签/分级'], localRow: 5 },
+      {
+        kind: 'update' as const,
+        subjectId: '1',
+        changedFields: ['名称', '标签/分级'],
+        localRow: 5,
+      },
     ]
-    const resolutions = [{ sid: '1', field: '名称', chosenValue: 'local' as const }]
+    const resolutions = [{ subjectId: '1', field: '名称', chosenValue: 'local' as const }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result[0]?.changedFields).toEqual(['标签/分级'])
   })
 
   it('所有字段被移除时应删除该 diff', () => {
     const diffs = [
-      { kind: 'update' as const, sid: '1', changedFields: ['名称'], localRow: 5 },
-      { kind: 'update' as const, sid: '2', changedFields: ['名称'], localRow: 6 },
+      { kind: 'update' as const, subjectId: '1', changedFields: ['名称'], localRow: 5 },
+      { kind: 'update' as const, subjectId: '2', changedFields: ['名称'], localRow: 6 },
     ]
-    const resolutions = [{ sid: '1', field: '名称', chosenValue: 'local' as const }]
+    const resolutions = [{ subjectId: '1', field: '名称', chosenValue: 'local' as const }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
-    expect(result[0]?.sid).toBe('2')
+    expect(result[0]?.subjectId).toBe('2')
   })
 
   it('选择 remote 应保留字段', () => {
-    const diffs = [{ kind: 'update' as const, sid: '1', changedFields: ['名称'], localRow: 5 }]
-    const resolutions = [{ sid: '1', field: '名称', chosenValue: 'remote' as const }]
+    const diffs = [
+      { kind: 'update' as const, subjectId: '1', changedFields: ['名称'], localRow: 5 },
+    ]
+    const resolutions = [{ subjectId: '1', field: '名称', chosenValue: 'remote' as const }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result[0]?.changedFields).toEqual(['名称'])
   })
 
   it('add diff 不应受影响', () => {
     const diffs = [
-      { kind: 'add' as const, sid: '1', remote: { sid: '1', name: 'Test' }, changedFields: ['*'] },
+      {
+        kind: 'add' as const,
+        subjectId: '1',
+        remote: { subjectId: '1', name: 'Test' },
+        changedFields: ['*'],
+      },
     ]
-    const resolutions = [{ sid: '1', field: '名称', chosenValue: 'local' as const }]
+    const resolutions = [{ subjectId: '1', field: '名称', chosenValue: 'local' as const }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
     expect(result[0]?.kind).toBe('add')
   })
 
   it('force-overwrite diff (changedFields=["*"]) 不应受影响', () => {
-    const diffs = [{ kind: 'update' as const, sid: '1', changedFields: ['*'], localRow: 5 }]
-    const resolutions = [{ sid: '1', field: '名称', chosenValue: 'local' as const }]
+    const diffs = [{ kind: 'update' as const, subjectId: '1', changedFields: ['*'], localRow: 5 }]
+    const resolutions = [{ subjectId: '1', field: '名称', chosenValue: 'local' as const }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
     expect(result[0]?.changedFields).toEqual(['*'])
   })
 
   it('空 resolutions 数组应原样返回', () => {
-    const diffs = [{ kind: 'update' as const, sid: '1', changedFields: ['名称'], localRow: 5 }]
+    const diffs = [
+      { kind: 'update' as const, subjectId: '1', changedFields: ['名称'], localRow: 5 },
+    ]
     const result = applyConflictResolutions(diffs, [])
     expect(result).toHaveLength(1)
   })
@@ -1475,9 +1493,9 @@ describe('applyDiffToSheet', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: '1',
+        subjectId: '1',
         remote: {
-          sid: '1',
+          subjectId: '1',
           name: '测试条目',
           date: '2024-06-15',
         },
@@ -1517,9 +1535,9 @@ describe('applyDiffToSheet', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: '1',
+        subjectId: '1',
         remote: {
-          sid: '1',
+          subjectId: '1',
           name: '新名称',
         },
         changedFields: ['名称'],
@@ -1566,7 +1584,7 @@ describe('applyDiffToSheet', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'delete',
-        sid: '1',
+        subjectId: '1',
         localRow: 3,
         changedFields: [],
       },
@@ -1598,7 +1616,7 @@ describe('applyDiffToSheet', () => {
     const diffs = [
       {
         kind: 'conflict',
-        sid: '1',
+        subjectId: '1',
       },
     ] as unknown as GithubSyncDiff[]
 
@@ -1616,8 +1634,8 @@ describe('applyDiffToSheet', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'sheet-null-1',
-        remote: { sid: 'sheet-null-1', name: '测试' },
+        subjectId: 'sheet-null-1',
+        remote: { subjectId: 'sheet-null-1', name: '测试' },
         changedFields: ['*'],
       },
     ]
@@ -1628,7 +1646,7 @@ describe('applyDiffToSheet', () => {
   })
 })
 
-// ========== syncFromGithub selectedRowsOnly 测试（覆盖 getSelectedRowSids）==========
+// ========== syncFromGithub selectedRowsOnly 测试（覆盖 getSelectedRowSubjectIds）==========
 
 describe('syncFromGithub selectedRowsOnly', () => {
   beforeEach(() => {
@@ -1642,7 +1660,7 @@ describe('syncFromGithub selectedRowsOnly', () => {
   })
 
   it('selectedRowsOnly 时无法获取 SIDs 应抛错', async () => {
-    // getApp 返回 null → getSelectedRowSids 返回空集合
+    // getApp 返回 null → getSelectedRowSubjectIds 返回空集合
     mockGetApp.mockReturnValue(null)
 
     await expect(
@@ -1666,7 +1684,7 @@ describe('syncFromGithub selectedRowsOnly', () => {
     mockGetColumnMap.mockReturnValue(new Map([['名称', 1]]))
     mockGetCellValue.mockReturnValue('')
 
-    // 无 Bangumi_URL 列 → getSelectedRowSids 返回空集合
+    // 无 Bangumi_URL 列 → getSelectedRowSubjectIds 返回空集合
     await expect(
       syncFromGithub(undefined, 'add-update', undefined, undefined, true),
     ).rejects.toThrow(/未选中任何行/)
@@ -1703,9 +1721,9 @@ describe('syncFromGithub selectedRowsOnly', () => {
 
     // 返回远程数据（含选中的和未选中的条目）
     const mockRemoteEntries: GithubRemoteEntry[] = [
-      { sid: '111', name: '选中条目1' },
-      { sid: '222', name: '选中条目2' },
-      { sid: '333', name: '未选中条目' },
+      { subjectId: '111', name: '选中条目1' },
+      { subjectId: '222', name: '选中条目2' },
+      { subjectId: '333', name: '未选中条目' },
     ]
     mockParseJsonl.mockReturnValue({ entries: mockRemoteEntries, errors: [] })
     mockComputeDiff.mockReturnValue([])
@@ -1833,8 +1851,8 @@ describe('fetchGithubJson 委托分片编排', () => {
 
   it('成功时应返回编排结果中的 entries', async () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: 'Test1' },
-      { sid: '2', name: 'Test2' },
+      { subjectId: '1', name: 'Test1' },
+      { subjectId: '2', name: 'Test2' },
     ]
     setupRemoteEntries(entries)
 
@@ -1847,7 +1865,7 @@ describe('fetchGithubJson 委托分片编排', () => {
     await expect(fetchGithubJson()).rejects.toThrow(/分片清单格式非法/)
   })
 
-  it('缺合法 sid 计数经出参 stats 透传给调用方（结果弹窗用）', async () => {
+  it('缺合法 subjectId 计数经出参 stats 透传给调用方（结果弹窗用）', async () => {
     remoteEntriesState.skippedInvalidRecords = 3
     const stats = { skippedInvalidLines: 0 }
 
@@ -1888,9 +1906,9 @@ describe('syncFromGithub 时间过滤', () => {
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const remoteEntries: GithubRemoteEntry[] = [
-      { sid: '1', name: '近期条目', date: now.toISOString() },
-      { sid: '2', name: '一周前', date: weekAgo.toISOString() },
-      { sid: '3', name: '一个月前', date: monthAgo.toISOString() },
+      { subjectId: '1', name: '近期条目', date: now.toISOString() },
+      { subjectId: '2', name: '一周前', date: weekAgo.toISOString() },
+      { subjectId: '3', name: '一个月前', date: monthAgo.toISOString() },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     mockComputeDiff.mockReturnValue([])
@@ -1930,9 +1948,9 @@ describe('syncFromGithub 时间过滤', () => {
     const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
     const remoteEntries: GithubRemoteEntry[] = [
-      { sid: '1', name: '近期', date: now.toISOString() },
-      { sid: '2', name: '一月前', date: monthAgo.toISOString() },
-      { sid: '3', name: '三月前', date: threeMonthsAgo.toISOString() },
+      { subjectId: '1', name: '近期', date: now.toISOString() },
+      { subjectId: '2', name: '一月前', date: monthAgo.toISOString() },
+      { subjectId: '3', name: '三月前', date: threeMonthsAgo.toISOString() },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     mockComputeDiff.mockReturnValue([])
@@ -1990,7 +2008,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2035,7 +2053,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
       throw new Error('diff 计算失败')
     })
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2077,7 +2095,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2086,7 +2104,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
   })
 })
 
-describe('getSelectedRowSids 分支覆盖', () => {
+describe('getSelectedRowSubjectIds 分支覆盖', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
@@ -2133,9 +2151,9 @@ describe('getSelectedRowSids 分支覆盖', () => {
     )
   })
 
-  it('getSelectedRowSids 中发生异常时应记录 ERROR', async () => {
+  it('getSelectedRowSubjectIds 中发生异常时应记录 ERROR', async () => {
     const worksheet = createMockWorksheet()
-    // 让 Range 调用抛异常，在 getSelectedRowSids 的循环中触发 try-catch
+    // 让 Range 调用抛异常，在 getSelectedRowSubjectIds 的循环中触发 try-catch
     worksheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
@@ -2186,8 +2204,8 @@ describe('getSelectedRowSids 分支覆盖', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [
-      { sid: '1', name: '条目1', date: '2024-01-01' },
-      { sid: '2', name: '条目2', date: '2024-02-01' },
+      { subjectId: '1', name: '条目1', date: '2024-01-01' },
+      { subjectId: '2', name: '条目2', date: '2024-02-01' },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     setupRemoteEntries(remoteEntries)
@@ -2221,7 +2239,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
     // finally 中的条件判断 if (app) 和 if (prevScreenUpdating !== undefined) 都不会执行
     mockGetApp.mockReturnValue(null)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2255,7 +2273,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2279,7 +2297,7 @@ describe('syncFromGithub 读取本地数据为空分支 (line 1391)', () => {
   })
 
   it('readLocalEntriesForSync 返回 null 时应抛出错误', async () => {
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2320,7 +2338,7 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [
-      { sid: '1', name: '已更新条目', updatedAt: '2024-01-01' },
+      { subjectId: '1', name: '已更新条目', updatedAt: '2024-01-01' },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     setupRemoteEntries(remoteEntries)
@@ -2329,13 +2347,13 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
     mockComputeDiff.mockReturnValue([
       {
         kind: 'update' as const,
-        sid: '1',
+        subjectId: '1',
         localRow: 2,
         changedFields: ['rating'],
       },
     ])
 
-    const conflictResolution = [{ sid: '1', field: 'rating', chosenValue: 'remote' as const }]
+    const conflictResolution = [{ subjectId: '1', field: 'rating', chosenValue: 'remote' as const }]
 
     // 捕获 syncFromGithub 的结果（可能因 applyDiffToSheet 的 mock 工作表限制而失败）
     // 但关键是验证冲突解决分支（line 1401-1402）被执行
@@ -2388,7 +2406,7 @@ describe('syncFromGithub ensureSheetHeaders 返回 true (lines 1350-1351)', () =
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
+    const remoteEntries: GithubRemoteEntry[] = [{ subjectId: '1', name: 'Test' }]
     setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
@@ -2495,7 +2513,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     for (let index = 0; index < 11; index += 1) {
       deletedDiffs.push({
         kind: 'delete',
-        sid: String(index + 1),
+        subjectId: String(index + 1),
         localRow: index + 2,
         changedFields: ['*'],
       })
@@ -2555,9 +2573,9 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
     // 生成 501 条 add diff（超过 BATCH_WRITE_SIZE=500）
     const addedDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, index) => ({
       kind: 'add' as const,
-      sid: String(index + 1),
+      subjectId: String(index + 1),
       remote: {
-        sid: String(index + 1),
+        subjectId: String(index + 1),
         name: `测试条目${String(index + 1)}`,
         date: '2024-06-15',
       },
@@ -2608,10 +2626,10 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
     // 生成 51 条 update diff（超过 BATCH_UPDATE_SIZE=50）
     const updateDiffs: GithubSyncDiff[] = Array.from({ length: 51 }, (_, index) => ({
       kind: 'update' as const,
-      sid: String(index + 1),
+      subjectId: String(index + 1),
       localRow: index + 2,
       remote: {
-        sid: String(index + 1),
+        subjectId: String(index + 1),
         name: `更新条目${String(index + 1)}`,
         date: '2024-06-15',
       },
@@ -2639,8 +2657,8 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
 
   it('未知 range 应返回空数组', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: '测试', date: '2024-06-15' },
-      { sid: '2', name: '测试2', date: '2024-07-20' },
+      { subjectId: '1', name: '测试', date: '2024-06-15' },
+      { subjectId: '2', name: '测试2', date: '2024-07-20' },
     ]
     // 刻意传入越界 range：filterByTime 的 default 分支返回空数组
     const result = filterByTime(entries, {
@@ -2652,7 +2670,7 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
   })
 
   it('range 为 all 时应直接返回所有条目', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    const entries: GithubRemoteEntry[] = [{ subjectId: '1', name: '测试', date: '2024-06-15' }]
     // year 在 range='all' 下不参与筛选，但类型上必填
     const result = filterByTime(entries, {
       enabled: false,
@@ -2664,18 +2682,18 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
 
   it('year 策略: 匹配年份的条目通过', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: '2024条目', date: '2024-06-15' },
-      { sid: '2', name: '2023条目', date: '2023-07-20' },
+      { subjectId: '1', name: '2024条目', date: '2024-06-15' },
+      { subjectId: '2', name: '2023条目', date: '2023-07-20' },
     ]
     const result = filterByTime(entries, { enabled: true, range: 'year', year: 2024 })
     expect(result).toHaveLength(1)
-    expect(result[0]!.sid).toBe('1')
+    expect(result[0]!.subjectId).toBe('1')
   })
 
   it('quarter 策略: Q1 包含 1-3 月', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: '1月', date: '2024-01-15' },
-      { sid: '2', name: '4月', date: '2024-04-20' },
+      { subjectId: '1', name: '1月', date: '2024-01-15' },
+      { subjectId: '2', name: '4月', date: '2024-04-20' },
     ]
     const result = filterByTime(entries, {
       enabled: true,
@@ -2684,11 +2702,11 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
       quarter: 1,
     })
     expect(result).toHaveLength(1)
-    expect(result[0]!.sid).toBe('1')
+    expect(result[0]!.subjectId).toBe('1')
   })
 
   it('quarter 策略: 12 月条目归属上一年 Q1 (line 362 对应 filterByTime line 319)', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '12月条目', date: '2024-12-15' }]
+    const entries: GithubRemoteEntry[] = [{ subjectId: '1', name: '12月条目', date: '2024-12-15' }]
     const result = filterByTime(entries, {
       enabled: true,
       range: 'quarter',
@@ -2700,7 +2718,7 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
   })
 
   it('quarter 策略: quarter 超出范围返回空', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    const entries: GithubRemoteEntry[] = [{ subjectId: '1', name: '测试', date: '2024-06-15' }]
     // 刻意传入越界 quarter：覆盖「quarter 不在 QUARTER_MONTH_RANGES」的分支
     const result = filterByTime(entries, {
       enabled: true,
@@ -2713,12 +2731,12 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
 
   it('month 策略: 精确匹配月份', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: '6月', date: '2024-06-15' },
-      { sid: '2', name: '7月', date: '2024-07-20' },
+      { subjectId: '1', name: '6月', date: '2024-06-15' },
+      { subjectId: '2', name: '7月', date: '2024-07-20' },
     ]
     const result = filterByTime(entries, { enabled: true, range: 'month', year: 2024, month: 6 })
     expect(result).toHaveLength(1)
-    expect(result[0]!.sid).toBe('1')
+    expect(result[0]!.subjectId).toBe('1')
   })
 })
 
@@ -2748,7 +2766,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('quarter 策略: 本地12月条目归属上一年 (line 362)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年12月15日', 名称: '12月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年12月15日', 名称: '12月条目' } },
+      ],
     ])
     // 2024年12月的条目应该属于2025 Q1（跨年归属）
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -2765,7 +2786,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('quarter 策略: quarter 超出范围返回 false 不删除 (line 360)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '测试' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '测试' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2781,7 +2805,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('month 策略: 精确匹配月份 (line 365-366)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2797,7 +2824,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('month 策略: 不匹配月份时不删除', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2813,7 +2843,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('mirror 策略 + 时间过滤: 本地年份不匹配时跳过 delete', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2023年05月15日', 名称: '旧条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2023年05月15日', 名称: '旧条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2828,7 +2861,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('matchesTimeFilter default 分支: 未知 range 返回 true (line 367-368)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2843,7 +2879,10 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
   it('quarter 策略: 非 12 月条目正常年份匹配 (line 363)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -2911,9 +2950,9 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'fail-1',
+        subjectId: 'fail-1',
         remote: {
-          sid: 'fail-1',
+          subjectId: 'fail-1',
           name: '失败条目',
           date: '2024-06-15',
         },
@@ -2951,9 +2990,9 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'ok-1',
+        subjectId: 'ok-1',
         remote: {
-          sid: 'ok-1',
+          subjectId: 'ok-1',
           name: '正常条目',
           date: '2024-06-15',
         },
@@ -2995,7 +3034,10 @@ describe('matchesTimeFilter 分支: 月份不在季度范围内 (line 361)', () 
     const remote: GithubRemoteEntry[] = []
     // 1月条目，但是筛选 quarter=7 (包含 6,7,8月)
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -3014,7 +3056,10 @@ describe('matchesTimeFilter 分支: 月份不在季度范围内 (line 361)', () 
     // 3月应该在 Q1 (quarter=1: [12,1,2]) 范围内？不，Q1 只有 12月/1月/2月
     // 所以3月也不在Q1范围内
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年03月15日', 名称: '3月条目' } }],
+      [
+        'sid-1',
+        { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年03月15日', 名称: '3月条目' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -3051,7 +3096,7 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
   it('远程扩展字段与本地不同时应检测为差异 (line 463)', () => {
     const remote: GithubRemoteEntry[] = [
       {
-        sid: 'ext-1',
+        subjectId: 'ext-1',
         name: '扩展条目',
         date: '2024-06-15',
         播放结束: '2024-12-25',
@@ -3062,7 +3107,7 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
         'ext-1',
         {
           row: 2,
-          sid: 'ext-1',
+          subjectId: 'ext-1',
           fields: {
             名称: '扩展条目',
             // 不同的完播日
@@ -3080,7 +3125,7 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
   it('远程扩展字段为空字符串时不视为差异', () => {
     const remote: GithubRemoteEntry[] = [
       {
-        sid: 'ext-2',
+        subjectId: 'ext-2',
         name: '条目2',
         date: '2024-06-15',
         播放结束: '',
@@ -3091,7 +3136,7 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
         'ext-2',
         {
           row: 3,
-          sid: 'ext-2',
+          subjectId: 'ext-2',
           fields: {
             名称: '条目2',
             // 与 remote.date 匹配
@@ -3142,15 +3187,15 @@ describe('batchUpdateRows tryAddCol 去重逻辑 (line 722)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'upd-1',
-        remote: { sid: 'upd-1', name: '条目1', date: '2024-06-15' },
+        subjectId: 'upd-1',
+        remote: { subjectId: 'upd-1', name: '条目1', date: '2024-06-15' },
         localRow: 2,
         changedFields: ['名称', '标签/分级'],
       },
       {
         kind: 'update',
-        sid: 'upd-2',
-        remote: { sid: 'upd-2', name: '条目2', date: '2024-06-15' },
+        subjectId: 'upd-2',
+        remote: { subjectId: 'upd-2', name: '条目2', date: '2024-06-15' },
         localRow: 3,
         changedFields: ['名称', '集数'],
       },
@@ -3205,8 +3250,8 @@ describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'same-1',
-        remote: { sid: 'same-1', name: '保持不变', date: '2024-06-15' },
+        subjectId: 'same-1',
+        remote: { subjectId: 'same-1', name: '保持不变', date: '2024-06-15' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -3254,8 +3299,8 @@ describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'fail-1',
-        remote: { sid: 'fail-1', name: '失败条目', date: '2024-06-15' },
+        subjectId: 'fail-1',
+        remote: { subjectId: 'fail-1', name: '失败条目', date: '2024-06-15' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -3311,7 +3356,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'delete',
-        sid: 'del-1',
+        subjectId: 'del-1',
         localRow: 2,
         changedFields: ['*'],
       },
@@ -3370,7 +3415,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'delete',
-        sid: 'del-fail',
+        subjectId: 'del-fail',
         localRow: 2,
         changedFields: ['*'],
       },
@@ -3422,9 +3467,9 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'ext-upd-1',
+        subjectId: 'ext-upd-1',
         remote: {
-          sid: 'ext-upd-1',
+          subjectId: 'ext-upd-1',
           name: '扩展条目',
           date: '2024-06-15',
           // 扩展字段
@@ -3475,9 +3520,9 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'ext-num-1',
+        subjectId: 'ext-num-1',
         remote: {
-          sid: 'ext-num-1',
+          subjectId: 'ext-num-1',
           name: '数字扩展',
           date: '2024-06-15',
           // JSONL 字段 '片长'，对应 Excel 列 '时长'
@@ -3530,9 +3575,9 @@ describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'date-1',
+        subjectId: 'date-1',
         remote: {
-          sid: 'date-1',
+          subjectId: 'date-1',
           name: '日期条目',
           date: '2024-06-15',
         },
@@ -3586,9 +3631,9 @@ describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'non-date-1',
+        subjectId: 'non-date-1',
         remote: {
-          sid: 'non-date-1',
+          subjectId: 'non-date-1',
           name: '非日期测试',
           date: '2024-06-15',
           // JSONL 字段 → Excel '制作公司'
@@ -3656,8 +3701,8 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'safe-1',
-        remote: { sid: 'safe-1', name: '安全条目', meta_tags: ['远程标签'], score: 9 },
+        subjectId: 'safe-1',
+        remote: { subjectId: 'safe-1', name: '安全条目', meta_tags: ['远程标签'], score: 9 },
         localRow: 2,
         changedFields: ['标签/分级', '评分'],
       },
@@ -3708,8 +3753,8 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'safe-2',
-        remote: { sid: 'safe-2', name: '回退条目', meta_tags: ['远程标签'] },
+        subjectId: 'safe-2',
+        remote: { subjectId: 'safe-2', name: '回退条目', meta_tags: ['远程标签'] },
         localRow: 2,
         changedFields: ['标签/分级'],
       },
@@ -3754,9 +3799,9 @@ describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'no-column-1',
+        subjectId: 'no-column-1',
         remote: {
-          sid: 'no-column-1',
+          subjectId: 'no-column-1',
           name: '无匹配列',
           date: '2024-06-15',
         },
@@ -3796,9 +3841,9 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
     for (let index = 0; index < 600; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${String(index)}`,
+        subjectId: `eta-${String(index)}`,
         remote: {
-          sid: `eta-${String(index)}`,
+          subjectId: `eta-${String(index)}`,
           name: `条目 ${String(index)}`,
           date: '2024-06-15',
         },
@@ -3854,9 +3899,9 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'ext-str-1',
+        subjectId: 'ext-str-1',
         remote: {
-          sid: 'ext-str-1',
+          subjectId: 'ext-str-1',
           name: '扩展字符串测试',
           date: '2024-06-15',
           // 非日期字符串扩展字段
@@ -3898,9 +3943,9 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'ext-num-1',
+        subjectId: 'ext-num-1',
         remote: {
-          sid: 'ext-num-1',
+          subjectId: 'ext-num-1',
           name: '扩展数字测试',
           date: '2024-06-15',
           // 数字类型扩展字段
@@ -3933,9 +3978,9 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'empty-column-1',
+        subjectId: 'empty-column-1',
         remote: {
-          sid: 'empty-column-1',
+          subjectId: 'empty-column-1',
           name: '空列测试',
           date: '2024-06-15',
         },
@@ -3982,7 +4027,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'delete',
-        sid: 'del-err-1',
+        subjectId: 'del-err-1',
         localRow: 2,
         changedFields: [],
       },
@@ -4012,7 +4057,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'delete',
-        sid: 'del-outer-1',
+        subjectId: 'del-outer-1',
         localRow: 2,
         changedFields: [],
       },
@@ -4073,8 +4118,8 @@ describe('applyDiffToSheet delete 批量 undo 快照', () => {
 
     try {
       const diffs: GithubSyncDiff[] = [
-        { kind: 'delete', sid: 'rect-1', localRow: 2, changedFields: [] },
-        { kind: 'delete', sid: 'rect-2', localRow: 4, changedFields: [] },
+        { kind: 'delete', subjectId: 'rect-1', localRow: 2, changedFields: [] },
+        { kind: 'delete', subjectId: 'rect-2', localRow: 4, changedFields: [] },
       ]
 
       const result = await applyDiffToSheet(diffs, 'mirror')
@@ -4117,8 +4162,12 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     for (let index = 0; index < 501; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${String(index)}`,
-        remote: { sid: `eta-${String(index)}`, name: `条目 ${String(index)}`, date: '2024-06-15' },
+        subjectId: `eta-${String(index)}`,
+        remote: {
+          subjectId: `eta-${String(index)}`,
+          name: `条目 ${String(index)}`,
+          date: '2024-06-15',
+        },
         changedFields: ['*'],
       })
     }
@@ -4181,9 +4230,9 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'ext-str-632',
+        subjectId: 'ext-str-632',
         remote: {
-          sid: 'ext-str-632',
+          subjectId: 'ext-str-632',
           name: '扩展字符串',
           date: '2024-06-15',
           动画制作公司: '非日期字符串值',
@@ -4228,9 +4277,9 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'ext-num-635',
+        subjectId: 'ext-num-635',
         remote: {
-          sid: 'ext-num-635',
+          subjectId: 'ext-num-635',
           name: '扩展数字',
           date: '2024-06-15',
           片长: '42',
@@ -4270,8 +4319,8 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'range-null-1',
-        remote: { sid: 'range-null-1', name: 'RangeNull', date: '2024-06-15' },
+        subjectId: 'range-null-1',
+        remote: { subjectId: 'range-null-1', name: 'RangeNull', date: '2024-06-15' },
         changedFields: ['*'],
       },
     ]
@@ -4304,8 +4353,8 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'range-err-1',
-        remote: { sid: 'range-err-1', name: 'RangeErr', date: '2024-06-15' },
+        subjectId: 'range-err-1',
+        remote: { subjectId: 'range-err-1', name: 'RangeErr', date: '2024-06-15' },
         changedFields: ['*'],
       },
     ]
@@ -4346,9 +4395,9 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'update-url-skip',
+        subjectId: 'update-url-skip',
         localRow: 3,
-        remote: { sid: 'update-url-skip', name: '名称更新', date: '2024-06-15' },
+        remote: { subjectId: 'update-url-skip', name: '名称更新', date: '2024-06-15' },
         // 不包含 Bangumi_URL
         changedFields: ['名称'],
       },
@@ -4388,9 +4437,14 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'name-skip',
+        subjectId: 'name-skip',
         localRow: 3,
-        remote: { sid: 'name-skip', name: '名称更新', date: '2024-06-15', meta_tags: ['Tag'] },
+        remote: {
+          subjectId: 'name-skip',
+          name: '名称更新',
+          date: '2024-06-15',
+          meta_tags: ['Tag'],
+        },
         // 不包含名称
         changedFields: ['Bangumi_URL'],
       },
@@ -4423,9 +4477,9 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     for (let index = 0; index < 3; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `dur-ms-${String(index)}`,
+        subjectId: `dur-ms-${String(index)}`,
         remote: {
-          sid: `dur-ms-${String(index)}`,
+          subjectId: `dur-ms-${String(index)}`,
           name: `快速处理${String(index)}`,
           date: '2024-06-15',
         },
@@ -4465,8 +4519,8 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'eta-zero',
-        remote: { sid: 'eta-zero', name: '单条', date: '2024-06-15' },
+        subjectId: 'eta-zero',
+        remote: { subjectId: 'eta-zero', name: '单条', date: '2024-06-15' },
         changedFields: ['*'],
       },
     ]
@@ -4515,10 +4569,10 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'ext-str-update',
+        subjectId: 'ext-str-update',
         localRow: 3,
         remote: {
-          sid: 'ext-str-update',
+          subjectId: 'ext-str-update',
           name: '测试',
           date: '2024-06-15',
           动画制作公司: 'Test Studio',
@@ -4558,10 +4612,10 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'ext-num-update',
+        subjectId: 'ext-num-update',
         localRow: 3,
         remote: {
-          sid: 'ext-num-update',
+          subjectId: 'ext-num-update',
           name: '数字测试',
           date: '2024-06-15',
           // 数字类型
@@ -4626,8 +4680,12 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     for (let index = 0; index < 1100; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sec-${String(index)}`,
-        remote: { sid: `sec-${String(index)}`, name: `秒分支${String(index)}`, date: '2024-06-15' },
+        subjectId: `sec-${String(index)}`,
+        remote: {
+          subjectId: `sec-${String(index)}`,
+          name: `秒分支${String(index)}`,
+          date: '2024-06-15',
+        },
         changedFields: ['*'],
       })
     }
@@ -4686,8 +4744,12 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     for (let index = 0; index < 1500; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `min-${String(index)}`,
-        remote: { sid: `min-${String(index)}`, name: `分分支${String(index)}`, date: '2024-06-15' },
+        subjectId: `min-${String(index)}`,
+        remote: {
+          subjectId: `min-${String(index)}`,
+          name: `分分支${String(index)}`,
+          date: '2024-06-15',
+        },
         changedFields: ['*'],
       })
     }
@@ -4735,8 +4797,12 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     for (let index = 0; index < 3; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `ms-${String(index)}`,
-        remote: { sid: `ms-${String(index)}`, name: `毫秒${String(index)}`, date: '2024-06-15' },
+        subjectId: `ms-${String(index)}`,
+        remote: {
+          subjectId: `ms-${String(index)}`,
+          name: `毫秒${String(index)}`,
+          date: '2024-06-15',
+        },
         changedFields: ['*'],
       })
     }
@@ -4787,9 +4853,9 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'num-ext-506',
+        subjectId: 'num-ext-506',
         remote: {
-          sid: 'num-ext-506',
+          subjectId: 'num-ext-506',
           name: '数字扩展测试',
           date: '2024-06-15',
           话数: numericExtensionField(24),
@@ -4828,9 +4894,9 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'num-ext-506b',
+        subjectId: 'num-ext-506b',
         remote: {
-          sid: 'num-ext-506b',
+          subjectId: 'num-ext-506b',
           name: '数字扩展测试B',
           date: '2024-06-15',
           话数: numericExtensionField(12),
@@ -4867,8 +4933,8 @@ describe('syncFromGithub 配置校验失败 (line 1314)', () => {
   })
 })
 
-// ========== 补充测试：getSelectedRowSids 无选区路径 (lines 1460-1461) ==========
-describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
+// ========== 补充测试：getSelectedRowSubjectIds 无选区路径 (lines 1460-1461) ==========
+describe('getSelectedRowSubjectIds 无选区路径 (lines 1460-1461)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
@@ -4898,7 +4964,7 @@ describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
       Calculation: 1,
     })
 
-    // selectedRowsOnly=true 触发 getSelectedRowSids
+    // selectedRowsOnly=true 触发 getSelectedRowSubjectIds
     // 由于选区为空，selectedSids.size === 0，syncFromGithub 会抛错
     await expect(
       syncFromGithub(undefined, 'add-update', undefined, undefined, true),
@@ -4961,9 +5027,9 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'date-fallback-1',
+        subjectId: 'date-fallback-1',
         remote: {
-          sid: 'date-fallback-1',
+          subjectId: 'date-fallback-1',
           name: '日期回退测试',
           // ISO 日期字符串，formatDateToLocal 可解析
           date: '2024-06-15',
@@ -5008,9 +5074,9 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 'num-field-1',
+        subjectId: 'num-field-1',
         remote: {
-          sid: 'num-field-1',
+          subjectId: 'num-field-1',
           name: '数字字段测试',
           // 数字类型，触发 line 506
           片长: '24',
@@ -5150,7 +5216,7 @@ describe('GithubSyncSource 方法', () => {
   })
 
   it('fetchRemoteEntries 委托给 fetchGithubJson', async () => {
-    setupRemoteEntries([{ sid: '1', name: 'Test' }])
+    setupRemoteEntries([{ subjectId: '1', name: 'Test' }])
 
     const source = new GithubSyncSource()
     const entries = await source.fetchRemoteEntries()
@@ -5196,8 +5262,8 @@ describe('fetchGithubText onerror 与 signal.aborted 竞态 (line 194)', () => {
   })
 })
 
-// ========== 补充测试：getSelectedRowSids ActiveSheet 为 null (line 1469) ==========
-describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
+// ========== 补充测试：getSelectedRowSubjectIds ActiveSheet 为 null (line 1469) ==========
+describe('getSelectedRowSubjectIds ActiveSheet 为 null (line 1469)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
@@ -5213,7 +5279,7 @@ describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
     mockSetCellValue.mockImplementation(() => {})
   })
 
-  it('ActiveSheet 为 null 时 getSelectedRowSids 应返回空集合 (line 1469)', async () => {
+  it('ActiveSheet 为 null 时 getSelectedRowSubjectIds 应返回空集合 (line 1469)', async () => {
     setupRemoteEntries([])
 
     const mockWs = createMockWorksheet()
@@ -5233,8 +5299,8 @@ describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
   })
 })
 
-// ========== 补充测试：getSelectedRowSids row===headerRow continue 分支 (line 1479) ==========
-describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
+// ========== 补充测试：getSelectedRowSubjectIds row===headerRow continue 分支 (line 1479) ==========
+describe('getSelectedRowSubjectIds row===headerRow continue (line 1479)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
@@ -5248,7 +5314,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('选区包含表头行时应跳过表头行（row===headerRow continue）', async () => {
-    setupRemoteEntries([{ sid: 'test1', name: '测试' }])
+    setupRemoteEntries([{ subjectId: 'test1', name: '测试' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -5271,7 +5337,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
       return null
     })
     mockParseJsonl.mockReturnValue({
-      entries: [{ sid: '999', name: '匹配条目', date: '2024-01-01' }],
+      entries: [{ subjectId: '999', name: '匹配条目', date: '2024-01-01' }],
       errors: [],
     })
 
@@ -5282,7 +5348,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('行无 URL 时应跳过（!url continue line 1481）', async () => {
-    setupRemoteEntries([{ sid: 'test2', name: '测试2' }])
+    setupRemoteEntries([{ subjectId: 'test2', name: '测试2' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -5308,7 +5374,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('extractSubjectId 返回有效 SID 时应添加到集合 (lines 1482-1483)', async () => {
-    setupRemoteEntries([{ sid: 'valid-sid', name: '有效条目' }])
+    setupRemoteEntries([{ subjectId: 'valid-sid', name: '有效条目' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -5327,7 +5393,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
       return null
     })
     mockParseJsonl.mockReturnValue({
-      entries: [{ sid: '12345', name: '有效条目', date: '2024-01-01' }],
+      entries: [{ subjectId: '12345', name: '有效条目', date: '2024-01-01' }],
       errors: [],
     })
 
@@ -5370,9 +5436,9 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     for (let index = 0; index < 501; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${String(index)}`,
+        subjectId: `sid-${String(index)}`,
         remote: {
-          sid: `sid-${String(index)}`,
+          subjectId: `sid-${String(index)}`,
           name: `条目${String(index)}`,
           date: '2024-06-15',
         },
@@ -5433,9 +5499,9 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     for (let index = 0; index < 600; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${String(index)}`,
+        subjectId: `sid-${String(index)}`,
         remote: {
-          sid: `sid-${String(index)}`,
+          subjectId: `sid-${String(index)}`,
           name: `条目${String(index)}`,
           date: '2024-06-15',
         },
@@ -5464,14 +5530,14 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 's1',
-        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        subjectId: 's1',
+        remote: { subjectId: 's1', name: '条目一', date: '2024-01-01' },
         changedFields: ['*'],
       },
       {
         kind: 'add',
-        sid: 's2',
-        remote: { sid: 's2', name: '条目二', date: '2024-01-02' },
+        subjectId: 's2',
+        remote: { subjectId: 's2', name: '条目二', date: '2024-01-02' },
         changedFields: ['*'],
       },
     ]
@@ -5530,9 +5596,9 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
     })
 
     const diffs: GithubSyncDiff[] = [
-      { kind: 'delete', sid: 'd1', localRow: 5, changedFields: ['*'] },
-      { kind: 'delete', sid: 'd2', localRow: 4, changedFields: ['*'] },
-      { kind: 'delete', sid: 'd3', localRow: 3, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd1', localRow: 5, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd2', localRow: 4, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd3', localRow: 3, changedFields: ['*'] },
     ]
 
     const result = await applyDiffToSheet(diffs, 'mirror', undefined, 'test', controller.signal)
@@ -5609,9 +5675,9 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'empty-name',
+        subjectId: 'empty-name',
         // name 缺失 → 解析值为空串，且非强制覆盖 → 整行没有要写的值
-        remote: { sid: 'empty-name' },
+        remote: { subjectId: 'empty-name' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5641,8 +5707,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', name: '新名字' },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', name: '新名字' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5668,8 +5734,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', name: '新名字' },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', name: '新名字' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5697,8 +5763,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', name: '新名字' },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', name: '新名字' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5722,8 +5788,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', name: '新名字' },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', name: '新名字' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5750,8 +5816,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', name: '新名字' },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', name: '新名字' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5779,8 +5845,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', meta_tags: ['远程标签'] },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', meta_tags: ['远程标签'] },
         localRow: 2,
         changedFields: ['标签/分级'],
       },
@@ -5811,8 +5877,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'update',
-        sid: 'n1',
-        remote: { sid: 'n1', meta_tags: ['远程标签'] },
+        subjectId: 'n1',
+        remote: { subjectId: 'n1', meta_tags: ['远程标签'] },
         localRow: 2,
         changedFields: ['*'],
       },
@@ -5839,14 +5905,14 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 's1',
-        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        subjectId: 's1',
+        remote: { subjectId: 's1', name: '条目一', date: '2024-01-01' },
         changedFields: ['*'],
       },
       {
         kind: 'add',
-        sid: 's2',
-        remote: { sid: 's2', name: '条目二', date: '2024-01-02' },
+        subjectId: 's2',
+        remote: { subjectId: 's2', name: '条目二', date: '2024-01-02' },
         changedFields: ['*'],
       },
     ]
@@ -5872,14 +5938,14 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 's1',
-        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        subjectId: 's1',
+        remote: { subjectId: 's1', name: '条目一', date: '2024-01-01' },
         changedFields: ['*'],
       },
       {
         kind: 'update',
-        sid: 'u1',
-        remote: { sid: 'u1', name: '改名' },
+        subjectId: 'u1',
+        remote: { subjectId: 'u1', name: '改名' },
         localRow: 2,
         changedFields: ['名称'],
       },
@@ -5918,8 +5984,8 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     const diffs: GithubSyncDiff[] = [
       {
         kind: 'add',
-        sid: 's1',
-        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        subjectId: 's1',
+        remote: { subjectId: 's1', name: '条目一', date: '2024-01-01' },
         changedFields: ['*'],
       },
     ]

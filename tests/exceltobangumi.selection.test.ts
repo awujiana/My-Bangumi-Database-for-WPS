@@ -854,9 +854,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
       mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockReadRangeValues.mockReturnValue([])
       mockGetAllSyncRecords.mockReturnValue([
-        { sid: '1', fingerprint: 'fp-1' },
-        { sid: '', fingerprint: 'fp-2' },
-        { sid: '3', fingerprint: '' },
+        { subjectId: '1', fingerprint: 'fp-1' },
+        { subjectId: '', fingerprint: 'fp-2' },
+        { subjectId: '3', fingerprint: '' },
       ])
 
       await SyncToBangumiAsync(worksheet, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, {
@@ -1131,14 +1131,14 @@ describe('exceltobangumi 选区与筛选链路', () => {
       const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
-      const skipSids = {
+      const skipSubjectIds = {
         size: 1,
         has: (): boolean => {
           throw new Error('冲突集读取失败')
         },
       } as unknown as Set<string>
 
-      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { skipSids })
+      await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, { skipSubjectIds })
 
       expect(mockHandleError).toHaveBeenCalledWith(
         expect.any(Error),
@@ -1307,7 +1307,7 @@ describe('exceltobangumi 选区与筛选链路', () => {
       const worksheet = createWorksheet()
       mockGetApp.mockReturnValue(createApp({ worksheet }))
       mockGetCellValue.mockImplementation(batchCellValue())
-      mockGetAllSyncRecords.mockReturnValue([{ sid: '1', fingerprint: 'fp-1' }])
+      mockGetAllSyncRecords.mockReturnValue([{ subjectId: '1', fingerprint: 'fp-1' }])
       mockCalcFingerprint.mockReturnValue('fp-1')
 
       const result = await SyncToBangumiAsync(worksheet, FULL_COL_MAP, 'token', 3, 1, {

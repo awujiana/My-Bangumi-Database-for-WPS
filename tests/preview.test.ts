@@ -880,7 +880,7 @@ describe('preview · uploadSingleRow', () => {
     expect(button.disabled).toBe(false)
     expect(button.classList.contains('uploading')).toBe(false)
     expect(mocks.addSyncRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ sid: '100', status: '成功', count: 1 }),
+      expect.objectContaining({ subjectId: '100', status: '成功', count: 1 }),
     )
     expect(mocks.showToast).not.toHaveBeenCalled()
   })
@@ -1036,7 +1036,7 @@ describe('preview · showDetailModal / closeDetailModal', () => {
 describe('preview · viewSyncRecordDetail', () => {
   it('找不到记录 → 提示未找到', () => {
     mountDiv('bgmDialogContainer')
-    mocks.getAllSyncRecords.mockReturnValue([{ sid: 999 }])
+    mocks.getAllSyncRecords.mockReturnValue([{ subjectId: 999 }])
 
     viewSyncRecordDetail('100')
 
@@ -1047,7 +1047,7 @@ describe('preview · viewSyncRecordDetail', () => {
     mountDiv('bgmDialogContainer')
     mocks.getAllSyncRecords.mockReturnValue([
       {
-        sid: 100,
+        subjectId: 100,
         name: '动画A',
         url: 'https://bgm.tv/subject/100',
         time: '2026-09-14',
@@ -1072,7 +1072,7 @@ describe('preview · viewSyncRecordDetail', () => {
 
   it('内容不是合法 JSON → 记日志后按原文展示', () => {
     mountDiv('bgmDialogContainer')
-    mocks.getAllSyncRecords.mockReturnValue([{ sid: 100, content: '不是 JSON' }])
+    mocks.getAllSyncRecords.mockReturnValue([{ subjectId: 100, content: '不是 JSON' }])
 
     viewSyncRecordDetail('100')
 

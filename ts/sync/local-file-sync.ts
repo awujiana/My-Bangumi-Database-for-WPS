@@ -8,7 +8,7 @@
  *              - 不依赖网络请求，读取本地文件系统
  *              - 不需要 owner/repo/branch 配置，仅需 path 字段（文件绝对路径）
  *              - 复用 githubConfig 的 path 字段存储本地文件路径（避免引入独立存储）
- *              - 复用 parseJsonl / isGithubRemoteEntry 解析逻辑，不重复实现
+ *              - 复用 parseJsonl / isWireRemoteEntry 解析逻辑，不重复实现
  *
  * 数据格式（与 GitHub 同步源一致）：
  *   「表头 + 值数组」两段式 JSON Lines——第 1 个非空行是表头（纯字符串数组），
@@ -159,7 +159,7 @@ export class LocalFileSyncSource implements SyncSource {
   /**
    * 最近一次 {@link fetchRemoteEntries} 的下载统计
    *
-   * 与 `BaseSyncSource` 子类同口径：loadEntriesFromPath 拼完后缺合法 sid
+   * 与 `BaseSyncSource` 子类同口径：loadEntriesFromPath 拼完后缺合法 subjectId
    * 被跳过的条数，由 syncFromRemote 读取后进入同步结果弹窗。实例级，
    * 每次同步从注册表取到的都是同一实例（注册表单例），但值是每次取数
    * 整体覆写（不是累加），不存在跨同步残留。

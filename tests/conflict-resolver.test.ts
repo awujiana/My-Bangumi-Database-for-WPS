@@ -22,8 +22,8 @@ import type { Conflict } from '../ts/services/ribbon-service.js'
 
 // ========== 公共测试数据 ==========
 const SAMPLE_CONFLICTS: Conflict[] = [
-  { sid: '123', field: '打分', localValue: '8', remoteValue: '9', localRow: 2 },
-  { sid: '456', field: '名称', localValue: '旧名称', remoteValue: '新名称', localRow: 3 },
+  { subjectId: '123', field: '打分', localValue: '8', remoteValue: '9', localRow: 2 },
+  { subjectId: '456', field: '名称', localValue: '旧名称', remoteValue: '新名称', localRow: 3 },
 ]
 
 /** 每个测试前清理 body，避免上次测试残留 */
@@ -108,7 +108,7 @@ describe('showConflictResolver - 模态框渲染', () => {
   it('XSS payload 被正确转义（使用 textContent）', async (): Promise<void> => {
     const xssConflicts: Conflict[] = [
       {
-        sid: '<img onerror=alert(1)>',
+        subjectId: '<img onerror=alert(1)>',
         field: '<script>alert(1)</script>',
         localValue: '"><svg onload=alert(1)>',
         remoteValue: 'javascript:alert(1)',
@@ -144,10 +144,10 @@ describe('showConflictResolver - 确认与取消', () => {
     expect(result).toHaveLength(SAMPLE_CONFLICTS.length)
     // 默认全部 local
     expect(result?.every((r) => r.chosenValue === 'local')).toBe(true)
-    // 验证 sid 与 field 对应
-    expect(result?.[0]?.sid).toBe('123')
+    // 验证 subjectId 与 field 对应
+    expect(result?.[0]?.subjectId).toBe('123')
     expect(result?.[0]?.field).toBe('打分')
-    expect(result?.[1]?.sid).toBe('456')
+    expect(result?.[1]?.subjectId).toBe('456')
     expect(result?.[1]?.field).toBe('名称')
   })
 
@@ -256,7 +256,7 @@ describe('showConflictResolver - 单条切换', () => {
 
   it('单条冲突切换为 remote 后确认', async (): Promise<void> => {
     const singleConflict: Conflict[] = [
-      { sid: '789', field: '是否看完', localValue: '在看', remoteValue: '看过', localRow: 5 },
+      { subjectId: '789', field: '是否看完', localValue: '在看', remoteValue: '看过', localRow: 5 },
     ]
     const promise = showConflictResolver(singleConflict)
 
@@ -270,7 +270,7 @@ describe('showConflictResolver - 单条切换', () => {
     const result = await promise
     expect(result).toHaveLength(1)
     expect(result?.[0]?.chosenValue).toBe('remote')
-    expect(result?.[0]?.sid).toBe('789')
+    expect(result?.[0]?.subjectId).toBe('789')
     expect(result?.[0]?.field).toBe('是否看完')
   })
 })

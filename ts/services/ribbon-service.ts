@@ -44,7 +44,7 @@ import { createStatusBarWriter } from '../tools/util/status-bar.js'
  */
 export interface Conflict {
   /** Bangumi subject ID（主键） */
-  sid: string
+  subjectId: string
   /** 冲突字段名（如 '打分', '名称', '是否看完'） */
   field: string
   /** 本地值（字符串形式，便于直接渲染） */
@@ -143,11 +143,11 @@ function collectEntryConflicts(
   local: Map<string, LocalRowEntry>,
   conflicts: Conflict[],
 ): void {
-  if (!entry.sid) {
+  if (!entry.subjectId) {
     return
   }
 
-  const localEntry = local.get(entry.sid)
+  const localEntry = local.get(entry.subjectId)
   if (!localEntry) {
     return
   }
@@ -159,7 +159,7 @@ function collectEntryConflicts(
       const localValue = localEntry.fields[spec.localField] ?? ''
       if (remoteValue !== localValue) {
         conflicts.push({
-          sid: entry.sid,
+          subjectId: entry.subjectId,
           field: spec.localField,
           localValue,
           remoteValue,
@@ -264,8 +264,8 @@ export function getSyncPreview(
         alreadyUploaded += 1
         if (isIncremental) {
           // 增量模式：已上传且指纹匹配则跳过
-          const sid = extractSubjectId(bgmUrl)
-          if (sid && fingerprintMap) {
+          const subjectId = extractSubjectId(bgmUrl)
+          if (subjectId && fingerprintMap) {
             const uploadedWatchType = mapWatchStatus(
               getField(rowNumber, '是否看完') ||
                 getField(rowNumber, '状态') ||
@@ -275,7 +275,7 @@ export function getSyncPreview(
               (key) => getField(rowNumber, key),
               uploadedWatchType,
             )
-            if (fingerprintMap.get(sid) === currentFingerprint) {
+            if (fingerprintMap.get(subjectId) === currentFingerprint) {
               incrementalSkipped += 1
               isUploadedSkipped = true
             }
@@ -302,13 +302,13 @@ export function getSyncPreview(
             // 增量模式：检查指纹是否匹配
             let isFingerprintMatched = false
             if (isIncremental && fingerprintMap) {
-              const sid = extractSubjectId(bgmUrl)
-              if (sid) {
+              const subjectId = extractSubjectId(bgmUrl)
+              if (subjectId) {
                 const currentFingerprint = calcSyncRowFingerprint(
                   (key) => getField(rowNumber, key),
                   type,
                 )
-                isFingerprintMatched = fingerprintMap.get(sid) === currentFingerprint
+                isFingerprintMatched = fingerprintMap.get(subjectId) === currentFingerprint
               }
             }
             if (isFingerprintMatched) {
@@ -368,7 +368,7 @@ export async function detectConflicts(
 ): Promise<{
   conflicts: {
     row: number
-    sid: string
+    subjectId: string
     name: string
     existingType?: number
     incomingType: number
@@ -379,7 +379,7 @@ export async function detectConflicts(
   const startRow = headerRow + 1
   const conflicts: {
     row: number
-    sid: string
+    subjectId: string
     name: string
     existingType?: number
     incomingType: number
@@ -392,8 +392,8 @@ export async function detectConflicts(
   try {
     const collections = await fetchAllUserCollections(token)
     for (const item of collections) {
-      const sid = String(item.subject_id)
-      bgmCollection.set(sid, {
+      const subjectId = String(item.subject_id)
+      bgmCollection.set(subjectId, {
         type: item.type,
         ...(item.rate !== undefined && { rate: item.rate }),
         tags: item.tags ?? [],
@@ -446,9 +446,9 @@ export async function detectConflicts(
   for (const rowNumber of rowsToProcess) {
     const bgmUrl = getField(rowNumber, 'Bangumi_URL')
     if (bgmUrl) {
-      const sid = extractSubjectId(bgmUrl)
-      if (sid) {
-        const bgmEntry = bgmCollection.get(sid)
+      const subjectId = extractSubjectId(bgmUrl)
+      if (subjectId) {
+        const bgmEntry = bgmCollection.get(subjectId)
         // 无对应收藏，不视为冲突
         if (bgmEntry) {
           const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
@@ -456,7 +456,7 @@ export async function detectConflicts(
           if (excelType !== 0 && bgmEntry.type !== excelType) {
             conflicts.push({
               row: rowNumber,
-              sid,
+              subjectId,
               name: getField(rowNumber, '名称') || '',
               existingType: bgmEntry.type,
               incomingType: excelType,
@@ -541,7 +541,7 @@ export async function syncWithConfirmation(): Promise<void> {
   if (confirmResult !== 6) return
 
   // 4. 冲突检测（用户确认后执行，网络不通时会被 try/catch 捕获并跳过）
-  let skipSids: Set<string> | undefined
+  let skipSubjectIds: Set<string> | undefined
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...')
     const { conflicts, conflictCount } = await detectConflicts(
@@ -552,7 +552,7 @@ export async function syncWithConfirmation(): Promise<void> {
       token,
     )
     if (conflictStrategy === 'skip' && conflictCount > 0) {
-      skipSids = new Set(conflicts.map((c) => c.sid))
+      skipSubjectIds = new Set(conflicts.map((c) => c.subjectId))
     }
     bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${String(conflictCount)} 条冲突`)
   } catch (error: unknown) {
@@ -573,7 +573,7 @@ export async function syncWithConfirmation(): Promise<void> {
     // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
     const statusBar = createStatusBarWriter(app)
     const result = await SyncToBangumiAsync(worksheet, columnMap, token, lastRow, headerRow, {
-      ...(skipSids !== undefined && { skipSids }),
+      ...(skipSubjectIds !== undefined && { skipSubjectIds }),
       incremental: isIncremental,
       onProgress: (current, total, message) => {
         statusBar.write(`[${String(current)}/${String(total)}] ${message}`)

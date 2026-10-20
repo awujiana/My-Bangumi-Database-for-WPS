@@ -98,7 +98,7 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
         record.collType ?? '',
         record.status ?? '',
         record.count ?? '',
-        record.sid ?? '',
+        record.subjectId ?? '',
         record.url ?? '',
         record.source ?? '',
         record.message ?? '',

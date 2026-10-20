@@ -440,9 +440,9 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
     lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
     const entries = await promise
     expect(entries).toHaveLength(2)
-    expect(entries[0]?.sid).toBe('111')
+    expect(entries[0]?.subjectId).toBe('111')
     expect(entries[0]?.name).toBe('条目A')
-    expect(entries[1]?.sid).toBe('222')
+    expect(entries[1]?.subjectId).toBe('222')
     expect(entries[1]?.name).toBe('条目B')
   })
 
@@ -459,8 +459,8 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
     lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
     const entries = await promise
     expect(entries).toHaveLength(2)
-    expect(entries[0]?.sid).toBe('111')
-    expect(entries[1]?.sid).toBe('222')
+    expect(entries[0]?.subjectId).toBe('111')
+    expect(entries[1]?.subjectId).toBe('222')
   })
 
   it('空 content（files 为空对象）返回空数组', async () => {
@@ -499,9 +499,9 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
     const promise = source.fetchRemoteEntries()
     lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
     const entries = await promise
-    // 仅第二行（合法且含 sid）应被解析
+    // 仅第二行（合法且含 subjectId）应被解析
     expect(entries).toHaveLength(1)
-    expect(entries[0]?.sid).toBe('111')
+    expect(entries[0]?.subjectId).toBe('111')
   })
 
   it('全部行非法时抛出错误', async () => {
@@ -707,7 +707,7 @@ describe('fetchGistJson', () => {
       lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
       const entries = await promise
       expect(entries.length).toBe(1)
-      expect(entries[0]?.sid).toBe('s1')
+      expect(entries[0]?.subjectId).toBe('s1')
     })
 
     it('files 中有 null 值条目时 isGistApiResponse 提前返回空', async () => {

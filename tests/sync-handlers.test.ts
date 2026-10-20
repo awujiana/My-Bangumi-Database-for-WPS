@@ -530,9 +530,9 @@ describe('sync · syncFromPanel > 确认与执行', () => {
   it('增量同步开启 → 用同步记录构建历史指纹映射并透传', async () => {
     m.isIncrementalSyncEnabled.mockReturnValue(true)
     m.getAllSyncRecords.mockReturnValue([
-      { sid: '100', fingerprint: 'fp-100' },
-      { sid: '', fingerprint: 'fp-noise' },
-      { sid: '200', fingerprint: '' },
+      { subjectId: '100', fingerprint: 'fp-100' },
+      { subjectId: '', fingerprint: 'fp-noise' },
+      { subjectId: '200', fingerprint: '' },
     ])
 
     await syncFromPanel()
@@ -562,30 +562,30 @@ describe('sync · syncFromPanel > 确认与执行', () => {
   it('冲突策略=跳过冲突且有冲突 → 把冲突 SID 集合传给同步层', async () => {
     mountSelect('conflictStrategy', 'skip')
     m.detectConflicts.mockResolvedValue({
-      conflicts: [{ row: 2, sid: '100', name: '动画A', incomingType: 2 }],
+      conflicts: [{ row: 2, subjectId: '100', name: '动画A', incomingType: 2 }],
       conflictCount: 1,
       bgmCollectionReady: true,
     })
 
     await syncFromPanel()
 
-    const options = m.SyncToBangumiAsync.mock.calls[0]?.[5] as { skipSids?: Set<string> }
-    expect(options.skipSids).toEqual(new Set(['100']))
+    const options = m.SyncToBangumiAsync.mock.calls[0]?.[5] as { skipSubjectIds?: Set<string> }
+    expect(options.skipSubjectIds).toEqual(new Set(['100']))
     expect(String(m.showConfirm.mock.calls[0]?.[0])).toContain('已选择【跳过冲突】')
   })
 
-  it('冲突策略=Excel数据覆盖 → 不传 skipSids 且确认文案标注覆盖', async () => {
+  it('冲突策略=Excel数据覆盖 → 不传 skipSubjectIds 且确认文案标注覆盖', async () => {
     mountSelect('conflictStrategy', 'excel')
     m.detectConflicts.mockResolvedValue({
-      conflicts: [{ row: 2, sid: '100', name: '动画A', incomingType: 2 }],
+      conflicts: [{ row: 2, subjectId: '100', name: '动画A', incomingType: 2 }],
       conflictCount: 1,
       bgmCollectionReady: true,
     })
 
     await syncFromPanel()
 
-    const options = m.SyncToBangumiAsync.mock.calls[0]?.[5] as { skipSids?: Set<string> }
-    expect(options.skipSids).toBeUndefined()
+    const options = m.SyncToBangumiAsync.mock.calls[0]?.[5] as { skipSubjectIds?: Set<string> }
+    expect(options.skipSubjectIds).toBeUndefined()
     expect(String(m.showConfirm.mock.calls[0]?.[0])).toContain('将使用【Excel数据覆盖】')
   })
 
@@ -1005,11 +1005,11 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
     m.getAllSyncRecords
       .mockReturnValueOnce([])
       .mockReturnValue([
-        { sid: '100' },
-        { sid: '100' },
-        { sid: '200' },
-        { sid: '200' },
-        { sid: '200' },
+        { subjectId: '100' },
+        { subjectId: '100' },
+        { subjectId: '200' },
+        { subjectId: '200' },
+        { subjectId: '200' },
       ])
     cells.set('2:1', { Value: 'https://bgm.tv/subject/100' })
     cells.set('3:1', { Value: 'https://bgm.tv/subject/200' })
@@ -1030,7 +1030,7 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
 
   it('同步记录恰好 1 条 → 涂 BGM_SYNC 底色', async () => {
     m.fetchAllUserCollections.mockResolvedValue([collection({ subject_id: 100 })])
-    m.getAllSyncRecords.mockReturnValueOnce([]).mockReturnValue([{ sid: '100' }])
+    m.getAllSyncRecords.mockReturnValueOnce([]).mockReturnValue([{ subjectId: '100' }])
     cells.set('2:1', { Value: 'https://bgm.tv/subject/100' })
     cells.set('2:9', { Value: '', Interior: { Color: 0 } })
 
@@ -1045,7 +1045,7 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
 
   it('序列号单元格没有 Interior → 只计数不涂色', async () => {
     m.fetchAllUserCollections.mockResolvedValue([collection({ subject_id: 100 })])
-    m.getAllSyncRecords.mockReturnValueOnce([]).mockReturnValue([{ sid: '100' }])
+    m.getAllSyncRecords.mockReturnValueOnce([]).mockReturnValue([{ subjectId: '100' }])
     cells.set('2:1', { Value: 'https://bgm.tv/subject/100' })
     cells.set('2:9', { Value: '' })
 
@@ -1100,7 +1100,7 @@ describe('sync · _doAPISync > 两阶段同步流程', () => {
     expect(records?.[0]).toMatchObject({
       name: '(无名称)',
       url: 'https://bgm.tv/subject/100',
-      sid: '100',
+      subjectId: '100',
       type: BGM_SUBJECT_TYPES[2],
       content: '标记同步',
       status: '成功',
@@ -1294,7 +1294,7 @@ describe('sync · 补充分支', () => {
   it('进入流程前已有同步记录 → 计数映射在初始化阶段就统计条数', async () => {
     m.fetchAllUserCollections.mockResolvedValue([collection({ subject_id: 100 })])
     // 首次 getAllSyncRecords（初始化计数）即返回 1 条 → 命中 for 循环体
-    m.getAllSyncRecords.mockReturnValue([{ sid: '100' }])
+    m.getAllSyncRecords.mockReturnValue([{ subjectId: '100' }])
     cells.set('2:1', { Value: 'https://bgm.tv/subject/100' })
     cells.set('2:9', { Value: '', Interior: { Color: 0 } })
 

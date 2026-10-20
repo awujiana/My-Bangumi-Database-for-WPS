@@ -4,7 +4,7 @@
  * @description 数据仓库的数据文件已从「单片 `data/bangumi.jsonlines.gz`」改为
  *              「按字段类别切 6 片 + 一份清单 `data/anime.manifest.json`」：
  *
- *              - `anime.base.jsonlines.gz`       7 列   sid/name/name_original/updatedAt/date/meta_tags/nsfw
+ *              - `anime.base.jsonlines.gz`       7 列   subjectId/name/name_original/updatedAt/date/meta_tags/nsfw
  *              - `anime.meta.jsonlines.gz`      20 列   infobox 解析出的 19 个中文列
  *              - `anime.relations.jsonlines.gz`  3 列   关联条目ID（全部）/ 关联的动漫ID（只含 type=2）
  *              - `anime.stats.jsonlines.gz`      8 列   platform/series/score/rank/score_details/favorite/tags
@@ -21,7 +21,7 @@
  * ## 拼接约定
  *
  * 每片都带 `sid`（唯一连接键），且**行序与 dump 完全一致**，所以按**行号**即可拼接，
- * 不需要建索引、也不要求 sid 可比较大小。除 `sid` 外各片字段两两不重叠，因此
+ * 不需要建索引、也不要求 subjectId 可比较大小。除 `sid` 外各片字段两两不重叠，因此
  * 「后写覆盖前写」在这里只是防御性检查，正常数据不会触发。
  */
 
@@ -33,7 +33,7 @@ export interface ShardDescriptor {
   name: string
   /** 数据仓库内的文件名（与清单同目录） */
   file: string
-  /** 该片包含的字段名（顺序即列序，第 1 个固定是 sid） */
+  /** 该片包含的字段名（顺序即列序，第 1 个固定是 subjectId） */
   fields: string[]
   /** 压缩后字节数（可选，用于日志） */
   bytes?: number
@@ -206,7 +206,7 @@ export function buildFieldIndex(manifest: ShardManifest): Map<string, string> {
  * 按「需要的字段」挑出要下载的分片
  *
  * 规则：
- * 1. **必选片**（含 sid/updatedAt/name 的片，通常是 base）永远选中 —— 否则拼不出记录；
+ * 1. **必选片**（含 subjectId/updatedAt/name 的片，通常是 base）永远选中 —— 否则拼不出记录；
  * 2. 其余片按「该片的字段与 neededFields 有交集」选中；
  * 3. `manual` 非空时以它为准（用户在界面上多选/取消的结果），但仍会补上必选片；
  * 4. `neededFields` 传 `undefined` 表示**无法判断**（例如读不到工作表表头）→ 全选，
@@ -228,8 +228,8 @@ export function selectShards(
   const isRequired = (shard: ShardDescriptor): boolean =>
     shard.fields.some((field) => REQUIRED_SHARD_ANCHORS.includes(field))
 
-  // 出现在两片以上的字段是**连接键**（当前只有 sid）。它不能参与「需要这个字段」的
-  // 匹配 —— 否则每片都含 sid，任何非空 neededFields 都会把全部片选中，选片直接失效。
+  // 出现在两片以上的字段是**连接键**（当前只有 subjectId）。它不能参与「需要这个字段」的
+  // 匹配 —— 否则每片都含 subjectId，任何非空 neededFields 都会把全部片选中，选片直接失效。
   const occurrences = new Map<string, number>()
   for (const shard of manifest.shards) {
     for (const field of shard.fields) {
@@ -383,7 +383,7 @@ function mergeRowAt(
  * 把单片的 JSONL 文本解析成 { fields, rows }
  *
  * 与 `parseJsonl` 的两段式约定一致（首行表头、其后等长值数组），但**不要求
- * 含 sid**：`meta` / `stats` 等片靠行号对齐，不需要自身校验主键（校验由
+ * 含 subjectId**：`meta` / `stats` 等片靠行号对齐，不需要自身校验主键（校验由
  * {@link joinShardRows} 统一做）。
  *
  * @param name 分片短名（仅用于错误信息）

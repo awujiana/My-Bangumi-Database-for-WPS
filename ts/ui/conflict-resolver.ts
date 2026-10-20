@@ -160,9 +160,9 @@ function createConflictModal(
     const tr = document.createElement('tr')
     tr.className = 'conflict-row'
 
-    const sidTd = document.createElement('td')
-    sidTd.textContent = conflict.sid
-    tr.appendChild(sidTd)
+    const subjectIdCell = document.createElement('td')
+    subjectIdCell.textContent = conflict.subjectId
+    tr.appendChild(subjectIdCell)
 
     const fieldTd = document.createElement('td')
     fieldTd.textContent = conflict.field
@@ -240,7 +240,7 @@ function createConflictModal(
       const localRadio = localRadios[index]
       const chosenValue: 'local' | 'remote' = localRadio?.checked ? 'local' : 'remote'
       return {
-        sid: conflict.sid,
+        subjectId: conflict.subjectId,
         field: conflict.field,
         chosenValue,
       }

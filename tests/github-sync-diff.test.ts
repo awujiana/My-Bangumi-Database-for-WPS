@@ -5,7 +5,7 @@ import {
   filterByTime,
   computeDiff,
   tagsToString,
-  isGithubRemoteEntry,
+  isWireRemoteEntry,
   getExcelAliases,
   EXTENDED_FIELD_MAP,
   SYNC_STRATEGY_LABELS,
@@ -54,20 +54,20 @@ describe('parseJsonl', () => {
       ]),
     )
     expect(result.entries.length).toBe(2)
-    expect(result.entries[0]?.sid).toBe('123')
-    expect(result.entries[1]?.sid).toBe('456')
+    expect(result.entries[0]?.subjectId).toBe('123')
+    expect(result.entries[1]?.subjectId).toBe('456')
     expect(result.errors).toEqual([])
   })
 
   it('字段按表头顺序映射，与值的位置一一对应', () => {
     const result = parseJsonl('["name","sid"]\n["测试","123"]')
-    expect(result.entries[0]?.sid).toBe('123')
+    expect(result.entries[0]?.subjectId).toBe('123')
     expect(result.entries[0]?.name).toBe('测试')
   })
 
   it('数组/布尔等非字符串值应原样还原', () => {
     const result = parseJsonl('["sid","meta_tags","nsfw"]\n["8",["机战","TV"],false]')
-    expect(result.entries[0]?.sid).toBe('8')
+    expect(result.entries[0]?.subjectId).toBe('8')
     expect(result.entries[0]?.meta_tags).toEqual(['机战', 'TV'])
     expect(result.entries[0]?.nsfw).toBe(false)
   })
@@ -115,7 +115,7 @@ describe('parseJsonl', () => {
     expect(result.errors[0]?.reason).toContain('不是数组')
   })
 
-  it('缺少 sid 字段的条目应记录错误', () => {
+  it('缺少 subjectId 字段的条目应记录错误', () => {
     const result = parseJsonl('["name"]\n["测试"]')
     expect(result.entries.length).toBe(0)
     expect(result.errors.length).toBe(1)
@@ -144,40 +144,40 @@ describe('tagsToString', () => {
   })
 })
 
-// ========== isGithubRemoteEntry 测试 ==========
-describe('isGithubRemoteEntry', () => {
+// ========== isWireRemoteEntry 测试（线上形状，键名是 sid） ==========
+describe('isWireRemoteEntry', () => {
   it('null 应返回 false', () => {
-    expect(isGithubRemoteEntry(null)).toBe(false)
+    expect(isWireRemoteEntry(null)).toBe(false)
   })
 
   it('非对象应返回 false', () => {
-    expect(isGithubRemoteEntry('string')).toBe(false)
-    expect(isGithubRemoteEntry(123)).toBe(false)
+    expect(isWireRemoteEntry('string')).toBe(false)
+    expect(isWireRemoteEntry(123)).toBe(false)
   })
 
-  it('缺少 sid 应返回 false', () => {
-    expect(isGithubRemoteEntry({ name: 'test' })).toBe(false)
+  it('缺少 subjectId 应返回 false', () => {
+    expect(isWireRemoteEntry({ name: 'test' })).toBe(false)
   })
 
   it('sid 不是字符串应返回 false', () => {
-    expect(isGithubRemoteEntry({ sid: 123 })).toBe(false)
+    expect(isWireRemoteEntry({ sid: 123 })).toBe(false)
   })
 
   it('有效对象应返回 true', () => {
-    expect(isGithubRemoteEntry({ sid: '123' })).toBe(true)
+    expect(isWireRemoteEntry({ sid: '123' })).toBe(true)
   })
 })
 
 // ========== filterByTime 测试 ==========
 describe('filterByTime', () => {
   const testEntries: GithubRemoteEntry[] = [
-    { sid: '1', date: '2026-01-15', name: '1月' },
-    { sid: '2', date: '2026-04-20', name: '4月' },
-    { sid: '3', date: '2026-07-10', name: '7月' },
-    { sid: '4', date: '2026-10-25', name: '10月' },
-    { sid: '5', date: '2025-12-30', name: '上年12月' },
-    { sid: '6', date: '', name: '无日期' },
-    { sid: '7', name: '无 date 字段' },
+    { subjectId: '1', date: '2026-01-15', name: '1月' },
+    { subjectId: '2', date: '2026-04-20', name: '4月' },
+    { subjectId: '3', date: '2026-07-10', name: '7月' },
+    { subjectId: '4', date: '2026-10-25', name: '10月' },
+    { subjectId: '5', date: '2025-12-30', name: '上年12月' },
+    { subjectId: '6', date: '', name: '无日期' },
+    { subjectId: '7', name: '无 date 字段' },
   ]
 
   it('未启用筛选或范围为 all 时应返回全部条目', () => {
@@ -223,14 +223,18 @@ describe('filterByTime', () => {
   })
 
   it('日期格式 YYYY/MM/DD 应正确解析', () => {
-    const entriesWithSlash: GithubRemoteEntry[] = [{ sid: '1', date: '2026/03/15', name: '测试' }]
+    const entriesWithSlash: GithubRemoteEntry[] = [
+      { subjectId: '1', date: '2026/03/15', name: '测试' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, year: 2026, range: 'year' }
     const result = filterByTime(entriesWithSlash, filter)
     expect(result.length).toBe(1)
   })
 
   it('日期格式 YYYY.MM.DD 应正确解析', () => {
-    const entriesWithDot: GithubRemoteEntry[] = [{ sid: '1', date: '2026.03.15', name: '测试' }]
+    const entriesWithDot: GithubRemoteEntry[] = [
+      { subjectId: '1', date: '2026.03.15', name: '测试' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, year: 2026, range: 'year' }
     const result = filterByTime(entriesWithDot, filter)
     expect(result.length).toBe(1)
@@ -245,29 +249,29 @@ describe('filterByTime', () => {
 
 // ========== computeDiff 测试 ==========
 function createRemoteEntry(
-  sid: string,
+  subjectId: string,
   // exactOptionalPropertyTypes 下 Partial<T> 不接受显式 undefined，故用映射类型放宽
   overrides: Partial<{ [K in keyof GithubRemoteEntry]: GithubRemoteEntry[K] | undefined }> = {},
 ): GithubRemoteEntry {
   // overrides 允许显式 undefined（见上），展开后类型含 undefined，
   // 但显式 undefined 与「字段缺失」在读侧等价，故在此断言收窄
   return {
-    sid,
-    name: `条目${sid}`,
+    subjectId,
+    name: `条目${subjectId}`,
     ...overrides,
   } as GithubRemoteEntry
 }
 
 function createLocalEntry(
-  sid: string,
+  subjectId: string,
   row: number,
   fields: Record<string, string> = {},
 ): LocalRowEntry {
   return {
     row,
-    sid,
+    subjectId,
     fields: {
-      名称: `本地${sid}`,
+      名称: `本地${subjectId}`,
       '标签/分级': '',
       集数: '',
       开播日期: '',
@@ -447,7 +451,7 @@ describe('computeDiff', () => {
   })
 
   it('空 SID 应被跳过', () => {
-    const remote = [{ sid: '', name: '空SID' } as GithubRemoteEntry]
+    const remote = [{ subjectId: '', name: '空SID' } as GithubRemoteEntry]
     const local = new Map<string, LocalRowEntry>()
     const diffs = computeDiff(remote, local, 'add-update')
     expect(diffs.length).toBe(0)
@@ -487,7 +491,11 @@ describe('isWithinTimeFilter 默认 quarter/month 值', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q-default',
-        { row: 2, sid: 'sid-q-default', fields: { 开播日期: '2024年02月15日', 名称: '2月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-q-default',
+          fields: { 开播日期: '2024年02月15日', 名称: '2月条目' },
+        },
       ],
     ])
     // quarter 未指定，使用默认值 1（Q1：1月、2月、3月）
@@ -507,7 +515,11 @@ describe('isWithinTimeFilter 默认 quarter/month 值', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q-default2',
-        { row: 2, sid: 'sid-q-default2', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-q-default2',
+          fields: { 开播日期: '2024年07月15日', 名称: '7月条目' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -526,7 +538,11 @@ describe('isWithinTimeFilter 默认 quarter/month 值', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-m-default',
-        { row: 2, sid: 'sid-m-default', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-m-default',
+          fields: { 开播日期: '2024年01月15日', 名称: '1月条目' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -545,7 +561,11 @@ describe('isWithinTimeFilter 默认 quarter/month 值', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-m-default2',
-        { row: 2, sid: 'sid-m-default2', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-m-default2',
+          fields: { 开播日期: '2024年06月15日', 名称: '6月条目' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -568,9 +588,9 @@ describe('filterByTime isNaN 边界 (line 306)', () => {
     // 这里测试 match 存在但解析出的 year/month 不在有效范围
     const entries: GithubRemoteEntry[] = [
       // 月份 13 无效
-      { sid: 'nan-1', name: '测试1', date: '0000-13-01' },
+      { subjectId: 'nan-1', name: '测试1', date: '0000-13-01' },
       // 无法匹配正则
-      { sid: 'nan-2', name: '测试2', date: 'abc-01-01' },
+      { subjectId: 'nan-2', name: '测试2', date: 'abc-01-01' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 1 }
     const result = filterByTime(entries, filter)
@@ -580,42 +600,50 @@ describe('filterByTime isNaN 边界 (line 306)', () => {
   })
 
   it('日期格式 YYYY-MM-DD 正确解析', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'valid-1', name: '有效日期', date: '2024-06-15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'valid-1', name: '有效日期', date: '2024-06-15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
   })
 
   it('日期格式 YYYY/MM/DD 正确解析', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'valid-2', name: '斜杠格式', date: '2024/06/15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'valid-2', name: '斜杠格式', date: '2024/06/15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
   })
 
   it('日期格式 YYYY.MM.DD 正确解析', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'valid-3', name: '点号格式', date: '2024.06.15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'valid-3', name: '点号格式', date: '2024.06.15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
   })
 
   it('月份和日期为个位数时正确解析', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'single-1', name: '个位数', date: '2024-1-5' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'single-1', name: '个位数', date: '2024-1-5' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 1 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
   })
 
   it('date 字段为空时被过滤', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'no-date', name: '无日期', date: '' }]
+    const entries: GithubRemoteEntry[] = [{ subjectId: 'no-date', name: '无日期', date: '' }]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(0)
   })
 
   it('date 字段不存在时被过滤', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'no-date-field', name: '无日期字段' }]
+    const entries: GithubRemoteEntry[] = [{ subjectId: 'no-date-field', name: '无日期字段' }]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(0)
@@ -623,7 +651,7 @@ describe('filterByTime isNaN 边界 (line 306)', () => {
 
   it('日期格式不匹配正则时返回 false', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'bad-format', name: '坏格式', date: '2024年6月15日' },
+      { subjectId: 'bad-format', name: '坏格式', date: '2024年6月15日' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const result = filterByTime(entries, filter)
@@ -641,7 +669,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q1',
-        { row: 2, sid: 'sid-q1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
+        { row: 2, subjectId: 'sid-q1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -652,7 +680,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(1)
-    expect(deletes[0]?.sid).toBe('sid-q1')
+    expect(deletes[0]?.subjectId).toBe('sid-q1')
   })
 
   it('quarter 默认值 1 时，7月条目不在 Q1 范围不被删除 (line 315)', () => {
@@ -660,7 +688,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q7',
-        { row: 2, sid: 'sid-q7', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } },
+        { row: 2, subjectId: 'sid-q7', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -678,7 +706,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-m1',
-        { row: 2, sid: 'sid-m1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
+        { row: 2, subjectId: 'sid-m1', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -689,7 +717,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(1)
-    expect(deletes[0]?.sid).toBe('sid-m1')
+    expect(deletes[0]?.subjectId).toBe('sid-m1')
   })
 
   it('month 默认值 1 时，6月条目不在1月范围不被删除 (line 325)', () => {
@@ -697,7 +725,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-m6',
-        { row: 2, sid: 'sid-m6', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } },
+        { row: 2, subjectId: 'sid-m6', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -713,7 +741,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
   it('isWithinTimeFilter dateStr 为空字符串时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-empty', { row: 2, sid: 'sid-empty', fields: { 开播日期: '', 名称: '空日期' } }],
+      ['sid-empty', { row: 2, subjectId: 'sid-empty', fields: { 开播日期: '', 名称: '空日期' } }],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -728,7 +756,10 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
   it('isWithinTimeFilter dateStr 格式不匹配时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-bad', { row: 2, sid: 'sid-bad', fields: { 开播日期: 'invalid-date', 名称: '坏日期' } }],
+      [
+        'sid-bad',
+        { row: 2, subjectId: 'sid-bad', fields: { 开播日期: 'invalid-date', 名称: '坏日期' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
@@ -744,7 +775,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-year',
-        { row: 2, sid: 'sid-year', fields: { 开播日期: '2023年06月15日', 名称: '2023年' } },
+        { row: 2, subjectId: 'sid-year', fields: { 开播日期: '2023年06月15日', 名称: '2023年' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -762,7 +793,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-all',
-        { row: 2, sid: 'sid-all', fields: { 开播日期: '2023年06月15日', 名称: '任意日期' } },
+        { row: 2, subjectId: 'sid-all', fields: { 开播日期: '2023年06月15日', 名称: '任意日期' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -781,7 +812,7 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-all2',
-        { row: 2, sid: 'sid-all2', fields: { 开播日期: '2023年06月15日', 名称: '任意日期' } },
+        { row: 2, subjectId: 'sid-all2', fields: { 开播日期: '2023年06月15日', 名称: '任意日期' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -798,11 +829,15 @@ describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
 // ========== 补充测试：computeDiff force-overwrite 与 mirror 组合 ==========
 describe('computeDiff 更多策略分支', () => {
   it('force-overwrite 策略应标记所有匹配 SID 为 update with changedFields=["*"]', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: 'f1', name: '远程1', date: '2024-01-01' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: 'f1', name: '远程1', date: '2024-01-01' }]
     const local = new Map<string, LocalRowEntry>([
       [
         'f1',
-        { row: 2, sid: 'f1', fields: { 名称: '本地1', Bangumi_URL: 'http://bgm.tv/subject/f1' } },
+        {
+          row: 2,
+          subjectId: 'f1',
+          fields: { 名称: '本地1', Bangumi_URL: 'http://bgm.tv/subject/f1' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'force-overwrite')
@@ -817,7 +852,7 @@ describe('computeDiff 更多策略分支', () => {
       // 1月新番(quarter=1)范围: [12, 1, 2]，12月归属上一年
       [
         'sid-dec',
-        { row: 2, sid: 'sid-dec', fields: { 开播日期: '2023年12月15日', 名称: '12月条目' } },
+        { row: 2, subjectId: 'sid-dec', fields: { 开播日期: '2023年12月15日', 名称: '12月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -837,7 +872,7 @@ describe('computeDiff 更多策略分支', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-dec2',
-        { row: 2, sid: 'sid-dec2', fields: { 开播日期: '2023年12月15日', 名称: '12月条目' } },
+        { row: 2, subjectId: 'sid-dec2', fields: { 开播日期: '2023年12月15日', 名称: '12月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -858,7 +893,7 @@ describe('computeDiff 更多策略分支', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-dec3',
-        { row: 2, sid: 'sid-dec3', fields: { 开播日期: '2025年01月15日', 名称: '1月条目' } },
+        { row: 2, subjectId: 'sid-dec3', fields: { 开播日期: '2025年01月15日', 名称: '1月条目' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -877,22 +912,28 @@ describe('computeDiff 更多策略分支', () => {
 // ========== 补充测试：filterByTime month 默认值 (line 325) ==========
 describe('filterByTime month 默认值精确路径 (line 325)', () => {
   it('filter.month 为 undefined 时使用默认值 1 (line 325)', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'm-default', name: '默认月', date: '2024-01-15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'm-default', name: '默认月', date: '2024-01-15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
-    expect(result[0]?.sid).toBe('m-default')
+    expect(result[0]?.subjectId).toBe('m-default')
   })
 
   it('filter.month 为 undefined 且条目月份不匹配时被过滤 (line 325)', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'm-no-match', name: '不匹配', date: '2024-06-15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'm-no-match', name: '不匹配', date: '2024-06-15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(0)
   })
 
   it('filter.month 显式指定时正确匹配', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'm-explicit', name: '显式月', date: '2024-06-15' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'm-explicit', name: '显式月', date: '2024-06-15' },
+    ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 6 }
     const result = filterByTime(entries, filter)
     expect(result.length).toBe(1)
@@ -900,7 +941,7 @@ describe('filterByTime month 默认值精确路径 (line 325)', () => {
 
   it('range 为无效值时 default 分支返回 false (line 327-328)', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'bad-range', name: '无效范围', date: '2024-06-15' },
+      { subjectId: 'bad-range', name: '无效范围', date: '2024-06-15' },
     ]
     const filter = { enabled: true, range: 'invalid', year: 2024 } as unknown as SyncTimeFilter
     const result = filterByTime(entries, filter)
@@ -912,9 +953,9 @@ describe('filterByTime month 默认值精确路径 (line 325)', () => {
 describe('filterByTime quarter 分支完整路径', () => {
   it('Q1 (1月新番: 12,1,2月) 正确匹配', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'q1-12', name: '12月', date: '2023-12-15' },
-      { sid: 'q1-1', name: '1月', date: '2024-01-15' },
-      { sid: 'q1-2', name: '2月', date: '2024-02-15' },
+      { subjectId: 'q1-12', name: '12月', date: '2023-12-15' },
+      { subjectId: 'q1-1', name: '1月', date: '2024-01-15' },
+      { subjectId: 'q1-2', name: '2月', date: '2024-02-15' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2024, quarter: 1 }
     const result = filterByTime(entries, filter)
@@ -923,7 +964,7 @@ describe('filterByTime quarter 分支完整路径', () => {
 
   it('Q1 中 12 月跨年逻辑：归属上一年', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'q1-12-other', name: '其他年份12月', date: '2022-12-15' },
+      { subjectId: 'q1-12-other', name: '其他年份12月', date: '2022-12-15' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2024, quarter: 1 }
     const result = filterByTime(entries, filter)
@@ -932,9 +973,9 @@ describe('filterByTime quarter 分支完整路径', () => {
 
   it('10月新番 (quarter=10: 9,10,11月) 正确匹配', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'q10-9', name: '9月', date: '2024-09-15' },
-      { sid: 'q10-10', name: '10月', date: '2024-10-15' },
-      { sid: 'q10-11', name: '11月', date: '2024-11-15' },
+      { subjectId: 'q10-9', name: '9月', date: '2024-09-15' },
+      { subjectId: 'q10-10', name: '10月', date: '2024-10-15' },
+      { subjectId: 'q10-11', name: '11月', date: '2024-11-15' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2024, quarter: 10 }
     const result = filterByTime(entries, filter)
@@ -943,7 +984,7 @@ describe('filterByTime quarter 分支完整路径', () => {
 
   it('quarter 为 undefined 时默认使用 1', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'q-default', name: '默认季度', date: '2024-01-15' },
+      { subjectId: 'q-default', name: '默认季度', date: '2024-01-15' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2024 }
     const result = filterByTime(entries, filter)
@@ -952,7 +993,7 @@ describe('filterByTime quarter 分支完整路径', () => {
 
   it('quarter 为无效值时 qMonths 为 undefined 返回 false', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'q-invalid', name: '无效季度', date: '2024-06-15' },
+      { subjectId: 'q-invalid', name: '无效季度', date: '2024-06-15' },
     ]
     const filter = {
       enabled: true,
@@ -972,7 +1013,7 @@ describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', (
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-nosep',
-        { row: 2, sid: 'sid-nosep', fields: { 开播日期: '20240615', 名称: '无分隔符' } },
+        { row: 2, subjectId: 'sid-nosep', fields: { 开播日期: '20240615', 名称: '无分隔符' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -989,7 +1030,7 @@ describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', (
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-cn',
-        { row: 2, sid: 'sid-cn', fields: { 开播日期: '2024年06月15日', 名称: '中文日期' } },
+        { row: 2, subjectId: 'sid-cn', fields: { 开播日期: '2024年06月15日', 名称: '中文日期' } },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -1006,7 +1047,11 @@ describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', (
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-qdef-m',
-        { row: 2, sid: 'sid-qdef-m', fields: { 开播日期: '2024年03月15日', 名称: '3月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-qdef-m',
+          fields: { 开播日期: '2024年03月15日', 名称: '3月条目' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -1023,7 +1068,11 @@ describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', (
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-mdef-m',
-        { row: 2, sid: 'sid-mdef-m', fields: { 开播日期: '2024年01月15日', 名称: '1月条目' } },
+        {
+          row: 2,
+          subjectId: 'sid-mdef-m',
+          fields: { 开播日期: '2024年01月15日', 名称: '1月条目' },
+        },
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
@@ -1040,7 +1089,11 @@ describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', (
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-default',
-        { row: 2, sid: 'sid-default', fields: { 开播日期: '2024年06月15日', 名称: '默认分支' } },
+        {
+          row: 2,
+          subjectId: 'sid-default',
+          fields: { 开播日期: '2024年06月15日', 名称: '默认分支' },
+        },
       ],
     ])
     const invalidFilter = {
@@ -1061,7 +1114,7 @@ describe('isWithinTimeFilter quarter 无效值 (line 360)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q5',
-        { row: 2, sid: 'sid-q5', fields: { 开播日期: '2024年01月15日', 名称: '无效季度' } },
+        { row: 2, subjectId: 'sid-q5', fields: { 开播日期: '2024年01月15日', 名称: '无效季度' } },
       ],
     ])
     // quarter=5 不在 QUARTER_MONTH_RANGES[1,4,7,10] 中
@@ -1082,7 +1135,11 @@ describe('isWithinTimeFilter quarter 无效值 (line 360)', () => {
     const local = new Map<string, LocalRowEntry>([
       [
         'sid-q-undef',
-        { row: 2, sid: 'sid-q-undef', fields: { 开播日期: '2024年01月15日', 名称: '默认季度' } },
+        {
+          row: 2,
+          subjectId: 'sid-q-undef',
+          fields: { 开播日期: '2024年01月15日', 名称: '默认季度' },
+        },
       ],
     ])
     // quarter 为 undefined，?? 1 → Q1 → [12,1,2]
@@ -1099,14 +1156,17 @@ describe('computeDiff 扩展字段空字符串 (line 463)', () => {
   it('扩展字段为空字符串时 remoteStr 为 falsy，不应触发差异 (line 463)', () => {
     const remote: GithubRemoteEntry[] = [
       {
-        sid: 'sid-empty',
+        subjectId: 'sid-empty',
         name: '测试',
         // date 字段为空字符串 → toExtStringValue 返回 '' → remoteStr 为 falsy
         date: '',
       },
     ]
     const local = new Map<string, LocalRowEntry>([
-      ['sid-empty', { row: 2, sid: 'sid-empty', fields: { 名称: '测试', 开播日期: '2024-01-01' } }],
+      [
+        'sid-empty',
+        { row: 2, subjectId: 'sid-empty', fields: { 名称: '测试', 开播日期: '2024-01-01' } },
+      ],
     ])
     const diffs = computeDiff(remote, local, 'add-update')
     const updates = diffs.filter((d) => d.kind === 'update')
@@ -1122,7 +1182,10 @@ describe('isWithinTimeFilter isNaN 分支 (line 353)', () => {
     // 使用无效日期格式触发 isNaN 检查
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
-      ['sid-nan', { row: 2, sid: 'sid-nan', fields: { 开播日期: '0年0月', 名称: 'NaN测试' } }],
+      [
+        'sid-nan',
+        { row: 2, subjectId: 'sid-nan', fields: { 开播日期: '0年0月', 名称: 'NaN测试' } },
+      ],
     ])
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const diffs = computeDiff(remote, local, 'mirror', filter)
@@ -1136,44 +1199,48 @@ describe('isWithinTimeFilter isNaN 分支 (line 353)', () => {
 describe('mirror 策略本地 SID 不在远程 (line 482)', () => {
   it('mirror 策略下本地 SID 不在远程集合中应生成 delete', () => {
     const remote: GithubRemoteEntry[] = [
-      { sid: 'sid-1', name: '远程条目1' },
-      { sid: 'sid-2', name: '远程条目2' },
+      { subjectId: 'sid-1', name: '远程条目1' },
+      { subjectId: 'sid-2', name: '远程条目2' },
     ]
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: {} }],
-      ['sid-3', { row: 3, sid: 'sid-3', fields: { 开播日期: '2024-06-15' } }],
+      ['sid-1', { row: 2, subjectId: 'sid-1', fields: {} }],
+      ['sid-3', { row: 3, subjectId: 'sid-3', fields: { 开播日期: '2024-06-15' } }],
     ])
-    // 无时间筛选时，sid-3 不在远程 → 应被删除
+    // 无时间筛选时，subjectId-3 不在远程 → 应被删除
     const diffs = computeDiff(remote, local, 'mirror')
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(1)
-    expect(deletes[0]?.sid).toBe('sid-3')
+    expect(deletes[0]?.subjectId).toBe('sid-3')
   })
 
   it('mirror 策略下时间筛选范围内本地 SID 不在远程应被删除', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: 'sid-1', name: '远程条目1', date: '2024-06-01' }]
+    const remote: GithubRemoteEntry[] = [
+      { subjectId: 'sid-1', name: '远程条目1', date: '2024-06-01' },
+    ]
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月01日' } }],
-      ['sid-2', { row: 3, sid: 'sid-2', fields: { 开播日期: '2024年06月15日' } }],
+      ['sid-1', { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月01日' } }],
+      ['sid-2', { row: 3, subjectId: 'sid-2', fields: { 开播日期: '2024年06月15日' } }],
     ])
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 6 }
     const diffs = computeDiff(remote, local, 'mirror', filter)
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // sid-2 不在远程但在时间范围内 → 应被删除
+    // subjectId-2 不在远程但在时间范围内 → 应被删除
     expect(deletes.length).toBe(1)
-    expect(deletes[0]?.sid).toBe('sid-2')
+    expect(deletes[0]?.subjectId).toBe('sid-2')
   })
 
   it('mirror 策略下时间筛选范围外本地 SID 不在远程不应被删除', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: 'sid-1', name: '远程条目1', date: '2024-06-01' }]
+    const remote: GithubRemoteEntry[] = [
+      { subjectId: 'sid-1', name: '远程条目1', date: '2024-06-01' },
+    ]
     const local = new Map<string, LocalRowEntry>([
-      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月01日' } }],
-      ['sid-2', { row: 3, sid: 'sid-2', fields: { 开播日期: '2023年12月15日' } }],
+      ['sid-1', { row: 2, subjectId: 'sid-1', fields: { 开播日期: '2024年06月01日' } }],
+      ['sid-2', { row: 3, subjectId: 'sid-2', fields: { 开播日期: '2023年12月15日' } }],
     ])
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 6 }
     const diffs = computeDiff(remote, local, 'mirror', filter)
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // sid-2 在 2023年12月，不在 2024年6月 范围内 → 不应被删除
+    // subjectId-2 在 2023年12月，不在 2024年6月 范围内 → 不应被删除
     expect(deletes.length).toBe(0)
   })
 })
@@ -1200,19 +1267,21 @@ describe('parseJsonl 全空白文本 (line 367)', () => {
 describe('filterByTime future 模式 (line 469)', () => {
   it('range=future 时应只保留无开播日期的条目', () => {
     const entries: GithubRemoteEntry[] = [
-      { sid: 'sid-1', name: '有日期', date: '2024-06-01' },
-      { sid: 'sid-2', name: '无日期' },
-      { sid: 'sid-3', name: '空日期', date: ' '.repeat(3) },
+      { subjectId: 'sid-1', name: '有日期', date: '2024-06-01' },
+      { subjectId: 'sid-2', name: '无日期' },
+      { subjectId: 'sid-3', name: '空日期', date: ' '.repeat(3) },
     ]
     const filter: SyncTimeFilter = { enabled: true, year: 2024, range: 'future' }
 
     const result = filterByTime(entries, filter)
 
-    expect(result.map((entry) => entry.sid)).toEqual(['sid-2', 'sid-3'])
+    expect(result.map((entry) => entry.subjectId)).toEqual(['sid-2', 'sid-3'])
   })
 
   it('range=future 且 enabled=false 时不筛选', () => {
-    const entries: GithubRemoteEntry[] = [{ sid: 'sid-1', name: '有日期', date: '2024-06-01' }]
+    const entries: GithubRemoteEntry[] = [
+      { subjectId: 'sid-1', name: '有日期', date: '2024-06-01' },
+    ]
     const filter: SyncTimeFilter = { enabled: false, year: 2024, range: 'future' }
 
     expect(filterByTime(entries, filter)).toBe(entries)
@@ -1220,14 +1289,14 @@ describe('filterByTime future 模式 (line 469)', () => {
 })
 
 describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
-  it('本地 Bangumi_URL 与 sid 派生值不一致时应记入 changedFields', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+  it('本地 Bangumi_URL 与 subjectId 派生值不一致时应记入 changedFields', () => {
+    const remote: GithubRemoteEntry[] = [{ subjectId: '123', name: '条目' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '123',
         {
           row: 2,
-          sid: '123',
+          subjectId: '123',
           fields: { Bangumi_URL: 'https://bgm.tv/subject/999', 名称: '条目' },
         },
       ],
@@ -1241,13 +1310,13 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
   })
 
   it('本地 Bangumi_URL 与派生值一致且其余字段无差异时不产生 diff', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '123', name: '条目' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '123',
         {
           row: 2,
-          sid: '123',
+          subjectId: '123',
           fields: { Bangumi_URL: 'https://bgm.tv/subject/123', 名称: '条目' },
         },
       ],
@@ -1257,9 +1326,9 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
   })
 
   it('本地没有 Bangumi_URL 列时跳过该字段比对', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+    const remote: GithubRemoteEntry[] = [{ subjectId: '123', name: '条目' }]
     const local = new Map<string, LocalRowEntry>([
-      ['123', { row: 2, sid: '123', fields: { 名称: '条目' } }],
+      ['123', { row: 2, subjectId: '123', fields: { 名称: '条目' } }],
     ])
 
     expect(computeDiff(remote, local)).toEqual([])
@@ -1271,7 +1340,7 @@ describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
 // 本函数负责把这类字段挑出来交给 UI 提示用户自行添加表头。
 describe('collectMissingColumns', () => {
   it('本地缺少 Bangumi_URL 列时应报出该列（无法按 SID 定位行）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: '条目' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: '条目' }]
     const columnMap = new Map<string, number>([['名称', 2]])
 
     expect(collectMissingColumns(remotes, columnMap)).toContain('Bangumi_URL')
@@ -1284,7 +1353,7 @@ describe('collectMissingColumns', () => {
   })
 
   it('远程有数据但本地无对应列时应报出应添加的表头名', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 8.5, rank: 120 }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', score: 8.5, rank: 120 }]
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
@@ -1296,7 +1365,7 @@ describe('collectMissingColumns', () => {
   })
 
   it('本地已存在对应列时不应报出', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 8.5 }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', score: 8.5 }]
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
@@ -1307,7 +1376,9 @@ describe('collectMissingColumns', () => {
   })
 
   it('远程字段为空值或 0 时不应催促用户加列（score/rank 的 0 表示无数据）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', score: 0, rank: 0, 别名: '', meta_tags: [] }]
+    const remotes: GithubRemoteEntry[] = [
+      { subjectId: '1', score: 0, rank: 0, 别名: '', meta_tags: [] },
+    ]
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
@@ -1317,7 +1388,7 @@ describe('collectMissingColumns', () => {
   })
 
   it('别名命中其一即不报缺失（动画制作公司 → 制作公司 / 动画制作公司 任一存在）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', 动画制作公司: 'Studio' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', 动画制作公司: 'Studio' }]
     const columnMap = new Map<string, number>([
       ['Bangumi_URL', 1],
       ['名称', 2],
@@ -1329,8 +1400,8 @@ describe('collectMissingColumns', () => {
 
   it('多条目同一字段缺失时结果应去重，且核心字段排在前面', () => {
     const remotes: GithubRemoteEntry[] = [
-      { sid: '1', name: 'A', score: 7 },
-      { sid: '2', name: 'B', score: 9 },
+      { subjectId: '1', name: 'A', score: 7 },
+      { subjectId: '2', name: 'B', score: 9 },
     ]
     const missing = collectMissingColumns(remotes, new Map<string, number>())
 
@@ -1350,12 +1421,14 @@ describe('collectMissingColumns', () => {
 
 /** 构造本地条目：只给显式列出的字段（未列出的列视为不存在） */
 function makeEmptyFieldsLocal(fields: Record<string, string>): Map<string, LocalRowEntry> {
-  return new Map([['1', { row: 2, sid: '1', fields }]])
+  return new Map([['1', { row: 2, subjectId: '1', fields }]])
 }
 
 describe('collectRemoteEmptyFields', () => {
   it('本地该列为空 + 远程字段为空 → 计入（本次完结日期/制作公司场景）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' }]
+    const remotes: GithubRemoteEntry[] = [
+      { subjectId: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
+    ]
     const local = makeEmptyFieldsLocal({ 完播日: '', 制作公司: '' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([
@@ -1365,21 +1438,21 @@ describe('collectRemoteEmptyFields', () => {
   })
 
   it('本地该列为空但远程有值 → 不计入（那属于同步没写进去，不是远程无数据）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '2026-09-24' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A', 播放结束: '2026-09-24' }]
     const local = makeEmptyFieldsLocal({ 完播日: '' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
   })
 
   it('本地该列已有值 → 不计入（用户不会为已填好的列困惑）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A', 播放结束: '' }]
     const local = makeEmptyFieldsLocal({ 完播日: '2026-09-24' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
   })
 
   it('本地没有该列 → 不计入（归缺列体检，避免两处重复提示）', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A', 播放结束: '' }]
     // 完全没有「完播日」这一列
     const local = makeEmptyFieldsLocal({ 名称: 'A' })
 
@@ -1389,14 +1462,14 @@ describe('collectRemoteEmptyFields', () => {
   })
 
   it('远程缺该字段（undefined）→ 同样计入', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A' }]
     const local = makeEmptyFieldsLocal({ 完播日: '' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([{ name: '完播日', count: 1 }])
   })
 
   it('新增行（本地无该 SID）不参与统计', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '999', name: 'A', 播放结束: '' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '999', name: 'A', 播放结束: '' }]
     const local = makeEmptyFieldsLocal({ 完播日: '' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([])
@@ -1404,12 +1477,12 @@ describe('collectRemoteEmptyFields', () => {
 
   it('多条目按命中条数降序聚合', () => {
     const remotes: GithubRemoteEntry[] = [
-      { sid: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
-      { sid: '99', name: 'B', 播放结束: '', 动画制作公司: '' },
+      { subjectId: '1', name: 'A', 播放结束: '', 动画制作公司: '' },
+      { subjectId: '99', name: 'B', 播放结束: '', 动画制作公司: '' },
     ]
     const local = new Map<string, LocalRowEntry>([
-      ['1', { row: 2, sid: '1', fields: { 完播日: '', 制作公司: '' } }],
-      ['99', { row: 3, sid: '99', fields: { 完播日: '' } }],
+      ['1', { row: 2, subjectId: '1', fields: { 完播日: '', 制作公司: '' } }],
+      ['99', { row: 3, subjectId: '99', fields: { 完播日: '' } }],
     ])
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([
@@ -1419,7 +1492,7 @@ describe('collectRemoteEmptyFields', () => {
   })
 
   it('别名列两个名字都存在且都为空 → 两个名字各计一次', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 动画制作公司: '' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A', 动画制作公司: '' }]
     const local = makeEmptyFieldsLocal({ 制作公司: '', 动画制作公司: '' })
 
     const stats = collectRemoteEmptyFields(remotes, local)
@@ -1431,7 +1504,7 @@ describe('collectRemoteEmptyFields', () => {
   })
 
   it('远程无数据但本地也无任何相关列 → 空结果', () => {
-    const remotes: GithubRemoteEntry[] = [{ sid: '1', name: 'A', 播放结束: '' }]
+    const remotes: GithubRemoteEntry[] = [{ subjectId: '1', name: 'A', 播放结束: '' }]
     const local = makeEmptyFieldsLocal({ 名称: 'A' })
 
     expect(collectRemoteEmptyFields(remotes, local)).toEqual([])

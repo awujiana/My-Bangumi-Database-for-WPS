@@ -146,7 +146,7 @@ describe('exportData 主流程', () => {
         collType: '想看',
         status: '成功',
         count: 1,
-        sid: '123',
+        subjectId: '123',
         url: 'https://bgm.tv/subject/123',
         source: 'api',
         message: '',

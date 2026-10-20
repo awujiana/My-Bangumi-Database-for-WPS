@@ -25,16 +25,16 @@ import { extractSubjectId } from './pure-utilities.js'
  *
  * @returns SID 字符串集合；空集合表示未选中行或未找到 URL
  */
-export function getSelectedRowSids(): Set<string> {
-  const sids = new Set<string>()
+export function getSelectedRowSubjectIds(): Set<string> {
+  const subjectIds = new Set<string>()
   try {
     const app = getApp()
-    if (!app) return sids
+    if (!app) return subjectIds
 
     const selection = app.Selection
     if (!selection) {
-      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 无选区')
-      return sids
+      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSubjectIds] 无选区')
+      return subjectIds
     }
 
     // 获取选区的行范围
@@ -42,18 +42,18 @@ export function getSelectedRowSids(): Set<string> {
     const lastRow = selection.Row + selection.Rows.Count - 1
     bgmLog(
       LOG_LEVELS.INFO,
-      `[getSelectedRowSids] 选区行范围: ${String(firstRow)}-${String(lastRow)}`,
+      `[getSelectedRowSubjectIds] 选区行范围: ${String(firstRow)}-${String(lastRow)}`,
     )
 
     // 获取工作表和列映射
     const worksheet = app.ActiveSheet
-    if (!worksheet) return sids
+    if (!worksheet) return subjectIds
     const headerRow = findHeaderRow(worksheet) || 1
     const columnMap = getColumnMap(worksheet, headerRow)
     const urlCol = columnMap.get('Bangumi_URL')
     if (!urlCol) {
-      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 未找到 Bangumi_URL 列')
-      return sids
+      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSubjectIds] 未找到 Bangumi_URL 列')
+      return subjectIds
     }
 
     // 遍历选区每行，提取 SID
@@ -63,17 +63,17 @@ export function getSelectedRowSids(): Set<string> {
       if (isNotHeaderRow) {
         const url = trim(getCellValue(worksheet, row, urlCol))
         if (url) {
-          const sid = extractSubjectId(url)
-          if (sid) {
-            sids.add(sid)
+          const subjectId = extractSubjectId(url)
+          if (subjectId) {
+            subjectIds.add(subjectId)
           }
         }
       }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
+    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSubjectIds] 提取到 ${String(subjectIds.size)} 个 SID`)
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(error as Error).message}`)
+    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSubjectIds] 提取失败: ${(error as Error).message}`)
   }
-  return sids
+  return subjectIds
 }

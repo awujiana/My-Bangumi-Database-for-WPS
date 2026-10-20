@@ -17,8 +17,8 @@ export interface BGMCache {
   username: string | null
   /** 当前用户头像 URL */
   avatarUrl: string | null
-  /** Subject ID 缓存（sid → 行号） */
-  sidCache: Map<string, string>
+  /** Subject ID 缓存（subjectId → 行号） */
+  subjectIdCache: Map<string, string>
   /** 列表缓存（通用数据） */
   listCache: unknown[]
 }

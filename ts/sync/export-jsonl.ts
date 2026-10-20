@@ -133,7 +133,7 @@ function getCellText(worksheet: WpsWorksheet, row: number, column: number): stri
  * 将 Excel 工作表中的数据导出为 JSONL 字符串
  *
  * 读取数据工作表中的所有行，按 {@link GithubRemoteEntry} 格式组织，
- * 包含 sid、name、updatedAt、date、meta_tags、话数 等字段。
+ * 包含 subjectId、name、updatedAt、date、meta_tags、话数 等字段。
  *
  * 输出第 1 行为表头（{@link EXPORT_FIELDS}），其后每行为等长的值数组。
  *
@@ -181,8 +181,8 @@ export function buildJsonlFromSheet(): string {
   for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(cellText(row, urlCol))
     if (url) {
-      const sid = extractSubjectId(url)
-      if (sid) {
+      const subjectId = extractSubjectId(url)
+      if (subjectId) {
         const getField = (key: string): string => {
           const column = columnMap.get(key)
           if (!column) return ''
@@ -204,7 +204,7 @@ export function buildJsonlFromSheet(): string {
 
         // 构建 JSON 对象
         const entry: Record<string, unknown> = {
-          sid,
+          sid: subjectId,
           name: name || undefined,
           updatedAt: new Date().toISOString().slice(0, 10),
         }
