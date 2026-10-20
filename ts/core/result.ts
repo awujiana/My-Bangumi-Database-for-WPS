@@ -62,10 +62,10 @@ export class BgmError extends Error {
    *
    * @example
    * // 基本用法
-   * const err = new BgmError('网络请求失败', { code: 'NETWORK_ERROR' });
+   * const error = new BgmError('网络请求失败', { code: 'NETWORK_ERROR' });
    *
    * // 带详细信息的用法
-   * const err = new BgmError('API调用失败', {
+   * const error = new BgmError('API调用失败', {
    *     code: 'API_ERROR',
    *     details: {
    *         endpoint: '/v0/me',
@@ -91,8 +91,8 @@ export class BgmError extends Error {
    * @returns {string} 格式化的错误字符串
    *
    * @example
-   * const err = new BgmError('Token无效', { code: 'TOKEN_INVALID' });
-   * console.log(err.toString()); // '[TOKEN_INVALID] Token无效'
+   * const error = new BgmError('Token无效', { code: 'TOKEN_INVALID' });
+   * console.log(error.toString()); // '[TOKEN_INVALID] Token无效'
    */
   toString(): string {
     return `[${this.code}] ${this.message}`
@@ -336,8 +336,8 @@ export class Result<T> {
    * @returns {Result<T>} 转换后的Result
    *
    * @example
-   * const result = apiResult.mapErr(err => {
-   *     return new BgmError(err.message, 'WRAPPED_' + err.code);
+   * const result = apiResult.mapErr(error => {
+   *     return new BgmError(error.message, 'WRAPPED_' + err.code);
    * });
    */
   mapErr(function_: (error: BgmError) => BgmError): Result<T> {

@@ -53,6 +53,40 @@
   不能整条覆盖（会盖掉 hover 的 transform / box-shadow）。已有 `prefers-reduced-motion`
   全局规则自动降级。
 
+### 重构（命名规范化第二批：ws / col / param / sid 全拼化）
+
+继 cf / hl / cfg 之后的内部缩写清理，分 4 个提交（便于单独 review 与回滚）：
+
+| 缩写                        | 改为                                 | 数量级 | 提交       |
+| --------------------------- | ------------------------------------ | ------ | ---------- |
+| `ws`                        | `worksheet`                          | 1541   | `511fda7a` |
+| `col` / `cols` / `colMap` … | `column` / `columns` / `columnMap` … | 1700   | `c795dcf9` |
+| `param` / `params`          | `parameter` / `parameters`           | 543    | `7458e354` |
+| `sid`                       | `subjectId`（**线上键保持 sid**）    | 1341   | `6835887e` |
+
+**`sid` 是唯一有线上契约的一个**，单独说明：它是 dump / shard manifest / Excel 三处的列名，
+`FIELD_NAME_MAP` 早已声明规范名 `subjectId`。本轮把模型内部统一成 `subjectId`，线上格式一字不改，
+为此新增一对边界函数：
+
+- `isWireRemoteEntry(value)`：按**线上形状**校验（键名 `sid`），取代 `isGithubRemoteEntry`
+- `toRemoteEntry(wire)`：`sid` → `subjectId` 归一；两个解析边界（`parseJsonl` 的 buildEntry、
+  shard-fetch）用完守卫必须过这道——漏一步不报错，只会静默丢数据
+
+**踩到的三个坑（都已修，写进记忆）**：
+
+1. `eslint --fix` 会删掉「预留测试选项」的 `eslint-disable` 注释（fix 模式下 UNSAFE 组 unicorn
+   规则缺席，注释变成无用指令）——lint-staged 只对 `ts/**` 跑 eslint、对 `tests/**` 只跑
+   prettier，所以**永远不要对 tests/ 手动跑 eslint --fix**。
+2. 重命名正则误伤 `eslint-disable` 注释里的规则名：`no-param-reassign` 被改成不存在的
+   `no-parameter-reassign`（param 那轮）。
+3. `sid` 的字符串字面量必须整体排除：zod schema 键、`IMPORTANT_COLS` / `FIELD_NAME_MAP` 键、
+   `EXPORT_FIELDS` 第一列、测试 fixture 的表头数组、shard-fetch 的 WARN 文案——漏一处就是
+   静默数据错误（导出 JSONL 第一列变空），编译期发现不了。
+
+**刻意不改**（不是遗漏）：`vi.fn()` 的 `fn`（库 API）、Bangumi API 的 `msg` 字段、
+CSS 类名里的 `num` / `env` / `err` / `idx`（如 `.row-num` / `bgm-dp-env-card` / `match-all-idx`，
+属于样式命名空间，改了对可读性没有增量）。
+
 ### 重构（命名规范化：cf / hl / cfg → 全拼）
 
 项目既定方针是「缩写标识符 → 全拼」（见 `eslint.config.mjs` 里 `unicorn/name-replacements` 的

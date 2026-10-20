@@ -34,7 +34,7 @@ export interface DialogButton {
 export interface DialogConfig {
   id: string
   titleId: string
-  msgId: string
+  messageId: string
   buttons: DialogButton[]
 }
 
@@ -54,13 +54,13 @@ const DIALOG_TYPES: Record<string, DialogConfig> = {
   alert: {
     id: 'bgmAlertDialog',
     titleId: 'bgmAlertTitle',
-    msgId: 'bgmAlertMessage',
+    messageId: 'bgmAlertMessage',
     buttons: [{ id: 'bgmAlertOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' }],
   },
   confirm: {
     id: 'bgmConfirmDialog',
     titleId: 'bgmConfirmTitle',
-    msgId: 'bgmConfirmMessage',
+    messageId: 'bgmConfirmMessage',
     buttons: [
       { id: 'bgmConfirmOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
       { id: 'bgmConfirmCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
@@ -69,25 +69,25 @@ const DIALOG_TYPES: Record<string, DialogConfig> = {
   error: {
     id: 'bgmErrorDialog',
     titleId: 'bgmErrorTitle',
-    msgId: 'bgmErrorMessage',
+    messageId: 'bgmErrorMessage',
     buttons: [{ id: 'bgmErrorOk', cls: 'bgm-dialog-btn-danger', text: '确定', event: 'ok' }],
   },
   warning: {
     id: 'bgmWarningDialog',
     titleId: 'bgmWarningTitle',
-    msgId: 'bgmWarningMessage',
+    messageId: 'bgmWarningMessage',
     buttons: [{ id: 'bgmWarningOk', cls: 'bgm-dialog-btn-warning', text: '确定', event: 'ok' }],
   },
   success: {
     id: 'bgmSuccessDialog',
     titleId: 'bgmSuccessTitle',
-    msgId: 'bgmSuccessMessage',
+    messageId: 'bgmSuccessMessage',
     buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-dialog-btn-success', text: '确定', event: 'ok' }],
   },
   input: {
     id: 'bgmInputDialog',
     titleId: 'bgmInputTitle',
-    msgId: 'bgmInputPrompt',
+    messageId: 'bgmInputPrompt',
     buttons: [
       { id: 'bgmInputOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
       { id: 'bgmInputCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
@@ -159,7 +159,7 @@ function createDialogs(): void {
     const body = document.createElement('div')
     body.className = 'bgm-dialog-body'
     const message = document.createElement('p')
-    message.id = config.msgId
+    message.id = config.messageId
     message.className = 'bgm-dialog-message'
     body.appendChild(message)
     content.appendChild(body)
@@ -207,7 +207,7 @@ function bindAllEvents(): void {
   for (const config of Object.values(DIALOG_TYPES)) {
     dom[config.id] = document.getElementById(config.id)
     dom[config.titleId] = document.getElementById(config.titleId)
-    dom[config.msgId] = document.getElementById(config.msgId)
+    dom[config.messageId] = document.getElementById(config.messageId)
     for (const button of config.buttons) {
       dom[button.id] = document.getElementById(button.id)
     }
@@ -281,7 +281,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
   }
 
   const titleElement = dom[config.titleId]
-  const messageElement = dom[config.msgId]
+  const messageElement = dom[config.messageId]
   if (titleElement) titleElement.textContent = options.title ?? ''
   if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
 
