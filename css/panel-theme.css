@@ -300,7 +300,7 @@ body {
 }
 
 /* ---- 滚动高亮滑动胶囊（scrollspy 指示器）---- */
-/* 由 shell-nav 的 initScrollspy 注入并随当前高亮项平移；高亮底色与边框
+/* 由 shell-nav 的 initializeScrollspy 注入并随当前高亮项平移；高亮底色与边框
    由胶囊提供，.nav a.active 只保留文字强调色（避免双重底色/边框叠加）。 */
 .nav-indicator {
   position: absolute;
