@@ -161,8 +161,17 @@ const patchedBaseRecommendedConfig = baseRecommendedConfig.map((config) => {
 // 说明：这不是"降低严格度"——被排除的规则要么有等价的现行规则在生效，要么在本项目
 // 语言范围内不可能命中；UNSAFE_FIX_RULES 仍保持 error 门禁（靠手工清零，不使用 --fix）。
 const EXCLUDED_RULE_PATTERN = /^jsx-/
-const isLanguageUnsupported = (impl) =>
-  Array.isArray(impl?.meta?.languages) && !impl.meta.languages.includes('js/js')
+// 注意 `languages: ['*']`（unicorn 的 filename-case / comment-content / prefer-https 等用此写法）
+// 表示「所有语言」，必须视为支持 js/js；只认字面量 js/js 会把这类规则误伤（实测会把
+// filename-case 这类现行门禁规则一起关掉，等于悄悄降低严格度）。
+const isLanguageUnsupported = (impl) => {
+  const languages = impl?.meta?.languages
+  return (
+    Array.isArray(languages) &&
+    !languages.includes('js/js') &&
+    !languages.includes('*')
+  )
+}
 
 const allRulesAsError = (plugin, prefix) =>
   Object.fromEntries(
