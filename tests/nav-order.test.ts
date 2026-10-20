@@ -242,8 +242,9 @@ describe('applyNavOrder 就地重排 DOM', () => {
 })
 
 describe('nav-order 页面注册表', () => {
-  it('五个页面全部登记：panel / enrich / clean / highlight / settings', () => {
+  it('六个页面全部登记：panel / enrich / clean / highlight / cf / settings', () => {
     expect([...ORDERABLE_PAGES].sort((a, b) => a.localeCompare(b))).toEqual([
+      'cf',
       'clean',
       'enrich',
       'highlight',

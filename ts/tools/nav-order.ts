@@ -68,6 +68,12 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
     { id: 'sec-preview', label: '实时预览', icon: '👁️' },
     { id: 'sec-run', label: '应用与清除', icon: '🖌️' },
   ],
+  cf: [
+    { id: 'sec-target', label: '目标工作表', icon: '🎯' },
+    { id: 'sec-rules', label: '规则管理', icon: '☑️' },
+    { id: 'sec-defaults', label: '默认规则集', icon: '📦' },
+    { id: 'sec-apply', label: '应用与修复', icon: '🖌️' },
+  ],
   settings: [
     { id: 'sec-appearance', label: '外观与导航', icon: '🎨' },
     { id: 'sec-modules', label: '模块排序', icon: '🧩' },
@@ -87,6 +93,7 @@ export const PAGE_LABELS: Readonly<Record<string, string>> = {
   enrich: '富化面板',
   clean: '清理面板',
   highlight: '高亮面板',
+  cf: '条件格式面板',
   settings: '设置页',
 }
 
@@ -96,6 +103,7 @@ export const ORDERABLE_PAGES: readonly string[] = [
   'enrich',
   'clean',
   'highlight',
+  'cf',
   'settings',
 ]
 

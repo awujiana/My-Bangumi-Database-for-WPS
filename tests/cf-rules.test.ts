@@ -23,6 +23,7 @@ import {
   buildErrorFormula,
   buildSeasonFormula,
   filterRules,
+  firstRowOfRange,
   groupRules,
   parseRules,
   planApply,
@@ -330,5 +331,19 @@ describe('planApply：双策略', () => {
     expect(
       plan.entries.slice(0, 2).map((entry) => (entry.source === 'foreign' ? entry.formula : '')),
     ).toEqual(['=1', '=2'])
+  })
+})
+
+describe('firstRowOfRange：范围首行号', () => {
+  it('取首段行号', () => {
+    expect(firstRowOfRange('B3:B1048576')).toBe(3)
+    expect(firstRowOfRange('C10:C100')).toBe(10)
+    expect(firstRowOfRange('AA2:AA99')).toBe(2)
+  })
+
+  it('单格与异常输入回 1', () => {
+    expect(firstRowOfRange('B5')).toBe(5)
+    expect(firstRowOfRange('')).toBe(1)
+    expect(firstRowOfRange('abc')).toBe(1)
   })
 })

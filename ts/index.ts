@@ -373,6 +373,7 @@ export {
   // 显示通用数据清理面板
   showCleanPanel,
   showHighlightPanel,
+  showCfPanel,
   // 标记清理面板已成功加载（面板 ID 自愈）
   markCleanPaneLoaded,
   markHighlightPaneLoaded,

@@ -1085,6 +1085,70 @@ export function markHighlightPaneLoaded(): void {
 }
 
 /**
+ * 标记「条件格式管理」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
+ */
+export function markCfPaneLoaded(): void {
+  if (typeof window === 'undefined') return
+  const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
+  app?.PluginStorage?.setItem('cf_pane_url', window.location.href)
+}
+
+/**
+ * 显示 / 切换「条件格式管理」面板（独立面板，与设置 / 富化 / 清理 / 高亮并列）
+ *
+ * 面板 ID 缓存于 `cf_pane_id`；配合 `cf_pane_url` 标记做自愈：缓存 ID 存在但
+ * 页面从未成功加载时，隐藏旧面板并重建。与清理 / 高亮面板同款机制。
+ */
+export function showCfPanel(): void {
+  const app = getApp() as {
+    PluginStorage?: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+    }
+    CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    GetTaskPane?: (id: string) => { Visible: boolean }
+  } | null
+  if (!app) {
+    bgmLog(LOG_LEVELS.ERROR, '[showCfPanel] 无法获取 WPS Application 对象')
+    return
+  }
+
+  let cfId = app.PluginStorage?.getItem('cf_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('cf_pane_url')
+
+  // 自愈：缓存 ID 存在但页面从未成功加载 → 隐藏并重建
+  if (cfId && !storedPaneUrl?.includes('cf.html')) {
+    const stalePane = app.GetTaskPane?.(cfId)
+    if (stalePane) stalePane.Visible = false
+    app.PluginStorage?.setItem('cf_pane_id', '')
+    app.PluginStorage?.setItem('cf_pane_url', '')
+    cfId = null
+    bgmLog(LOG_LEVELS.WARN, '[showCfPanel] 检测到加载失败的旧条件格式面板，已重建')
+  }
+
+  if (cfId) {
+    const pane = app.GetTaskPane?.(cfId)
+    if (pane) {
+      pane.Visible = !pane.Visible
+      bgmLog(LOG_LEVELS.INFO, `[showCfPanel] 条件格式面板可见性切换: ${String(pane.Visible)}`)
+      return
+    }
+    app.PluginStorage?.setItem('cf_pane_id', '')
+    app.PluginStorage?.setItem('cf_pane_url', '')
+    bgmLog(LOG_LEVELS.WARN, '[showCfPanel] 条件格式面板ID失效，已清除存储')
+  }
+
+  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('cf.html'))
+  if (pane) {
+    pane.Visible = true
+    app.PluginStorage?.setItem('cf_pane_id', pane.ID)
+    bgmLog(LOG_LEVELS.INFO, `[showCfPanel] 条件格式面板已创建(ID:${pane.ID})`)
+  } else {
+    bgmLog(LOG_LEVELS.ERROR, '[showCfPanel] 创建条件格式面板失败')
+  }
+}
+
+/**
  * 显示 / 切换「番剧高亮」面板（独立面板，与设置 / 富化 / 清理面板并列）
  *
  * 面板 ID 缓存于 `highlight_pane_id`；配合 `highlight_pane_url` 标记做自愈：

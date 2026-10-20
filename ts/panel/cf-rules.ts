@@ -81,6 +81,9 @@ export const CF_STORE_KEY = 'cf.rules.v1'
 /** 默认应用策略的 PluginStorage 键 */
 export const CF_STRATEGY_KEY = 'cf.strategy.v1'
 
+/** 默认策略（无历史选择时）：清掉后应用——插件规则完整生效 */
+export const CF_STRATEGY_FALLBACK: ApplyStrategy = 'clear-all'
+
 /** 默认分组名 */
 export const CF_GROUP_HIGHLIGHT = '番剧高亮'
 export const CF_GROUP_QUALITY = '数据质量'
@@ -137,6 +140,17 @@ export function shiftFormulaRows(formula: string, rowDelta: number): string {
       return `${dollar}${col}${String(shifted)}`
     },
   )
+}
+
+/**
+ * 取 A1 范围的首行号（公式锚点行）
+ *
+ * `B3:B1048576` → 3；解析不了回 1（调用方会连同公式一起让用户编辑）。
+ */
+export function firstRowOfRange(range: string): number {
+  const head = range.split(':', 1)[0] ?? ''
+  const match = /(\d+)/.exec(head)
+  return match ? Number(match[1]) : 1
 }
 
 /** 「日期格式错误」标红公式（数据页公式列的报错文本） */

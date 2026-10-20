@@ -27,6 +27,9 @@
 				<group id="highlightGroup" label="番剧高亮">
                     <button id="btnOpenHighlightPanel" label="番剧高亮" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
+				<group id="cfGroup" label="条件格式">
+                    <button id="btnOpenCfPanel" label="条件格式管理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                </group>
             </tab>
         </tabs>
     </ribbon>
