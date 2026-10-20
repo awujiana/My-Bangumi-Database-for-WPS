@@ -65,33 +65,39 @@
             </button>
           </h3>
           <p class="hint">
-            当前工作表：<strong id="hlSheetName">—</strong>。日期列三种格式都认（<code>25年4月</code> 文本 /
-            <code>2026-10-01</code> / 真实日期单元格）。
+            当前工作表：<strong id="highlightSheetName">—</strong>。日期列三种格式都认（<code
+              >25年4月</code
+            >
+            文本 / <code>2026-10-01</code> / 真实日期单元格）。
           </p>
 
-          <label class="hl-field-label" for="hlSource">日期列（匹配依据）</label>
-          <select id="hlSource" class="hl-select"></select>
+          <label class="highlight-field-label" for="highlightSource">日期列（匹配依据）</label>
+          <select id="highlightSource" class="highlight-select"></select>
           <p class="hint">
             自动模式优先用「开播季度」列（数据页公式已归一并排除电影/剧场版）；没有时回退
             「开播日期」「完播日」。
           </p>
 
-          <label class="hl-field-label">匹配模式</label>
-          <div class="hl-mode-row">
-            <button type="button" class="hl-mode-btn active" id="hlModeAuto">自动：当前季</button>
-            <button type="button" class="hl-mode-btn" id="hlModeManual">手动指定年月</button>
+          <label class="highlight-field-label">匹配模式</label>
+          <div class="highlight-mode-row">
+            <button type="button" class="highlight-mode-btn active" id="highlightModeAuto">
+              自动：当前季
+            </button>
+            <button type="button" class="highlight-mode-btn" id="highlightModeManual">
+              手动指定年月
+            </button>
           </div>
-          <div id="hlManualBox" class="hl-manual-box" style="display: none">
-            <select id="hlManualYear" class="hl-select"></select>
-            <select id="hlManualMonth" class="hl-select"></select>
+          <div id="highlightManualBox" class="highlight-manual-box" style="display: none">
+            <select id="highlightManualYear" class="highlight-select"></select>
+            <select id="highlightManualMonth" class="highlight-select"></select>
           </div>
           <p class="hint">
-            自动模式按今天定位当前季：1/2 月→1 月季，3/4/5 月→4 月季，6/7/8 月→7 月季，9/10/11
-            月→10 月季，12 月→次年 1 月季（12 月播的番剧归冬季档）。
+            自动模式按今天定位当前季：1/2 月→1 月季，3/4/5 月→4 月季，6/7/8 月→7 月季，9/10/11 月→10
+            月季，12 月→次年 1 月季（12 月播的番剧归冬季档）。
           </p>
 
-          <label class="hl-watch-row">
-            <input type="checkbox" id="hlAutoWatch" />
+          <label class="highlight-watch-row">
+            <input type="checkbox" id="highlightAutoWatch" />
             <span>自动跟随表格变化（编辑后自动重算高亮）</span>
           </label>
           <p class="hint">默认关闭。开启后本面板保持打开才会生效，不会常驻监听。</p>
@@ -114,7 +120,7 @@
             勾选命中行要涂绿的列，选择会被记住（下次自动带上）。序列号列不在列表里——它的绿色是
             「已上传」标记，混用会分不清。
           </p>
-          <div id="hlColList" class="hl-col-list"></div>
+          <div id="highlightColList" class="highlight-col-list"></div>
         </section>
 
         <!-- 实时预览 -->
@@ -131,15 +137,15 @@
             </button>
           </h3>
           <p class="hint">预览只读表格、不动数据；改动上面的选项会实时重算。</p>
-          <div class="hl-preview-box">
-            <div class="hl-preview-count" id="hlPreviewCount">命中 0 行</div>
-            <div class="hl-preview-target" id="hlPreviewTarget"></div>
-            <div class="hl-preview-chips" id="hlPreviewChips"></div>
-            <div class="hl-preview-names" id="hlPreviewNames"></div>
-            <div class="hl-preview-skip" id="hlPreviewSkip"></div>
+          <div class="highlight-preview-box">
+            <div class="highlight-preview-count" id="highlightPreviewCount">命中 0 行</div>
+            <div class="highlight-preview-target" id="highlightPreviewTarget"></div>
+            <div class="highlight-preview-chips" id="highlightPreviewChips"></div>
+            <div class="highlight-preview-names" id="highlightPreviewNames"></div>
+            <div class="highlight-preview-skip" id="highlightPreviewSkip"></div>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small" id="hlRefreshBtn">🔄 刷新预览</button>
+            <button class="bgm-btn small" id="highlightRefreshBtn">🔄 刷新预览</button>
           </div>
         </section>
 
@@ -161,8 +167,8 @@
             不碰你自己填的色。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="hlApplyBtn">🖌️ 应用高亮</button>
-            <button class="bgm-btn small" id="hlClearBtn">🧽 清除高亮</button>
+            <button class="bgm-btn small primary" id="highlightApplyBtn">🖌️ 应用高亮</button>
+            <button class="bgm-btn small" id="highlightClearBtn">🧽 清除高亮</button>
           </div>
         </section>
       </main>
