@@ -183,17 +183,24 @@ kebab-case，不受本规则约束（`ts/**` 里的 `class="bgm-dp-env-value-war
 
 ## 6. 自检
 
-- **门禁**：`npm run lint:check`
+- **门禁**：`npm run lint:check`（`npm run gate` 的一环）。
 - **独立扫描器**：`node scripts/probe-naming.mjs`
-  不加载主配置（无需类型感知，几秒出结果），只挂 `naming-convention` 一条规则，
-  按「命中名 → 次数 → 文件:行」汇总。调黑名单、评估新一批改名工作量时用它。
+  不加载主配置（无需类型感知，几秒出结果，比 eslint 的 2.5 分钟快两个数量级），只挂
+  `naming-convention` 一条规则，按「命中名 → 次数 → 文件:行」汇总，命中即退出码 1。
+  调黑名单、评估新一批改名工作量时用它。
+  ⚠️ 改动本规则后，扫描器的 `SELECTORS` 必须与 `eslint.config.mjs` 的 `NAMING_SELECTORS`
+  **逐项一致**——不一致会出现「扫描器全绿、eslint 仍报错」（实测漏掉 `classProperty`
+  就漏了 60 个名字）。
+- **反向验证**：`npm run check:guards-reverse` 的 `naming-convention` 用例会往
+  `ts/tools/log-buffer.ts` 注入 `__probeReverseVerifyWs`，门禁必须变红 ——
+  证明这条规则不是「永远为真」的空断言。
 
 ---
 
 ## 7. 变更记录
 
 - **2026-10-20**：新增 `@typescript-eslint/naming-convention` 配置（缩写黑名单
-  ＋ 字母形态），并据此全量清理既有缩写（约 1800 处，含
-  `xxxCol→xxxColumn` / `xxxWs→xxxWorksheet` / `xxxSid→xxxSubjectId` 家族、常量
+  ＋ 字母形态），并据此全量清理既有缩写（约 2100 处 / 104 文件，含
+  `xxxCol→xxxColumn` / `xxxWs→xxxWorksheet` / `xxxSid→xxxSubjectId` 三大族、常量
   `*_COL→*_COLUMN`、`img→image`、`win→windowGlobals`、`cls→cssClass` 等）。
   本文件同批建立。
