@@ -192,7 +192,7 @@
   border: 1px solid var(--bg-surface-2);
 }
 
-.mapping-row .mapping-col-name {
+.mapping-row .mapping-column-name {
   flex: 1;
   font-size: 12px;
   color: var(--text-1);
@@ -358,7 +358,7 @@
 
 /* ========== 数据预览单元格美化 ========== */
 /* 名称列加粗，突出主字段 */
-.preview-table .col-name .preview-name {
+.preview-table .column-name .preview-name {
   font-weight: 600;
   color: var(--text-1);
 }
@@ -517,11 +517,11 @@
 }
 
 /* 简介表字段列：与主表列做视觉区分（弱化色） */
-.preview-table th.col-intro {
+.preview-table th.column-intro {
   color: var(--text-3);
   font-weight: 500;
 }
-.preview-table td.col-intro {
+.preview-table td.column-intro {
   color: var(--text-3);
   max-width: 180px;
 }

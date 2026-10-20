@@ -71,12 +71,12 @@
   border-bottom: none;
 }
 
-.diff-marker-col {
+.diff-marker-column {
   width: 22px;
   text-align: center;
 }
 
-.diff-num-col {
+.diff-num-column {
   width: 56px;
   text-align: right;
 }
@@ -182,7 +182,7 @@
     max-height: 300px;
   }
 
-  .diff-num-col {
+  .diff-num-column {
     width: 44px;
   }
 }

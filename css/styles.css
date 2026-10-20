@@ -2590,31 +2590,31 @@ select.input {
     background: var(--bg-surface-2);
 }
 
-.conflict-col-local {
+.conflict-column-local {
     color: #6bcfff;
     word-break: break-all;
 }
 
-.conflict-col-remote {
+.conflict-column-remote {
     color: #ffd93d;
     word-break: break-all;
 }
 
-.conflict-col-select {
+.conflict-column-select {
     white-space: nowrap;
 }
 
-.conflict-col-select input[type='radio'] {
+.conflict-column-select input[type='radio'] {
     margin: 0 2px 0 6px;
     cursor: pointer;
     vertical-align: middle;
 }
 
-.conflict-col-select input[type='radio']:first-child {
+.conflict-column-select input[type='radio']:first-child {
     margin-left: 0;
 }
 
-.conflict-col-select label {
+.conflict-column-select label {
     margin: 0 4px;
     font-size: 12px;
     color: #c0c0c0;
