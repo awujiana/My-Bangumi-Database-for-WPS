@@ -88,6 +88,16 @@ function main() {
   if (!isRangeSatisfied(declaredRange, installedVersion)) {
     problems.push(`package.json 声明范围 ${declaredRange} 不覆盖已安装版本 ${installedVersion}`)
   }
+  // 官方 UMD 包末尾带 `//# sourceMappingURL=purify.min.js.map`，但我们只 vendored .js 本体
+  // （map 有 2MB+，对运行时无意义）。留着它 DevTools 每次启动都会去请求
+  // `<host>/libs/purify.min.js.map`，拿到 404 的 HTML 再报
+  // 「Could not parse content for ...map」——一条与功能无关、但会长期挂在控制台的噪声。
+  if (/sourceMappingURL=/.test(readText('libs/purify.js'))) {
+    problems.push(
+      'libs/purify.js 仍带 `//# sourceMappingURL=purify.min.js.map`（不发布 .map 文件，' +
+        'DevTools 会 404 并报 Could not parse content for ...map）',
+    )
+  }
 
   if (problems.length > 0) {
     console.error('✖ DOMPurify 版本一致性校验失败：')
@@ -95,7 +105,8 @@ function main() {
     console.error(
       '\n修复方式：升级时**必须同时**替换两份副本 ——\n' +
         '  1) npm install dompurify@<版本>\n' +
-        '  2) 用同版本的 dist/purify.min.js 覆盖 libs/purify.js（保留文件头部 banner 中的版本号）\n' +
+        '  2) 用同版本的 dist/purify.min.js 覆盖 libs/purify.js（保留头部 banner 版本号）\n' +
+        '  3) 删掉文件末尾的 `//# sourceMappingURL=purify.min.js.map`（不发布 .map，留着会 404）\n' +
         '原因：运行时实际加载的是 libs/purify.js，npm audit 不会检查它。',
     )
     process.exit(1)

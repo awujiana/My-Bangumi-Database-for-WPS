@@ -13,6 +13,14 @@ const READY_TIMEOUT_MS = 5000
 /** 统一的按钮选择器（与 HTML 里的 `data-action` 约定一致） */
 const ACTION_BUTTON_SELECTOR = 'button[data-action]'
 
+/**
+ * 当前页面的日志前缀，由 {@link installActionButtonsGate} 登记。
+ *
+ * 页面侧只调 {@link notifyModulesReady}，不再各自拼事件名 / 拼 tag——重复手写正是
+ * 「cf / highlight / clean 三页都忘了派发、只能等 5s 超时兜底」的成因。
+ */
+let pageLogTag = '[BGM]'
+
 function setActionButtonsDisabled(isDisabled: boolean): void {
   for (const button of document.querySelectorAll(ACTION_BUTTON_SELECTOR)) {
     const element = button as HTMLButtonElement
@@ -30,6 +38,7 @@ function setActionButtonsDisabled(isDisabled: boolean): void {
  */
 export function installActionButtonsGate(logTag: string): void {
   if (typeof document === 'undefined') return
+  pageLogTag = logTag
 
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
   setActionButtonsDisabled(true)
@@ -50,4 +59,17 @@ export function installActionButtonsGate(logTag: string): void {
     )
     setActionButtonsDisabled(false)
   }, READY_TIMEOUT_MS)
+}
+
+/**
+ * 通知门禁：本页模块初始化完成，启用 `data-action` 按钮。
+ *
+ * 各页面 `initXxxPage()` 末尾必须调用。漏调不会让按钮永久失效（5s 后兜底强开），
+ * 但用户会看到按钮灰 5 秒，控制台只剩一条极易被当噪声忽略的 warn——所以别漏。
+ */
+export function notifyModulesReady(): void {
+  if (typeof document === 'undefined') return
+  document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
+  // eslint-disable-next-line no-console -- 启动阶段日志后端未必就绪，console 是唯一输出通道
+  console.log(`${pageLogTag} 模块就绪事件已派发`)
 }

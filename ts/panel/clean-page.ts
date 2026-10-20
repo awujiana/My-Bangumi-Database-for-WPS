@@ -25,11 +25,8 @@ import { renderDiffSections } from '../ui/diff-view.js'
 import type { DiffRow, DiffSection } from '../ui/diff-view.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
-import {
-  appendOperationLog,
-  clearOperationLogs,
-  CLEAN_LOG_SCOPE,
-} from '../tools/operation-log.js'
+import { notifyModulesReady } from './action-buttons-gate.js'
+import { appendOperationLog, clearOperationLogs, CLEAN_LOG_SCOPE } from '../tools/operation-log.js'
 import { renderStatCards } from '../ui/stat-cards.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 import { initShellNav } from './shell-nav.js'
@@ -953,4 +950,7 @@ export function initCleanPage(): void {
   bindButtons()
   invalidatePreview()
   appendLog('清理页已就绪：点击「📋 加载工作表」选择要清理的表格')
+
+  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
+  notifyModulesReady()
 }

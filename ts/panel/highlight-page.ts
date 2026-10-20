@@ -40,6 +40,7 @@ import {
 import type { SeasonSelectResult, YearMonth } from './highlight-season.js'
 import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
 import { initShellNav } from './shell-nav.js'
+import { notifyModulesReady } from './action-buttons-gate.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
@@ -645,4 +646,7 @@ export function initHighlightPage(): void {
   }
 
   refreshPreview()
+
+  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
+  notifyModulesReady()
 }

@@ -27,7 +27,7 @@
 - **新增 `.npmrc`（`legacy-peer-deps=true`）**：`eslint-config-airbnb-extended@3.x` 的 peer 仍写
   `eslint: ^9.0.0`（实际在 v10 下工作正常），不放宽则任何 `npm install` / `npm ci` 都 ERESOLVE，
   新克隆的仓库装不上依赖。
-- **移除 `@types/dompurify`**：dompurify 3.x 自带 `dist/purify.cjs.d.ts`，该 @types 包从未生效。
+- **移除 `@types/dompurify`**：dompurify 3.x 自带 `dist/purify.cjs.d.ts` + `exports.types`，该 @types 包从 3.0 起就是废弃 stub——留着只会引入类型版本漂移，且从未真正生效。
 - **`vite.config.js` → `vite.config.mjs`**：vite 8 的 `configLoader: 'native'` 会警告
   「ESM 语法被按 CJS 加载」，未来该 loader 成为默认后会直接失败。
 
@@ -52,6 +52,25 @@
   反复重播，看起来像闪烁。主题过渡在 `.section` 上是**追加**进既有 transition 列表，
   不能整条覆盖（会盖掉 hover 的 transform / box-shadow）。已有 `prefers-reduced-motion`
   全局规则自动降级。
+
+### 修复（真机反馈 · 第二轮）
+
+- **cf / highlight / clean 三页按钮灰 5 秒**：三页 `initXxxPage()` 都漏了派发
+  `bgm:modulesReady`，门禁只能等 5s 超时强开，控制台留一条
+  `[BGM CF] 5000ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`。
+  事件名与日志 tag 收进 `action-buttons-gate.ts`：新增 `notifyModulesReady()`（tag 由
+  `installActionButtonsGate` 登记一次，页面侧不再各拼一份——重复手写正是漏派发的成因），
+  三页 init 末尾统一调用。新增 `tests/action-buttons-gate.test.ts` 锁住
+  「安装即禁用 / 派发即启用 / 5s 兜底 / 事件先到不重复告警」。
+- **DevTools 反复报 `Could not parse content for …/libs/purify.min.js.map`**：vendored 的 UMD
+  副本末尾带 `//# sourceMappingURL=purify.min.js.map`，但 .map 不随包发布，DevTools 每次启动
+  都去请求、拿到 404 的 HTML 后报解析失败。已删掉该行，并在 `check:dompurify-version` 里加断言
+  ——下次重新 vendor 时脚本会直接拦下，不靠人记。
+- **`latest` 依赖不可复现**：`et-jsapi-declare` / `wpsjs` 由 `latest` 钉成 `^2.5.0` / `^2.2.3`
+  （当前实装版本），否则新机器 / CI 装到的版本随发布时间漂移。
+- **`typescript` 声明与锁文件自相矛盾**：HEAD 声明 `^7.0.1` 却锁着 6.0.3；统一为 `^6.0.3`
+  ——typescript-eslint@8.72 的 peer 上限是 `<6.1.0`，TS 7（Go 原生实现）不在范围内，
+  声明成 ^7 只会让 `npm install` 直接 ERESOLVE。等上游放开上限再升。
 
 ### 新增（功能 · 条件格式管理器：引擎 + COM 层 + 独立页，完整落地）
 

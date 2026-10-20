@@ -37,6 +37,7 @@ import {
 import type { ApplyStrategy, CfRule, ForeignRuleSnapshot } from './cf-rules.js'
 import { applyCfPlan, isFormatConditionsSupported, readForeignRules } from './cf-apply.js'
 import { initShellNav } from './shell-nav.js'
+import { notifyModulesReady } from './action-buttons-gate.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
@@ -695,4 +696,7 @@ export function initCfPage(): void {
   })
 
   renderRuleList()
+
+  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
+  notifyModulesReady()
 }
