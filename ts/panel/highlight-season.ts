@@ -229,8 +229,8 @@ export function selectSeasonRows(
 /**
  * 连续行合并：行号列表 → 最少的区域地址
  *
- * 宏的做法是逐行拼地址（`H123,H124,…`），但 **Range 地址串上限 255 字符**
- * （约 40 个单格地址就超限），匹配行一多就静默失败。合并连续行后，
+ * 宏的做法是逐行拼地址（`H123,H124,…`），匹配行一多就会踩到地址串上限而静默失败
+ * （宏里错误出口是 `提示()` → `Console.log`，用户看不到）。合并连续行后，
  * 按日期排序的数据一季通常只剩一两个区域（`H100:H105`），一次调用搞定。
  *
  * @param rows 行号列表（无需有序，内部会排序）
@@ -269,25 +269,110 @@ export function rowsToRangeAddresses(rows: readonly number[], columnLetter: stri
 }
 
 /**
- * 区域地址分块：每个块拼成一条逗号连接的区域串
+ * 地址串单次可接受的长度上限（字符）
  *
- * 同样受 255 字符上限约束；默认按 200 字符 greedy 装车（留足余量）。
- * 调用方对每个块做一次 `ws.Range(块)` 属性设置。
+ * 2026-10-20 真机探针实测：WPS JS 宏里 `Application.ActiveSheet.Range(地址)` 能接受约
+ * **524287 字符**（二分收敛值，2^19 边界），远大于 VBA 经典的 255 限额——那个数字是
+ * Excel 95~2003 的遗留说法，套到 WPS JS 上会把 COM 调用次数白放大 2000 倍。
+ *
+ * 这里取 8000（≈1000 个单格区域）而非贴着 524287 用，原因有二：
+ * ① 探针只测了「字符串长度」，「区域个数」上限没测；单区域地址越长（如 `AB123456:`）
+ *    同样字符数下区域更少，两者不是一回事；
+ * ② 万一某一版 WPS 拒绝超大并集，调用方还有对半拆分重试兜底（见 highlight-page），
+ *    单个块太大只会多几次调用，不会整批失败。
  */
-export function chunkRangeAddresses(addresses: readonly string[], maxChars = 200): string[] {
-  const chunks: string[] = []
-  let current = ''
+const DEFAULT_MAX_ADDRESS_CHARS = 8000
+
+/**
+ * 区域地址分块（按组返回，便于失败时对半拆分重试）
+ *
+ * greedy 装车：每块拼到接近 `maxChars` 为止，保证不把单个地址拆开。
+ *
+ * @param addresses 区域地址列表（如 `['H100:H105', 'H108']`）
+ * @param maxChars 单块字符上限，默认 {@link DEFAULT_MAX_ADDRESS_CHARS}
+ * @returns 分组后的地址数组，每组可直接 `join(',')` 成一条并集地址
+ */
+export function splitRangeAddresses(
+  addresses: readonly string[],
+  maxChars = DEFAULT_MAX_ADDRESS_CHARS,
+): string[][] {
+  const groups: string[][] = []
+  let current: string[] = []
+  let currentLength = 0
   for (const address of addresses) {
-    const canAppend = current !== '' && current.length + 1 + address.length <= maxChars
-    if (current === '') {
-      current = address
-    } else if (canAppend) {
-      current += `,${address}`
+    const appendedLength =
+      current.length === 0 ? address.length : currentLength + 1 + address.length
+    if (current.length > 0 && appendedLength > maxChars) {
+      groups.push(current)
+      current = [address]
+      currentLength = address.length
     } else {
-      chunks.push(current)
-      current = address
+      current.push(address)
+      currentLength = appendedLength
     }
   }
-  if (current !== '') chunks.push(current)
-  return chunks
+  if (current.length > 0) groups.push(current)
+  return groups
+}
+
+/**
+ * 逐组执行写入，单组失败时对半拆分重试（组 → 两个子组 → … → 单区域）。
+ *
+ * 为什么抽成纯函数：真正的 COM 写入通过 `attempt` 注入，测试里用一个「区域数超过 N 就抛错」
+ * 的假实现就能走完拆分路径，不必造 WPS 宿主——这是本项目唯一能验证该分支的办法。
+ *
+ * 为什么不直接猜一个「安全长度」：探针只证明了**字符数**能到 50 万级（2026-10-20 实测
+ * 524287），「区域个数」上限（并集里能放多少个 Area）没测过，各版本 WPS 对超大并集的
+ * 处理也不一致。与其赌，不如失败就拆：最坏退化成逐区域调用，也比宏那种「整批静默不上色」强。
+ *
+ * @param groups 地址分组（{@link splitRangeAddresses} 的产物）
+ * @param attempt 对单组执行写入；抛错表示该组被宿主拒绝
+ * @param onGroupFailed 拆到单区域仍失败时的回调（调用方用来记日志，不传则静默）
+ * @returns 成功的组数（拆分后的子组各计 1；0 表示全部失败）
+ */
+export function runRangeGroupsWithSplit(
+  groups: readonly string[][],
+  attempt: (group: readonly string[]) => void,
+  onGroupFailed?: (group: readonly string[], error: unknown) => void,
+): number {
+  let succeeded = 0
+  for (const group of groups) {
+    succeeded += attemptRangeGroup(group, attempt, onGroupFailed)
+  }
+  return succeeded
+}
+
+/** 单组尝试；失败拆两半递归，单区域仍失败才交给 `onGroupFailed` */
+function attemptRangeGroup(
+  group: readonly string[],
+  attempt: (group: readonly string[]) => void,
+  onGroupFailed?: (group: readonly string[], error: unknown) => void,
+): number {
+  try {
+    attempt(group)
+    return 1
+  } catch (error: unknown) {
+    if (group.length <= 1) {
+      onGroupFailed?.(group, error)
+      return 0
+    }
+    const middle = Math.ceil(group.length / 2)
+    return (
+      attemptRangeGroup(group.slice(0, middle), attempt, onGroupFailed) +
+      attemptRangeGroup(group.slice(middle), attempt, onGroupFailed)
+    )
+  }
+}
+
+/**
+ * 区域地址分块：每个块拼成一条逗号连接的区域串
+ *
+ * 调用方对每个块做一次 `ws.Range(块)` 属性设置。需要「失败再拆」时用
+ * {@link splitRangeAddresses} 拿数组，别把字符串再拆回去。
+ */
+export function chunkRangeAddresses(
+  addresses: readonly string[],
+  maxChars = DEFAULT_MAX_ADDRESS_CHARS,
+): string[] {
+  return splitRangeAddresses(addresses, maxChars).map((group) => group.join(','))
 }

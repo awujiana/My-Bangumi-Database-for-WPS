@@ -6,8 +6,9 @@
  *
  * 三个设计约束：
  * 1. **预览不动表**：只有点「应用高亮」才写工作表（用户选定的 A 口径）；
- * 2. **Range 地址串上限 255 字符**：连续行合并 + 分块后逐块设置（宏的逐行拼地址
- *    在匹配行稍多时就会静默失败，见 highlight-season.rowsToRangeAddresses）；
+ * 2. **地址串长度不是瓶颈**：2026-10-20 真机探针实测单次 `Range` 可接受约 524287 字符
+ *    （VBA 那个 255 是 Excel 2003 时代的说法）。仍按 8000 字符 greedy 装车 + 连续行合并，
+ *    且块失败会对半拆分重试——不赌平台上限，也不像宏那样整批静默失败；
  * 3. **清除只抹本插件加的绿**：上次应用的地址记录在 PluginStorage，清除精确重放，
  *    不整列 ColorIndex 乱扫（那会抹掉用户手工填的色）。
  *
@@ -30,19 +31,20 @@ import {
 } from '../tools/util/index.js'
 import { getConfig, setConfig } from '../tools/config.js'
 import {
-  chunkRangeAddresses,
   currentSeason,
   formatSeasonKey,
   formatSeasonLabel,
   rowsToRangeAddresses,
+  runRangeGroupsWithSplit,
   selectSeasonRows,
+  splitRangeAddresses,
 } from './highlight-season.js'
 import type { SeasonSelectResult, YearMonth } from './highlight-season.js'
 import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
 import { initShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
-import type { WpsWorksheet } from '../tools/wps.js'
+import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 // ===== 配置键（PluginStorage，跨会话缓存）=====
 
@@ -420,6 +422,52 @@ function readLastApplied(): LastApplied | null {
   return null
 }
 
+/** 一次性写入的样式：属性名与 WPS Range 成员一一对应，不做抽象层 */
+interface RangeStyle {
+  /** `Interior.Color`（ARGB） */
+  fillColor?: number
+  /** `Interior.ColorIndex`（`-4142` = 无填充） */
+  fillColorIndex?: number
+  /** `Font.Color`（ARGB） */
+  fontColor?: number
+  /** `Font.ColorIndex`（`-4105` = 自动） */
+  fontColorIndex?: number
+}
+
+/** 写样式。Interior / Font 先取到局部量，避免把 COM 属性读两遍 */
+function applyRangeStyle(range: WpsRange, style: RangeStyle): void {
+  const interior = range.Interior
+  if (interior) {
+    if (style.fillColor !== undefined) interior.Color = style.fillColor
+    if (style.fillColorIndex !== undefined) interior.ColorIndex = style.fillColorIndex
+  }
+  const font = range.Font
+  if (font) {
+    if (style.fontColor !== undefined) font.Color = style.fontColor
+    if (style.fontColorIndex !== undefined) font.ColorIndex = style.fontColorIndex
+  }
+}
+
+/**
+ * 给一个工作表刷样式：分组装车 + 失败自动对半拆分（拆分逻辑在引擎里，可单测）。
+ *
+ * @returns 写入成功的组数（0 表示全部失败）
+ */
+function paintSheet(ws: WpsWorksheet, addresses: readonly string[], style: RangeStyle): number {
+  return runRangeGroupsWithSplit(
+    splitRangeAddresses(addresses),
+    (group) => {
+      applyRangeStyle(ws.Range(group.join(',')), style)
+    },
+    (group, error) => {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[highlight] 区域写入失败: ${(error as Error).message}（${group.join(',')}）`,
+      )
+    },
+  )
+}
+
 function applyHighlight(isSilent = false): void {
   const { ws } = state
   if (!ws) {
@@ -432,24 +480,12 @@ function applyHighlight(isSilent = false): void {
     return
   }
 
-  // 连续行合并 + 分块：Range 地址串上限 255 字符，逐块设置属性
+  // 连续行合并 + 按 8000 字符装车：块失败自动对半拆（见 paintRangeGroups）
   const addresses: string[] = []
   for (const column of state.columns) {
     addresses.push(...rowsToRangeAddresses(rows, column.letter))
   }
-  const chunks = chunkRangeAddresses(addresses)
-
-  let painted = 0
-  for (const chunk of chunks) {
-    try {
-      const range = ws.Range(chunk)
-      if (range.Interior) range.Interior.Color = HIGHLIGHT_COLOR
-      if (range.Font) range.Font.Color = 0
-      painted += 1
-    } catch (error: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[highlight] 高亮块写入失败: ${(error as Error).message}`)
-    }
-  }
+  const painted = paintSheet(ws, addresses, { fillColor: HIGHLIGHT_COLOR, fontColor: 0 })
   if (painted === 0) {
     if (!isSilent) showToast('高亮写入失败，请查看日志', 'error')
     return
@@ -478,16 +514,10 @@ function clearHighlight(isSilent = false): void {
     return
   }
 
-  const chunks = chunkRangeAddresses(record.addresses)
-  for (const chunk of chunks) {
-    try {
-      const range = ws.Range(chunk)
-      if (range.Interior) range.Interior.ColorIndex = COLOR_INDEX_NONE
-      if (range.Font) range.Font.ColorIndex = COLOR_INDEX_AUTOMATIC
-    } catch (error: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[highlight] 清除块失败: ${(error as Error).message}`)
-    }
-  }
+  paintSheet(ws, record.addresses, {
+    fillColorIndex: COLOR_INDEX_NONE,
+    fontColorIndex: COLOR_INDEX_AUTOMATIC,
+  })
   setConfig(KEY_LAST_APPLIED, '')
   bgmLog(LOG_LEVELS.INFO, '[highlight] 已清除上次高亮')
   if (!isSilent) showToast('已清除高亮', 'success')

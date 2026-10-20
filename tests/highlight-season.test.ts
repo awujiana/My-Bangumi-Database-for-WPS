@@ -19,7 +19,9 @@ import {
   parseYearMonth,
   seasonStartMonth,
   rowsToRangeAddresses,
+  runRangeGroupsWithSplit,
   chunkRangeAddresses,
+  splitRangeAddresses,
   selectSeasonRows,
   toSeason,
 } from '../ts/panel/highlight-season.js'
@@ -247,7 +249,7 @@ describe('rowsToRangeAddresses：连续行合并', () => {
     expect(rowsToRangeAddresses([], 'H')).toEqual([])
   })
 
-  it('整季连续匹配时一列只剩一个地址（255 字符上限的关键）', () => {
+  it('整季连续匹配时一列只剩一个地址（一次 Range 调用就能刷完整季）', () => {
     const rows = Array.from({ length: 200 }, (_, index) => 500 + index)
     expect(rowsToRangeAddresses(rows, 'H')).toEqual(['H500:H699'])
   })
@@ -274,5 +276,100 @@ describe('chunkRangeAddresses：地址分块', () => {
 
   it('空输入返回空数组', () => {
     expect(chunkRangeAddresses([])).toEqual([])
+  })
+})
+
+describe('splitRangeAddresses：分组（供失败拆分重试）', () => {
+  it('返回地址数组而不是拼好的字符串——重试时要按区域对半切', () => {
+    expect(splitRangeAddresses(['H1', 'H3', 'H5'], 100)).toEqual([['H1', 'H3', 'H5']])
+  })
+
+  it('超 maxChars 时开新组，组内是原地址（未被逗号拆散）', () => {
+    // 'H1:H2' + ',' + 'H3' = 8 字符，正好装得下；再加 'H4' 变 11 → 开新组
+    expect(splitRangeAddresses(['H1:H2', 'H3', 'H4'], 8)).toEqual([['H1:H2', 'H3'], ['H4']])
+  })
+
+  it('默认上限是 8000 字符：1000 个单格地址（约 5KB）只成一组', () => {
+    // 真机实测单次 Range 可接受约 524287 字符（2026-10-20），8000 是刻意的保守值。
+    // 对比旧默认 200：同样 1000 个地址要拆成 50 块 → 50 次跨进程 COM 往返。
+    const addresses = Array.from({ length: 1000 }, (_, index) => `H${String(index + 1)}`)
+    const groups = splitRangeAddresses(addresses)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toHaveLength(1000)
+    expect(chunkRangeAddresses(addresses)).toEqual([addresses.join(',')])
+  })
+
+  it('chunkRangeAddresses 与 splitRangeAddresses 的分组边界一致', () => {
+    const addresses = ['H100:H105', 'H108', 'H200:H210', 'H300']
+    expect(chunkRangeAddresses(addresses, 30)).toEqual(
+      splitRangeAddresses(addresses, 30).map((group) => group.join(',')),
+    )
+  })
+
+  it('空输入返回空数组', () => {
+    expect(splitRangeAddresses([])).toEqual([])
+  })
+})
+
+describe('runRangeGroupsWithSplit：宿主拒绝并集时对半拆', () => {
+  it('全部成功时每组只调一次', () => {
+    const calls: string[] = []
+    const succeeded = runRangeGroupsWithSplit([['H1', 'H3'], ['H5']], (group) => {
+      calls.push(group.join(','))
+    })
+
+    expect(succeeded).toBe(2)
+    expect(calls).toEqual(['H1,H3', 'H5'])
+  })
+
+  it('整组被拒时一路拆到单区域，4 个区域全部写入成功', () => {
+    const calls: string[] = []
+    const failures: string[] = []
+    // 模拟「WPS 拒绝 2 个以上区域的并集」：真机上没测过 Area 数上限，这条路径就是兜底
+    const attempt = (group: readonly string[]): void => {
+      calls.push(group.join(','))
+      if (group.length > 1) throw new Error('区域过多')
+    }
+
+    const succeeded = runRangeGroupsWithSplit([['H1', 'H2', 'H3', 'H4']], attempt, (group) => {
+      failures.push(group.join(','))
+    })
+
+    expect(succeeded).toBe(4)
+    expect(failures).toEqual([])
+    expect(calls).toEqual(['H1,H2,H3,H4', 'H1,H2', 'H1', 'H2', 'H3,H4', 'H3', 'H4'])
+  })
+
+  it('拆到单区域仍失败时返回 0 并回调（不抛，避免整个应用中断）', () => {
+    const failures: string[] = []
+    const succeeded = runRangeGroupsWithSplit(
+      [['H9']],
+      () => {
+        throw new Error('工作表被保护')
+      },
+      (group, error) => {
+        failures.push(`${group.join(',')}:${(error as Error).message}`)
+      },
+    )
+
+    expect(succeeded).toBe(0)
+    expect(failures).toEqual(['H9:工作表被保护'])
+  })
+
+  it('不传失败回调时静默返回 0', () => {
+    const succeeded = runRangeGroupsWithSplit([['H1']], () => {
+      throw new Error('boom')
+    })
+
+    expect(succeeded).toBe(0)
+  })
+
+  it('部分成功按实际写入计数', () => {
+    const succeeded = runRangeGroupsWithSplit([['H1', 'H2'], ['H3']], (group) => {
+      if (group.length > 1) throw new Error('太大')
+    })
+
+    // 第一组拆成 H1 / H2 两个都成，第二组直接成 → 3
+    expect(succeeded).toBe(3)
   })
 })
