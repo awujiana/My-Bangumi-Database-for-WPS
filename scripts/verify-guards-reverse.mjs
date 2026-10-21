@@ -142,6 +142,20 @@ const CASES = [
     expectInOutput: ['__probeReverseVerifyWs', '__probeReverseVerifyCol'],
   },
   {
+    id: 'module-manifest',
+    label: 'main.js 登记了不存在的模块 → critical 链路断，功能区按钮全废（真机才报）',
+    check: 'scripts/check-module-manifest.mjs',
+    mutations: [
+      {
+        file: 'main.js',
+        mode: 'literal',
+        from: "src: 'dist-ts/core/constants.js'",
+        to: "src: 'dist-ts/core/crypto.js'",
+      },
+    ],
+    expectInOutput: ['dist-ts/core/crypto.js', 'dist-ts/ 下没有这个文件'],
+  },
+  {
     id: 'cycles',
     label: '新增 import 环（logger ↔ log-buffer）→ 顶层跨模块读取的 TDZ 风险',
     check: 'scripts/check-import-cycles.mjs',

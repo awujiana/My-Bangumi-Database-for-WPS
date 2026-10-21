@@ -7,10 +7,14 @@
 const MODULES = [
     { src: 'dist-ts/index.js', type: 'module', critical: true },     // 先加载类型/枚举
     { src: 'dist-ts/tools/config.js', type: 'module', critical: true },
-    { src: 'dist-ts/tools/utility.js', type: 'module', critical: true },
+    // 历史命名修正：tools/utility.ts 已删（commit 958c5b00 双轨 barrel 合一到
+    // tools/util/index.js），core/crypto.ts 已改名 core/token-payload.ts。
+    // 这两条 src 漏改，一直靠「wpsjs 404 分支缺 charset」的巧合没炸；
+    // 补上 charset 后立即显形，故连带修正。
+    { src: 'dist-ts/tools/util/index.js', type: 'module', critical: true },
     { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
     { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
-    { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
+    { src: 'dist-ts/core/token-payload.js', type: 'module', critical: true },
     { src: 'dist-ts/tools/events.js', type: 'module', critical: true },
     { src: 'dist-ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
     { src: 'dist-ts/tools/http.js', type: 'module' },
