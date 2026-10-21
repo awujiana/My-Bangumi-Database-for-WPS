@@ -22,6 +22,12 @@
  *   2. 新增页面时漏配 CSP 是**静默失效** —— 没有任何编译期或运行期报错，
  *      只在控制台多两行红字，很容易一直带着。
  *
+ * 本脚本同时守住另一条（同源，都是关于 rpcsdk 的）：
+ *   **页面不得直接 `<script src="../wpsjsrpcsdk.js">`** —— 加载项环境必须走
+ *   `libs/wps-sdk-loader.js` 条件加载。直接引用会让 rpcsdk 在加载项里也去连
+ *   58890/58892，失败重试耗尽后调 `InitWpsCloudSvr()` 另开一个 WebView，
+ *   表现为「多一块黑窗格 + 零日志」（日志在它自己的上下文里，调试器看不到）。
+ *
  * 注意：本项目的 `getApp()` 读的是宿主注入的 `window.Application`，**并不依赖 rpcsdk**
  * （所以功能不会因为这条报错直接挂）。放行的目的是消灭噪音 + 让 rpcsdk 这条通道
  * 在需要它的场景（浏览器唤起 WPS）真正可用。
@@ -77,6 +83,15 @@ for (const page of pages) {
           `"Refused to connect ... violates ... connect-src"`,
       )
     }
+  }
+
+  // rpcsdk 必须走条件加载器，直接在页面里引用会让加载项环境也去连本地服务
+  if (html.includes('../wpsjsrpcsdk.js')) {
+    problems.push(
+      `ui/${page} 直接引用了 ../wpsjsrpcsdk.js —— 加载项环境必须走 ` +
+        `libs/wps-sdk-loader.js 条件加载（宿主已注入 Application，rpcsdk 用不上；` +
+        `加载它会在连不上 58890/58892 后开出一块黑 WebView）`,
+    )
   }
   checkedPages += 1
 }

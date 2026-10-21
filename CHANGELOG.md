@@ -8,20 +8,39 @@
 
 ## [未发布]
 
-### 回退：wpsjs 热更新注入恢复默认开启（2026-10-21）
+### rpcsdk 改为条件加载（消除「黑 WebView + 零日志」链路）（2026-10-21）
+
+7 个页面不再直接 `<script src="../wpsjsrpcsdk.js">`，改为
+`<script src="../libs/wps-sdk-loader.js">`：**仅当 `window.Application` 不存在
+（浏览器直接打开）时才动态插入 rpcsdk**，加载项环境根本不加载。
+
+理由（真机日志提供的证据）：
+
+- rpcsdk 为「浏览器唤起 WPS」服务，启动后向 WPS 客户端本地服务
+  `http://127.0.0.1:58890` / `ws://127.0.0.1:58892` 探测 `/version`；
+- 真机实测 `ws://127.0.0.1:58892/version ... ERR_CONNECTION_REFUSED`
+  （注意：是连不上，不是被 CSP 拦 —— 说明放行已生效、rpcsdk 真的在连）；
+- rpcsdk 的 `onerror` 会按 `tryCount` 重试（源码 `startWpsInnderWebsocket`：
+  1s 一次 setTimeout 重连），重试耗尽后走 **`InitWpsCloudSvr()` 另开一个 WebView 传参**；
+- 那块 WebView 里没有我们的代码 → 表现为「多出一块黑窗格、且任何调试器都看不到
+  它的日志」。这与用户报的症状（右侧黑窗格 + 零日志）吻合。
+- 加载项环境宿主已注入 `window.Application`，本项目 `getApp()` 读的就是它，
+  **不依赖 rpcsdk**，所以不加载没有任何功能损失。
+
+`check:csp` 门禁新增一条防回归：页面不得直接引用 `../wpsjsrpcsdk.js`
+（已反向验证）。CSP 放行 58890/58891/58892 保留 —— 浏览器调试场景仍需要。
+
+### 回退再恢复：wpsjs 热更新注入开关（2026-10-21）
 
 上一轮为消除 `Main resource content verification failed` 而「默认关闭
-`hot-update-inject.js` 注入」，真机上出现**整个插件卡住、调试器都不出日志**。
-按「忽略弹窗」方案回退：注入恢复为默认开启，patch 回到**只补响应头**
-（`Content-Type` 补 charset + 补 `Content-Length`）的状态。
+`hot-update-inject.js` 注入」，真机上出现**整个插件卡住、调试器都不出日志**，
+于是先回退（注入恢复默认开启，patch 回到只补响应头的状态）。
 
-`Main resource content verification failed` 这条红字会回来 —— 它是 WPS 宿主
-对「主资源内容被改写」的提示，官方确认无功能影响，页面本身加载正常。
-
-**保留**的改动：CSP 放行 WPS 本地服务端口（`check:csp` 门禁在位）。
-**若回退后仍卡**，下一步候选是这一项（放行后 rpcsdk 才真的去连 58890）；
-届时可单独回退，或直接在页面里去掉 `wpsjsrpcsdk.js` 引用（本项目
-`getApp()` 读宿主注入的 `window.Application`，并不依赖 rpcsdk）。
+**回退后问题依旧，嫌疑排除**：真机日志显示页面完整初始化
+（`initializeEnrichPage 完成`、按钮已启用）、功能正常，卡顿/黑屏照旧。
+故**关闭注入的开关已恢复**（`WPSJS_HOT_UPDATE=1` 可开回注入），
+`Main resource content verification failed` 这条红字属**无害提示**——它是宿主对
+「主资源内容被改写」的提示，官方确认无功能影响。
 
 ### 目标工作表拆成两级：先选工作簿、再选工作表（2026-10-21）
 
