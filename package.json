@@ -8,8 +8,9 @@
   },
   "scripts": {
     "dev": "npm run build:ts && vite --port 5173",
-    "build": "vite build",
+    "build": "npm run clean:ts && npm run build:ts && vite build",
     "build:ts": "tsc --project tsconfig.build.json",
+    "clean:ts": "node scripts/clean-dist-ts.mjs",
     "debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
     "lint": "eslint ts tests --fix",
     "lint:check": "eslint ts tests",
