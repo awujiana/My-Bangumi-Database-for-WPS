@@ -25,27 +25,27 @@ import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initializeConditionalFormatPage } from './conditional-format-page.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
+import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js'
 
 if (typeof document !== 'undefined') {
+  // ---- 零 COM 首屏：以下全部是纯 DOM，绝不碰 Application / PluginStorage ----
   installActionButtonsGate('[BGM ConditionalFormat]')
+  // 降级兜底：撞上宿主初始化窗口时插「点此继续初始化」按钮（见 tools/com-ready.ts）
+  installComStartupFallback('conditionalFormat')
+  setupDetachablePanels()
 
-  // DOM 就绪后初始化条件格式管理页面
-  const onConditionalFormatReady = (): void => {
-    initializeConditionalFormatPage()
-    // 跨页导航模式同步：设置页勾选「导航仅显示图标」后本页跟随切换
+  // 开闸门：只注册 load / rAF / setTimeout，本身不发任何 COM
+  openComGate('conditionalFormat')
+
+  // ---- COM 分片：initializeConditionalFormatPage 里有工作簿/工作表枚举等同步 COM ----
+  const startPolling = (): void => {
     startNavModeSync()
-    // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
     startNavOrderSync('conditional-format')
-    // 模块折叠 / 隐藏：注入右上折叠按钮 + 应用状态 + 轮询跨页同步
     startModuleStateSync('conditional-format')
-    // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
-    // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
     startPaneHeartbeat('conditionalFormat')
-    setupDetachablePanels()
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onConditionalFormatReady)
-  } else {
-    onConditionalFormatReady()
-  }
+  runComPhases('conditionalFormat', [
+    { name: '初始化条件格式页', run: initializeConditionalFormatPage },
+    { name: '启动轮询', run: startPolling },
+  ])
 }

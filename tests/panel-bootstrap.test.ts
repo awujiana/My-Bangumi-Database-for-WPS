@@ -112,6 +112,21 @@ function mountActionButtons(count = 2): HTMLButtonElement[] {
   return buttons
 }
 
+/** 派发 window.load（闸门等待的生命周期事件） */
+function signalLoad(): void {
+  window.dispatchEvent(new Event('load'))
+}
+
+/**
+ * 推进时钟直到「宿主 COM 就绪闸门」开启并排空分片队列
+ *
+ * 各 bootstrap 的 COM 初始化现在都过闸门（load → 两帧 → 800ms → 逐片跑），
+ * 所以断言「初始化函数被调用」前必须先让闸门开、队列排空。
+ */
+async function drainComGate(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(3000)
+}
+
 /** 在 window 上派发一个带自定义 target 的事件（资源加载失败监听靠 target 分辨类型） */
 function dispatchWindowEvent(type: string, target: EventTarget): void {
   const event = new Event(type)
@@ -161,6 +176,7 @@ describe('panel-bootstrap', () => {
 
   it('启动外壳导航与跨页同步，页标识为 panel', async () => {
     await import('../ts/panel/panel-bootstrap.js')
+    await drainComGate()
 
     expect(stubs.initializeShellNav).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('panel')
@@ -292,6 +308,7 @@ describe('settings-bootstrap', () => {
 describe('enrich-bootstrap', () => {
   it('装配主题、跨页同步与导航（页标识 enrich）', async () => {
     await import('../ts/panel/enrich-bootstrap.js')
+    await drainComGate()
 
     expect(stubs.initializeTheme).toHaveBeenCalledTimes(1)
     expect(stubs.startThemeSync).toHaveBeenCalledTimes(1)
@@ -302,19 +319,22 @@ describe('enrich-bootstrap', () => {
     expect(stubs.installModalA11y).toHaveBeenCalledTimes(1)
   })
 
-  it('document 已就绪 → 立即初始化富化页', async () => {
+  it('document 已就绪 → 闸门开启后初始化富化页', async () => {
     await import('../ts/panel/enrich-bootstrap.js')
+    await drainComGate()
 
     expect(stubs.initializeEnrichPage).toHaveBeenCalledTimes(1)
   })
 
-  it('document 仍在加载 → 等 DOMContentLoaded 再初始化', async () => {
+  it('document 仍在加载 → 等 load 事件开闸门后才初始化', async () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
 
     await import('../ts/panel/enrich-bootstrap.js')
+    await drainComGate()
     expect(stubs.initializeEnrichPage).not.toHaveBeenCalled()
 
-    document.dispatchEvent(new Event('DOMContentLoaded'))
+    signalLoad()
+    await drainComGate()
     expect(stubs.initializeEnrichPage).toHaveBeenCalledTimes(1)
   })
 
@@ -353,8 +373,9 @@ describe('clean-bootstrap', () => {
     expect(hasConsoleOutput('log', '[BGM Clean] 模块加载完成，按钮已启用')).toBe(true)
   })
 
-  it('document 已就绪 → 立即初始化清理页并启动三个跨页同步（页标识 clean）', async () => {
+  it('document 已就绪 → 闸门开启后初始化清理页并启动三个跨页同步（页标识 clean）', async () => {
     await import('../ts/panel/clean-bootstrap.js')
+    await drainComGate()
 
     expect(stubs.initializeCleanPage).toHaveBeenCalledTimes(1)
     expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
@@ -362,13 +383,15 @@ describe('clean-bootstrap', () => {
     expect(stubs.startModuleStateSync).toHaveBeenCalledWith('clean')
   })
 
-  it('document 仍在加载 → 等 DOMContentLoaded 再初始化', async () => {
+  it('document 仍在加载 → 等 load 事件开闸门后才初始化', async () => {
     Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
 
     await import('../ts/panel/clean-bootstrap.js')
+    await drainComGate()
     expect(stubs.initializeCleanPage).not.toHaveBeenCalled()
 
-    document.dispatchEvent(new Event('DOMContentLoaded'))
+    signalLoad()
+    await drainComGate()
     expect(stubs.initializeCleanPage).toHaveBeenCalledTimes(1)
     expect(stubs.startNavOrderSync).toHaveBeenCalledWith('clean')
   })

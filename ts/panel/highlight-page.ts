@@ -44,6 +44,7 @@ import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
+import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 // ===== 配置键（PluginStorage，跨会话缓存）=====
@@ -632,13 +633,16 @@ function reloadSheet(): void {
   renderColumnList()
 }
 
-export function initializeHighlightPage(): void {
+/**
+ * 分片 1：恢复配置 + 主题（含 PluginStorage 读，属跨进程调用，必须过 COM 闸门）
+ *
+ * 不做工作表读取 —— 那是本页最重的 COM，单独放分片 3，避免它一卡把整页拖死。
+ */
+function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
-  initializeShellNav()
   initializeTheme()
   startThemeSync()
 
-  // 恢复缓存配置
   const mode = getConfig(KEY_MODE, 'auto', true)
   state.mode = mode === 'manual' ? 'manual' : 'auto'
   const manual = getConfig(KEY_MANUAL, '', true)
@@ -646,10 +650,11 @@ export function initializeHighlightPage(): void {
   if (manualMatch) {
     state.manual = { year: Number(manualMatch[1]), month: Number(manualMatch[2]) }
   }
-
   buildManualSelectors()
-  reloadSheet()
+}
 
+/** 分片 2：事件接线 + 启用按钮（纯 DOM，零 COM） */
+function highlightPhaseBind(): void {
   // 事件接线（直接用元素引用，不绕 event.target）
   const sourceSelect = selectById('highlightSource')
   sourceSelect?.addEventListener('change', () => {
@@ -685,8 +690,43 @@ export function initializeHighlightPage(): void {
     if (watchBox.checked) setAutoWatch(true)
   }
 
-  refreshPreview()
-
-  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
+  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底。
+  // 放在数据读取**之前** —— 宿主初始化窗口可能让后续分片推迟，但按钮必须能用。
   notifyModulesReady()
+}
+
+/** 分片 3：读工作表（getDataSheet + 表头/列映射 —— 中等 COM 量） */
+function highlightPhaseSheet(): void {
+  reloadSheet()
+}
+
+/** 分片 4：渲染预览（大 Range 读 —— 本页最重的 COM，放最后，卡了也不影响按钮） */
+function highlightPhasePreview(): void {
+  refreshPreview()
+}
+
+/**
+ * 高亮页初始化分片（顺序即依赖顺序，越重的越靠后）
+ *
+ * 为什么要拆片：`initializeHighlightPage` 一次性跑完时，里面的同步 COM
+ * （getDataSheet / Range.Read / PluginStorage）全部落在宿主「新窗格 → attach →
+ * COM 桥建好」的初始化窗口里，实测把 WPS 主线程卡 70 秒（宿主与渲染进程互锁死等，
+ * 直到 JSAPI 桥看门狗超时）。拆片后每片之间让出主线程，且单片超时即停止自动初始化、
+ * 降级为「点此继续」按钮（见 tools/com-ready.ts）。
+ */
+export function createHighlightPagePhases(): ComPhase[] {
+  return [
+    { name: '恢复配置', run: highlightPhaseConfig },
+    { name: '事件接线', run: highlightPhaseBind },
+    { name: '读取工作表', run: highlightPhaseSheet },
+    { name: '渲染预览', run: highlightPhasePreview },
+  ]
+}
+
+/** 一次性跑完所有分片（供测试 / 非窗格场景使用；窗格页面请走 runComPhases） */
+export function initializeHighlightPage(): void {
+  initializeShellNav()
+  for (const phase of createHighlightPagePhases()) {
+    phase.run()
+  }
 }

@@ -34,37 +34,36 @@ import { startNavOrderSync } from '../tools/nav-order.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initializeEnrichPage } from './enrich-page.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
+import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js'
 
 if (typeof document !== 'undefined') {
-  // 应用外观主题（深色 / 浅色 / 跟随系统）
-  initializeTheme()
-  // 跨页主题同步：监听其他页面（panel / settings）的主题变更并重应用
-  startThemeSync()
-  // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
-  startNavModeSync()
-
-  // 外壳导航：吸顶偏移测量（--topbar-h / --nav-h）+ 侧栏滚动高亮
+  // ---- 零 COM 首屏：以下全部是纯 DOM，绝不碰 Application / PluginStorage ----
+  installActionButtonsGate('[BGM Enrich]')
+  // 降级兜底：撞上宿主初始化窗口时插「点此继续初始化」按钮（见 tools/com-ready.ts）
+  installComStartupFallback('enrich')
   initializeShellNav()
-  // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
-  startNavOrderSync('enrich')
-  // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
-  startModuleStateSync('enrich')
-  // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
-  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
-  startPaneHeartbeat('enrich')
   setupDetachablePanels()
-
-  // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）
   installModalA11y()
 
-  installActionButtonsGate('[BGM Enrich]')
+  // 开闸门：只注册 load / rAF / setTimeout，本身不发任何 COM
+  openComGate('enrich')
 
-  // DOM 就绪后初始化富化页面
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeEnrichPage()
-    })
-  } else {
-    initializeEnrichPage()
+  // ---- COM 分片：initializeEnrichPage 里有工作簿枚举 / 表头识别等同步 COM ----
+  const startPolling = (): void => {
+    startNavModeSync()
+    startNavOrderSync('enrich')
+    startModuleStateSync('enrich')
+    startPaneHeartbeat('enrich')
   }
+  runComPhases('enrich', [
+    {
+      name: '主题与导航',
+      run: () => {
+        initializeTheme()
+        startThemeSync()
+      },
+    },
+    { name: '初始化富化页', run: initializeEnrichPage },
+    { name: '启动轮询', run: startPolling },
+  ])
 }

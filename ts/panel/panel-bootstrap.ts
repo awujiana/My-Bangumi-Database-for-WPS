@@ -32,6 +32,7 @@ import { installActionButtonsGate } from './action-buttons-gate.js'
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
+import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -61,14 +62,26 @@ installActionButtonsGate('[BGM]')
 // ========== 外壳导航（吸顶偏移测量 + 滚动高亮） ==========
 // 逻辑已抽到 shell-nav.ts 由三页面共享；此处调用统一初始化。
 if (typeof window !== 'undefined') {
+  // 降级兜底：撞上宿主初始化窗口时插「点此继续初始化」按钮（见 tools/com-ready.ts）
+  installComStartupFallback('panel')
   initializeShellNav()
-  // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
-  startNavOrderSync('panel')
-  // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
-  startModuleStateSync('panel')
-  // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
-  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
-  startPaneHeartbeat('panel')
+  // 以下 start* 全是周期性同步 COM（PluginStorage 读写）：过闸门排队执行，
+  // 避免落在宿主「新窗格 → attach」的初始化窗口里（见 tools/com-ready.ts）
+  openComGate('panel')
+  runComPhases('panel', [
+    {
+      name: '启动轮询',
+      run: () => {
+        // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
+        startNavOrderSync('panel')
+        // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
+        startModuleStateSync('panel')
+        // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+        // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
+        startPaneHeartbeat('panel')
+      },
+    },
+  ])
   setupDetachablePanels()
 }
 

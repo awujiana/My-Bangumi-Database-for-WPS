@@ -29,6 +29,7 @@ import { startPaneHeartbeat } from '../tools/pane-alive.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
+import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -58,8 +59,18 @@ if (typeof document !== 'undefined') {
 
   // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========
   installModalA11y()
+  // 降级兜底：撞上宿主初始化窗口时插「点此继续初始化」按钮（见 tools/com-ready.ts）
+  installComStartupFallback('settings')
   // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
-  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
-  startPaneHeartbeat('settings')
   setupDetachablePanels()
+  // 页面心跳是周期性同步 COM，过闸门排队执行（tools/com-ready.ts）
+  openComGate('settings')
+  runComPhases('settings', [
+    {
+      name: '启动心跳',
+      run: () => {
+        startPaneHeartbeat('settings')
+      },
+    },
+  ])
 }
