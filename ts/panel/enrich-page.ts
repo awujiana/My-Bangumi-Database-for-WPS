@@ -152,7 +152,7 @@ function bindTargetSheetControls(): void {
   if (wbSelect) {
     wbSelect.addEventListener('change', () => {
       // 用户已手动选择：取消自动识别的兜底重试，避免覆盖用户选择
-      cancelEnrichWatchRetries()
+      suppressEnrichAutoSelect()
       refreshSheetList()
       // 切换工作簿时同步锁定状态显示
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
@@ -163,7 +163,7 @@ function bindTargetSheetControls(): void {
   if (sheetSelect) {
     sheetSelect.addEventListener('change', () => {
       // 用户已手动选择：取消自动识别的兜底重试，避免覆盖用户选择
-      cancelEnrichWatchRetries()
+      suppressEnrichAutoSelect()
       selectTargetSheet()
       // 切换工作表时同步锁定状态显示
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
@@ -752,15 +752,47 @@ function checkBangumiAutoDetectRecords(): void {
 // 命中任一项即刷新工作簿列表并重新识别目标表，无需用户手动点击「刷新」。
 
 const ENRICH_WATCH_INTERVAL_MS = 2000
-const ENRICH_WATCH_MAX_RETRY = 3
 
 let enrichWatchTimer: number | null = null
-/** 剩余兜底重试次数（用户手动选择/解锁后置 0，避免覆盖用户意图） */
-let enrichWatchRetriesLeft = ENRICH_WATCH_MAX_RETRY
+/**
+ * 上一轮的工作簿集合签名（Count + 各簿名 + 活动簿名）。
+ * 轮询每 2s 只做这次**便宜的读取**（Count 次 `Name` 读取，无全量扫描），
+ * 签名没变就什么都不做 —— 旧版「未识别就盲重试 3 次全量扫描」每轮都是
+ * refreshWorkbookList + autoSelectEnrichTarget + refreshSheetList 的完整
+ * COM 往返（真机日志：打开页面连扫 5 轮），是页面卡顿的来源之一。
+ * 签名变化才全量识别，且**永不过期**：旧版重试次数用完后就再也不自动识别了，
+ * 现在用户稍后打开目标工作簿仍会被自动识别到。
+ */
+let lastWorkbookSignature: string | null = null
+/**
+ * 用户已手动选择 / 主动解锁：自动识别只同步列表、不再选表（避免覆盖用户意图）。
+ * 由 `suppressEnrichAutoSelect()` 置位（原「取消兜底重试」的等价物 ——
+ * 兜底重试机制移除后，防覆盖语义由本标志承担）。
+ */
+let isAutoSelectSuppressed = false
 
-/** 取消自动识别的兜底重试（用户已手动选择目标或主动解锁时调用） */
-function cancelEnrichWatchRetries(): void {
-  enrichWatchRetriesLeft = 0
+/** 用户已手动选择 / 主动解锁后调用：停止自动选表（保留列表刷新） */
+function suppressEnrichAutoSelect(): void {
+  isAutoSelectSuppressed = true
+}
+
+/**
+ * 读工作簿集合签名：只读 Count 与各簿 `Name`（Count 提出循环，守 com-in-loop），
+ * 不碰工作表内容 —— 成本比全量识别低一个数量级。
+ */
+function readWorkbookSignature(app: ReturnType<typeof getApp> | null): string {
+  const workbooks = app?.Workbooks
+  const count = workbooks?.Count ?? 0
+  const names: string[] = []
+  for (let index = 1; index <= count; index += 1) {
+    try {
+      names.push((workbooks?.Item(index) as { Name?: string } | undefined)?.Name ?? '?')
+    } catch {
+      names.push('?')
+    }
+  }
+  const activeName = app?.ActiveWorkbook?.Name ?? ''
+  return `${String(count)}|${names.join(',')}|${activeName}`
 }
 
 /** 刷新工作簿列表并重新自动识别目标表（已锁定时仅同步列表与引用） */
@@ -774,14 +806,17 @@ function recheckEnrichTarget(reason: string): void {
     return
   }
 
-  const result = autoSelectEnrichTarget(
-    'workbookSelect',
-    'sheetSelect',
-    'lockSheetBtn',
-    'lockStatus',
-  )
+  // 用户已手动选择 / 解锁过：只同步列表，不自动选（避免覆盖用户意图）
+  const isAutoSelectAllowed = !isAutoSelectSuppressed && !state.bangumiSheet
+  const result = isAutoSelectAllowed
+    ? autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    : null
   refreshSheetList()
   selectTargetSheet()
+  if (result === null) {
+    bgmLog(LOG_LEVELS.INFO, `[enrich] ${reason}：用户已手动选择，跳过自动识别`)
+    return
+  }
   bgmLog(
     LOG_LEVELS.INFO,
     `[enrich] ${reason}：目标表自动识别结果=${result}（${describeOpenWorkbooks()}）`,
@@ -793,43 +828,19 @@ function startEnrichWorkbookWatch(): void {
   if (typeof window === 'undefined') return
   if (enrichWatchTimer !== null) return
 
-  const app = getApp()
-  let lastWorkbookCount = app?.Workbooks?.Count ?? 0
-  let lastActiveWorkbookName = app?.ActiveWorkbook?.Name ?? null
-
-  /**
-   * 判断本轮是否需要重新识别，返回用于日志的原因；无需处理返回 null。
-   * 会顺带更新基线（count / 活动工作簿名 / 剩余重试次数）。
-   */
-  const takeRecheckReason = (count: number, activeName: string | null): string | null => {
-    if (count !== lastWorkbookCount) {
-      lastWorkbookCount = count
-      lastActiveWorkbookName = activeName
-      return `检测到工作簿数量变化（${String(count)} 个）`
-    }
-
-    if (activeName !== lastActiveWorkbookName) {
-      lastActiveWorkbookName = activeName
-      return `检测到活动工作簿切换（${activeName ?? '无'}）`
-    }
-
-    // 兜底重试：页面刚打开时集合可能未就绪，未锁定且尚未识别到目标表时再扫几次
-    if (enrichWatchRetriesLeft > 0 && !BGM.sheet.isLocked && !state.bangumiSheet) {
-      enrichWatchRetriesLeft -= 1
-      return `目标表尚未识别，重试扫描（剩余 ${String(enrichWatchRetriesLeft)} 次）`
-    }
-
-    return null
-  }
+  // 基线取**启动时**的签名：首轮不再扫（initializeEnrichPage 刚扫过一次）。
+  // 「集合未就绪」场景下签名会在就绪后变化，自然触发一次全量识别 ——
+  // 覆盖旧版盲重试的场景，且没有「3 次用完就再也不自动识别」的死角。
+  lastWorkbookSignature = readWorkbookSignature(getApp())
 
   const pollOnce = (): void => {
     try {
       const currentApp = getApp()
-      const reason = takeRecheckReason(
-        currentApp?.Workbooks?.Count ?? 0,
-        currentApp?.ActiveWorkbook?.Name ?? null,
-      )
-      if (reason) recheckEnrichTarget(reason)
+      const signature = readWorkbookSignature(currentApp)
+      // 签名没变 → 本轮什么都不做（这是卡顿修复的核心：不再每 2s 全量扫描）
+      if (signature === lastWorkbookSignature) return
+      lastWorkbookSignature = signature
+      recheckEnrichTarget(`检测到工作簿集合变化（${String(currentApp?.Workbooks?.Count ?? 0)} 个）`)
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
@@ -980,7 +991,7 @@ function toggleSheetLock(): void {
     selectTargetSheet()
   } else {
     // 用户主动解锁：取消自动识别的兜底重试，避免立刻又被自动锁定回去
-    cancelEnrichWatchRetries()
+    suppressEnrichAutoSelect()
     state.bangumiSheet = null
   }
 }

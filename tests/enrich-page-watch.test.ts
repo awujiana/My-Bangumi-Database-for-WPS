@@ -351,7 +351,7 @@ describe('enrich-page · 工作簿变化监听', () => {
 
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringContaining('检测到工作簿数量变化'),
+      expect.stringContaining('检测到工作簿集合变化'),
     )
     expect(m.refreshEnrichWorkbooks).toHaveBeenCalledWith('workbookSelect')
     expect(m.refreshEnrichSheets).toHaveBeenCalled()
@@ -390,30 +390,59 @@ describe('enrich-page · 工作簿变化监听', () => {
 
     expect(m.bgmLog).toHaveBeenCalledWith(
       expect.anything(),
-      expect.stringContaining('检测到活动工作簿切换'),
+      expect.stringContaining('检测到工作簿集合变化'),
     )
     expect(m.refreshEnrichWorkbooks).toHaveBeenCalled()
   })
 
-  it('未锁定且尚未识别到目标表 → 兜底重试 3 次后不再处理', async () => {
+  it('签名没变 → 本轮什么都不做（卡顿修复核心：不再每 2s 全量扫描）', async () => {
     const session = await bootWatch({ Workbooks: { Count: 1 }, ActiveWorkbook: null })
     vi.clearAllMocks()
-    // 数量与活动工作簿都没变、state 里也没有目标表 → 每轮都命中「重试扫描」
+    // 数量、各簿名、活动工作簿全都一致 → 签名一致
     m.getApp.mockReturnValue({ Workbooks: { Count: 1 }, ActiveWorkbook: null })
 
     session.poll()
     session.poll()
     session.poll()
 
-    expect(m.refreshEnrichWorkbooks).toHaveBeenCalledTimes(3)
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('剩余 2 次'))
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('剩余 1 次'))
-    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('剩余 0 次'))
-
-    // 重试次数用尽 → 本轮无事可做
-    vi.clearAllMocks()
-    session.poll()
     expect(m.refreshEnrichWorkbooks).not.toHaveBeenCalled()
+    expect(m.autoSelectEnrichTarget).not.toHaveBeenCalled()
+  })
+
+  it('数量没变但工作簿名变了（同数换簿）→ 也要重新识别', async () => {
+    const session = await bootWatch({
+      Workbooks: { Count: 1, Item: () => ({ Name: '旧.xlsx' }) },
+      ActiveWorkbook: null,
+    })
+    vi.clearAllMocks()
+
+    m.getApp.mockReturnValue({
+      Workbooks: { Count: 1, Item: () => ({ Name: '新.xlsx' }) },
+      ActiveWorkbook: null,
+    })
+    session.poll()
+
+    expect(m.refreshEnrichWorkbooks).toHaveBeenCalled()
+    expect(m.autoSelectEnrichTarget).toHaveBeenCalled()
+  })
+
+  it('用户已手动选择（suppress）→ 集合变化时只同步列表，不再自动选', async () => {
+    const session = await bootWatch({ Workbooks: { Count: 1 }, ActiveWorkbook: null })
+    // 模拟用户手动点过下拉（触发 suppress）
+    // 模拟用户手动点过工作簿下拉（initializeEnrichPage 已绑定 change → suppress）
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+    wbSelect?.dispatchEvent(new Event('change'))
+    vi.clearAllMocks()
+
+    m.getApp.mockReturnValue({ Workbooks: { Count: 2 }, ActiveWorkbook: null })
+    session.poll()
+
+    expect(m.refreshEnrichWorkbooks).toHaveBeenCalled()
+    expect(m.autoSelectEnrichTarget).not.toHaveBeenCalled()
+    expect(m.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('用户已手动选择，跳过自动识别'),
+    )
   })
 
   it('轮询时取宿主抛错 → 记警告且不冒泡', async () => {

@@ -8,6 +8,38 @@
 
 ## [未发布]
 
+### 富化页工作簿监听收敛：签名对比替代全量扫描（2026-10-21）
+
+`startEnrichWorkbookWatch` 原来**每 2 秒全量扫一遍工作簿**（逐簿逐表读取 +
+完整识别），工作簿多时对 COM 的压力可感知（与真机「卡顿」症状同期出现）。
+现改为**签名对比**：
+
+- `readWorkbookSignature(app)` 只读 `Workbooks.Count` + 各簿 `Name` +
+  活动簿名，拼成 `${count}|${names}|${active}`——成本比全量识别低一个数量级
+  （Count 提出循环外，守 com-in-loop 门禁）；
+- 签名没变 → 本轮**什么都不做**（这是卡顿修复的核心：不再每 2s 全量扫描）；
+- 签名变了（数量、簿名、活动簿任一变化）→ 触发一次完整刷新与自动识别；
+- 移除旧版 `ENRICH_WATCH_MAX_RETRY` 3 次盲重试兜底：改由「集合未就绪时签名
+  会在就绪后变化，自然触发一次识别」覆盖，且没有「3 次用完就再也不自动识别」
+  的死角；
+- 新增 `isAutoSelectSuppressed` 防覆盖语义：用户手动选过表 / 主动解锁后，
+  监听只同步列表，**不再自动选表覆盖用户意图**。
+
+### 窄任务窗格适配（<400px）+ 视口自愈（2026-10-21）
+
+用户截图显示窄窗格（约 185px）下内容挤成竖条、右侧大片黑区。处理两层：
+
+1. **CSS 兜底**（`css/panel-theme.css`）：`@media (max-width: 400px)` 下
+   收紧区块内边距，`.bgm-btn-row` / `.conditional-format-sheet-row` /
+   `.stat-grid` / `.command-actions` 换行堆叠，按钮 `flex:1 1 100%`，
+   表格改块级横向滚动；7 个页面共用。
+2. **视口自愈**（`libs/fit-viewport.js`，7 页注入）：检测
+   `window.innerWidth` 与 `documentElement.clientWidth` 偏差 ≥24px（宿主
+   缩放/viewport 污染场景）时重写 `meta viewport`，并挂 resize + 1s 兜底轮询。
+
+无头 Chrome 实测（最小窗宽 485px）clean/panel/enrich 三页 0 横向溢出
+（`scripts/probe-overflow.mjs` 为诊断工具，保留备用）。
+
 ### rpcsdk 改为条件加载（消除「黑 WebView + 零日志」链路）（2026-10-21）
 
 7 个页面不再直接 `<script src="../wpsjsrpcsdk.js">`，改为

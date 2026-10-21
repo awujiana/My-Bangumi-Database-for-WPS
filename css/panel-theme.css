@@ -1251,6 +1251,39 @@ select.input option,
   }
 }
 
+/* 极窄任务窗格（用户可把 WPS 窗格拖到 ~200px）：这里的目标不是好看，
+   是**不横向溢出** —— 任何固定 min-width / 不换行的行容器在 200px 下都会
+   把页面撑出横向滚动条，用户要左右拖才能看完一块卡片。 */
+@media (max-width: 400px) {
+  .section {
+    padding: 10px;
+  }
+  /* 行容器统一允许换行：按钮行 / 下拉行 / 统计条在极窄下各占一行 */
+  .bgm-btn-row,
+  .conditional-format-sheet-row,
+  .stat-grid,
+  .command-actions {
+    flex-wrap: wrap;
+  }
+  .command-actions .bgm-btn {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  /* 数据表 / 预览表在极窄下横向滚动（局部滚动优于撑破整页） */
+  .preview-table,
+  .conditional-format-table {
+    display: block;
+    overflow-x: auto;
+  }
+  /* 顶栏品牌副标题在 620px 已隐藏，极窄下把主标题也收紧 */
+  .topbar {
+    padding: 8px 10px;
+  }
+  .brand-title {
+    font-size: 14px;
+  }
+}
+
 /* ============================ 14. 降低动效偏好 ========================== */
 @media (prefers-reduced-motion: reduce) {
   * {
