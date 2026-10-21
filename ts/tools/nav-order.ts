@@ -346,12 +346,6 @@ export function notifyNavOrderChanged(page: string): void {
  * @param page - 当前页面键
  */
 export function startNavOrderSync(page: string): void {
-  // 临时实验开关：停掉周期性同步 COM 轮询（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  )
-    return
   if (typeof window === 'undefined' || typeof setTimeout !== 'function') return
   // 启动时先应用一次，避免首屏闪回默认顺序
   applyNavOrder(page)

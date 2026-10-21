@@ -63,13 +63,6 @@ export function restoreUserInfoFromStorage(): void {
  * 因此 Panel 需要定期从 PluginStorage 读取最新数据并更新 UI。
  */
 export function startUserInfoPolling(): void {
-  // 临时实验开关：停掉周期性同步 COM 轮询（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  ) {
-    return
-  }
   let lastUserId = BGM.cache.userId ?? null
   let lastUsername = BGM.cache.username ?? null
   let lastToken = loadBgToken()

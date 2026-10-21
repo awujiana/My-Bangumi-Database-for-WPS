@@ -64,13 +64,6 @@ export function saveTheme(mode: string): boolean {
  * 各页面入口（panel / settings / enrich）在启动时调用一次。
  */
 export function startThemeSync(): void {
-  // 临时实验开关（freeze-probe 读取 PluginStorage.fp_quiet 后置位）：
-  // 停掉所有周期性同步 COM 轮询，验证「渲染进程↔宿主同步 IPC 死锁」假设
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  )
-    return
   if (typeof window === 'undefined' || typeof setInterval !== 'function') return
   let lastApplied = resolveTheme(getTheme(true))
   const timer = setInterval(() => {

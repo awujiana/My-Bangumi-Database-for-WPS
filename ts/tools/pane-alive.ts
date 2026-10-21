@@ -64,12 +64,6 @@ export function startPaneHeartbeat(
   intervalMs: number = DEFAULT_INTERVAL_MS,
 ): void {
   if (typeof window === 'undefined') return
-  // 临时实验开关：停掉心跳的周期性同步 COM 写入（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  )
-    return
   if (startedPages.has(pageKey)) return
   startedPages.add(pageKey)
 

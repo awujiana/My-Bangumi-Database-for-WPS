@@ -357,12 +357,6 @@ function rawSnapshot(): string {
  * @returns 清理函数（清除定时器）
  */
 export function startModuleStateSync(page: string): () => void {
-  // 临时实验开关：停掉周期性同步 COM 轮询（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  )
-    return noopCleanup
   if (typeof window === 'undefined') return noopCleanup
   bindCollapseToggles()
   applyModuleState(page)

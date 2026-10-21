@@ -27,12 +27,6 @@ function applyNavMode(isEnabled: boolean): void {
  * 变化时切换 body.nav-icons-only 类并重测导航布局。
  */
 export function startNavModeSync(): void {
-  // 临时实验开关：停掉周期性同步 COM 轮询（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  )
-    return
   if (typeof window === 'undefined' || typeof setInterval !== 'function') return
   let wasEnabled = areNavIconsOnly(true)
   applyNavMode(wasEnabled)

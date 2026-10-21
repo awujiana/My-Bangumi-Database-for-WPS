@@ -136,13 +136,6 @@ let _configPollingTimer: ReturnType<typeof setInterval> | null = null
  * 确保双边同步延迟在 2 秒以内。
  */
 function startRibbonConfigPolling(): void {
-  // 临时实验开关：停掉周期性同步 COM 轮询（见 freeze-probe 的 fp_quiet）
-  if (
-    typeof window !== 'undefined' &&
-    (window as unknown as { __FP_QUIET__?: boolean }).__FP_QUIET__ === true
-  ) {
-    return
-  }
   // 防止重复启动
   if (_configPollingTimer) return
 
