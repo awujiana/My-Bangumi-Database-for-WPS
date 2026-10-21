@@ -316,3 +316,160 @@
   flex: 1;
   min-width: 100px;
 }
+
+/* =====================================================================
+   既有规则表格（对标 WPS 规则管理器，列 = #/类型/格式/应用于/公式/为真则停/操作）
+   用 CSS Grid 而不是 <table>：表格要支持「行内可编辑控件 + 换行不跳动」，
+   grid 的行列对齐比 table 更好控，且列宽可以用 minmax(0,1fr) 做省略号截断。
+   ===================================================================== */
+.conditional-format-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  overflow: hidden;
+  background: var(--bg-1, transparent);
+}
+
+/* 行：7 列网格。序号/格式/停止/操作固定宽，范围与公式吃剩余空间 */
+.conditional-format-table .conditional-format-row {
+  display: grid;
+  grid-template-columns: 34px minmax(72px, 0.9fr) 58px minmax(110px, 1.1fr) minmax(140px, 1.6fr) 46px 96px;
+  gap: var(--sp-2, 6px);
+  align-items: center;
+  padding: 6px var(--sp-2, 6px);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.conditional-format-table .conditional-format-row:last-child {
+  border-bottom: none;
+}
+
+.conditional-format-table .conditional-format-row:hover {
+  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+}
+
+.conditional-format-row-head {
+  color: var(--text-3);
+  font-weight: 600;
+  background: var(--bg-2, rgba(255, 255, 255, 0.03));
+  pointer-events: none;
+}
+
+/* 插件无法重建的类型：整行降透明度 + 左侧警示条，扫一眼就知道哪些不能导 */
+.conditional-format-row-foreign {
+  opacity: 0.72;
+  box-shadow: inset 2px 0 0 var(--warn, #d97706);
+}
+
+.conditional-format-col-index {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.conditional-format-col-type {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-1);
+}
+
+.conditional-format-tag-warn {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--warn-bg, rgba(217, 119, 6, 0.18));
+  color: var(--warn, #d97706);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.conditional-format-col-range,
+.conditional-format-col-formula {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+.conditional-format-col-formula {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.conditional-format-col-stop {
+  display: flex;
+  justify-content: center;
+}
+
+.conditional-format-col-stop input:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.conditional-format-col-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+.conditional-format-col-actions button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.conditional-format-col-actions button:hover {
+  background: var(--bg-3, rgba(255, 255, 255, 0.1));
+  color: var(--text-1);
+}
+
+.conditional-format-col-actions button[data-action='delete']:hover {
+  color: var(--danger, #ef4444);
+}
+
+/* 格式预览：填充块 + 右下角字体色小条（WPS 只显示填充） */
+.conditional-format-table .conditional-format-swatch {
+  position: relative;
+  width: 26px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.conditional-format-swatch-font {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+}
+
+/* 分页条 */
+.conditional-format-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2, 6px);
+  margin-top: var(--sp-2, 6px);
+  min-height: 24px;
+}
+
+.conditional-format-pager:empty {
+  display: none;
+}
+
+.conditional-format-pager-label {
+  color: var(--text-3);
+  font-size: 12px;
+}
