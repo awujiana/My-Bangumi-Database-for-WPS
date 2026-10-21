@@ -28,6 +28,7 @@ import '../entry/panel-entry.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initializeShellNav } from './shell-nav.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
+import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 
@@ -64,6 +65,8 @@ if (typeof window !== 'undefined') {
   startNavOrderSync('panel')
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
   startModuleStateSync('panel')
+  // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+  setupDetachablePanels()
 }
 
 // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========

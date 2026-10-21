@@ -46,10 +46,14 @@ import {
   buildForeignRuleHeadHtml,
   buildForeignRuleRowHtml,
   filterForeignRuleRows,
+  filterRowsByScope,
   fcTypeLabel,
   paginate,
+  selectionSummary,
   toForeignRuleRows,
+  toggleSelection,
 } from './conditional-format-table.js'
+import { createDetachablePanel } from '../ui/components/detachable-panel.js'
 import {
   applyConditionalFormatPlan,
   checkFormatConditionsReadable,
@@ -122,6 +126,20 @@ interface PageState {
   existingQuery: string
   /** 既有规则表格的当前页码（1 基） */
   existingPage: number
+  /**
+   * 既有规则表格的选中集合（1 基序号）
+   *
+   * 跨筛选 / 翻页保持：用户在第 2 页勾的规则，翻回第 1 页仍然勾着。
+   * 换工作表或重新读取时清空（序号是「那张表」的序号，换了表就失效）。
+   */
+  existingSelection: Set<number>
+  /**
+   * 「显示其格式规则」范围：整表 / 当前选择（对齐 WPS 原生下拉）
+   *
+   * 当前选择 = 只列 AppliesTo 与选区相交的规则。选区取不到时退化为整表
+   * 并在表格上方提示（不静默显示全部，否则用户以为「选择里没规则」）。
+   */
+  existingScope: 'all' | 'selection'
 }
 
 const state: PageState = {
@@ -137,6 +155,8 @@ const state: PageState = {
   existingError: null,
   existingQuery: '',
   existingPage: 1,
+  existingSelection: new Set<number>(),
+  existingScope: 'all',
 }
 
 // ===== DOM 辅助 =====
@@ -289,7 +309,9 @@ function loadExistingRules(): void {
     state.existing = []
     state.existingError = `读取失败：${(error as Error).message}`
   }
-  // 换表 / 重读后回到第一页：留在越界页会看到空列表，用户会以为规则没了
+  // 换表 / 重读后：选中集合作废（序号是「那张表」的序号，换表即失效），
+  // 不停留在越界页码（否则看到空列表，用户会以为规则没了）
+  state.existingSelection = new Set<number>()
   state.existingPage = 1
   renderExistingRules()
 }
@@ -338,25 +360,89 @@ function renderExistingRulesInner(container: HTMLElement): void {
     return
   }
 
-  const rows = toForeignRuleRows(state.existing)
-  const matched = filterForeignRuleRows(rows, state.existingQuery)
-  const page = paginate(matched, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
+  const rows = toForeignRuleRows(state.existing, state.existingSelection)
+  const searched = filterForeignRuleRows(rows, state.existingQuery)
+  // 「显示其格式规则」= 当前选择时，还要按选区再筛一层。
+  // 选区地址读不到（没选区 / 宿主不暴露）时退化为整表，并在计数里说明 ——
+  // 不静默显示全部，否则用户会以为「我框的这条列上真没有规则」。
+  const selectionRange = state.existingScope === 'selection' ? currentSelectionRange() : ''
+  const scoped = filterRowsByScope(searched, state.existingScope, selectionRange)
+  const page = paginate(scoped, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
   // 分页后页码可能被收敛（删掉一页里的全部规则后），回写 state 让翻页按钮用同一页
   state.existingPage = page.page
 
-  const hiddenByFilter = state.existing.length - matched.length
+  const hiddenByFilter = state.existing.length - scoped.length
   setText(
     'conditionalFormatExistingCount',
     `${String(state.existing.length)} 条${
-      hiddenByFilter > 0 ? `（筛出 ${String(matched.length)} 条）` : ''
+      hiddenByFilter > 0
+        ? `（筛出 ${String(scoped.length)} 条${
+            selectionRange === '' && state.existingScope === 'selection'
+              ? '，未读到选区，已按整表显示'
+              : ''
+          }）`
+        : ''
     }`,
   )
 
   // 一次 innerHTML 写入（表头 + 本页行）；行内事件在容器上委托，见 handleExistingTableClick
-  container.innerHTML = `${buildForeignRuleHeadHtml()}${page.items
+  const summary = selectionSummary(page.items)
+  container.innerHTML = `${buildForeignRuleHeadHtml(summary.isAllSelected)}${page.items
     .map((row) => buildForeignRuleRowHtml(row))
     .join('')}`
+
+  // 全选复选框的三态：HTML 属性表达不了「部分选中」，必须走 DOM property。
+  // 漏了这一步，半选时全选框显示未勾选，用户会以为「什么都没选」。
+  const selectAll = container.querySelector<HTMLInputElement>('input[data-action="select-all"]')
+  if (selectAll) selectAll.indeterminate = summary.isSomeSelected
+
+  renderExistingBatchBar()
   renderExistingPagination(page.page, page.pageCount)
+  // 浮动窗口顶栏的 ↑↓ / 删除要跟随选中数放开 / 禁用：
+  // 按钮在 DOM 搬家范围之外，只能在这里统一同步（渲染的终点）。
+  syncFloatToolbarState()
+}
+
+/** 浮动窗口顶栏按钮的可用性（选中数为 0 时 ↑↓ / 删除禁用） */
+function syncFloatToolbarState(): void {
+  const hasSelection = state.existingSelection.size > 0
+  const setDisabled = (id: string): void => {
+    const button = byId(id)
+    if (button instanceof HTMLButtonElement) button.disabled = !hasSelection
+  }
+  setDisabled('conditionalFormatFloatUp')
+  setDisabled('conditionalFormatFloatDown')
+  setDisabled('conditionalFormatFloatDelete')
+}
+
+/**
+ * 渲染批量操作条（选中 N 条时才出现）
+ *
+ * 没有选中时整条隐藏：平时屏幕上只留「全选」一个入口，不添乱。
+ * 按钮全部 `data-batch-action`，与表格行内按钮一样走容器事件委托。
+ */
+function renderExistingBatchBar(): void {
+  const bar = byId('conditionalFormatExistingBatchBar')
+  if (!bar) return
+  const selectedCount = state.existingSelection.size
+  if (selectedCount === 0) {
+    bar.replaceChildren()
+    bar.classList.remove('is-visible')
+    return
+  }
+  bar.classList.add('is-visible')
+  const selectedIndices = [...state.existingSelection].sort((a, b) => a - b)
+  const rebuildableCount = selectedIndices.filter((index) => {
+    const snapshot = state.existing[index - 1]
+    return snapshot?.kind === 'expression' && snapshot.formula !== ''
+  }).length
+  bar.innerHTML = `
+    <span class="conditional-format-batch-count">已选 ${String(selectedCount)} 条</span>
+    <button type="button" class="bgm-btn small" data-batch-action="import" ${
+      rebuildableCount === 0 ? 'disabled' : ''
+    } title="${rebuildableCount === 0 ? '所选规则里没有可导入的公式类规则' : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
+    <button type="button" class="bgm-btn small danger" data-batch-action="delete" title="从工作表删除所选规则">✕ 批量删除</button>
+    <button type="button" class="bgm-btn small" data-batch-action="clear" title="取消选择">取消选择</button>`
 }
 
 /** 渲染既有规则表格的分页条（页码 + 上下页） */
@@ -377,7 +463,7 @@ function renderExistingPagination(current: number, pageCount: number): void {
     }>下一页 ›</button>`
 }
 
-// ===== 既有规则的行内操作 =====
+// ===== 既有规则的行内操作与批量操作 =====
 
 /**
  * 既有规则表格的事件委托
@@ -396,6 +482,14 @@ function handleExistingTableClick(event: MouseEvent): void {
     renderExistingRules()
     return
   }
+
+  // 批量操作条（在表格容器外，但同属这个浮动面板，故一并在这里分流）
+  const batchButton = target.closest<HTMLButtonElement>('[data-batch-action]')
+  if (batchButton) {
+    handleBatchAction(batchButton.dataset.batchAction ?? '')
+    return
+  }
+
   const button = target.closest<HTMLButtonElement>('button[data-action]')
   if (!button) return
   const row = button.closest<HTMLElement>('[data-row-index]')
@@ -425,10 +519,174 @@ function handleExistingTableClick(event: MouseEvent): void {
   }
 }
 
-/** 既有规则表格里勾选「如果为真则停止」 */
+/** 批量操作条的分流（导入 / 删除 / 取消选择） */
+function handleBatchAction(action: string): void {
+  switch (action) {
+    case 'import': {
+      batchImportForeignRules()
+      break
+    }
+    case 'delete': {
+      batchDeleteForeignRules()
+      break
+    }
+    case 'clear': {
+      state.existingSelection = new Set<number>()
+      renderExistingRules()
+      break
+    }
+    default: {
+      break
+    }
+  }
+}
+
+/**
+ * 批量导入所选既有规则到规则库
+ *
+ * 不可导入的（数据条 / 色阶等）逐条跳过并在结果里报数——不静默丢，
+ * 否则用户以为 10 条全导进来了，实际只进了 3 条。
+ */
+function batchImportForeignRules(): void {
+  const indices = [...state.existingSelection].sort((a, b) => a - b)
+  const imported: ConditionalFormatRule[] = []
+  let skipped = 0
+  for (const index of indices) {
+    const snapshot = state.existing[index - 1]
+    // 用条件包裹而非 continue（项目禁 continue）：snapshot 缺失说明序号越界，
+    // 跳过这条继续处理其余选中项
+    if (snapshot) {
+      const rule = foreignSnapshotToRule(snapshot, nextId)
+      if (rule) imported.push(rule)
+      else skipped += 1
+    }
+  }
+  if (imported.length === 0) {
+    showToast('所选规则里没有可导入的公式类规则', 'warn')
+    return
+  }
+  state.rules = [...state.rules, ...imported]
+  persistRules()
+  renderRuleList()
+  state.existingSelection = new Set<number>()
+  renderExistingRules()
+  showToast(
+    `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条类型不支持，已跳过）` : ''}`,
+    skipped > 0 ? 'info' : 'success',
+  )
+}
+
+/**
+ * 批量删除所选既有规则
+ *
+ * ⚠️ **必须倒序删**：删除单条会让后续规则的序号整体前移（`Item(i)` 变成 `Item(i-1)`）。
+ * 正序删会「删着删着就错位」——第 3 条删掉后，原来的第 5 条变成第 4 条，
+ * 而循环手里的 i 已经走到 5，于是删错了对象（真机踩过这个坑）。
+ * 倒序（从大下标往小下标）则被删项后面的序号不受影响。
+ */
+function batchDeleteForeignRules(): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const indices = [...state.existingSelection].sort((a, b) => b - a)
+  let succeeded = 0
+  const failures: string[] = []
+  for (const index of indices) {
+    const result = deleteForeignRule(entry.worksheet, index)
+    if (result.ok) succeeded += 1
+    else failures.push(`第 ${String(index)} 条：${result.error}`)
+  }
+  state.existingSelection = new Set<number>()
+  if (failures.length > 0) {
+    showToast(
+      `已删除 ${String(succeeded)} 条，${String(failures.length)} 条失败（${failures[0] ?? '未知原因'}）`,
+      'error',
+    )
+  } else {
+    showToast(`已删除 ${String(succeeded)} 条规则`, 'success')
+  }
+  loadExistingRules()
+}
+
+/**
+ * 取当前选区的 A1 地址（「显示其格式规则 = 当前选择」用）
+ *
+ * 读不到返回空串：调用方据此退化为整表并在计数上说明，不静默显示全部。
+ */
+function currentSelectionRange(): string {
+  const entry = selectedSheet()
+  if (!entry) return ''
+  try {
+    const app = getApp() as { Selection?: { Address?: string } } | null
+    const address = app?.Selection?.Address
+    return typeof address === 'string' ? address : ''
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * 批量调整所选规则优先级
+ *
+ * ⚠️ **必须倒序**（与批量删除同理）：移动会改变其余规则的下标，正序走着就错位。
+ * 每次只移动一格：`-1` = 把所选规则逐条顶到最高优先级，`+1` = 逐条压到最低。
+ * 跨多条的精确排序需要反复重排，代价高且易错，先不做。
+ */
+function batchMoveForeignRules(direction: -1 | 1): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const indices = [...state.existingSelection].sort((a, b) => b - a)
+  let succeeded = 0
+  let failed = 0
+  for (const index of indices) {
+    const result = moveForeignRule(entry.worksheet, index, direction)
+    if (result.ok) succeeded += 1
+    else failed += 1
+  }
+  if (failed > 0) {
+    showToast(`已调整 ${String(succeeded)} 条，${String(failed)} 条失败`, 'error')
+  } else if (succeeded > 0) {
+    showToast(
+      `已把 ${String(succeeded)} 条规则${direction === -1 ? '提前' : '置后'}（每次一格）`,
+      'success',
+    )
+  }
+  loadExistingRules()
+}
+
+/**
+ * 既有规则表格里的 checkbox 变化（三处：选中单行 / 全选 / 如果为真则停止）
+ *
+ * 同一容器上按 `data-action` 分流，避免给每种 checkbox 各绑一个监听器。
+ */
 function handleExistingTableChange(event: Event): void {
   const target = event.target as HTMLInputElement | null
-  if (target?.dataset.action !== 'stop') return
+  if (!target) return
+
+  if (target.dataset.action === 'select') {
+    const row = target.closest<HTMLElement>('[data-row-index]')
+    const index = Number(row?.dataset.rowIndex ?? '0')
+    if (!Number.isSafeInteger(index) || index < 1) return
+    // 不可变更新：改原 Set 会让「上一次渲染的旧行模型」与当前 state 指向同一对象
+    state.existingSelection = toggleSelection(state.existingSelection, index, target.checked)
+    renderExistingRules()
+    return
+  }
+
+  if (target.dataset.action === 'select-all') {
+    // 全选只作用于**当前可见页**（翻页不跨页全选）：347 条规则里「全选」通常
+    // 指「这一屏我都不要了」，跨页全选反而危险（一删就是 347 条）。
+    const rows = toForeignRuleRows(state.existing, state.existingSelection)
+    const visible = filterForeignRuleRows(rows, state.existingQuery)
+    const page = paginate(visible, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
+    const next = new Set(state.existingSelection)
+    if (target.checked) for (const row of page.items) next.add(row.index)
+    else for (const row of page.items) next.delete(row.index)
+    state.existingSelection = next
+    renderExistingRules()
+    return
+  }
+
+  if (target.dataset.action !== 'stop') return
   const row = target.closest<HTMLElement>('[data-row-index]')
   const index = Number(row?.dataset.rowIndex ?? '0')
   if (!Number.isSafeInteger(index) || index < 1) return
@@ -990,8 +1248,14 @@ export function initializeConditionalFormatPage(): void {
     state.existingPage = 1
     renderExistingRules()
   })
-  byId('conditionalFormatExistingList')?.addEventListener('click', handleExistingTableClick)
-  byId('conditionalFormatExistingList')?.addEventListener('change', handleExistingTableChange)
+  // 委托绑在 **panel** 上而不是表格上：批量操作条在表格容器外，
+  // 且表格节点会在「正文」与「浮动窗口」之间搬家（appendChild 不丢监听器，
+  // 但绑在表格上就意味着批量条要另绑一份——绑父节点一次覆盖两者）。
+  byId('conditionalFormatExistingPanel')?.addEventListener('click', handleExistingTableClick)
+  byId('conditionalFormatExistingPanel')?.addEventListener('change', handleExistingTableChange)
+
+  // 浮动「规则管理器」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
+  setupExistingDetachable()
 
   // 规则操作
   byId('conditionalFormatNewRuleBtn')?.addEventListener('click', () => {
@@ -1041,4 +1305,55 @@ export function initializeConditionalFormatPage(): void {
 
   // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
   notifyModulesReady()
+}
+
+// ===== 「既有规则」拖出为浮动「规则管理器」窗口 =====
+
+/**
+ * 把「既有规则」区注册成可拖出面板（复用通用组件 detachable-panel，见 UI 组件目录）
+ *
+ * 这里只做三件本页特有的事，拖动 / 缩放 / 收起 / 最大化 / Esc 全在组件里：
+ *   1. 复用正文里已有的「🔍 规则管理器」按钮作触发器（不另注入 ⧉，避免两个入口）；
+ *   2. 挂上本页专属工具条（「显示其格式规则」下拉 + ↑↓ + 删除）；
+ *   3. 拖出时重渲染一次，确保窗口里是当前工作表的快照。
+ *
+ * **为什么搬的是整个 section 而不是里面的面板**：组件统一按「区块」搬家，
+ * 这样搜索框、计数、分页跟着一起走，不会出现「窗口里有表格但没搜索框」。
+ * 正文侧仍是同一份 DOM —— 页面代码照旧 `byId('conditionalFormatExistingList')` 读写，
+ * 这就是「原页面在变化」：不是同步两份视图，是本来就只有一份。
+ */
+function setupExistingDetachable(): void {
+  const section = byId('sec-existing')
+  const scopeSelect = selectById('conditionalFormatFloatScope')
+
+  // 「显示其格式规则」：整表 / 当前选择。
+  // 当前选择 = 只显示 AppliesTo 与选区相交的规则 —— 用户框了一列想看
+  // 「这条列上挂了哪些条件」时不用在 347 条里翻。
+  scopeSelect?.addEventListener('change', () => {
+    state.existingScope = scopeSelect.value === 'selection' ? 'selection' : 'all'
+    state.existingPage = 1
+    renderExistingRules()
+  })
+
+  // ↑↓ / 删除：与批量条同一套实现，只是入口不同（WPS 原生的按钮位）
+  byId('conditionalFormatFloatUp')?.addEventListener('click', () => {
+    batchMoveForeignRules(-1)
+  })
+  byId('conditionalFormatFloatDown')?.addEventListener('click', () => {
+    batchMoveForeignRules(1)
+  })
+  byId('conditionalFormatFloatDelete')?.addEventListener('click', () => {
+    batchDeleteForeignRules()
+  })
+
+  if (!section) return
+  createDetachablePanel(section, {
+    title: '条件格式规则管理器',
+    width: 860,
+    height: 560,
+    toolbar: byId('conditionalFormatFloatToolbar'),
+    trigger: byId('conditionalFormatFloatBtn'),
+    // 拖出时重渲染一次：用户可能已经切过工作表，窗口里不能是旧表的快照
+    onDetach: renderExistingRules,
+  })
 }

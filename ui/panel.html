@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/diff.css" />
   </head>
   <body data-page="panel">
@@ -131,7 +132,7 @@
       <!-- ===================== 主区 ===================== -->
       <main class="main main-grid">
         <!-- 核心操作指令中心（视觉焦点） -->
-        <section class="command-center" id="sec-command" aria-label="核心操作">
+        <section class="command-center" id="sec-command" data-detachable aria-label="核心操作">
           <div class="command-head">
             <div class="command-title">开始同步</div>
             <div class="command-desc">
@@ -155,7 +156,7 @@
         </section>
 
         <!-- 账户与凭证 -->
-        <section class="section" id="sec-account">
+        <section class="section" id="sec-account" data-detachable>
           <h3>
             🔑 账户与凭证<button
               type="button"
@@ -219,7 +220,7 @@
         </section>
 
         <!-- 同步范围与选择 -->
-        <section class="section" id="sec-scope">
+        <section class="section" id="sec-scope" data-detachable>
           <h3>
             🎯 同步范围与选择<button
               type="button"
@@ -325,7 +326,7 @@
         </section>
 
         <!-- 同步策略 -->
-        <section class="section" id="sec-strategy">
+        <section class="section" id="sec-strategy" data-detachable>
           <h3>
             ⚖️ 同步策略<button
               type="button"
@@ -352,7 +353,7 @@
         </section>
 
         <!-- 远程数据同步 -->
-        <section class="section" id="sec-remote">
+        <section class="section" id="sec-remote" data-detachable>
           <h3>
             🗄️ 数据同步（远程仓库 → 本地）<button
               type="button"
@@ -698,7 +699,7 @@
         </section>
 
         <!-- 数据预览 -->
-        <section class="section" id="sec-preview">
+        <section class="section" id="sec-preview" data-detachable>
           <h3>
             👁️ 数据预览 <span id="previewCount"></span
             ><button
@@ -738,7 +739,7 @@
         </section>
 
         <!-- 记录与日志 -->
-        <section class="section" id="sec-records">
+        <section class="section" id="sec-records" data-detachable>
           <h3>
             📊 记录与日志<button
               type="button"
@@ -824,7 +825,7 @@
         </section>
 
         <!-- 帮助与格式 -->
-        <section class="section" id="sec-help">
+        <section class="section" id="sec-help" data-detachable>
           <h3>
             📖 帮助与格式<button
               type="button"

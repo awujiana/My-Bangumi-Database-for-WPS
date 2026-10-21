@@ -24,6 +24,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 
 import { startNavModeSync } from '../tools/nav-mode.js'
+import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initializeCleanPage } from './clean-page.js'
@@ -41,6 +42,8 @@ if (typeof document !== 'undefined') {
     startNavOrderSync('clean')
     // 模块折叠 / 隐藏：注入右上折叠按钮 + 应用状态 + 轮询跨页同步
     startModuleStateSync('clean')
+    // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+    setupDetachablePanels()
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', onCleanReady)

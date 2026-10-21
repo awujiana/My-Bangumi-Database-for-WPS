@@ -63,20 +63,177 @@ export interface ForeignRuleRow {
   formula: string
   /** 「如果为真则停止」；undefined = 宿主未暴露该属性 */
   stopIfTrue?: boolean
+  /** 是否被选中（多选） */
+  selected: boolean
 }
 
-/** 快照 → 行模型（序号由数组下标推，保证与 FormatConditions.Item 一致） */
-export function toForeignRuleRows(snapshots: readonly ForeignRuleSnapshot[]): ForeignRuleRow[] {
-  return snapshots.map((snapshot, position) => ({
-    index: position + 1,
-    typeLabel: fcTypeLabel(snapshot.type, snapshot.kind),
-    rebuildable: snapshot.kind === 'expression',
-    ...(snapshot.interior !== undefined && { fillColor: snapshot.interior }),
-    ...(snapshot.fontColor !== undefined && { fontColor: snapshot.fontColor }),
-    range: snapshot.range || '（未读到范围）',
-    formula: snapshot.formula,
-    ...(snapshot.stopIfTrue !== undefined && { stopIfTrue: snapshot.stopIfTrue }),
-  }))
+/**
+ * 快照 → 行模型（序号由数组下标推，保证与 FormatConditions.Item 一致）
+ *
+ * @param selection 已选中的 1 基序号集合（跨筛选 / 翻页保持：用户在第 2 页选的，
+ *   翻回第 1 页仍然勾着 —— 这是多选的基本预期，做不到就是 bug）
+ */
+export function toForeignRuleRows(
+  snapshots: readonly ForeignRuleSnapshot[],
+  selection: ReadonlySet<number> = new Set(),
+): ForeignRuleRow[] {
+  return snapshots.map((snapshot, position) => {
+    const index = position + 1
+    return {
+      index,
+      typeLabel: fcTypeLabel(snapshot.type, snapshot.kind),
+      rebuildable: snapshot.kind === 'expression',
+      ...(snapshot.interior !== undefined && { fillColor: snapshot.interior }),
+      ...(snapshot.fontColor !== undefined && { fontColor: snapshot.fontColor }),
+      range: snapshot.range || '（未读到范围）',
+      formula: snapshot.formula,
+      ...(snapshot.stopIfTrue !== undefined && { stopIfTrue: snapshot.stopIfTrue }),
+      selected: selection.has(index),
+    }
+  })
+}
+
+/**
+ * 当前可见行里「是否全选」与「半选」（全选复选框的三态）
+ *
+ * 半选用 `indeterminate` 而不是用第三个图标：原生 checkbox 支持该属性，
+ * 且读屏软件能正确播报「部分选中」。
+ */
+export function selectionSummary(visibleRows: readonly ForeignRuleRow[]): {
+  isAllSelected: boolean
+  isSomeSelected: boolean
+} {
+  const selectedCount = visibleRows.filter((row) => row.selected).length
+  return {
+    isAllSelected: visibleRows.length > 0 && selectedCount === visibleRows.length,
+    isSomeSelected: selectedCount > 0 && selectedCount < visibleRows.length,
+  }
+}
+
+/**
+ * 把序号在选中集合里加入 / 移除（返回新集合，不改原集合）
+ *
+ * 不可变：渲染层每次都是 `state.existingSelection = toggleSelection(...)` 再重渲染，
+ * 改原集合会让「上一次渲染的旧行模型」和「当前 state」指向同一个 Set，
+ * 出现「取消了勾选但旧行还显示勾着」的灵异画面。
+ */
+export function toggleSelection(
+  selection: ReadonlySet<number>,
+  index: number,
+  isSelected: boolean,
+): Set<number> {
+  const next = new Set(selection)
+  if (isSelected) next.add(index)
+  else next.delete(index)
+  return next
+}
+
+// ===== 「显示其格式规则」范围筛选 =====
+
+/**
+ * 解析 A1 范围地址为可比较的矩形（绝对引用符 `$` 先剥掉）
+ *
+ * 支持 `A1` / `A1:B9` / `A:A`（整列）/ `1:10`（整行）三种形态；
+ * 解析不了返回 null —— 调用方按「不相交」处理并在 UI 上说明，
+ * 而不是抛错把整张表都藏掉。
+ *
+ * 行 / 列的「0」表示该维度不限：`A:A` 的 row 是 0..0，与任何行范围都算相交。
+ */
+/**
+ * 列字母转列号（A→1，Z→26，AA→27）
+ *
+ * 用 `charCodeAt` 逐字符算而不是 `[...letters]` 展开：展开运算符遇组合字符 / emoji
+ * 会拆成码点，而列字母只可能是 ASCII，逐字符更稳也更快。
+ */
+export function columnNumberOf(letters: string): number {
+  let total = 0
+  for (let index = 0; index < letters.length; index += 1) {
+    total = total * 26 + (letters.codePointAt(index) ?? 0) - 64
+  }
+  return total
+}
+
+/**
+ * 把单元格地址拆成「列字母段 + 行号段」，不是合法形态返回 null
+ *
+ * 不用正则：`^([A-Z]{1,3})?(\d+)?$` 被 ReDoS 扫描判为不安全（可选组里嵌量词），
+ * 而这种地址本来就是逐字符扫描最直白。
+ */
+function splitCellReference(cell: string): { letters: string; digits: string } | null {
+  const upper = cell.toUpperCase()
+  let split = 0
+  while (split < upper.length) {
+    const code = upper.codePointAt(split) ?? 0
+    if (code < 65 || code > 90) break
+    split += 1
+  }
+  const letters = upper.slice(0, split)
+  // 超过 3 位（XFD = 16384 列）不可能是合法列号，早退后再声明 digits
+  if (letters.length > 3) return null
+  const digits = upper.slice(split)
+  for (let index = 0; index < digits.length; index += 1) {
+    const code = digits.codePointAt(index) ?? 0
+    if (code < 48 || code > 57) return null
+  }
+  return { letters, digits }
+}
+
+/** 单元格地址转「行 / 列」坐标；两个维度都缺省说明根本不是地址 */
+function cellToCoordinate(cell: string): { row: number; column: number } | null {
+  const parts = splitCellReference(cell)
+  if (!parts) return null
+  const column = parts.letters === '' ? 0 : columnNumberOf(parts.letters)
+  const row = parts.digits === '' ? 0 : Number(parts.digits)
+  if (column === 0 && row === 0) return null
+  return { row, column }
+}
+
+export function parseRangeRect(
+  range: string,
+): { startRow: number; endRow: number; startColumn: number; endColumn: number } | null {
+  const cleaned = range.replace(/\$/gu, '').trim()
+  if (cleaned === '') return null
+  const [head = '', tail = head] = cleaned.split(':', 2)
+
+  const start = cellToCoordinate(head)
+  const end = cellToCoordinate(tail)
+  if (!start || !end) return null
+  return {
+    startRow: Math.min(start.row, end.row),
+    endRow: Math.max(start.row, end.row),
+    startColumn: Math.min(start.column, end.column),
+    endColumn: Math.max(start.column, end.column),
+  }
+}
+
+/** 两个 A1 范围是否相交（含「整列 / 整行」语义） */
+export function hasRangeOverlap(first: string, second: string): boolean {
+  const a = parseRangeRect(first)
+  const b = parseRangeRect(second)
+  if (!a || !b) return false
+  // 某一边该维度为 0 = 不限，直接算相交
+  const hasRowOverlap =
+    a.startRow === 0 || b.startRow === 0 || (a.startRow <= b.endRow && b.startRow <= a.endRow)
+  const hasColumnOverlap =
+    a.startColumn === 0 ||
+    b.startColumn === 0 ||
+    (a.startColumn <= b.endColumn && b.startColumn <= a.endColumn)
+  return hasRowOverlap && hasColumnOverlap
+}
+
+/**
+ * 按「显示其格式规则」范围筛选行
+ *
+ * `selection` 时只保留 AppliesTo 与选区相交的规则 —— 用户框了一列想看
+ * 「这条列上挂了哪些条件」时不用在 347 条里翻（对齐 WPS 原生下拉）。
+ */
+export function filterRowsByScope(
+  rows: readonly ForeignRuleRow[],
+  scope: 'all' | 'selection',
+  selectionRange: string,
+): ForeignRuleRow[] {
+  if (scope === 'all' || selectionRange === '') return [...rows]
+  return rows.filter((row) => hasRangeOverlap(row.range, selectionRange))
 }
 
 /**
@@ -159,7 +316,10 @@ export function buildForeignRuleRowHtml(row: ForeignRuleRow): string {
       ? `${row.formula.slice(0, FORMULA_PREVIEW_LIMIT)}…`
       : row.formula
   return `
-      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}" data-row-index="${String(row.index)}">
+      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}">
+        <label class="conditional-format-col-check" title="选中后可批量操作（删除 / 导入 / 复制）">
+          <input type="checkbox" data-action="select" ${row.selected ? 'checked' : ''} aria-label="选择第 ${String(row.index)} 条规则" />
+        </label>
         <span class="conditional-format-col-index" title="优先级（靠前先生效）">${String(row.index)}</span>
         <span class="conditional-format-col-type" title="${row.rebuildable ? '公式类：插件可原样重建' : '该类型插件无法重建，应用时会被丢弃或触发降级'}">${escapeHtml(row.typeLabel)}${row.rebuildable ? '' : '<em class="conditional-format-tag-warn">不可重建</em>'}</span>
         ${formatSwatchHtml(row)}
@@ -177,10 +337,18 @@ export function buildForeignRuleRowHtml(row: ForeignRuleRow): string {
       </div>`
 }
 
-/** 表头（与 buildForeignRuleRowHtml 的列一一对应） */
-export function buildForeignRuleHeadHtml(): string {
+/**
+ * 表头（与 buildForeignRuleRowHtml 的列一一对应）
+ *
+ * 全选复选框带 `data-action="select-all"`，`indeterminate` 由页面层在渲染后设置
+ * （HTML 属性表达不了三态，必须走 DOM property）。
+ */
+export function buildForeignRuleHeadHtml(isAllSelected = false): string {
   return `
       <div class="conditional-format-row conditional-format-row-head" aria-hidden="true">
+        <label class="conditional-format-col-check" title="全选 / 取消全选（当前页）">
+          <input type="checkbox" data-action="select-all" ${isAllSelected ? 'checked' : ''} aria-label="全选当前页规则" />
+        </label>
         <span class="conditional-format-col-index">#</span>
         <span class="conditional-format-col-type">类型</span>
         <span class="conditional-format-col-swatch">格式</span>

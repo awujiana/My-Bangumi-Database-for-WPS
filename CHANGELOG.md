@@ -8,6 +8,46 @@
 
 ## [未发布]
 
+### 新组件：任意区块可「拖出」为浮动窗口（detachable panel）（2026-10-21）
+
+用户诉求：弹窗化是**可选项**——默认就在页面上，想放大看时再拖出去；
+且要能应用到所有页面，而不是只给条件格式页做一套。
+
+- **声明式接入**：页面上 `<section id="sec-x" data-detachable>` 一行即可，
+  可选 `data-detachable-title / -trigger / -toolbar / -width / -height`。
+  六个页面 **37 个区块**已全部接入（模块清单由既有 `check:nav-order` 兜底）。
+- **新模块 `ts/ui/components/detachable-panel.ts`**（替代条件格式页专用的
+  `conditional-format-floating.ts`）：拖动 / 缩放 / 最大化 / 收起 / Esc 关闭 /
+  多窗口层叠，几何计算是纯函数（`clampPosition` / `clampSize` / `defaultPanelRect`），
+  Node 直跑单测 13 例。
+- **搬家而非复制**：拖出时把 section 这个 DOM 节点整体搬进窗口，收回时搬回原父节点
+  的**原下一个兄弟**位置。因此页面代码照旧 `getElementById` 读写同一份 DOM，
+  「原页面在变化」不是同步两份视图，是本来就只有一份；事件监听随节点走，
+  搜索词 / 选中集合 / 计数不会出现两份漂移。
+- **正文留占位块**：拖出后原位置插入虚线占位（含「收回」按钮），避免正文突然塌陷
+  一大块让人以为内容丢了。
+- **层级下调到 900**：早先「每开一个窗口 +1」会一路涨过各页 modal-mask 的 1000，
+  确认对话框被压在浮动窗口下面。改为统一 900（低于模态、高于正文），
+  多窗口靠 DOM 顺序叠放，「点谁谁置顶」= 把节点重新 append 到 body 末尾。
+- **条件格式页改为复用组件**：删掉手写的 `#conditionalFormatFloat` 整段 DOM 与
+  对应 CSS，改用 `data-detachable-toolbar` 挂本页专属工具条
+  （显示其格式规则 / ↑↓ / 删除），触发器沿用原有的「🔍 规则管理器」按钮。
+- **新门禁 `check:detachable`**：`data-detachable-trigger / -toolbar` 指向不存在的 id
+  时**静默失效**（按钮点了没反应 / 工具条消失），尺寸写错也静默退回默认值。
+  与项目其它「平行清单」同形态，故同样由门禁兜住，并已在
+  `verify-guards-reverse.mjs` 补反向用例（注入错误 id 必须变红）。
+
+### 修复
+
+- **「显示其格式规则」下拉被注册了两次 `change` 监听**（真 bug）：同一段代码在
+  `setupFloatingManager()` 里重复粘贴了一遍，切一次下拉会重渲染两次。
+  重写为 `setupExistingDetachable()` 时只有一处。
+- **`parseRangeRect` 的正则被 ReDoS 扫描判为不安全**：`^([A-Z]{1,3})?(\d+)?$`
+  是「可选组里嵌量词」。改为逐字符扫描（`codePointAt`），
+  顺带避开了 `[...letters]` 展开字符串的误报。
+- **`rangesIntersect` 改名 `hasRangeOverlap`**、表头参数 `allSelected` 改名
+  `isAllSelected`：布尔命名必须 `is/are/has` 前缀（项目 lint 规则，本次由门禁补上）。
+
 ### 条件格式管理器升级：既有规则从「只读列表」变成「可管理表格」（2026-10-21）
 
 对标 WPS 原生规则管理器并超出：WPS 的「格式规则」窗格只支持新建 / 编辑 / 删除 / 上下移，

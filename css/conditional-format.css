@@ -473,3 +473,96 @@
   color: var(--text-3);
   font-size: 12px;
 }
+
+/* =====================================================================
+   多选列 / 选中行 / 批量操作条
+   ===================================================================== */
+
+/* 行网格从 7 列变 8 列（最前插入 checkbox 列） */
+.conditional-format-table .conditional-format-row {
+  grid-template-columns: 30px 34px minmax(72px, 0.9fr) 58px minmax(110px, 1.1fr) minmax(
+      140px,
+      1.6fr
+    ) 46px 96px;
+}
+
+.conditional-format-col-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.conditional-format-row.is-selected {
+  background: color-mix(in srgb, var(--accent, #4f8cff) 14%, transparent);
+}
+
+.conditional-format-row.is-selected:hover {
+  background: color-mix(in srgb, var(--accent, #4f8cff) 22%, transparent);
+}
+
+.conditional-format-batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  padding: var(--sp-2, 6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 6px);
+  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+}
+
+.conditional-format-batch-bar[hidden] {
+  display: none;
+}
+
+.conditional-format-batch-count {
+  margin-right: auto;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bgm-btn.small.danger {
+  border-color: var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+}
+
+.bgm-btn.small.danger:hover {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
+
+.bgm-btn.small:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* 浮动窗口工具条（对齐 WPS 原生：显示其格式规则 + ↑↓ + 删除）
+   挂在通用浮动窗口「标题栏工具条插槽」里，不再自己占一行。
+   `[hidden]` 必须显式声明：`.detachable-panel-toolbar` 的 display 会盖掉 UA 的
+   `[hidden] { display: none }`，漏了这条工具条会在页面底部露出来。 */
+.conditional-format-float-toolbar {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  min-width: 0;
+}
+
+.conditional-format-float-toolbar[hidden] {
+  display: none;
+}
+
+.conditional-format-float-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.conditional-format-float-spacer {
+  flex: 1 1 auto;
+}

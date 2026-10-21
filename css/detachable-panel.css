@@ -1,0 +1,225 @@
+/**
+ * 可拖出浮动窗口（detachable panel）通用样式
+ *
+ * 设计要点：
+ *  1. **浮动窗口自身提供背景与阴影**，搬进来的 `.section` 要脱掉自己的卡片皮
+ *     （背景 / 外边距 / hover 上浮），否则出现「灰底套灰底」和窗口内悬停抖动。
+ *  2. 最大化靠 `.is-maximized` 的 inset 实现 —— 组件会先清掉内联几何，
+ *     内联样式优先级高于类选择器，不清就撑不开。这也是这里不用 `!important` 的原因。
+ *  3. 拖出后正文原位留 `.detachable-placeholder` 虚线块，避免正文塌陷一大块。
+ *  4. 标题栏 `cursor: move` 提示可拖；`user-select: none` 防拖出蓝块选区。
+ */
+
+/* ===== 区块标题里的「拖出」按钮 ===== */
+.detachable-trigger {
+  margin-left: auto;
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.detachable-trigger:hover {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+  background: var(--bg-surface-2);
+}
+
+/* ===== 拖出后正文原位的占位块 ===== */
+.detachable-placeholder {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: 12px;
+  color: var(--text-3);
+  font-size: var(--fs-small, 13px);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+}
+
+.detachable-placeholder-icon {
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.detachable-placeholder-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.detachable-placeholder-recall {
+  flex: 0 0 auto;
+}
+
+/* ===== 浮动窗口 ===== */
+.detachable-panel {
+  /* 900：低于各页 modal-mask（1000），高于正文（最高 100）。
+     多窗口不抢层级，一律同值，靠 DOM 顺序决定谁在上面。 */
+  position: fixed;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  min-width: 360px;
+  min-height: 200px;
+  overflow: hidden;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.detachable-panel[hidden] {
+  display: none;
+}
+
+/* 拖动 / 缩放中：禁过渡（否则跟手延迟）+ 禁文本选中（否则拖出蓝块） */
+.detachable-panel.is-dragging,
+.detachable-panel.is-resizing {
+  user-select: none;
+  transition: none;
+}
+
+.detachable-panel.is-maximized {
+  left: 2%;
+  top: 2%;
+  width: 96%;
+  height: 96%;
+}
+
+/* ---- 标题栏 ---- */
+.detachable-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  cursor: move;
+  user-select: none;
+}
+
+.detachable-panel-grip {
+  color: var(--text-3);
+  font-size: 13px;
+  letter-spacing: -2px;
+}
+
+.detachable-panel-title {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 工具条插槽：页面把自己的操作条挂进来（条件格式页的「显示其格式规则 / ↑↓ / 删除」） */
+.detachable-panel-toolbar {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.detachable-panel-toolbar:empty {
+  display: none;
+}
+
+.detachable-panel-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.detachable-panel-icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.detachable-panel-icon-btn:hover {
+  color: var(--text-1);
+  background: var(--bg-surface-2);
+}
+
+/* ---- 内容区：唯一滚动容器 ---- */
+.detachable-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--sp-3);
+  overflow: auto;
+}
+
+/* 搬进来的区块脱掉卡片皮，由窗口统一提供背景。
+   三个类名覆盖六页的区块变体：.section（clean / cf / highlight / panel / settings）、
+   .enrich-section（enrich 页）、.command-center（panel 页首屏）。
+   另加一条兜底：任何直接子元素都不留外边距，否则窗口内会多出一圈空白。 */
+.detachable-panel-body > * {
+  margin: 0;
+}
+
+.detachable-panel-body > .section,
+.detachable-panel-body > .enrich-section,
+.detachable-panel-body > .command-center {
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.detachable-panel-body > .section:hover,
+.detachable-panel-body > .enrich-section:hover {
+  /* 窗口内不做「悬停上浮」：一移动鼠标整个内容抖一下 */
+  transform: none;
+}
+
+/* ---- 右下角缩放手柄 ---- */
+.detachable-panel-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 45%,
+    var(--border-strong) 45%,
+    var(--border-strong) 55%,
+    transparent 55%,
+    transparent 70%,
+    var(--border-strong) 70%,
+    var(--border-strong) 80%,
+    transparent 80%
+  );
+}
+
+.detachable-panel.is-collapsed .detachable-panel-body,
+.detachable-panel.is-collapsed .detachable-panel-resize,
+.detachable-panel.is-collapsed .detachable-panel-toolbar {
+  display: none;
+}

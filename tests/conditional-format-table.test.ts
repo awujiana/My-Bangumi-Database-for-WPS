@@ -17,11 +17,17 @@ import {
   FOREIGN_RULE_PAGE_SIZE,
   buildForeignRuleHeadHtml,
   buildForeignRuleRowHtml,
+  columnNumberOf,
   fcTypeLabel,
   filterForeignRuleRows,
+  filterRowsByScope,
   formatSwatchHtml,
+  hasRangeOverlap,
   paginate,
+  parseRangeRect,
+  selectionSummary,
   toForeignRuleRows,
+  toggleSelection,
 } from '../ts/panel/conditional-format-table.js'
 import type { ForeignRuleRow } from '../ts/panel/conditional-format-table.js'
 import type { ForeignRuleSnapshot } from '../ts/panel/conditional-format-rules.js'
@@ -88,6 +94,7 @@ describe('buildForeignRuleRowHtml', () => {
     index: 3,
     typeLabel: '公式',
     rebuildable: true,
+    selected: false,
     range: '$B$3:$B$26958',
     formula: '=$R3="26年10月"',
   }
@@ -148,6 +155,7 @@ describe('formatSwatchHtml', () => {
       index: 1,
       typeLabel: '公式',
       rebuildable: true,
+      selected: false,
       range: 'A1',
       formula: '',
       fillColor: '#00B050',
@@ -163,6 +171,7 @@ describe('formatSwatchHtml', () => {
       index: 1,
       typeLabel: '公式',
       rebuildable: true,
+      selected: false,
       range: 'A1',
       formula: '',
     })
@@ -235,5 +244,142 @@ describe('paginate', () => {
 
   it('最后一页可能不满', () => {
     expect(paginate(items, 7, 50).items).toHaveLength(347 - 6 * 50)
+  })
+})
+
+describe('columnNumberOf', () => {
+  it('单字母 A→1 / Z→26', () => {
+    expect(columnNumberOf('A')).toBe(1)
+    expect(columnNumberOf('Z')).toBe(26)
+  })
+
+  it('双字母 AA→27 / AB→28（26 进制而非简单累加）', () => {
+    expect(columnNumberOf('AA')).toBe(27)
+    expect(columnNumberOf('AB')).toBe(28)
+  })
+
+  it('空串得 0（整行语义的「列不限」）', () => {
+    expect(columnNumberOf('')).toBe(0)
+  })
+})
+
+describe('parseRangeRect', () => {
+  it('普通区域 A1:B9', () => {
+    expect(parseRangeRect('A1:B9')).toEqual({
+      startRow: 1,
+      endRow: 9,
+      startColumn: 1,
+      endColumn: 2,
+    })
+  })
+
+  it('剥掉绝对引用符 $（AppliesTo.Address 常带 $）', () => {
+    expect(parseRangeRect('$B$3:$B$26958')).toEqual({
+      startRow: 3,
+      endRow: 26_958,
+      startColumn: 2,
+      endColumn: 2,
+    })
+  })
+
+  it('整列 A:A → 行维度 0（不限）', () => {
+    const rect = parseRangeRect('A:A')
+    expect(rect?.startRow).toBe(0)
+    expect(rect?.startColumn).toBe(1)
+  })
+
+  it('整行 1:10 → 列维度 0（不限）', () => {
+    const rect = parseRangeRect('1:10')
+    expect(rect?.startColumn).toBe(0)
+    expect(rect?.startRow).toBe(1)
+  })
+
+  it('单个单元格视为 1×1 区域', () => {
+    expect(parseRangeRect('C7')).toEqual({
+      startRow: 7,
+      endRow: 7,
+      startColumn: 3,
+      endColumn: 3,
+    })
+  })
+
+  it('倒着写的区域 B9:A1 归一化（Excel 偶尔返回这种）', () => {
+    expect(parseRangeRect('B9:A1')?.startRow).toBe(1)
+    expect(parseRangeRect('B9:A1')?.endColumn).toBe(2)
+  })
+
+  it('解析不了的返回 null（调用方按不相交处理，不抛错）', () => {
+    expect(parseRangeRect('')).toBeNull()
+    expect(parseRangeRect('???')).toBeNull()
+    expect(parseRangeRect('AAAA1')).toBeNull()
+  })
+})
+
+describe('hasRangeOverlap', () => {
+  it('相交', () => {
+    expect(hasRangeOverlap('A1:C9', 'B5:D12')).toBe(true)
+  })
+
+  it('不相交', () => {
+    expect(hasRangeOverlap('A1:A9', 'B1:B9')).toBe(false)
+  })
+
+  it('整列 B:B 的行维度不限（任何行号都算相交）', () => {
+    expect(hasRangeOverlap('B:B', 'B5:C6')).toBe(true)
+    expect(hasRangeOverlap('B:B', 'B99999')).toBe(true)
+  })
+
+  it('整列仍受列维度约束：B:B 与 C 列不相交', () => {
+    expect(hasRangeOverlap('B:B', 'C1:C9')).toBe(false)
+  })
+
+  it('任一解析失败时按不相交处理（不能把整表藏掉）', () => {
+    expect(hasRangeOverlap('A1:B2', 'not-a-range')).toBe(false)
+  })
+})
+
+describe('toggleSelection', () => {
+  it('选中与取消都不改原集合（不可变，避免渲染拿到脏引用）', () => {
+    const before = new Set([1, 2])
+    const after = toggleSelection(before, 3, true)
+    expect(before.has(3)).toBe(false)
+    expect(after.has(3)).toBe(true)
+    expect(toggleSelection(after, 3, false).has(3)).toBe(false)
+    expect(toggleSelection(after, 3, true).size).toBe(3)
+  })
+})
+
+describe('selectionSummary', () => {
+  it('空集合 → 全未选', () => {
+    expect(selectionSummary([])).toEqual({ isAllSelected: false, isSomeSelected: false })
+  })
+
+  it('部分选中 → 全选 false、部分 true（表头要显示半选态）', () => {
+    const rows = toForeignRuleRows([snapshot(), snapshot()], new Set([1]))
+    expect(selectionSummary(rows)).toEqual({ isAllSelected: false, isSomeSelected: true })
+  })
+
+  it('全部选中 → 全选 true', () => {
+    const rows = toForeignRuleRows([snapshot(), snapshot()], new Set([1, 2]))
+    expect(selectionSummary(rows).isAllSelected).toBe(true)
+  })
+})
+
+describe('filterRowsByScope', () => {
+  const rows = toForeignRuleRows([
+    snapshot({ range: '$B$3:$B$26958' }),
+    snapshot({ range: '$D$1:$D$20' }),
+  ])
+
+  it('scope=all 时原样返回', () => {
+    expect(filterRowsByScope(rows, 'all', 'B10')).toHaveLength(2)
+  })
+
+  it('scope=selection 时只留与选区相交的', () => {
+    expect(filterRowsByScope(rows, 'selection', 'B10')).toHaveLength(1)
+  })
+
+  it('读不到选区时按整表返回（不能把表清空）', () => {
+    expect(filterRowsByScope(rows, 'selection', '')).toHaveLength(2)
   })
 })

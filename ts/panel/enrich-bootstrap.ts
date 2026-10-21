@@ -26,6 +26,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import { initializeShellNav } from './shell-nav.js'
+import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 
@@ -47,6 +48,8 @@ if (typeof document !== 'undefined') {
   startNavOrderSync('enrich')
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
   startModuleStateSync('enrich')
+  // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+  setupDetachablePanels()
 
   // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）
   installModalA11y()

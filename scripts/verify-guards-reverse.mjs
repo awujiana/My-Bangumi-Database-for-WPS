@@ -156,6 +156,20 @@ const CASES = [
     expectInOutput: ['dist-ts/core/crypto.js', 'dist-ts/ 下没有这个文件'],
   },
   {
+    id: 'detachable-contract',
+    label: 'data-detachable-toolbar 指向不存在的 id → 窗口标题栏少一条工具条，静默不报错',
+    check: 'scripts/check-detachable.mjs',
+    mutations: [
+      {
+        file: 'ui/conditional-format.html',
+        mode: 'literal',
+        from: 'data-detachable-toolbar="conditionalFormatFloatToolbar"',
+        to: 'data-detachable-toolbar="conditionalFormatFloatToolbarTypo"',
+      },
+    ],
+    expectInOutput: ['conditionalFormatFloatToolbarTypo', '指向不存在的 id'],
+  },
+  {
     id: 'cycles',
     label: '新增 import 环（logger ↔ log-buffer）→ 顶层跨模块读取的 TDZ 风险',
     check: 'scripts/check-import-cycles.mjs',
