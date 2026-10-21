@@ -218,7 +218,7 @@ import {
   findSheetInWorkbook,
   findBangumiTargetSheets,
   findBangumiTargetSheetInWorkbook,
-  LOCKED_SHEET_KEY,
+  lockedSheetKey,
 } from '../ts/tools/locked-sheet.js'
 import {
   refreshEnrichWorkbooks,
@@ -291,6 +291,10 @@ function setupScanMocks(): void {
   })
 }
 
+/** panel 页默认键（各页独立键：bgm_locked_sheet_panel） */
+const KEY = lockedSheetKey('panel')
+const ENRICH_KEY = lockedSheetKey('enrich')
+
 // ============ 场景 1: saveLockedSheet / clearLockedSheet ============
 describe('saveLockedSheet / clearLockedSheet', () => {
   it('保存锁定信息到 PluginStorage（统一 key）', () => {
@@ -300,27 +304,43 @@ describe('saveLockedSheet / clearLockedSheet', () => {
 
     saveLockedSheet({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' })
 
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe(
+    expect(storage._store[KEY]).toBe(
       JSON.stringify({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }),
+    )
+  })
+
+  it('各页独立键：enrich 的锁不覆盖 panel 的锁', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage()
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    saveLockedSheet({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }, 'panel')
+    saveLockedSheet({ index: 2, name: 'Sheet1', workbookName: 'wb1.xlsx' }, 'enrich')
+
+    expect(storage._store[lockedSheetKey('panel')]).toBe(
+      JSON.stringify({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }),
+    )
+    expect(storage._store[lockedSheetKey('enrich')]).toBe(
+      JSON.stringify({ index: 2, name: 'Sheet1', workbookName: 'wb1.xlsx' }),
     )
   })
 
   it('传入 null 时清除持久化数据', () => {
     const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
+      [KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
     })
     setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
 
     saveLockedSheet(null)
 
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[KEY]).toBe('')
   })
 
   it('clearLockedSheet 重置 BGM.sheet 并清除持久化', () => {
     const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
+      [KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
     })
     setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
     sharedBGM.sheet.isLocked = true
@@ -334,7 +354,7 @@ describe('saveLockedSheet / clearLockedSheet', () => {
     expect(sharedBGM.sheet.lockedIndex).toBeNull()
     expect(sharedBGM.sheet.lockedName).toBeNull()
     expect(sharedBGM.sheet.lockedWorkbookName).toBeNull()
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[KEY]).toBe('')
   })
 
   it('PluginStorage 不可用时记录警告且不抛错', () => {
@@ -353,7 +373,7 @@ describe('restoreLockedSheet', () => {
   it('成功恢复锁定状态到 BGM.sheet', () => {
     const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
+      [KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
     })
     setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
 
@@ -378,7 +398,7 @@ describe('restoreLockedSheet', () => {
   it('锁定的工作簿不存在时清除状态', () => {
     const workbooks = createMockWorkbooks([{ Name: 'other.xlsx', Sheets: ['Sheet1'] }])
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
+      [KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
     })
     setMockApp(createMockApp(workbooks, 'other.xlsx', storage))
 
@@ -386,19 +406,19 @@ describe('restoreLockedSheet', () => {
 
     expect(isRestored).toBe(false)
     expect(sharedBGM.sheet.isLocked).toBe(false)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[KEY]).toBe('')
   })
 
   it('JSON 数据损坏时清除状态', () => {
     const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({ [LOCKED_SHEET_KEY]: 'invalid-json{{{' })
+    const storage = createMockPluginStorage({ [KEY]: 'invalid-json{{{' })
     setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
 
     const isRestored = restoreLockedSheet()
 
     expect(isRestored).toBe(false)
     expect(sharedBGM.sheet.isLocked).toBe(false)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[KEY]).toBe('')
   })
 
   it('PluginStorage 不可用时返回 false', () => {
@@ -448,7 +468,7 @@ describe('getLockedSheet / getLockedEnrichSheet', () => {
 
     expect(result).toBeNull()
     expect(sharedBGM.sheet.isLocked).toBe(false)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[KEY]).toBe('')
   })
 
   it('锁定的工作表不存在时清除锁状态', () => {
@@ -810,7 +830,7 @@ describe('toggleEnrichWorkbookLock', () => {
     expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
     expect(sharedBGM.sheet.lockedName).toBe('TargetSheet')
     expect(sharedBGM.sheet.lockedIndex).toBe(2)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
+    expect(storage._store[ENRICH_KEY]).toBeTruthy()
     expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
@@ -820,7 +840,7 @@ describe('toggleEnrichWorkbookLock', () => {
     sharedBGM.sheet.lockedName = 'TargetSheet'
     sharedBGM.sheet.lockedIndex = 2
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":2,"name":"TargetSheet","workbookName":"wb1.xlsx"}',
+      [ENRICH_KEY]: '{"index":2,"name":"TargetSheet","workbookName":"wb1.xlsx"}',
     })
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
@@ -842,7 +862,7 @@ describe('toggleEnrichWorkbookLock', () => {
     expect(sharedBGM.sheet.isLocked).toBe(false)
     expect(sharedBGM.sheet.lockedWorkbookName).toBeNull()
     expect(sharedBGM.sheet.lockedIndex).toBeNull()
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[ENRICH_KEY]).toBe('')
     expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
@@ -859,7 +879,7 @@ describe('toggleEnrichWorkbookLock', () => {
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     wbSelect.value = ''
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
-    expect(storage._store[LOCKED_SHEET_KEY]).toBeUndefined()
+    expect(storage._store[ENRICH_KEY]).toBeUndefined()
   })
 
   it('DOM 元素不存在时不抛错', () => {
@@ -926,7 +946,7 @@ describe('lockEnrichWorkbookByName', () => {
     expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
     expect(sharedBGM.sheet.lockedName).toBe('Target')
     expect(sharedBGM.sheet.lockedIndex).toBe(2)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
+    expect(storage._store[ENRICH_KEY]).toBeTruthy()
   })
 
   it('工作簿不存在 / 索引越界返回 false', () => {
@@ -962,7 +982,7 @@ describe('autoSelectEnrichTarget', () => {
     expect(sharedBGM.sheet.isLocked).toBe(true)
     expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1')
     expect(sharedBGM.sheet.lockedName).toBe('bangumi 追踪')
-    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
+    expect(storage._store[ENRICH_KEY]).toBeTruthy()
   })
 
   it('多个候选时预选首个并返回 preselected（不锁定）', () => {
@@ -1027,7 +1047,7 @@ describe('initializeEnrichLock', () => {
   it('有锁定状态时恢复选中值', () => {
     setupBasicDom()
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
+      [ENRICH_KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
     })
     setMockApp(
       createMockApp(
@@ -1054,7 +1074,7 @@ describe('initializeEnrichLock', () => {
     setupBasicDom()
     setupScanMocks()
     const storage = createMockPluginStorage({
-      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
+      [ENRICH_KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
     })
     setMockApp(createScanApp({ other: [createScanSheet('Sheet数据', null)] }, 'other', '', storage))
 
@@ -1148,7 +1168,7 @@ describe('getLockedSheet 的工作簿回退分支', () => {
       Workbooks: { Count: 1, Item: () => activeWorkbook },
     })
 
-    const result = getLockedSheet()
+    const result = getLockedSheet('enrich')
 
     expect(result?.[0]).toBe(activeWorkbook)
     expect(result?.[1].Name).toBe('Sheet1')
@@ -1160,9 +1180,9 @@ describe('getLockedSheet 的工作簿回退分支', () => {
     sharedBGM.sheet.lockedName = 'Sheet1'
     setMockApp({ ActiveWorkbook: null, PluginStorage: storage })
 
-    expect(getLockedSheet()).toBeNull()
+    expect(getLockedSheet('enrich')).toBeNull()
     expect(sharedBGM.sheet.isLocked).toBe(false)
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[ENRICH_KEY]).toBe('')
   })
 
   it('锁定的工作表名为空时清锁并返回 null', () => {
@@ -1174,7 +1194,7 @@ describe('getLockedSheet 的工作簿回退分支', () => {
       createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }]), '', storage),
     )
 
-    expect(getLockedSheet()).toBeNull()
+    expect(getLockedSheet('enrich')).toBeNull()
     expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 
@@ -1398,7 +1418,7 @@ describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () =>
     sharedBGM.sheet.lockedIndex = 4
     setMockApp(createMockApp([wb]))
 
-    const result = getLockedSheet()
+    const result = getLockedSheet('enrich')
 
     expect(result?.[1].Name).toBe('Target')
     // 4 张表，快路径只按提示索引探测 1 次（原实现要逐表扫 4 次）
@@ -1418,7 +1438,7 @@ describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () =>
     sharedBGM.sheet.lockedIndex = 3
     setMockApp(createMockApp([wb]))
 
-    const result = getLockedSheet()
+    const result = getLockedSheet('enrich')
 
     expect(result?.[1].Name).toBe('Target')
     // 1 次提示探测 + 1 次扫描命中
@@ -1434,7 +1454,7 @@ describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () =>
     sharedBGM.sheet.lockedIndex = 99
     setMockApp(createMockApp([wb]))
 
-    const result = getLockedSheet()
+    const result = getLockedSheet('enrich')
 
     expect(result?.[1].Name).toBe('Target')
   })
@@ -1448,12 +1468,12 @@ describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () =>
     sharedBGM.sheet.lockedIndex = 1
     setMockApp(createMockApp([wb], '', storage))
 
-    const result = getLockedSheet()
+    const result = getLockedSheet('enrich')
 
     expect(result).toBeNull()
     expect(sharedBGM.sheet.isLocked).toBe(false)
     expect(sharedBGM.sheet.lockedIndex).toBeNull()
-    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+    expect(storage._store[ENRICH_KEY]).toBe('')
   })
 
   it('只有 lockedIndex 没有 lockedName 时不误命中（按名复核挡住）', () => {
@@ -1465,7 +1485,7 @@ describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () =>
     setMockApp(createMockApp([wb]))
 
     // 名字为 null 时任何表都不应被当成目标 → 清锁
-    expect(getLockedSheet()).toBeNull()
+    expect(getLockedSheet('enrich')).toBeNull()
     expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 })

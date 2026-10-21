@@ -31,6 +31,7 @@ import { renderStatCards } from '../ui/stat-cards.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 import { initializeShellNav } from './shell-nav.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
+import { mountDataContextNotice } from '../tools/data-context.js'
 import { createProgress } from '../ui/components/progress.js'
 import type { ProgressController } from '../ui/components/progress.js'
 
@@ -945,6 +946,8 @@ export function initializeCleanPage(): void {
   initializeTheme()
   startThemeSync()
   initializeShellNav()
+  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+  mountDataContextNotice('clean')
   renderSheetList()
   renderCleanItems()
   bindButtons()

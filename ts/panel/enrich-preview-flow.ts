@@ -35,6 +35,7 @@ import {
   BGM,
 } from '../tools/util/index.js'
 import { getOpenWorkbooks } from '../tools/locked-sheet.js'
+import { saveDataContext, snapshotFromWorksheet } from '../tools/data-context.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { COLUMN_MAPPING_FIELDS, resetEnrichPreviewConfig } from './enrich-page-state.js'
 import type { ScalarMappingKey } from './enrich-page-state.js'
@@ -76,6 +77,9 @@ export function detectHeaderOnSheet(
     state.headerRow = headerRow
     state.dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
     state.columnMapping = mapping
+
+    // 跨页共享：把刚获取的工作簿/表/列/行写入数据上下文，其它页进入时重放显示
+    saveDataContext(snapshotFromWorksheet(worksheet, headerRow, 'enrich'))
 
     // 关联简介表 + 刷新工作簿切换按钮条
     discoverIntroContext()

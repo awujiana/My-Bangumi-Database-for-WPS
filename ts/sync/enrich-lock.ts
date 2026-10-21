@@ -189,13 +189,13 @@ export function toggleEnrichWorkbookLock(
 
   if (isLockedAt(sheetIndex, wbName)) {
     // §5.6 C4：解锁走共享清位实现（applyLockedSheet(null) + 持久化）
-    clearLockedSheet()
+    clearLockedSheet('enrich')
     showToast('已解锁目标工作表', 'info')
   } else {
     const sheetName = sheetSelect.options[sheetSelect.selectedIndex]?.text ?? ''
     const info: LockedSheetInfo = { index: sheetIndex, name: sheetName, workbookName: wbName }
     applyLockedSheet(info)
-    saveLockedSheet(info)
+    saveLockedSheet(info, 'enrich')
     showToast(`已锁定: ${wbName} → ${sheetName}`, 'info')
   }
 
@@ -245,7 +245,7 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
 
   const sheetName = worksheet.Name
   applyLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
-  saveLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
+  saveLockedSheet({ index: sheetIndex, name: sheetName, workbookName }, 'enrich')
   bgmLog(
     LOG_LEVELS.INFO,
     `[enrichLock] 自动锁定: ${workbookName} → ${sheetName} (索引 ${String(sheetIndex)})`,
@@ -273,7 +273,7 @@ export function initializeEnrichLock(
 ): void {
   refreshEnrichWorkbooks(wbSelectId)
 
-  const isRestored = restoreLockedSheet()
+  const isRestored = restoreLockedSheet('enrich')
   if (isRestored && BGM.sheet.isLocked) {
     const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
     if (wbSelect && BGM.sheet.lockedWorkbookName) {

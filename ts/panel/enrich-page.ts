@@ -32,6 +32,7 @@ import { escapeHtml } from '../tools/string-utilities.js'
 import { showToast } from '../ui/dialog.js'
 import { findHeaderRow, bgmLog, BGM, getApp } from '../tools/util/index.js'
 import { findWorkbookByName } from '../tools/locked-sheet.js'
+import { mountDataContextNotice } from '../tools/data-context.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { recomputeScrollspy } from './shell-nav.js'
 import { extractFileName } from './enrich-file-name.js'
@@ -76,6 +77,9 @@ import { detectHeaderOnSheet, previewMatch, hideMatchDetail } from './enrich-pre
 
 export function initializeEnrichPage(): void {
   bgmLog(LOG_LEVELS.INFO, '[enrich] initializeEnrichPage 开始')
+
+  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+  mountDataContextNotice('enrich')
 
   // 初始化富化工作簿锁定模块（恢复持久化的锁定状态）
   initializeEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')

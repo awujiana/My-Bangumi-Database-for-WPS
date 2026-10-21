@@ -598,15 +598,17 @@ export function createDetachablePanel(
     }
     buttonMaximize.textContent = isMaximized ? '⤡' : '⤢'
   })
-  const buttonClose = makeIconButton(
-    '✕',
-    '关闭（区块回到页面原位）',
-    'detachable-panel-icon-btn',
+  // 还原按钮用**文字**而非图标：三个并排小图标（▾ ⤢ ✕）曾被当成「刷新窗口」，
+  // 没人猜得到 ✕ 是「放回页面原位」。文字按钮语义自明，不再依赖 tooltip。
+  const buttonRestore = makeIconButton(
+    '还原',
+    '还原：把模块放回页面原位',
+    'detachable-panel-restore-btn',
     () => {
       attach()
     },
   )
-  actions.append(buttonCollapse, buttonMaximize, buttonClose)
+  actions.append(buttonCollapse, buttonMaximize, buttonRestore)
   header.append(grip, titleNode, toolbarSlot, actions)
 
   const body = makeDiv('detachable-panel-body')

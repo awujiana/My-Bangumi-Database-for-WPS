@@ -46,6 +46,11 @@ import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
+import {
+  mountDataContextNotice,
+  saveDataContext,
+  snapshotFromWorksheet,
+} from '../tools/data-context.js'
 import type { SheetEntry } from '../tools/sheet-list.js'
 
 // ===== 配置键（PluginStorage，跨会话缓存）=====
@@ -732,6 +737,8 @@ function reloadSheet(): void {
   state.headerRow = findHeaderRow(worksheet)
   state.columnMap = getColumnMap(worksheet, state.headerRow)
   setText('highlightSheetName', worksheet.Name)
+  // 跨页共享：把刚加载的工作簿/表/列/行写入数据上下文，其它页进入时重放显示
+  saveDataContext(snapshotFromWorksheet(worksheet, state.headerRow, 'highlight'))
   renderSourceSelect()
   rebuildColumns()
   renderColumnList()
@@ -746,6 +753,8 @@ function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
   initializeTheme()
   startThemeSync()
+  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+  mountDataContextNotice('highlight')
 
   const mode = getConfig(KEY_MODE, 'auto', true)
   state.mode = mode === 'manual' ? 'manual' : 'auto'

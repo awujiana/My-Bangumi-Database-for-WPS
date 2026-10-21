@@ -81,7 +81,7 @@ export function toggleSheetLock(): void {
   if (isLockedAt(sheetIndex)) {
     // §5.6 C4：状态清位走共享实现；持久化显式调用（便于测试观察）
     applyLockedSheet(null)
-    saveLockedSheet(null)
+    saveLockedSheet(null, 'panel')
     showToast('已解锁工作表', 'info')
   } else {
     const sheetName = select.options[select.selectedIndex]?.text ?? ''
@@ -93,7 +93,7 @@ export function toggleSheetLock(): void {
       sheetInfo.workbookName = wbName
     }
     applyLockedSheet(sheetInfo)
-    saveLockedSheet(sheetInfo)
+    saveLockedSheet(sheetInfo, 'panel')
     showToast(`已锁定工作表: ${sheetName}${wbName ? `（工作簿: ${wbName}）` : ''}`, 'info')
   }
   updateLockButton()
@@ -968,7 +968,7 @@ export function refreshData(): void {
       BGM.sheet.lockedIndex = sheetIndex
       BGM.sheet.lockedName = sheetName
       BGM.sheet.isLocked = true
-      saveLockedSheet({ index: sheetIndex, name: sheetName })
+      saveLockedSheet({ index: sheetIndex, name: sheetName }, 'panel')
       updateLockButton()
       if (select) select.value = String(sheetIndex)
       showToast(`已自动锁定工作表: ${sheetName}`, 'info')
@@ -1112,11 +1112,14 @@ export function autoDetectAndLockSheet(): boolean {
     BGM.sheet.lockedName = detected.sheetName
     BGM.sheet.isLocked = true
     BGM.sheet.lockedWorkbookName = detected.workbookName || null
-    saveLockedSheet({
-      index: detected.sheetIndex,
-      name: detected.sheetName,
-      ...(detected.workbookName && { workbookName: detected.workbookName }),
-    })
+    saveLockedSheet(
+      {
+        index: detected.sheetIndex,
+        name: detected.sheetName,
+        ...(detected.workbookName && { workbookName: detected.workbookName }),
+      },
+      'panel',
+    )
     refreshSheets()
     const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
     if (select) select.value = String(detected.sheetIndex)

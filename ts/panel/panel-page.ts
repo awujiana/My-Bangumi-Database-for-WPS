@@ -31,6 +31,7 @@ import {
   autoDetectAndLockSheet,
 } from './panel-lifecycle.js'
 import { saveLockedSheet, restoreLockedSheet } from '../tools/locked-sheet.js'
+import { mountDataContextNotice } from '../tools/data-context.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
 import { registerSheetChangeAutoRefresh, registerVisibilityRefresh } from './panel-auto-refresh.js'
 
@@ -60,6 +61,9 @@ function shouldRefresh(): boolean {
 function initializePanelCore(): void {
   bgmLog(LOG_LEVELS.INFO, 'initializePanelCore 开始')
 
+  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+  mountDataContextNotice('panel')
+
   // 初始化 WPS 枚举（如果未设置）
   const app = getApp()
   if (app && typeof app.Enum !== 'object') {
@@ -74,7 +78,7 @@ function initializePanelCore(): void {
   startUserInfoPolling()
 
   // 恢复上次锁定的工作表：只读 PluginStorage，成本低，保持同步（BGM.sheet 状态立即可用）
-  const isRestored = restoreLockedSheet()
+  const isRestored = restoreLockedSheet('panel')
 
   /**
    * 刷新工作表列表 → 自动检测最佳工作表 → 首帧预览。
@@ -108,11 +112,14 @@ function initializePanelCore(): void {
     BGM.sheet.lockedName = detected.sheetName
     BGM.sheet.lockedWorkbookName = detected.workbookName || null
     BGM.sheet.isLocked = true
-    saveLockedSheet({
-      index: detected.sheetIndex,
-      name: detected.sheetName,
-      ...(detected.workbookName && { workbookName: detected.workbookName }),
-    })
+    saveLockedSheet(
+      {
+        index: detected.sheetIndex,
+        name: detected.sheetName,
+        ...(detected.workbookName && { workbookName: detected.workbookName }),
+      },
+      'panel',
+    )
     refreshSheets()
     const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
     if (select) select.value = String(detected.sheetIndex)
@@ -134,7 +141,7 @@ function initializePanelCore(): void {
       BGM.sheet.lockedIndex = null
       BGM.sheet.lockedName = null
       BGM.sheet.isLocked = false
-      saveLockedSheet(null)
+      saveLockedSheet(null, 'panel')
       updateLockButton()
       // 切换工作表时刷新预览
       refreshData()

@@ -332,11 +332,14 @@ describe('panel-lifecycle · toggleSheetLock', () => {
     expect(sheetState.lockedIndex).toBe(2)
     expect(sheetState.lockedName).toBe('漫画')
     expect(sheetState.lockedWorkbookName).toBe('BGM.xlsx')
-    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({
-      index: 2,
-      name: '漫画',
-      workbookName: 'BGM.xlsx',
-    })
+    expect(mocks.saveLockedSheet).toHaveBeenCalledWith(
+      {
+        index: 2,
+        name: '漫画',
+        workbookName: 'BGM.xlsx',
+      },
+      'panel',
+    )
     expect(mocks.showToast).toHaveBeenCalledWith('已锁定工作表: 漫画（工作簿: BGM.xlsx）', 'info')
   })
 
@@ -349,7 +352,7 @@ describe('panel-lifecycle · toggleSheetLock', () => {
     toggleSheetLock()
 
     expect(sheetState.lockedWorkbookName).toBeNull()
-    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' })
+    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' }, 'panel')
     expect(mocks.showToast).toHaveBeenCalledWith('已锁定工作表: 动画', 'info')
   })
 
@@ -367,7 +370,7 @@ describe('panel-lifecycle · toggleSheetLock', () => {
     expect(sheetState.lockedIndex).toBeNull()
     expect(sheetState.lockedName).toBeNull()
     expect(sheetState.lockedWorkbookName).toBeNull()
-    expect(mocks.saveLockedSheet).toHaveBeenCalledWith(null)
+    expect(mocks.saveLockedSheet).toHaveBeenCalledWith(null, 'panel')
     expect(mocks.showToast).toHaveBeenCalledWith('已解锁工作表', 'info')
   })
 
@@ -1688,11 +1691,14 @@ describe('panel-lifecycle · autoDetectAndLockSheet', () => {
     expect(sheetState.lockedIndex).toBe(2)
     expect(sheetState.lockedName).toBe('动画')
     expect(sheetState.lockedWorkbookName).toBe('BGM.xlsx')
-    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({
-      index: 2,
-      name: '动画',
-      workbookName: 'BGM.xlsx',
-    })
+    expect(mocks.saveLockedSheet).toHaveBeenCalledWith(
+      {
+        index: 2,
+        name: '动画',
+        workbookName: 'BGM.xlsx',
+      },
+      'panel',
+    )
     expect(mocks.showToast).toHaveBeenCalledWith('已自动检测表头: 动画', 'info')
   })
 
@@ -1713,6 +1719,6 @@ describe('panel-lifecycle · autoDetectAndLockSheet', () => {
     autoDetectAndLockSheet()
 
     expect(sheetState.lockedWorkbookName).toBeNull()
-    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' })
+    expect(mocks.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' }, 'panel')
   })
 })

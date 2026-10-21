@@ -13,8 +13,17 @@ import { readRangeValues } from './util/sheet.js'
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js'
 import type { WpsWorkbook, WpsWorksheet, WpsWindow } from './wps.js'
 
-/** 锁定持久化键（主面板与富化页面共用） */
+/** 锁定持久化键前缀（各页独立键：`bgm_locked_sheet_<page>`） */
 export const LOCKED_SHEET_KEY = 'bgm_locked_sheet'
+
+/**
+ * 各页独立的锁定键：panel 与 enrich 曾共用一把锁互相覆盖 ——
+ * 在面板锁了表，切到富化页锁另一张，回来面板的锁没了。现在各页各存各的。
+ * @param page 页面标识（'panel' / 'enrich' …）
+ */
+export function lockedSheetKey(page: string): string {
+  return `${LOCKED_SHEET_KEY}_${page}`
+}
 
 export interface LockedSheetInfo {
   index: number
@@ -24,13 +33,13 @@ export interface LockedSheetInfo {
 
 // ========== 持久化与状态重置 ==========
 
-export function saveLockedSheet(info: LockedSheetInfo | null): void {
+export function saveLockedSheet(info: LockedSheetInfo | null, page = 'panel'): void {
   const app = getApp()
   if (!app?.PluginStorage) {
     bgmLog(LOG_LEVELS.WARN, '[lockedSheet] saveLockedSheet: PluginStorage 不可用')
     return
   }
-  app.PluginStorage.setItem(LOCKED_SHEET_KEY, info ? JSON.stringify(info) : '')
+  app.PluginStorage.setItem(lockedSheetKey(page), info ? JSON.stringify(info) : '')
 }
 
 /**
@@ -96,22 +105,23 @@ export function renderSheetLockUi(
 }
 
 /** 清除 BGM.sheet 锁定状态（内存 + 持久化） */
-export function clearLockedSheet(): void {
+export function clearLockedSheet(page = 'panel'): void {
   applyLockedSheet(null)
-  saveLockedSheet(null)
+  saveLockedSheet(null, page)
 }
 
 /**
  * 从 PluginStorage 恢复锁定状态到 BGM.sheet，并校验工作簿是否仍存在
+ * @param page 页面标识（读该页自己的锁定键）
  * @returns 是否成功恢复
  */
-export function restoreLockedSheet(): boolean {
+export function restoreLockedSheet(page = 'panel'): boolean {
   const app = getApp()
   if (!app?.PluginStorage) {
     bgmLog(LOG_LEVELS.WARN, '[lockedSheet] restoreLockedSheet: PluginStorage 不可用')
     return false
   }
-  const raw = app.PluginStorage.getItem(LOCKED_SHEET_KEY)
+  const raw = app.PluginStorage.getItem(lockedSheetKey(page))
   if (!raw) return false
 
   try {
@@ -128,14 +138,14 @@ export function restoreLockedSheet(): boolean {
           LOG_LEVELS.WARN,
           `[restoreLockedSheet] 锁定的工作簿 "${info.workbookName}" 已不存在，清除锁信息`,
         )
-        clearLockedSheet()
+        clearLockedSheet(page)
         return false
       }
     }
     return true
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[restoreLockedSheet] 解析锁定数据失败: ${String(error)}`)
-    clearLockedSheet()
+    clearLockedSheet(page)
     return false
   }
 }
@@ -307,7 +317,7 @@ function resolveSheetInWorkbook(
  * 解析当前锁定的工作簿 + 工作表引用（跨所有已打开工作簿）
  * @returns [工作簿, 工作表] 元组；未锁定或引用失效时清除锁并返回 null
  */
-export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
+export function getLockedSheet(page = 'panel'): [WpsWorkbook, WpsWorksheet] | null {
   if (!BGM.sheet.isLocked) return null
   const app = getApp()
   const wb = BGM.sheet.lockedWorkbookName
@@ -318,7 +328,7 @@ export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
       LOG_LEVELS.WARN,
       `[getLockedSheet] 锁定的工作簿 "${BGM.sheet.lockedWorkbookName ?? ''}" 已不存在`,
     )
-    clearLockedSheet()
+    clearLockedSheet(page)
     return null
   }
   const worksheet = resolveSheetInWorkbook(wb, BGM.sheet.lockedName, BGM.sheet.lockedIndex)
@@ -327,7 +337,7 @@ export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
       LOG_LEVELS.WARN,
       `[getLockedSheet] 锁定的工作表 "${BGM.sheet.lockedName ?? ''}" 已不存在`,
     )
-    clearLockedSheet()
+    clearLockedSheet(page)
     return null
   }
   return [wb, worksheet]

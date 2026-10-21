@@ -8,6 +8,24 @@
 
 ## [未发布]
 
+### 锁定各页独立键 + 数据上下文跨页重放 + 浮窗显式「还原」按钮（2026-10-21）
+
+- **锁定各页独立键**：panel 与 enrich 曾共用 `bgm_locked_sheet` 一把锁互相覆盖
+  （面板锁 A 表 → 富化页锁 B 表 → 回面板锁丢了）。`saveLockedSheet` /
+  `restoreLockedSheet` / `clearLockedSheet` / `getLockedSheet` 增加 `page` 参数，
+  键名变为 `bgm_locked_sheet_<page>`（panel / enrich 各存各的）。
+  **注意**：旧键 `bgm_locked_sheet` 不再读取，升级后首次需重新锁定一次。
+- **数据上下文跨页同步（进入时重放）**：新增 `ts/tools/data-context.ts`——
+  页面获取到工作簿 / 工作表 / 列 / 行后写入 `bgm_data_context`（enrich 在
+  识别表头成功时、highlight 在「加载并预览」时写入）；其它页**进入时**读一次
+  并在 `<main>` 顶部重放成可关闭的通知条（「📋 富化页已获取：wb1 / Sheet1 · N 列 · M 行 · HH:MM」）。
+  零轮询：只在「写入时」与「进入时」各碰一次存储，与卡顿根因（周期性同步 COM）划清界限。
+  已接 reader：enrich / highlight / clean / panel；writer：enrich / highlight（其余页可后续接入）。
+- **浮窗头部显式「还原」按钮**：右侧三个图标（▾ 折叠 / ⤢ 最大化 / ✕ 关闭）曾被当成
+  「刷新窗口」——没人猜得到 ✕ 是「放回页面原位」。✕ 换成文字按钮**「还原」**，语义自明。
+- 单测：新增 `tests/data-context.test.ts`（8 用例）；`enrich-lock.test.ts` 更新为各页独立键
+  并补「enrich 锁不覆盖 panel 锁」隔离用例（77 用例）。
+
 ### 浮动窗口拖动 / 缩放掉帧修复 + 原位置「还原」按钮（2026-10-21）
 
 用户反馈窗格内 float 浮动窗口拖动与缩放掉帧。查下来掉帧只是表象，同段代码里

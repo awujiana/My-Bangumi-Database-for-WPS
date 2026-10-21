@@ -321,11 +321,14 @@ describe('initializePanelCore · 工作表自动检测', () => {
     expect(stubs.bgm.sheet.lockedName).toBe('动画')
     expect(stubs.bgm.sheet.lockedWorkbookName).toBe('数据表.xlsx')
     expect(stubs.bgm.sheet.isLocked).toBe(true)
-    expect(stubs.saveLockedSheet).toHaveBeenCalledWith({
-      index: 2,
-      name: '动画',
-      workbookName: '数据表.xlsx',
-    })
+    expect(stubs.saveLockedSheet).toHaveBeenCalledWith(
+      {
+        index: 2,
+        name: '动画',
+        workbookName: '数据表.xlsx',
+      },
+      'panel',
+    )
     expect((document.getElementById('workbookSelect') as HTMLSelectElement).value).toBe(
       '数据表.xlsx',
     )
@@ -342,7 +345,7 @@ describe('initializePanelCore · 工作表自动检测', () => {
 
     vi.advanceTimersByTime(0)
 
-    expect(stubs.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' })
+    expect(stubs.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' }, 'panel')
     expect(stubs.bgm.sheet.lockedWorkbookName).toBeNull()
     expect(select.value).toBe('保持不变')
   })
@@ -360,7 +363,7 @@ describe('initializePanelCore · 事件绑定', () => {
     expect(stubs.bgm.sheet.lockedIndex).toBeNull()
     expect(stubs.bgm.sheet.lockedName).toBeNull()
     expect(stubs.bgm.sheet.isLocked).toBe(false)
-    expect(stubs.saveLockedSheet).toHaveBeenCalledWith(null)
+    expect(stubs.saveLockedSheet).toHaveBeenCalledWith(null, 'panel')
     expect(stubs.updateLockButton).toHaveBeenCalled()
     expect(stubs.refreshData).toHaveBeenCalled()
   })

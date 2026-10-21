@@ -691,12 +691,14 @@ describe('列映射下拉与 updateColumnMapping', () => {
 // ========== 源数据预览 ==========
 
 describe('源数据预览', () => {
-  it('预览表格容器缺失时提前返回，不读末行', () => {
+  it('预览表格容器缺失时提前返回：只有数据快照读一次末行，渲染路径不读', () => {
     removeElement('sourceTable')
 
     detectWithMapping(makeMapping())
 
-    expect(m.getLastRow).not.toHaveBeenCalled()
+    // 1 次 = detectHeaderOnSheet 里的跨页数据快照（saveDataContext）；
+    // 若 renderSourcePreview 没跳过，这里会是 2 次
+    expect(m.getLastRow).toHaveBeenCalledTimes(1)
   })
 
   it('没有任何映射列时清空表头表体、关掉预览标记并重置匹配结果', () => {
