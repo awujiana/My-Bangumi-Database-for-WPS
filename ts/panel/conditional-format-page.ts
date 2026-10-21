@@ -220,19 +220,49 @@ function collectSheets(): SheetEntry[] {
   return entries
 }
 
+/** 当前选中的工作簿名（工作簿下拉的值；从选中表反推，选中为空时读下拉兜底） */
+function currentWorkbookName(): string {
+  const bySelected = selectedSheet()?.workbook
+  if (bySelected) return bySelected
+  const select = selectById('conditionalFormatWorkbook')
+  return select?.value ?? ''
+}
+
+/** 渲染目标工作簿下拉（去重的工作簿名，保持枚举顺序） */
+function renderWorkbookSelect(): void {
+  const select = selectById('conditionalFormatWorkbook')
+  if (!select) return
+  const workbookNames: string[] = []
+  for (const entry of state.sheets) {
+    if (!workbookNames.includes(entry.workbook)) workbookNames.push(entry.workbook)
+  }
+  if (workbookNames.length === 0) {
+    select.innerHTML = '<option value="">（无已打开的工作簿）</option>'
+    return
+  }
+  const current = currentWorkbookName()
+  select.innerHTML = workbookNames
+    .map(
+      (name) =>
+        `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>`,
+    )
+    .join('')
+}
+
 function renderSheetSelect(): void {
   const select = selectById('conditionalFormatSheet')
   if (!select) return
-  if (state.sheets.length === 0) {
-    select.innerHTML = '<option value="">（未找到已打开的工作表）</option>'
+  // 二级菜单只显示**当前工作簿下**的工作表（第一级选簿、第二级选表）
+  const workbook = currentWorkbookName()
+  const visible = state.sheets.filter((entry) => entry.workbook === workbook)
+  if (visible.length === 0) {
+    select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>'
     return
   }
-  select.innerHTML = state.sheets
+  select.innerHTML = visible
     .map(
       (entry) =>
-        `<option value="${escapeHtml(entry.key)}"${entry.key === state.selectedKey ? ' selected' : ''}>${escapeHtml(
-          `${entry.workbook} · ${entry.sheet}`,
-        )}</option>`,
+        `<option value="${escapeHtml(entry.key)}"${entry.key === state.selectedKey ? ' selected' : ''}>${escapeHtml(entry.sheet)}</option>`,
     )
     .join('')
 }
@@ -272,6 +302,7 @@ function reloadSheets(): void {
     const fallback = state.sheets[0]
     state.selectedKey = (matched ?? fallback)?.key ?? ''
   }
+  renderWorkbookSelect()
   renderSheetSelect()
   // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
   // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
@@ -1243,7 +1274,21 @@ export function initializeConditionalFormatPage(): void {
     renderRuleList()
   })
 
-  // 工作表选择
+  // 目标工作簿（第一级）：切换后二级菜单只留该簿下的表；
+  // 原选中表若属于新簿则保持，否则选中该簿第一张
+  selectById('conditionalFormatWorkbook')?.addEventListener('change', (event) => {
+    const workbook = (event.target as HTMLSelectElement).value
+    const inWorkbook = state.sheets.filter((entry) => entry.workbook === workbook)
+    const isStillValid = inWorkbook.some((entry) => entry.key === state.selectedKey)
+    if (!isStillValid) {
+      state.selectedKey = inWorkbook[0]?.key ?? ''
+      setConfig(KEY_SHEET, state.selectedKey)
+    }
+    renderSheetSelect()
+    loadExistingRules()
+  })
+
+  // 工作表选择（第二级）
   selectById('conditionalFormatSheet')?.addEventListener('change', (event) => {
     state.selectedKey = (event.target as HTMLSelectElement).value
     setConfig(KEY_SHEET, state.selectedKey)
