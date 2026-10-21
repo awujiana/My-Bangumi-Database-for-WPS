@@ -290,7 +290,11 @@ function makePlaceholder(message: string, onRecall: () => void): HTMLElement {
   const recall = document.createElement('button')
   recall.type = 'button'
   recall.className = 'bgm-btn small detachable-placeholder-recall'
-  recall.textContent = '收回'
+  // 文案用「还原」而非「关闭」：用户要的是「把内容放回原位」这个语义，
+  // 「关闭」容易被理解成把内容丢掉（区块其实一直在，只是搬去了窗口里）。
+  recall.textContent = '还原'
+  recall.title = '把区块收回本页面原位'
+  recall.setAttribute('aria-label', recall.title)
   recall.addEventListener('click', onRecall)
   placeholder.append(icon, text, recall)
   return placeholder
@@ -396,6 +400,7 @@ function bindDrag(
   grip: HTMLElement,
   root: HTMLElement,
   draggingClass: string,
+  onStart: () => void,
   onDelta: (deltaX: number, deltaY: number) => void,
 ): void {
   // 标题栏里嵌了按钮 / 下拉，按在这些控件上不应该启动拖动
@@ -408,11 +413,31 @@ function bindDrag(
     const startY = event.clientY
     grip.setPointerCapture(event.pointerId)
     root.classList.add(draggingClass)
+    // 拖动起点：让调用方捕获基准几何与视口（见下方 onStart 说明）
+    onStart()
+
+    // rAF 合帧：pointermove 可能快于屏幕刷新率，每次都写 style 会让一帧内跑多次
+    // 「样式重算 + 布局」。只记最新位移，一帧至多写一次。
+    let frame: number | null = null
+    let latestX = 0
+    let latestY = 0
+    const flush = (): void => {
+      frame = null
+      onDelta(latestX, latestY)
+    }
 
     const onMove = (moveEvent: PointerEvent): void => {
-      onDelta(moveEvent.clientX - startX, moveEvent.clientY - startY)
+      latestX = moveEvent.clientX - startX
+      latestY = moveEvent.clientY - startY
+      frame ??= window.requestAnimationFrame(flush)
     }
     const onUp = (): void => {
+      // 收尾补一次：最后一个 rAF 可能还没跑，直接结束会丢掉最后几像素
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame)
+        frame = null
+      }
+      flush()
       root.classList.remove(draggingClass)
       grip.removeEventListener('pointermove', onMove)
       grip.removeEventListener('pointerup', onUp)
@@ -595,30 +620,57 @@ export function createDetachablePanel(
   // ---- 占位块：拖出后顶在原位置，避免正文塌陷 ----
   const placeholder = makePlaceholder(`「${title}」已拖出为浮动窗口`, attach)
 
-  bindDrag(header, root, DRAGGING_CLASS, (deltaX, deltaY) => {
-    const next = clampPosition(
-      { left: rect.left + deltaX, top: rect.top + deltaY },
-      { width: rect.width, height: rect.height },
-      readViewport(),
-    )
-    rect.left = next.left
-    rect.top = next.top
-    applyRect()
-  })
+  // 拖动 / 缩放期间的基准：起点几何 + 起点视口。
+  // 视口只在 pointerdown 时读一次（`window.innerWidth/Height` 有挂起样式变更时会触发
+  // 强制布局，逐帧读 = 逐帧重排）；几何用「基准 + 累计位移」算绝对位置 —— 若用
+  // 「当前 rect + 累计位移」，rect 已被上一帧改过，位移会被重复累加，窗口越拖越快。
+  let dragViewport: ViewportSize = readViewport()
+  let dragBase: PanelRect = { ...rect }
 
-  bindDrag(resizeHandle, root, RESIZING_CLASS, (deltaX, deltaY) => {
-    const next = clampSize(
-      { width: rect.width + deltaX, height: rect.height + deltaY },
-      readViewport(),
-    )
-    rect.width = next.width
-    rect.height = next.height
-    applyRect()
-  })
+  bindDrag(
+    header,
+    root,
+    DRAGGING_CLASS,
+    () => {
+      dragBase = { ...rect }
+      dragViewport = readViewport()
+    },
+    (deltaX, deltaY) => {
+      const next = clampPosition(
+        { left: dragBase.left + deltaX, top: dragBase.top + deltaY },
+        { width: dragBase.width, height: dragBase.height },
+        dragViewport,
+      )
+      rect.left = next.left
+      rect.top = next.top
+      applyRect()
+    },
+  )
 
-  // 点击任意位置置顶：把节点重新 append 到 body 末尾（同 z-index 下由 DOM 顺序决定层级）
+  bindDrag(
+    resizeHandle,
+    root,
+    RESIZING_CLASS,
+    () => {
+      dragBase = { ...rect }
+      dragViewport = readViewport()
+    },
+    (deltaX, deltaY) => {
+      const next = clampSize(
+        { width: dragBase.width + deltaX, height: dragBase.height + deltaY },
+        dragViewport,
+      )
+      rect.width = next.width
+      rect.height = next.height
+      applyRect()
+    },
+  )
+
+  // 点击任意位置置顶：把节点重新 append 到 body 末尾（同 z-index 下由 DOM 顺序决定层级）。
+  // 已是最后一个就别再 append —— 重复 append 等于「移除再插入」，会强制整树样式重算，
+  // 而这个监听在每次 pointerdown（含每次拖动开始）都会触发。
   root.addEventListener('pointerdown', () => {
-    document.body.append(root)
+    if (document.body.lastElementChild !== root) document.body.append(root)
   })
 
   // ---- 搬家 ----

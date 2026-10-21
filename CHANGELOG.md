@@ -8,6 +8,41 @@
 
 ## [未发布]
 
+### 浮动窗口拖动 / 缩放掉帧修复 + 原位置「还原」按钮（2026-10-21）
+
+用户反馈窗格内 float 浮动窗口拖动与缩放掉帧。查下来掉帧只是表象，同段代码里
+还藏着一个**更严重的正确性 bug**：
+
+- **窗口越拖越快（真 bug，必修）**：每帧用「当前 `rect` + 累计位移」算绝对位置，
+  而 `rect` 已被上一帧改过 —— 位移被**重复累加**，拖一下窗口会飞出去。改为在
+  pointerdown 时捕获**基准几何**，之后每帧用「基准 + 累计位移」计算。
+- **掉帧三处**：① `readViewport()`（`window.innerWidth/Height`）逐帧调用，有挂起
+  样式变更时会触发强制布局；② pointermove 未合帧，一帧内多次写 style 触发多次
+  「样式重算 + 布局」；③ 置顶用的 `document.body.append(root)` 每次 pointerdown
+  都执行，而重复 append 等于「移除再插入」 → 整树样式重算。
+  改法：视口在 pointerdown 读一次并复用；用 `requestAnimationFrame` 合帧（一帧最多
+  写一次 style）；已是 body 末元素时不再 append。
+- **原位置还原入口更直白**：拖出后占位块上的按钮由「收回」改为「**还原**」并补
+  提示文案（「关闭」容易被理解成把内容丢掉，而区块其实一直在、只是搬去了窗口里）。
+- 说明：float 模式标题栏 `✕` 本就能把区块搬回原位；`native` 模式是宿主独立窗口
+  （另一个 WebView，节点搬不过去），用户在 WPS 里点系统关闭后本页收不到事件，
+  只能轮询 `isAlive()`，因此该窗口**内部**无法提供还原入口 —— 回路是原位置的
+  「还原」按钮。
+
+### 全量 COM 调用审计（2026-10-21）
+
+为定位「初始化期自动 COM 撞宿主窗口」的扩散面，对源码做了一次全量扫描：
+
+- `getApp()` 共 **118 处**；COM 密集文件：`tools/util/index.ts`(131)、
+  `tools/locked-sheet.ts`(39)、`panel/panel-lifecycle.ts`(37)、
+  `sync/workbook-auto-detect.ts`(35)、`services/ribbon-service.ts`(30)、
+  `panel/enrich-page.ts`(30)。
+- 仍存在「打开就自动读表」的页面：`clean`（`getDataSheet`）、`enrich`
+  （`ActiveWorkbook.ActiveSheet`）、`panel`（`ActiveSheet`）—— 与高亮页此前的
+  70 秒卡顿同一根因，计划改为显式选工作簿/工作表（复用 `tools/sheet-list.ts`）。
+- **待决策**：`panel` 与 `enrich` 都往同一个 `bgm_locked_sheet` 键写锁，会互相
+  覆盖 —— 这是「锁定跨页不同步」的根因之一，锁的归属需先定。
+
 ### 高亮页改为显式选簿/表/识别列：不再自动读、不再轮询（2026-10-21）
 
 上一轮「重分片按需 + 闸门延迟」虽绕开了首屏卡死，但本质仍是「打开就尝试读表」——
