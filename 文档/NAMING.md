@@ -200,6 +200,21 @@ kebab-case，不受本规则约束（`ts/**` 里的 `class="bgm-dp-env-value-war
 
 ---
 
+## 7. 附：一条同源教训（`-pure` 后缀是承诺）
+
+`ts/tools/string-utilities-pure.ts` 里的 `escapeHtml` 曾用
+`document.createElement('div')` + `textContent` → `innerHTML` 实现 —— 文件名的
+`-pure` 承诺了「零 DOM 依赖」，实现却破了约，代价是：
+
+1. 所有 import 它的模块（如 `conditional-format-table.ts`）在 Node / 单测环境
+   直接抛 `document is not defined`；
+2. 每次调用都建一次元素（347 行规则 = 347 次 `createElement`）。
+
+已改为纯字符串替换（`& < > " '` 五字符），转义语义与 DOM 方案完全一致。
+**教训**：模块名里的 `pure` / 无副作用是给后来人的契约，加依赖前先看文件名。
+
+---
+
 ## 7. 变更记录
 
 - **2026-10-20**：新增 `@typescript-eslint/naming-convention` 配置（缩写黑名单

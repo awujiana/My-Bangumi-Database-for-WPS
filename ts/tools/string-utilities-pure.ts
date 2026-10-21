@@ -35,9 +35,11 @@ export function columnNumberToLetter(column: number): string {
 /**
  * HTML 转义（防止 XSS）
  *
- * 安全模式：创建临时 div，设 textContent（浏览器自动转义 `<`, `>`, `&`），
- * 读 innerHTML 获取已转义字符串。再手动补齐双引号 `"` 和单引号 `'` 转义，
- * 以便安全地插入到 HTML 属性值（如 `value="..."`、`href="..."`）中。
+ * 纯字符串替换实现（`& < > " '` 五个字符）。
+ * 曾经用「创建临时 div 设 textContent 再读 innerHTML」——那需要 DOM，
+ * 使本模块（以及所有 import 它的纯函数模块，如 conditional-format-table）
+ * 在 Node / 单测环境直接抛 `document is not defined`，且每次调用都建一次元素。
+ * 转义语义与 DOM 方案完全一致：5 个字符逐一替换即可覆盖 textNode 与属性值两种上下文。
  *
  * 转义字符表：`< > " ' &` 共 5 个字符。
  *
@@ -46,10 +48,12 @@ export function columnNumberToLetter(column: number): string {
  */
 export function escapeHtml(text: string | null | undefined): string {
   if (!text) return ''
-  const div = document.createElement('div')
-  div.textContent = text
-  // textContent → innerHTML 已转义 & < >；补齐引号转义以安全用于属性值上下文
-  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  return text
+    .replace(/&/gu, '&amp;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;')
+    .replace(/"/gu, '&quot;')
+    .replace(/'/gu, '&#39;')
 }
 
 /**

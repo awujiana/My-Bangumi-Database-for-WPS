@@ -78,8 +78,8 @@
           </div>
         </section>
 
-        <!-- 既有规则（只读）：目标工作表当前的条件格式 -->
-        <section class="section" id="sec-existing">
+        <!-- 既有规则（可管理）：目标工作表当前的条件格式 -->
+        <section class="section section-wide" id="sec-existing">
           <h3>
             👀 既有规则<button
               type="button"
@@ -92,16 +92,24 @@
             </button>
           </h3>
           <p class="hint">
-            目标工作表<strong>现在就有</strong>的条件格式（只读，按优先级排列）。应用前先看这里：
-            数据条 / 色阶 / 图标集等类型插件无法重建，双策略会按你的选择处理。
+            目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
+            可以直接管理：导入规则库 / 上移下移 / 删除 / 「如果为真则停止」。 数据条 / 色阶 /
+            图标集等类型插件无法重建，双策略会按你的选择处理。
           </p>
           <div class="conditional-format-toolbar">
+            <input
+              type="search"
+              id="conditionalFormatExistingSearch"
+              class="conditional-format-search"
+              placeholder="搜索类型 / 范围 / 公式 / 颜色"
+            />
             <span class="conditional-format-rule-count" id="conditionalFormatExistingCount">—</span>
             <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
           </div>
-          <div id="conditionalFormatExistingList" class="conditional-format-rule-list"></div>
+          <div id="conditionalFormatExistingList" class="conditional-format-table"></div>
+          <div id="conditionalFormatExistingPager" class="conditional-format-pager"></div>
         </section>
 
         <!-- 规则管理 -->

@@ -1,0 +1,239 @@
+// @vitest-environment node
+/**
+ * @fileoverview `ts/panel/conditional-format-table.ts` 既有规则表格引擎单测（纯函数，Node 直跑）
+ *
+ * 守住的东西：
+ * 1. 快照 → 行模型：序号与 FormatConditions.Item 的 1 基下标一致（对错一行 = 操作错规则）
+ * 2. 行 HTML 的**转义**：公式与范围来自 Excel 内容，是 XSS 入口，必须转义
+ * 3. 「不可重建」标记：数据条 / 色阶等不能导进规则库，UI 必须显式标出
+ * 4. StopIfTrue 三态：true / false / undefined（宿主未暴露 → 复选框禁用而非 unchecked）
+ * 5. 分页：页码越界收敛到合法区间（删完一页后不能停在空页）
+ * 6. 搜索命中类型 / 范围 / 公式 / 颜色（用户常按「那条黄色的」找规则）
+ */
+
+import { describe, expect, it } from 'vitest'
+
+import {
+  FOREIGN_RULE_PAGE_SIZE,
+  buildForeignRuleHeadHtml,
+  buildForeignRuleRowHtml,
+  fcTypeLabel,
+  filterForeignRuleRows,
+  formatSwatchHtml,
+  paginate,
+  toForeignRuleRows,
+} from '../ts/panel/conditional-format-table.js'
+import type { ForeignRuleRow } from '../ts/panel/conditional-format-table.js'
+import type { ForeignRuleSnapshot } from '../ts/panel/conditional-format-rules.js'
+
+/** 造一条快照的便捷工厂（只覆盖被测字段，其余用默认值） */
+function snapshot(overrides: Partial<ForeignRuleSnapshot> = {}): ForeignRuleSnapshot {
+  return {
+    range: '$B$3:$B$26958',
+    formula: '=$R3="26年10月"',
+    kind: 'expression',
+    ...overrides,
+  }
+}
+
+describe('fcTypeLabel', () => {
+  it('已知类型号给中文标签', () => {
+    expect(fcTypeLabel(2, 'expression')).toBe('公式')
+    expect(fcTypeLabel(8, 'other')).toBe('数据条')
+    expect(fcTypeLabel(9, 'other')).toBe('色阶')
+  })
+
+  it('读不到类型号时按 kind 兜底（不显示裸数字）', () => {
+    expect(fcTypeLabel(undefined, 'expression')).toBe('公式')
+    expect(fcTypeLabel(undefined, 'other')).toBe('其它类型')
+  })
+
+  it('未知类型号显示原始编号，方便回报宿主问题', () => {
+    expect(fcTypeLabel(99, 'other')).toBe('类型 99')
+  })
+})
+
+describe('toForeignRuleRows', () => {
+  it('序号从 1 起且与数组下标对齐（= FormatConditions.Item 下标）', () => {
+    const rows = toForeignRuleRows([snapshot(), snapshot(), snapshot()])
+    expect(rows.map((row) => row.index)).toEqual([1, 2, 3])
+  })
+
+  it('公式类标记为可重建，其它类型不可重建', () => {
+    const rows = toForeignRuleRows([snapshot(), snapshot({ kind: 'other', type: 8 })])
+    expect(rows[0]?.rebuildable).toBe(true)
+    expect(rows[1]?.rebuildable).toBe(false)
+  })
+
+  it('读不到范围时给占位文案而不是空单元格', () => {
+    const rows = toForeignRuleRows([snapshot({ range: '' })])
+    expect(rows[0]?.range).toBe('（未读到范围）')
+  })
+
+  it('颜色与 StopIfTrue 原样带出；没读到的字段不出现（而非置空串）', () => {
+    const rows = toForeignRuleRows([
+      snapshot({ interior: '#00B050', fontColor: '#FFFFFF', stopIfTrue: true }),
+      snapshot(),
+    ])
+    expect(rows[0]?.fillColor).toBe('#00B050')
+    expect(rows[0]?.fontColor).toBe('#FFFFFF')
+    expect(rows[0]?.stopIfTrue).toBe(true)
+    expect('fillColor' in (rows[1] ?? {})).toBe(false)
+    expect('stopIfTrue' in (rows[1] ?? {})).toBe(false)
+  })
+})
+
+describe('buildForeignRuleRowHtml', () => {
+  const baseRow: ForeignRuleRow = {
+    index: 3,
+    typeLabel: '公式',
+    rebuildable: true,
+    range: '$B$3:$B$26958',
+    formula: '=$R3="26年10月"',
+  }
+
+  it('公式与范围里的 HTML 必须被转义（Excel 内容是 XSS 入口）', () => {
+    const html = buildForeignRuleRowHtml({
+      ...baseRow,
+      range: '<img src=x onerror=alert(1)>',
+      formula: '"><script>alert(1)</script>',
+    })
+    expect(html).not.toContain('<script>')
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&lt;img')
+    expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('data-row-index 与 index 一致（事件委托靠它定位规则）', () => {
+    const html = buildForeignRuleRowHtml(baseRow)
+    expect(html).toContain('data-row-index="3"')
+  })
+
+  it('不可重建的类型整行加标记 class，且类型列带警示徽章', () => {
+    const html = buildForeignRuleRowHtml({ ...baseRow, rebuildable: false, typeLabel: '数据条' })
+    expect(html).toContain('conditional-format-row-foreign')
+    expect(html).toContain('conditional-format-tag-warn')
+    expect(html).toContain('不可重建')
+  })
+
+  it('StopIfTrue 三态：true 勾选 / false 不勾 / 未读到则禁用', () => {
+    expect(buildForeignRuleRowHtml({ ...baseRow, stopIfTrue: true })).toMatch(
+      /data-action="stop"[^>]*checked/,
+    )
+    const off = buildForeignRuleRowHtml({ ...baseRow, stopIfTrue: false })
+    expect(off).not.toMatch(/data-action="stop"[^>]*checked/)
+    expect(off).not.toMatch(/data-action="stop"[^>]*disabled/)
+    const unknown = buildForeignRuleRowHtml({ ...baseRow })
+    expect(unknown).toMatch(/data-action="stop"[^>]*disabled/)
+  })
+
+  it('超长公式截断显示，但 title 保留全量', () => {
+    const long = `=${'A'.repeat(120)}`
+    const html = buildForeignRuleRowHtml({ ...baseRow, formula: long })
+    expect(html).toContain('…')
+    expect(html).toContain(`title="${long}"`)
+  })
+
+  it('四个行内操作按钮齐备（导入 / 上移 / 下移 / 删除）', () => {
+    const html = buildForeignRuleRowHtml(baseRow)
+    for (const action of ['import', 'up', 'down', 'delete']) {
+      expect(html).toContain(`data-action="${action}"`)
+    }
+  })
+})
+
+describe('formatSwatchHtml', () => {
+  it('填充色与字体色都在（WPS 只显示填充）', () => {
+    const html = formatSwatchHtml({
+      index: 1,
+      typeLabel: '公式',
+      rebuildable: true,
+      range: 'A1',
+      formula: '',
+      fillColor: '#00B050',
+      fontColor: '#FFFFFF',
+    })
+    expect(html).toContain('background:#00B050')
+    expect(html).toContain('conditional-format-swatch-font')
+    expect(html).toContain('background:#FFFFFF')
+  })
+
+  it('读不到颜色时用斜纹占位（不是空白，用户看得出「没读到」）', () => {
+    const html = formatSwatchHtml({
+      index: 1,
+      typeLabel: '公式',
+      rebuildable: true,
+      range: 'A1',
+      formula: '',
+    })
+    expect(html).toContain('repeating-conic-gradient')
+    expect(html).toContain('未读到格式')
+  })
+})
+
+describe('buildForeignRuleHeadHtml', () => {
+  it('七列表头与行列一一对应', () => {
+    const head = buildForeignRuleHeadHtml()
+    for (const label of ['#', '类型', '格式', '应用于', '公式', '为真则停', '操作']) {
+      expect(head).toContain(`>${label}<`)
+    }
+  })
+})
+
+describe('filterForeignRuleRows', () => {
+  const rows = toForeignRuleRows([
+    snapshot({ range: '$B$3:$B$100', formula: '=$R3="26年10月"' }),
+    snapshot({ kind: 'other', type: 8, formula: '', range: '$C$3:$C$100' }),
+    snapshot({ interior: '#FFC7CE', range: '$D$3:$D$100', formula: '=$S3<>""' }),
+  ])
+
+  it('空查询返回全部（不改引用语义也要内容一致）', () => {
+    expect(filterForeignRuleRows(rows, '  ')).toHaveLength(3)
+  })
+
+  it('按公式搜', () => {
+    expect(filterForeignRuleRows(rows, '26年10月')).toHaveLength(1)
+  })
+
+  it('按范围搜', () => {
+    expect(filterForeignRuleRows(rows, '$C$3')).toHaveLength(1)
+  })
+
+  it('按类型标签搜', () => {
+    expect(filterForeignRuleRows(rows, '数据条')).toHaveLength(1)
+  })
+
+  it('按颜色搜（用户常记得「那条黄色的」而不记得公式）', () => {
+    expect(filterForeignRuleRows(rows, '#ffc7ce')).toHaveLength(1)
+  })
+
+  it('大小写不敏感', () => {
+    expect(filterForeignRuleRows(rows, 'FFC7CE')).toHaveLength(1)
+  })
+})
+
+describe('paginate', () => {
+  const items = Array.from({ length: 347 }, (_unused, position) => position)
+
+  it('347 条按每页 50 分 7 页', () => {
+    const page = paginate(items, 1, FOREIGN_RULE_PAGE_SIZE)
+    expect(page.pageCount).toBe(7)
+    expect(page.items).toHaveLength(50)
+  })
+
+  it('页码越界时收敛到合法区间（删完一页后不能停在空页）', () => {
+    expect(paginate(items, 99, 50).page).toBe(7)
+    expect(paginate(items, 0, 50).page).toBe(1)
+    expect(paginate(items, -3, 50).page).toBe(1)
+  })
+
+  it('空列表仍是 1 页且条目为空', () => {
+    const page = paginate([], 1)
+    expect(page.pageCount).toBe(1)
+    expect(page.items).toEqual([])
+  })
+
+  it('最后一页可能不满', () => {
+    expect(paginate(items, 7, 50).items).toHaveLength(347 - 6 * 50)
+  })
+})

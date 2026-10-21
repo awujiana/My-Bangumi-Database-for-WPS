@@ -245,6 +245,8 @@ export interface WpsFormatCondition {
   AppliesTo?: WpsRange
   Interior?: WpsInterior
   Font?: WpsFont
+  /** 「如果为真则停止」：本条命中就不再评估后续规则 */
+  StopIfTrue?: boolean
   Delete?: () => void
   SetFirstPriority?: () => void
   SetLastPriority?: () => void
@@ -260,7 +262,12 @@ export interface WpsFormatCondition {
 /** 区域上的条件格式集合 */
 export interface WpsFormatConditions {
   Count?: number
-  Item?: (index: number) => WpsFormatCondition
+  /**
+   * 取第 index 条（1 基）规则。
+   * 返回类型带 `| undefined` 是**诚实的宿主建模**：越界下标下部分 WPS 版本返回
+   * undefined 而非抛错，调用方必须判空（见 conditional-format-apply 的 getForeignCondition）。
+   */
+  Item?: (index: number) => WpsFormatCondition | undefined
   Add?: (options: WpsFormatConditionAddOptions) => WpsFormatCondition
   /** 清空该区域全部规则（含手工建的——调用前必须读过并确认） */
   Delete?: () => void

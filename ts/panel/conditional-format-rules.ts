@@ -55,6 +55,8 @@ export interface ForeignRuleSnapshot {
   interior?: string
   /** 读到的字体色 */
   fontColor?: string
+  /** 「如果为真则停止」（StopIfTrue）：命中后续规则就不再评估。读不到留空 */
+  stopIfTrue?: boolean
 }
 
 /** 应用策略 */
@@ -89,6 +91,12 @@ export const CONDITIONAL_FORMAT_STRATEGY_FALLBACK: ApplyStrategy = 'clear-all'
 /** 默认分组名 */
 export const CONDITIONAL_FORMAT_GROUP_HIGHLIGHT = '番剧高亮'
 export const CONDITIONAL_FORMAT_GROUP_QUALITY = '数据质量'
+
+/** 从工作表导入的既有规则所在分组 */
+export const IMPORTED_RULE_GROUP = '导入的规则'
+
+/** 导入时读不到填充色用的兜底色（中灰：可见但不抢注意力） */
+export const IMPORTED_RULE_FALLBACK_COLOR = '#CCCCCC'
 
 /** 当前季高亮色：与宏的 RGB(0,176,80) 一致 */
 export const COLOR_CURRENT_SEASON = '#00B050'
@@ -296,6 +304,32 @@ export function groupRules(
     else groups.set(rule.group, [rule])
   }
   return [...groups]
+}
+
+/**
+ * 工作表既有规则快照 → 规则库条目（「导入」用）
+ *
+ * 只转**公式类**：数据条 / 图标集 / 色阶的类型插件无法重建（
+ * {@link planApply} 的 append-after 会因此降级），导进来只会得到一条看着像、
+ * 实际不生效的规则，所以直接拒绝并让调用方提示原因。
+ *
+ * @returns 可导入返回条目；不可导入返回 null
+ */
+export function foreignSnapshotToRule(
+  snapshot: ForeignRuleSnapshot,
+  makeId: () => string,
+): ConditionalFormatRule | null {
+  if (snapshot.kind !== 'expression' || !snapshot.formula) return null
+  return {
+    id: makeId(),
+    name: `导入 ${snapshot.range || '未知范围'}`,
+    group: IMPORTED_RULE_GROUP,
+    appliesTo: snapshot.range,
+    formula: snapshot.formula,
+    // 读不到颜色时给中灰：规则库里必须有个可见色块，否则用户分不出是哪条
+    interior: snapshot.interior ?? IMPORTED_RULE_FALLBACK_COLOR,
+    ...(snapshot.fontColor !== undefined && { fontColor: snapshot.fontColor }),
+  }
 }
 
 // ===== 应用计划 =====

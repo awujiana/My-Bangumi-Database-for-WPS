@@ -25,9 +25,11 @@ import {
   CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
   CONDITIONAL_FORMAT_STORE_KEY,
   CONDITIONAL_FORMAT_STRATEGY_KEY,
+  IMPORTED_RULE_GROUP,
   buildDefaultRules,
   filterRules,
   firstRowOfRange,
+  foreignSnapshotToRule,
   groupRules,
   parseRules,
   planApply,
@@ -40,10 +42,22 @@ import type {
   ForeignRuleSnapshot,
 } from './conditional-format-rules.js'
 import {
+  FOREIGN_RULE_PAGE_SIZE,
+  buildForeignRuleHeadHtml,
+  buildForeignRuleRowHtml,
+  filterForeignRuleRows,
+  fcTypeLabel,
+  paginate,
+  toForeignRuleRows,
+} from './conditional-format-table.js'
+import {
   applyConditionalFormatPlan,
   checkFormatConditionsReadable,
+  deleteForeignRule,
   isFormatConditionsSupported,
+  moveForeignRule,
   readForeignRules,
+  setForeignStopIfTrue,
 } from './conditional-format-apply.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
@@ -74,8 +88,8 @@ function readMigratedConfig(targetKey: string, legacyKey: string): string {
   return legacy
 }
 
-/** 导入的手工规则所在分组 */
-const IMPORTED_GROUP = '导入的规则'
+/** 从工作表导入的既有规则所在分组（与 rules.ts 的 IMPORTED_RULE_GROUP 同源） */
+const IMPORTED_GROUP = IMPORTED_RULE_GROUP
 
 // ===== 页面状态 =====
 
@@ -104,6 +118,10 @@ interface PageState {
   existing: ForeignRuleSnapshot[]
   /** 读取既有规则的失败原因；null = 正常读到（可能为空表） */
   existingError: string | null
+  /** 既有规则表格的搜索词 */
+  existingQuery: string
+  /** 既有规则表格的当前页码（1 基） */
+  existingPage: number
 }
 
 const state: PageState = {
@@ -117,6 +135,8 @@ const state: PageState = {
   pendingStrategy: CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
   existing: [],
   existingError: null,
+  existingQuery: '',
+  existingPage: 1,
 }
 
 // ===== DOM 辅助 =====
@@ -217,22 +237,7 @@ function reloadSheets(): void {
 
 // ===== 工作表既有规则（只读）=====
 
-/** WPS/Excel XlFormatConditionType 中文标签；未知类型显示原始编号 */
-const FC_TYPE_LABELS: Record<number, string> = {
-  1: '单元格值',
-  2: '公式',
-  3: '色阶',
-  4: '数据条',
-  5: 'Top10 / 平均值',
-  6: '图标集',
-}
-
-function fcTypeLabel(type: number | undefined, kind: 'expression' | 'other'): string {
-  if (type === undefined) return kind === 'expression' ? '公式' : '其它类型'
-  return FC_TYPE_LABELS[type] ?? `类型 ${String(type)}`
-}
-
-/** 读目标工作表既有规则并渲染（只读；导入走 importForeign） */
+/** 读目标工作表既有规则并渲染（表格呈现，可管理） */
 function loadExistingRules(): void {
   const entry = selectedSheet()
   if (!entry) {
@@ -255,45 +260,195 @@ function loadExistingRules(): void {
     state.existing = []
     state.existingError = `读取失败：${(error as Error).message}`
   }
+  // 换表 / 重读后回到第一页：留在越界页会看到空列表，用户会以为规则没了
+  state.existingPage = 1
   renderExistingRules()
 }
 
-/** 渲染既有规则列表（只读，按优先级排列） */
+/** 渲染既有规则表格（分页 + 搜索 + 行内管理） */
 function renderExistingRules(): void {
   const container = byId('conditionalFormatExistingList')
   if (!container) return
+
   if (state.existingError !== null) {
     container.innerHTML = `<p class="conditional-format-empty">${escapeHtml(state.existingError)}</p>`
     setText('conditionalFormatExistingCount', '—')
+    renderExistingPagination(1, 1)
     return
   }
   if (state.existing.length === 0) {
     container.innerHTML = '<p class="conditional-format-empty">这张表当前没有条件格式规则。</p>'
     setText('conditionalFormatExistingCount', '0 条')
+    renderExistingPagination(1, 1)
     return
   }
 
-  setText('conditionalFormatExistingCount', `${String(state.existing.length)} 条`)
-  container.innerHTML = state.existing
-    .map(
-      (rule, index) => `
-      <div class="conditional-format-rule">
-        <span class="conditional-format-existing-index" title="优先级（靠前先生效）">${String(index + 1)}</span>
-        <div class="conditional-format-rule-main">
-          <div class="conditional-format-rule-name">${escapeHtml(fcTypeLabel(rule.type, rule.kind))}${
-            rule.kind === 'other' ? ' · 插件无法重建' : ''
-          }</div>
-          <div class="conditional-format-rule-meta">${escapeHtml(rule.range || '（未读到范围）')}${
-            rule.formula
-              ? ` · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
-                  rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula,
-                )}</code>`
-              : ''
-          }</div>
-        </div>
-      </div>`,
+  const rows = toForeignRuleRows(state.existing)
+  const matched = filterForeignRuleRows(rows, state.existingQuery)
+  const page = paginate(matched, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
+  // 分页后页码可能被收敛（删掉一页里的全部规则后），回写 state 让翻页按钮用同一页
+  state.existingPage = page.page
+
+  const hiddenByFilter = state.existing.length - matched.length
+  setText(
+    'conditionalFormatExistingCount',
+    `${String(state.existing.length)} 条${
+      hiddenByFilter > 0 ? `（筛出 ${String(matched.length)} 条）` : ''
+    }`,
+  )
+
+  // 一次 innerHTML 写入（表头 + 本页行）；行内事件在容器上委托，见 handleExistingTableClick
+  container.innerHTML = `${buildForeignRuleHeadHtml()}${page.items
+    .map((row) => buildForeignRuleRowHtml(row))
+    .join('')}`
+  renderExistingPagination(page.page, page.pageCount)
+}
+
+/** 渲染既有规则表格的分页条（页码 + 上下页） */
+function renderExistingPagination(current: number, pageCount: number): void {
+  const container = byId('conditionalFormatExistingPager')
+  if (!container) return
+  if (pageCount <= 1) {
+    container.replaceChildren()
+    return
+  }
+  container.innerHTML = `
+    <button type="button" class="bgm-btn small" data-page-action="prev" ${
+      current <= 1 ? 'disabled' : ''
+    }>‹ 上一页</button>
+    <span class="conditional-format-pager-label">第 ${String(current)} / ${String(pageCount)} 页</span>
+    <button type="button" class="bgm-btn small" data-page-action="next" ${
+      current >= pageCount ? 'disabled' : ''
+    }>下一页 ›</button>`
+}
+
+// ===== 既有规则的行内操作 =====
+
+/**
+ * 既有规则表格的事件委托
+ *
+ * **不给每行绑监听器**：实测用户的表有 347 条既有规则，逐行绑就是 347×N 个
+ * 监听器 + 347 次 querySelectorAll，翻页时还要手动解绑。容器上代理一次即可。
+ * 行的 1 基序号从 `data-row-index` 取（与 FormatConditions.Item 下标一致）。
+ */
+function handleExistingTableClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  const pageButton = target.closest<HTMLElement>('[data-page-action]')
+  if (pageButton) {
+    const direction = pageButton.dataset.pageAction === 'prev' ? -1 : 1
+    state.existingPage = Math.max(1, state.existingPage + direction)
+    renderExistingRules()
+    return
+  }
+  const button = target.closest<HTMLButtonElement>('button[data-action]')
+  if (!button) return
+  const row = button.closest<HTMLElement>('[data-row-index]')
+  const index = Number(row?.dataset.rowIndex ?? '0')
+  if (!Number.isSafeInteger(index) || index < 1) return
+
+  switch (button.dataset.action) {
+    case 'import': {
+      importForeignRule(index)
+      break
+    }
+    case 'delete': {
+      deleteForeignRuleRow(index)
+      break
+    }
+    case 'up': {
+      moveForeignRuleRow(index, -1)
+      break
+    }
+    case 'down': {
+      moveForeignRuleRow(index, 1)
+      break
+    }
+    default: {
+      break
+    }
+  }
+}
+
+/** 既有规则表格里勾选「如果为真则停止」 */
+function handleExistingTableChange(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  if (target?.dataset.action !== 'stop') return
+  const row = target.closest<HTMLElement>('[data-row-index]')
+  const index = Number(row?.dataset.rowIndex ?? '0')
+  if (!Number.isSafeInteger(index) || index < 1) return
+  const entry = selectedSheet()
+  if (!entry) return
+  const result = setForeignStopIfTrue(entry.worksheet, index, target.checked)
+  if (result.ok) {
+    showToast(
+      `第 ${String(index)} 条规则已设为${target.checked ? '命中即停' : '继续评估后续'}`,
+      'success',
     )
-    .join('')
+    loadExistingRules()
+  } else {
+    // 写不进去要把复选框还原：否则用户以为生效了，实际没有
+    target.checked = !target.checked
+    showToast(`设置失败：${result.error}`, 'error')
+  }
+}
+
+/** 单条既有规则导入规则库 */
+function importForeignRule(index: number): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    return
+  }
+  const rule = foreignSnapshotToRule(snapshot, nextId)
+  if (!rule) {
+    showToast(
+      `第 ${String(index)} 条是${fcTypeLabel(snapshot.type, snapshot.kind)}，插件无法重建该类型，不能导入`,
+      'warn',
+    )
+    return
+  }
+  state.rules = [...state.rules, rule]
+  persistRules()
+  renderRuleList()
+  showToast(`已导入第 ${String(index)} 条规则到「${IMPORTED_GROUP}」`, 'success')
+}
+
+/** 从工作表删除单条既有规则 */
+function deleteForeignRuleRow(index: number): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    return
+  }
+  const label = snapshot.range || `第 ${String(index)} 条`
+  const result = deleteForeignRule(entry.worksheet, index)
+  if (!result.ok) {
+    showToast(`删除失败：${result.error}`, 'error')
+    return
+  }
+  showToast(`已删除 ${label} 上的规则`, 'success')
+  loadExistingRules()
+}
+
+/** 调整既有规则优先级 */
+function moveForeignRuleRow(index: number, direction: -1 | 1): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const total = state.existing.length
+  if (index < 1 || index > total) return
+  const target = index + direction
+  if (target < 1 || target > total) return
+  const result = moveForeignRule(entry.worksheet, index, direction)
+  if (!result.ok) {
+    showToast(`调整失败：${result.error}`, 'error')
+    return
+  }
+  loadExistingRules()
 }
 
 // ===== Store 读写 =====
@@ -720,7 +875,9 @@ function importForeign(): void {
     return
   }
   const foreign = readForeignRules(entry.worksheet)
-  const expressible = foreign.filter((rule) => rule.kind === 'expression' && rule.formula)
+  const expressible = foreign
+    .map((rule) => foreignSnapshotToRule(rule, nextId))
+    .filter((rule): rule is ConditionalFormatRule => rule !== null)
   if (expressible.length === 0) {
     showToast(
       foreign.length === 0
@@ -731,21 +888,12 @@ function importForeign(): void {
     loadExistingRules()
     return
   }
-  const imported: ConditionalFormatRule[] = expressible.map((rule) => ({
-    id: nextId(),
-    name: `导入 ${rule.range}`,
-    group: IMPORTED_GROUP,
-    appliesTo: rule.range,
-    formula: rule.formula,
-    interior: rule.interior ?? '#CCCCCC',
-    ...(rule.fontColor !== undefined && { fontColor: rule.fontColor }),
-  }))
-  state.rules = [...state.rules, ...imported]
+  state.rules = [...state.rules, ...expressible]
   persistRules()
   renderRuleList()
   const skipped = foreign.length - expressible.length
   showToast(
-    `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条非公式类无法导入）` : ''}`,
+    `已导入 ${String(expressible.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条非公式类无法导入）` : ''}`,
     'success',
   )
 }
@@ -780,6 +928,15 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatRefreshExistingBtn')?.addEventListener('click', () => {
     loadExistingRules()
   })
+
+  // 既有规则表格：搜索 + 事件委托（不给每行绑监听器，347 条规则下才不卡）
+  inputById('conditionalFormatExistingSearch')?.addEventListener('input', (event) => {
+    state.existingQuery = (event.target as HTMLInputElement).value
+    state.existingPage = 1
+    renderExistingRules()
+  })
+  byId('conditionalFormatExistingList')?.addEventListener('click', handleExistingTableClick)
+  byId('conditionalFormatExistingList')?.addEventListener('change', handleExistingTableChange)
 
   // 规则操作
   byId('conditionalFormatNewRuleBtn')?.addEventListener('click', () => {

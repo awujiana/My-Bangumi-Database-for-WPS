@@ -80,6 +80,108 @@ function readFontColor(fc: WpsFormatCondition): string | undefined {
   }
 }
 
+/** 读「如果为真则停止」（尽力而为；宿主不暴露时留空，UI 显示为未设置） */
+function readStopIfTrue(fc: WpsFormatCondition): boolean | undefined {
+  try {
+    const value = fc.StopIfTrue
+    return typeof value === 'boolean' ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * 取第 index 条（1 基，与 FormatConditions.Item 一致）规则对象
+ *
+ * 统一入口：调用方拿不到对象时（Item 不存在 / 越界 / 宿主抛错）返回 null，
+ * 由调用方给出「操作失败」提示，不静默当成功。
+ */
+export function getForeignCondition(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+): WpsFormatCondition | null {
+  const formatConditions = worksheet?.UsedRange?.FormatConditions
+  if (typeof formatConditions?.Item !== 'function') return null
+  try {
+    // 宿主可能对越界下标返回 undefined 而非抛错，这里统一收敛成 null
+    return formatConditions.Item(index) ?? null
+  } catch (error: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[conditionalFormatApply] 取第 ${String(index)} 条规则失败: ${(error as Error).message}`,
+    )
+    return null
+  }
+}
+
+/**
+ * 删除工作表上第 index 条既有规则
+ *
+ * WPS 对 FormatCondition.Delete 的支持随版本/只读代理而变，故用可选调用 +
+ * try 包裹：失败返回错误文案（页面提示），绝不静默返回成功。
+ */
+export function deleteForeignRule(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+): { ok: true } | { ok: false; error: string } {
+  const fc = getForeignCondition(worksheet, index)
+  if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
+  if (typeof fc.Delete !== 'function') {
+    return { ok: false, error: '当前 WPS 版本不支持删除单条规则，请用「清空后应用」' }
+  }
+  try {
+    fc.Delete()
+    return { ok: true }
+  } catch (error: unknown) {
+    return { ok: false, error: (error as Error).message }
+  }
+}
+
+/**
+ * 设置「如果为真则停止」
+ *
+ * 同理：写不进去就明说，不假装成功（用户会以为设置生效了）。
+ */
+export function setForeignStopIfTrue(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+  isStopIfTrue: boolean,
+): { ok: true } | { ok: false; error: string } {
+  const fc = getForeignCondition(worksheet, index)
+  if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
+  try {
+    fc.StopIfTrue = isStopIfTrue
+    return { ok: true }
+  } catch (error: unknown) {
+    return { ok: false, error: (error as Error).message }
+  }
+}
+
+/**
+ * 调整既有规则优先级（-1 上移 / +1 下移）
+ *
+ * 用 SetFirstPriority / SetLastPriority 而不是删了重建——重建会丢格式。
+ * 只支持相邻移动：跨多条的拖拽排序需要多次调用，代价高且易错，先不做。
+ */
+export function moveForeignRule(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+  direction: -1 | 1,
+): { ok: true } | { ok: false; error: string } {
+  const fc = getForeignCondition(worksheet, index)
+  if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
+  const setter = direction === -1 ? fc.SetFirstPriority : fc.SetLastPriority
+  if (typeof setter !== 'function') {
+    return { ok: false, error: '当前 WPS 版本不支持调整规则优先级' }
+  }
+  try {
+    setter.call(fc)
+    return { ok: true }
+  } catch (error: unknown) {
+    return { ok: false, error: (error as Error).message }
+  }
+}
+
 /**
  * 读工作表既有条件格式规则快照
  *
@@ -98,16 +200,22 @@ export function readForeignRules(
   for (let index = 1; index <= count; index += 1) {
     try {
       const fc = formatConditions.Item(index)
-      const interior = readInteriorColor(fc)
-      const fontColor = readFontColor(fc)
-      snapshots.push({
-        range: fc.AppliesTo?.Address ?? '',
-        formula: typeof fc.Formula1 === 'string' ? fc.Formula1 : '',
-        kind: fc.Type === XL_EXPRESSION ? 'expression' : 'other',
-        ...(typeof fc.Type === 'number' && { type: fc.Type }),
-        ...(interior !== undefined && { interior }),
-        ...(fontColor !== undefined && { fontColor }),
-      })
+      // 越界下标下宿主可能返回 undefined：把该下标读成空快照跳过，
+      // 而不是把整批读成空（项目禁用 continue，故用条件包裹而非提前跳）
+      if (fc) {
+        const interior = readInteriorColor(fc)
+        const fontColor = readFontColor(fc)
+        const stopIfTrue = readStopIfTrue(fc)
+        snapshots.push({
+          range: fc.AppliesTo?.Address ?? '',
+          formula: typeof fc.Formula1 === 'string' ? fc.Formula1 : '',
+          kind: fc.Type === XL_EXPRESSION ? 'expression' : 'other',
+          ...(typeof fc.Type === 'number' && { type: fc.Type }),
+          ...(interior !== undefined && { interior }),
+          ...(fontColor !== undefined && { fontColor }),
+          ...(stopIfTrue !== undefined && { stopIfTrue }),
+        })
+      }
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,

@@ -1,0 +1,26 @@
+diff --git a/node_modules/wpsjs/src/lib/debug_publish.js b/node_modules/wpsjs/src/lib/debug_publish.js
+index 77f1019..836157f 100644
+--- a/node_modules/wpsjs/src/lib/debug_publish.js
++++ b/node_modules/wpsjs/src/lib/debug_publish.js
+@@ -73,7 +73,7 @@ function startNormalServer(serverPort){
+                 pos += 6
+             }
+             htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
+-            response.writeHead(200, "OK", { "Content-Type": "text/html" })
++            response.writeHead(200, "OK", { "Content-Type": "text/html; charset=utf-8", "Content-Length": Buffer.byteLength(htmlData) })
+             response.end(htmlData)
+         } else if (req.originalUrl.endsWith("/hot-update-inject.js")) {
+             response.writeHead(200, "OK", { "Content-Type": "application/javascript; charset=utf-8" })
+diff --git a/node_modules/wpsjs/src/lib/debug_xmlplugin.js b/node_modules/wpsjs/src/lib/debug_xmlplugin.js
+index 56dfbb2..0824573 100644
+--- a/node_modules/wpsjs/src/lib/debug_xmlplugin.js
++++ b/node_modules/wpsjs/src/lib/debug_xmlplugin.js
+@@ -205,7 +205,7 @@ function StartServer(jspluginsXml, callback) {
+ 				pos += 6
+ 			}
+ 			htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
+-			response.writeHead(200, "OK", { "Content-Type": "text/html" })
++			response.writeHead(200, "OK", { "Content-Type": "text/html; charset=utf-8", "Content-Length": Buffer.byteLength(htmlData) })
+ 			response.end(htmlData)
+ 		} else if (req.originalUrl.endsWith("/hot-update-inject.js")) {
+ 			response.writeHead(200, "OK", { "Content-Type": "application/javascript; charset=utf-8" })

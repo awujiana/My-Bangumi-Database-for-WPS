@@ -26,7 +26,7 @@
     "gate": "npm run lint:check && npm run check:dompurify-version && npm run check:cycles && npm run check:ribbon-buttons && npm run check:nav-order && npm run check:com-in-loop && npm run typecheck:tests && npm run test",
     "format": "prettier --write ts/ tests/",
     "format:check": "prettier --check ts/ tests/",
-    "prepare": "husky",
+    "prepare": "husky && patch-package",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -56,6 +56,7 @@
     "husky": "^9.1.7",
     "jsdom": "^30.1.3",
     "lint-staged": "^17.6.0",
+    "patch-package": "^8.0.1",
     "prettier": "^3.9.10",
     "ts-declaration-location": "^1.0.7",
     "typescript": "^6.0.3",

@@ -8,6 +8,46 @@
 
 ## [未发布]
 
+### 条件格式管理器升级：既有规则从「只读列表」变成「可管理表格」（2026-10-21）
+
+对标 WPS 原生规则管理器并超出：WPS 的「格式规则」窗格只支持新建 / 编辑 / 删除 / 上下移，
+且规则量大时整表一次性渲染会明显掉帧。本次把「既有规则」区重做成表格。
+
+- **表格列**：# / 类型 / 格式预览 / 应用于 / 公式 / 如果为真则停止 / 操作。
+  格式预览同时显示填充色与字体色（WPS 只显示填充）；读不到颜色时给斜纹占位，
+  而不是空白——用户分得出「没读到」和「就是没颜色」。
+- **行内管理**：导入规则库 / 上移 / 下移 / 删除 / 「如果为真则停止」勾选。
+  删除与排序走 `fc.Delete()` / `SetFirstPriority()` / `SetLastPriority()`，
+  全部可选调用 + try 包裹，宿主不支持时**明确报错**而不是假装成功
+  （用户会以为设置生效了）。
+- **性能**：每页 50 条分页，容器上**事件委托**代替逐行绑监听器
+  （逐行绑就是 347×N 个监听器 + 347 次 querySelectorAll，翻页还要手动解绑）。
+- **搜索既有规则**（WPS 只有「当前选择 / 整表」下拉）：命中类型 / 范围 / 公式 /
+  **颜色**——用户找规则时常记得「那条黄色的」而不记得公式。
+- **新模块 `ts/panel/conditional-format-table.ts`**（纯函数）：行模型 / 筛选 / 分页 /
+  行 HTML 生成，零 WPS / DOM 依赖，Node 直跑单测 26 例（含 XSS 转义边界：
+  公式与范围来自 Excel 内容，是注入入口）。
+- **`ForeignRuleSnapshot` 增加 `stopIfTrue`**；`WpsFormatConditions.Item` 的返回类型
+  补上 `| undefined`——越界下标下部分 WPS 版本返回 undefined 而非抛错，
+  原来的类型签名不诚实，`getForeignCondition()` 的判空因此被 lint 判为「恒真」。
+
+### 修复
+
+- **`escapeHtml` 不是纯函数**（真 bug）：实现用 `document.createElement('div')` +
+  `textContent` → `innerHTML`，却放在 `string-utilities-pure.ts` 里。
+  后果：所有 import 它的模块（本次的 `conditional-format-table.ts`）在 Node /
+  单测环境直接抛 `document is not defined`，且每次调用都建一次元素。
+  改为纯字符串替换（`& < > " '` 五字符），转义语义与 DOM 方案完全一致。
+
+### 工具链
+
+- **给 `wpsjs@2.2.3` 打 patch 并固化**（`patch-package` + `prepare` 钩子）：
+  `wpsjs debug` 的静态服务对 `.html` 请求手写 `Content-Type: text/html`
+  （**缺 charset**、chunked 无 `Content-Length`），WPS 客户端据此判
+  「主资源内容校验失败」并弹提示。补上 `text/html; charset=utf-8` 与
+  `Content-Length`，`patches/wpsjs+2.2.3.patch` 随仓库分发，`npm install` 后自动生效。
+  （wpsjs 上游最新版仍是 2.2.3，无修复版；官方论坛已确认该提示无功能影响。）
+
 ### 新增：命名规范化进入 lint 门禁（2026-10-20）
 
 前几轮 `cf → conditionalFormat`、`ws/col/sid → worksheet/column/subjectId` 都是**人工排查**出来的 ——
