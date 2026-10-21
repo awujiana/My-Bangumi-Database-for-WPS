@@ -711,15 +711,19 @@ function highlightPhasePreview(): void {
  * 为什么要拆片：`initializeHighlightPage` 一次性跑完时，里面的同步 COM
  * （getDataSheet / Range.Read / PluginStorage）全部落在宿主「新窗格 → attach →
  * COM 桥建好」的初始化窗口里，实测把 WPS 主线程卡 70 秒（宿主与渲染进程互锁死等，
- * 直到 JSAPI 桥看门狗超时）。拆片后每片之间让出主线程，且单片超时即停止自动初始化、
- * 降级为「点此继续」按钮（见 tools/com-ready.ts）。
+ * 直到 JSAPI 桥看门狗超时）。拆片后每片之间让出主线程。
+ *
+ * 为什么后两片标 `heavy`：真机实测（2026-10-21）—— 闸门 800ms 开启后轻分片
+ * 1057ms 全跑完（按钮已可用），但自动跑「读取工作表」仍卡 69735ms；降级后用户
+ * 点击继续只花 642ms。说明这个窗口不是靠延迟能绕开的，**自动跑重 COM 必然撞**，
+ * 所以后两片默认挂起为「点此加载数据」，实测够快后才自动跑（见 tools/com-ready.ts）。
  */
 export function createHighlightPagePhases(): ComPhase[] {
   return [
     { name: '恢复配置', run: highlightPhaseConfig },
     { name: '事件接线', run: highlightPhaseBind },
-    { name: '读取工作表', run: highlightPhaseSheet },
-    { name: '渲染预览', run: highlightPhasePreview },
+    { name: '读取工作表', run: highlightPhaseSheet, heavy: true },
+    { name: '渲染预览', run: highlightPhasePreview, heavy: true },
   ]
 }
 

@@ -16,7 +16,9 @@ import {
   COM_DEGRADED_EVENT,
   installComStartupFallback,
   isComGateOpen,
+  isHeavyAutoAllowed,
   openComGate,
+  readHeavyCostMs,
   readLastStallMs,
   resetComGateForTest,
   resolveGateDelayMs,
@@ -36,6 +38,17 @@ function installFakeHost(): Map<string, string> {
     },
   }
   return storage
+}
+
+/** 捕获挂起 / 降级事件里的 resume 与 mode（监听后返回可变容器） */
+function capturePending(): { resume?: () => void; mode?: string | undefined } {
+  const captured: { resume?: () => void; mode?: string | undefined } = {}
+  document.addEventListener(COM_DEGRADED_EVENT, (event: Event) => {
+    const { detail } = event as CustomEvent<{ resume: () => void; mode?: string }>
+    captured.resume = detail.resume
+    captured.mode = detail.mode
+  })
+  return captured
 }
 
 beforeEach(() => {
@@ -215,13 +228,13 @@ describe('自适应闸门延迟', () => {
   })
 
   it('有 stall 记录 → 延迟 = stall + 200ms 余量', () => {
-    installFakeHost().set('bgm_com_stall_highlight', '10000')
-    expect(resolveGateDelayMs('highlight')).toBe(10_200)
+    installFakeHost().set('bgm_com_stall_highlight', '1000')
+    expect(resolveGateDelayMs('highlight')).toBe(1200)
   })
 
-  it('延迟有上限 15s（再长就不是初始化窗口的问题了）', () => {
+  it('延迟有上限 3s（重活已改按需，没必要让按钮陪着等十几秒）', () => {
     installFakeHost().set('bgm_com_stall_highlight', '70000')
-    expect(resolveGateDelayMs('highlight')).toBe(15_000)
+    expect(resolveGateDelayMs('highlight')).toBe(3000)
   })
 
   it('踩到 stall 后会把观测值写进 PluginStorage（下次绕开窗口）', () => {
@@ -286,5 +299,131 @@ describe('降级兜底 UI', () => {
       }),
     )
     expect(document.getElementById('bgm-com-fallback')).toBeNull()
+  })
+
+  it('awaiting 模式文案是「点此加载数据」（还没跑，不是跑崩了）', () => {
+    installComStartupFallback('highlight')
+    document.dispatchEvent(
+      new CustomEvent(COM_DEGRADED_EVENT, {
+        detail: {
+          pageKey: 'highlight',
+          reason: '先挂起',
+          mode: 'awaiting',
+          resume: () => {
+            // 不该被调用
+          },
+        },
+      }),
+    )
+    const button = document.getElementById('bgm-com-fallback')?.querySelector('button')
+    expect(button?.textContent).toBe('点此加载数据')
+  })
+})
+
+describe('重分片（heavy）按需：不再拿用户赌 70 秒', () => {
+  it('无历史记录 → 重分片挂起，不自动跑', () => {
+    const heavy = vi.fn()
+    runComPhases('highlight', [
+      {
+        name: '配置',
+        run: () => {
+          // 轻分片：占位
+        },
+      },
+      { name: '读取工作表', run: heavy, heavy: true },
+    ])
+    openComGate('highlight')
+    vi.advanceTimersByTime(3000)
+
+    expect(heavy).not.toHaveBeenCalled()
+  })
+
+  it('轻分片照常自动跑（按钮尽早可用），只有重分片挂起', () => {
+    const light = vi.fn()
+    const heavy = vi.fn()
+    runComPhases('highlight', [
+      { name: '事件接线', run: light },
+      { name: '读取工作表', run: heavy, heavy: true },
+    ])
+    openComGate('highlight')
+    vi.advanceTimersByTime(3000)
+
+    expect(light).toHaveBeenCalledTimes(1)
+    expect(heavy).not.toHaveBeenCalled()
+  })
+
+  it('挂起时派发 awaiting 事件，用户点击才跑重分片', () => {
+    const captured = capturePending()
+    const heavy = vi.fn()
+    runComPhases('highlight', [{ name: '读取工作表', run: heavy, heavy: true }])
+    openComGate('highlight')
+    vi.advanceTimersByTime(3000)
+
+    expect(captured.mode).toBe('awaiting')
+    captured.resume?.()
+    vi.advanceTimersByTime(100)
+    expect(heavy).toHaveBeenCalledTimes(1)
+  })
+
+  it('重分片跑完且够快 → 记下耗时，下次自动跑（自愈）', () => {
+    const captured = capturePending()
+    const heavy = vi.fn()
+    const phases = [{ name: '读取工作表', run: heavy, heavy: true }]
+
+    runComPhases('highlight', phases)
+    openComGate('highlight')
+    vi.advanceTimersByTime(3000)
+    expect(heavy).not.toHaveBeenCalled()
+
+    captured.resume?.()
+    vi.advanceTimersByTime(100)
+    expect(heavy).toHaveBeenCalledTimes(1)
+    expect(readHeavyCostMs('highlight')).toBeGreaterThan(0)
+    expect(readHeavyCostMs('highlight')).toBeLessThanOrEqual(1500)
+
+    // 第二次打开同一页：应自动跑，不再弹按钮
+    resetComGateForTest()
+    heavy.mockClear()
+    runComPhases('highlight', phases)
+    openComGate('highlight')
+    vi.advanceTimersByTime(3000)
+    expect(heavy).toHaveBeenCalledTimes(1)
+  })
+
+  it('曾 stall 过 → 即使有耗时记录也不自动跑', () => {
+    const storage = installFakeHost()
+    storage.set('bgm_com_stall_highlight', '69735')
+    storage.set('bgm_com_heavy_highlight', '642')
+    expect(isHeavyAutoAllowed('highlight')).toBe(false)
+  })
+
+  it('实测耗时超预算 → 下次仍不自动跑', () => {
+    const storage = installFakeHost()
+    storage.set('bgm_com_heavy_highlight', '5000')
+    expect(isHeavyAutoAllowed('highlight')).toBe(false)
+  })
+
+  it('重分片实测够快 → 清掉 stall 记录（窗口过了就恢复自动）', () => {
+    const storage = installFakeHost()
+    storage.set('bgm_com_stall_highlight', '69735')
+    const captured = capturePending()
+
+    // 历史 stall 69735ms → 本次闸门延迟被抬到上限 3s（先把闸门等开）
+    runComPhases('highlight', [
+      {
+        name: '读取工作表',
+        run: () => {
+          // 模拟用户点击时已出窗口：瞬时完成
+        },
+        heavy: true,
+      },
+    ])
+    openComGate('highlight')
+    vi.advanceTimersByTime(5000)
+    captured.resume?.()
+    vi.advanceTimersByTime(100)
+
+    expect(storage.get('bgm_com_stall_highlight')).toBe('0')
+    expect(isHeavyAutoAllowed('highlight')).toBe(true)
   })
 })
