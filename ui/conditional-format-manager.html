@@ -45,12 +45,24 @@
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="conditional-format-dialog-inner">
-      <!-- 目标工作表：与任务窗格页同 id，共用 reloadSheets / 选中逻辑 -->
+      <!-- 目标工作簿 + 工作表（两级联动）：与任务窗格页同 id，共用 reloadSheets / 选中逻辑 -->
       <div class="conditional-format-sheet-row">
+        <label class="conditional-format-dialog-label" for="conditionalFormatWorkbook">
+          目标工作簿
+        </label>
+        <select
+          id="conditionalFormatWorkbook"
+          class="conditional-format-select"
+          aria-label="目标工作簿"
+        ></select>
         <label class="conditional-format-dialog-label" for="conditionalFormatSheet">
           目标工作表
         </label>
-        <select id="conditionalFormatSheet" class="conditional-format-select"></select>
+        <select
+          id="conditionalFormatSheet"
+          class="conditional-format-select"
+          aria-label="目标工作表"
+        ></select>
         <button type="button" class="bgm-btn small" id="conditionalFormatReloadSheetsBtn">
           🔄 刷新列表
         </button>

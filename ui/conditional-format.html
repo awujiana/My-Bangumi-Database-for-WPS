@@ -69,10 +69,20 @@
             </button>
           </h3>
           <p class="hint">
-            规则库是全局的，这里选「应用到哪张表、从哪张表读既有规则」。已打开工作簿的全部工作表都可选。
+            规则库是全局的，这里选「应用到哪张表、从哪张表读既有规则」：
+            先选目标工作簿，再在二级菜单里选该工作簿下的工作表。
           </p>
           <div class="conditional-format-sheet-row">
-            <select id="conditionalFormatSheet" class="conditional-format-select"></select>
+            <select
+              id="conditionalFormatWorkbook"
+              class="conditional-format-select"
+              aria-label="目标工作簿"
+            ></select>
+            <select
+              id="conditionalFormatSheet"
+              class="conditional-format-select"
+              aria-label="目标工作表"
+            ></select>
             <button type="button" class="bgm-btn small" id="conditionalFormatReloadSheetsBtn">
               🔄 刷新列表
             </button>
