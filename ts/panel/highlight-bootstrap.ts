@@ -7,7 +7,7 @@
  * 注意：本文件由 tsc 编译至 dist-ts/，由 ui/highlight.html 通过
  *   <script type="module" src="../dist-ts/panel/highlight-bootstrap.js"> 加载。
  *
- * ===== 为什么改成「零 COM 首屏 + 分片 + 闸门」 =====
+ * ===== 为什么改成「零 COM 首屏 + 轻量分片」，且数据读取 100% 交给用户点击 =====
  *
  * 新任务窗格打开时，WPS 宿主还在做「渲染进程 attach → COM 桥建好」的初始化；
  * 在这个窗口里从渲染进程**立即发起同步跨进程 COM**（getDataSheet /
@@ -22,10 +22,10 @@
  * 所以本文件遵守三条硬约束：
  *   1. **模块执行期零 COM**：这里只做纯 DOM（按钮门禁 / 外壳导航 / 拖出面板 / 兜底 UI）
  *      和「开闸门」（只注册事件，不发 COM）；
- *   2. **所有 COM 走分片**：createHighlightPagePhases() 把初始化切成小片，片间让出
- *      主线程，最重的「渲染预览」放最后；
- *   3. **踩窗口就降级**：单片超时即停止后续自动分片，弹出「点此继续初始化」
- *      （tools/com-ready.ts 的 installComStartupFallback）。用户点击时宿主必然空闲。
+ *   2. **初始化只跑轻量 COM**：createHighlightPagePhases() 仅做「恢复配置 + 事件接线」
+ *      （配置 / 枚举表名 / 主题），**绝不读单元格数据**；
+ *   3. **数据读取交给用户点击**：高亮页的「加载并预览」按钮在宿主早已 attach 之后才
+ *      触发重 COM，稀疏同步调用只有几百毫秒，不再撞窗口、也不轮询。
  */
 
 import { startPaneHeartbeat } from '../tools/pane-alive.js'
@@ -52,7 +52,8 @@ import { installComStartupFallback, openComGate, runComPhases } from '../tools/c
 const NOOP_PHASE = {
   name: '空分片',
   run: () => {
-    // 占位：正常路径下 createHighlightPagePhases 恒返回 4 个分片
+    // 占位：正常路径下 createHighlightPagePhases 现返回 2 个分片（配置 / 事件接线），
+    // 多余的槽位（原「读取工作表」「渲染预览」）已改为用户点击触发，不再自动跑。
   },
 }
 

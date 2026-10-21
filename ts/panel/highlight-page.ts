@@ -24,7 +24,6 @@ import {
   findHeaderRow,
   getApp,
   getColumnMap,
-  getDataSheet,
   getLastRow,
   markHighlightPaneLoaded,
   readRangeValues,
@@ -46,6 +45,8 @@ import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
+import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
+import type { SheetEntry } from '../tools/sheet-list.js'
 
 // ===== 配置键（PluginStorage，跨会话缓存）=====
 
@@ -55,6 +56,8 @@ const KEY_MODE = 'highlight.mode'
 const KEY_MANUAL = 'highlight.manual'
 const KEY_AUTO_WATCH = 'highlight.autoWatch'
 const KEY_LAST_APPLIED = 'highlight.lastApplied'
+/** 上次选中的工作表（稳定键：工作簿名::工作表名）；下次打开直接定位 */
+const KEY_SHEET = 'highlight.sheet'
 
 /** 日期源候选（规范列名，按自动模式的优先级排列） */
 const SOURCE_CANDIDATES = ['开播季度', '开播日期', '完播日'] as const
@@ -103,6 +106,10 @@ interface PageState {
   manual: YearMonth
   lastSelect: SeasonSelectResult
   lastTarget: YearMonth | null
+  /** 已打开工作簿/工作表枚举（来自 collectSheets，轻量 COM） */
+  sheets: SheetEntry[]
+  /** 选中的工作表稳定键（工作簿名::工作表名） */
+  selectedKey: string
 }
 
 const state: PageState = {
@@ -116,6 +123,8 @@ const state: PageState = {
   manual: { year: new Date().getFullYear(), month: 1 },
   lastSelect: { matchedRows: [], emptyCount: 0, invalidCount: 0 },
   lastTarget: null,
+  sheets: [],
+  selectedKey: '',
 }
 
 /** 自动跟随（SheetChange 常驻监听）的清理函数；开关关闭时为 null */
@@ -158,11 +167,13 @@ function columnLetter(column: number): string {
  * @returns 规范列名与列号；都识别不到返回 null
  */
 function resolveSource(): { key: string; column: number } | null {
-  const configured = getConfig(KEY_SOURCE, '', true)
-  if (configured) {
+  const configured = getConfig(KEY_SOURCE, '__auto__', true)
+  // 显式指定了某一列（含非日期列）：直接用它识别，不再自动猜
+  if (configured && configured !== '__auto__') {
     const column = state.columnMap.get(configured)
     if (column !== undefined) return { key: configured, column }
   }
+  // 自动：开播季度 > 开播日期 > 完播日（公式列已归一，匹配最准）
   for (const candidate of SOURCE_CANDIDATES) {
     const column = state.columnMap.get(candidate)
     if (column !== undefined) return { key: candidate, column }
@@ -223,15 +234,16 @@ function rebuildColumns(): void {
 function renderSourceSelect(): void {
   const select = selectById('highlightSource')
   if (!select) return
-  const configured = getConfig(KEY_SOURCE, '', true)
+  const configured = getConfig(KEY_SOURCE, '__auto__', true)
+  // 列出全部列供用户选「识别列」；默认「自动识别」按日期候选挑
   const options: string[] = ['__auto__']
-  for (const candidate of SOURCE_CANDIDATES) {
-    if (state.columnMap.has(candidate)) options.push(candidate)
+  for (const [name] of state.columnMap) {
+    if (name && name !== '__auto__') options.push(name)
   }
   select.innerHTML = options
     .map((value) => {
-      const label = value === '__auto__' ? '自动（公式列优先）' : value
-      const isSelected = configured === value || (configured === '' && value === '__auto__')
+      const label = value === '__auto__' ? '自动识别（日期列优先）' : value
+      const isSelected = configured === value
       return `<option value="${escapeHtml(value)}"${isSelected ? ' selected' : ''}>${escapeHtml(label)}</option>`
     })
     .join('')
@@ -284,6 +296,98 @@ function persistColumns(): void {
   const withSource =
     state.sourceKey && !checked.includes(state.sourceKey) ? [state.sourceKey, ...checked] : checked
   setConfig(KEY_COLUMNS, JSON.stringify(withSource))
+}
+
+// ===== 工作簿 / 工作表选择（显式，不自动猜、不轮询）=====
+
+/** 当前选中的枚举项（按稳定键反查） */
+function selectedSheetEntry(): SheetEntry | null {
+  return state.sheets.find((entry) => entry.key === state.selectedKey) ?? null
+}
+
+/** 当前选中的工作簿名（从选中表反推；选中为空时读下拉兜底） */
+function currentWorkbookName(): string {
+  const bySelected = selectedSheetEntry()?.workbook
+  if (bySelected) return bySelected
+  const select = selectById('highlightWorkbook')
+  return select?.value ?? ''
+}
+
+/** 渲染工作簿下拉（去重的工作簿名，保持枚举顺序） */
+function renderWorkbookSelect(): void {
+  const select = selectById('highlightWorkbook')
+  if (!select) return
+  const workbookNames: string[] = []
+  for (const entry of state.sheets) {
+    if (!workbookNames.includes(entry.workbook)) workbookNames.push(entry.workbook)
+  }
+  if (workbookNames.length === 0) {
+    select.innerHTML = '<option value="">（无已打开的工作簿）</option>'
+    return
+  }
+  const current = currentWorkbookName()
+  select.innerHTML = workbookNames
+    .map(
+      (name) =>
+        `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>`,
+    )
+    .join('')
+}
+
+/** 渲染工作表下拉：只显示当前工作簿下的表（两级联动） */
+function renderSheetSelect(): void {
+  const select = selectById('highlightSheet')
+  if (!select) return
+  const workbook = currentWorkbookName()
+  const visible = state.sheets.filter((entry) => entry.workbook === workbook)
+  if (visible.length === 0) {
+    select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>'
+    return
+  }
+  select.innerHTML = visible
+    .map(
+      (entry) =>
+        `<option value="${escapeHtml(entry.key)}"${entry.key === state.selectedKey ? ' selected' : ''}>${escapeHtml(entry.sheet)}</option>`,
+    )
+    .join('')
+}
+
+/** 工作簿切换：只重渲工作表下拉（轻量，不读数据） */
+function onWorkbookChange(): void {
+  const select = selectById('highlightWorkbook')
+  if (!select) return
+  // 切到新工作簿后，默认选中该簿下第一张表
+  const first = state.sheets.find((entry) => entry.workbook === select.value)
+  if (first) {
+    state.selectedKey = first.key
+    state.worksheet = first.worksheet
+    setConfig(KEY_SHEET, first.key)
+  }
+  renderSheetSelect()
+  resetSheetData()
+}
+
+/** 工作表切换：只记录选择（轻量），真正读表等用户点「加载并预览」 */
+function onSheetChange(): void {
+  const select = selectById('highlightSheet')
+  const entry = state.sheets.find((item) => item.key === select?.value)
+  state.selectedKey = entry?.key ?? ''
+  state.worksheet = entry?.worksheet ?? null
+  if (entry) setConfig(KEY_SHEET, entry.key)
+  resetSheetData()
+}
+
+/** 切表后清空上一表的列映射 / 预览 / 识别列下拉（避免串表） */
+function resetSheetData(): void {
+  state.columnMap = new Map()
+  state.columns = []
+  state.sourceKey = ''
+  state.sourceCol = 0
+  const sourceSelect = selectById('highlightSource')
+  if (sourceSelect)
+    sourceSelect.innerHTML = '<option value="__auto__">自动识别（先加载数据）</option>'
+  setText('highlightSheetName', selectedSheetEntry()?.sheet ?? '请选择工作表')
+  renderPreviewEmpty('点「加载并预览」读取该表并生成预览')
 }
 
 // ===== 预览 =====
@@ -617,26 +721,26 @@ function setMode(mode: 'auto' | 'manual'): void {
 
 // ===== 初始化 =====
 
-/** 重新绑定工作表与列映射（init 与「刷新预览」按钮共用） */
+/** 重新绑定工作表与列映射（「加载并预览」按钮共用）。只跑选定表，不自动猜。 */
 function reloadSheet(): void {
-  state.worksheet = getDataSheet()
-  if (!state.worksheet) {
-    setText('highlightSheetName', '未识别到数据工作表')
-    renderPreviewEmpty('请先打开包含番剧数据的工作表，然后点「刷新预览」')
+  const { worksheet } = state
+  if (!worksheet) {
+    setText('highlightSheetName', '请选择数据工作表')
+    renderPreviewEmpty('请先在上方选择工作簿与工作表，然后点「加载并预览」')
     return
   }
-  state.headerRow = findHeaderRow(state.worksheet)
-  state.columnMap = getColumnMap(state.worksheet, state.headerRow)
-  setText('highlightSheetName', state.worksheet.Name)
+  state.headerRow = findHeaderRow(worksheet)
+  state.columnMap = getColumnMap(worksheet, state.headerRow)
+  setText('highlightSheetName', worksheet.Name)
   renderSourceSelect()
   rebuildColumns()
   renderColumnList()
 }
 
 /**
- * 分片 1：恢复配置 + 主题（含 PluginStorage 读，属跨进程调用，必须过 COM 闸门）
- *
- * 不做工作表读取 —— 那是本页最重的 COM，单独放分片 3，避免它一卡把整页拖死。
+ * 分片 1：恢复配置 + 主题 + 枚举工作表（含 PluginStorage 读与 collectSheets，
+ *   属跨进程调用，必须过 COM 闸门）。只枚举**表名**，不读单元格数据——
+ *   真正的重活在用户点「加载并预览」时才发生（那时宿主早已 attach，不会卡）。
  */
 function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
@@ -651,15 +755,37 @@ function highlightPhaseConfig(): void {
     state.manual = { year: Number(manualMatch[1]), month: Number(manualMatch[2]) }
   }
   buildManualSelectors()
+
+  // 枚举已打开的工作簿 / 工作表（轻量 COM），默认定位到：
+  //   上次选中的表（KEY_SHEET）> 当前活动表 > 第一张表
+  state.sheets = collectSheets()
+  const savedKey = getConfig(KEY_SHEET, '', true)
+  const isSavedValid = state.sheets.some((entry) => entry.key === savedKey)
+  if (isSavedValid) {
+    state.selectedKey = savedKey
+  } else {
+    const active = activeWorksheet()
+    const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
+    state.selectedKey = (matched ?? state.sheets[0])?.key ?? ''
+  }
+  state.worksheet = selectedSheetEntry()?.worksheet ?? null
+  renderWorkbookSelect()
+  renderSheetSelect()
+  resetSheetData()
 }
 
 /** 分片 2：事件接线 + 启用按钮（纯 DOM，零 COM） */
 function highlightPhaseBind(): void {
+  const workbookSelect = selectById('highlightWorkbook')
+  workbookSelect?.addEventListener('change', onWorkbookChange)
+  const sheetSelect = selectById('highlightSheet')
+  sheetSelect?.addEventListener('change', onSheetChange)
+
   // 事件接线（直接用元素引用，不绕 event.target）
   const sourceSelect = selectById('highlightSource')
   sourceSelect?.addEventListener('change', () => {
     const { value } = sourceSelect
-    setConfig(KEY_SOURCE, value === '__auto__' ? '' : value)
+    setConfig(KEY_SOURCE, value === '__auto__' ? '__auto__' : value)
     refreshPreview()
     renderColumnListIfChanged()
   })
@@ -680,57 +806,44 @@ function highlightPhaseBind(): void {
     clearHighlight()
   })
 
-  // 恢复开关状态（默认关；打开时才注册 SheetChange，不常驻）
+  // 自动跟随开关：默认关，且**不再随页面打开自动注册**（不再轮询）。
+  // 用户手动勾选才生效，且本面板保持打开才会监听 SheetChange。
   const watchBox = inputById('highlightAutoWatch')
   if (watchBox) {
     watchBox.checked = getConfig(KEY_AUTO_WATCH, '0', true) === '1'
     watchBox.addEventListener('change', () => {
       setAutoWatch(watchBox.checked)
     })
-    if (watchBox.checked) setAutoWatch(true)
   }
 
-  // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底。
-  // 放在数据读取**之前** —— 宿主初始化窗口可能让后续分片推迟，但按钮必须能用。
+  // 启用 data-action 按钮
   notifyModulesReady()
 }
 
-/** 分片 3：读工作表（getDataSheet + 表头/列映射 —— 中等 COM 量） */
-function highlightPhaseSheet(): void {
-  reloadSheet()
-}
-
-/** 分片 4：渲染预览（大 Range 读 —— 本页最重的 COM，放最后，卡了也不影响按钮） */
-function highlightPhasePreview(): void {
-  refreshPreview()
-}
-
 /**
- * 高亮页初始化分片（顺序即依赖顺序，越重的越靠后）
+ * 高亮页初始化分片（仅轻量 COM）。
  *
- * 为什么要拆片：`initializeHighlightPage` 一次性跑完时，里面的同步 COM
- * （getDataSheet / Range.Read / PluginStorage）全部落在宿主「新窗格 → attach →
- * COM 桥建好」的初始化窗口里，实测把 WPS 主线程卡 70 秒（宿主与渲染进程互锁死等，
- * 直到 JSAPI 桥看门狗超时）。拆片后每片之间让出主线程。
- *
- * 为什么后两片标 `heavy`：真机实测（2026-10-21）—— 闸门 800ms 开启后轻分片
- * 1057ms 全跑完（按钮已可用），但自动跑「读取工作表」仍卡 69735ms；降级后用户
- * 点击继续只花 642ms。说明这个窗口不是靠延迟能绕开的，**自动跑重 COM 必然撞**，
- * 所以后两片默认挂起为「点此加载数据」，实测够快后才自动跑（见 tools/com-ready.ts）。
+ * 关键原则（2026-10-21 真机 bisect）：新窗格打开时若在宿主「attach → COM 桥建好」
+ * 的窗口里自动读表，会把 WPS 主线程卡 70 秒（宿主与渲染进程互锁死等，直到 JSAPI
+ * 桥看门狗超时）。所以初始化**只做轻量 COM**（配置 + 枚举表名 + 主题），数据读取
+ * 100% 交给用户点「加载并预览」——那时宿主早已就绪，稀疏同步 COM 只有几百毫秒，
+ * 不再撞窗口、也不轮询。
  */
 export function createHighlightPagePhases(): ComPhase[] {
   return [
     { name: '恢复配置', run: highlightPhaseConfig },
     { name: '事件接线', run: highlightPhaseBind },
-    { name: '读取工作表', run: highlightPhaseSheet, heavy: true },
-    { name: '渲染预览', run: highlightPhasePreview, heavy: true },
   ]
 }
 
-/** 一次性跑完所有分片（供测试 / 非窗格场景使用；窗格页面请走 runComPhases） */
+/** 一次性跑完所有分片并加载（供测试 / 非窗格场景；窗格页面请走 runComPhases） */
 export function initializeHighlightPage(): void {
   initializeShellNav()
   for (const phase of createHighlightPagePhases()) {
     phase.run()
   }
+  // 非窗格路径无下拉可选，直接对活动表做完整加载
+  state.worksheet ??= activeWorksheet()
+  reloadSheet()
+  refreshPreview()
 }
