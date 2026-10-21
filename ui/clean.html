@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/clean.css" />
     <link rel="stylesheet" href="../css/diff.css" />
   </head>
@@ -56,8 +57,18 @@
       <!-- ===================== 主区 ===================== -->
       <main class="main">
         <!-- 选择清理的表格（用户显式勾选；选择持久化到 PluginStorage） -->
-        <section class="section" id="sec-targets">
-          <h3>🎯 选择清理的表格<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-targets" aria-expanded="true" aria-label="折叠 / 展开「选择清理的表格」">▾</button></h3>
+        <section class="section" id="sec-targets" data-detachable>
+          <h3>
+            🎯 选择清理的表格<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-targets"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「选择清理的表格」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
             点击「📋 加载工作表」枚举已打开工作簿中的全部工作表，勾选本次要清理的目标。WPS
             临时锁文件与插件自身目录会被自动跳过；未识别到「名称」列的表仍可勾选，规则会按列缺失自动跳过。
@@ -74,8 +85,18 @@
         </section>
 
         <!-- 可清理项（勾选列表，由 CLEAN_RULES 渲染） -->
-        <section class="section" id="sec-items">
-          <h3>☑️ 可清理项<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-items" aria-expanded="true" aria-label="折叠 / 展开「可清理项」">▾</button></h3>
+        <section class="section" id="sec-items" data-detachable>
+          <h3>
+            ☑️ 可清理项<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-items"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「可清理项」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">勾选本次要执行的清理项。新增清理项只需在规则配置中追加，页面无需改动。</p>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small" id="cleanSelectAllBtn">✅ 全选</button>
@@ -85,12 +106,20 @@
         </section>
 
         <!-- 执行前预览 -->
-        <section class="section section-wide" id="sec-preview">
-          <h3>🔍 执行前预览<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-preview" aria-expanded="true" aria-label="折叠 / 展开「执行前预览」">▾</button></h3>
-          <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="cleanScanBtn">
-              🔍 扫描预览
+        <section class="section section-wide" id="sec-preview" data-detachable>
+          <h3>
+            🔍 执行前预览<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-preview"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「执行前预览」"
+            >
+              ▾
             </button>
+          </h3>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cleanScanBtn">🔍 扫描预览</button>
           </div>
           <div id="cleanPreviewSummary">
             <p class="hint">勾选后点击「🔍 扫描预览」查看待清理条目。</p>
@@ -99,8 +128,18 @@
         </section>
 
         <!-- 执行清理 -->
-        <section class="section" id="sec-run">
-          <h3>🧹 执行清理<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-run" aria-expanded="true" aria-label="折叠 / 展开「执行清理」">▾</button></h3>
+        <section class="section" id="sec-run" data-detachable>
+          <h3>
+            🧹 执行清理<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-run"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「执行清理」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
             执行前会二次确认。删除行不可撤销，建议先备份工作簿；执行顺序为「先更新单元格，再删除行」。
           </p>
@@ -114,8 +153,18 @@
         </section>
 
         <!-- 结果日志 -->
-        <section class="section" id="sec-log">
-          <h3>📜 结果日志<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-log" aria-expanded="true" aria-label="折叠 / 展开「结果日志」">▾</button></h3>
+        <section class="section" id="sec-log" data-detachable>
+          <h3>
+            📜 结果日志<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-log"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「结果日志」"
+            >
+              ▾
+            </button>
+          </h3>
           <div class="bgm-btn-group bgm-btn-row">
             <button
               class="bgm-btn small"

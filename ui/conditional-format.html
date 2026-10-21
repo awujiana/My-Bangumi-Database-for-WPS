@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/conditional-format.css" />
   </head>
   <body data-page="conditional-format">
@@ -55,7 +56,7 @@
       <!-- ===================== 主区 ===================== -->
       <main class="main">
         <!-- 目标工作表 -->
-        <section class="section" id="sec-target">
+        <section class="section" id="sec-target" data-detachable>
           <h3>
             🎯 目标工作表<button
               type="button"
@@ -78,8 +79,25 @@
           </div>
         </section>
 
-        <!-- 既有规则（可管理）：目标工作表当前的条件格式 -->
-        <section class="section section-wide" id="sec-existing">
+        <!--
+          既有规则（可管理）：目标工作表当前的条件格式。
+
+          data-detachable-* 是通用浮动窗口组件（ui/components/detachable-panel.ts）的契约：
+            - 默认就在页面上，是普通 section；
+            - 点「🔍 规则管理器」把整个 section 搬进浮动窗口（可拖动 / 缩放 / 最大化 / 收起）；
+            - 搬的是 DOM 节点本身，正文与窗口永远只有一份；
+            - conditionalFormatFloatToolbar 是本页专属工具条，挂进窗口标题栏。
+        -->
+        <section
+          class="section section-wide"
+          id="sec-existing"
+          data-detachable
+          data-detachable-title="条件格式规则管理器"
+          data-detachable-trigger="conditionalFormatFloatBtn"
+          data-detachable-toolbar="conditionalFormatFloatToolbar"
+          data-detachable-width="860"
+          data-detachable-height="560"
+        >
           <h3>
             👀 既有规则<button
               type="button"
@@ -93,8 +111,11 @@
           </h3>
           <p class="hint">
             目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
-            可以直接管理：导入规则库 / 上移下移 / 删除 / 「如果为真则停止」。 数据条 / 色阶 /
-            图标集等类型插件无法重建，双策略会按你的选择处理。
+            可以直接管理：勾选后批量导入 / 删除，或单条上移下移 / 「如果为真则停止」。 数据条 / 色阶
+            / 图标集等类型插件无法重建，双策略会按你的选择处理。
+            <br />点「🔍 规则管理器」把整个区块拖出成浮动窗口：可拖动、可缩放、
+            可最大化、可收起（对齐 WPS 原生的「条件格式规则管理器」体验）。
+            拖出后正文原位留一块占位，点「收回」或按 Esc 即回到页面。
           </p>
           <div class="conditional-format-toolbar">
             <input
@@ -107,13 +128,25 @@
             <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
+            <button type="button" class="bgm-btn small primary" id="conditionalFormatFloatBtn">
+              🔍 规则管理器
+            </button>
           </div>
-          <div id="conditionalFormatExistingList" class="conditional-format-table"></div>
-          <div id="conditionalFormatExistingPager" class="conditional-format-pager"></div>
+          <!-- 这一整块（工具栏 + 表格 + 分页 + 批量条）连同 section 一起在「正文」
+               与「浮动窗口」之间搬家，是唯一一份 DOM —— 见 detachable-panel.ts。 -->
+          <div id="conditionalFormatExistingPanel">
+            <div id="conditionalFormatExistingList" class="conditional-format-table"></div>
+            <div
+              id="conditionalFormatExistingBatchBar"
+              class="conditional-format-batch-bar"
+              hidden
+            ></div>
+            <div id="conditionalFormatExistingPager" class="conditional-format-pager"></div>
+          </div>
         </section>
 
         <!-- 规则管理 -->
-        <section class="section section-wide" id="sec-rules">
+        <section class="section section-wide" id="sec-rules" data-detachable>
           <h3>
             ☑️ 规则管理<button
               type="button"
@@ -217,7 +250,7 @@
         </section>
 
         <!-- 默认规则集 -->
-        <section class="section" id="sec-defaults">
+        <section class="section" id="sec-defaults" data-detachable>
           <h3>
             📦 默认规则集<button
               type="button"
@@ -241,7 +274,7 @@
         </section>
 
         <!-- 应用与修复 -->
-        <section class="section" id="sec-apply">
+        <section class="section" id="sec-apply" data-detachable>
           <h3>
             🖌️ 应用与修复<button
               type="button"
@@ -265,6 +298,48 @@
           <p class="conditional-format-apply-status" id="conditionalFormatApplyStatus"></p>
         </section>
       </main>
+    </div>
+
+    <!-- ===================== 规则管理器工具条（拖出时才显示） =====================
+         这是通用浮动窗口组件的「工具条插槽」内容：组件在窗口打开时把它搬进标题栏，
+         收回时再搬回这里并隐藏。按钮与 WPS 原生对齐：显示其格式规则 + ↑↓ 调序 + 删除。
+         编辑与 ↑↓ 需要「有选中行」才有意义，故默认禁用，选中后由 JS 放开。 -->
+    <div id="conditionalFormatFloatToolbar" class="conditional-format-float-toolbar" hidden>
+      <label class="conditional-format-float-field" for="conditionalFormatFloatScope">
+        显示其格式规则
+        <select id="conditionalFormatFloatScope" class="conditional-format-select">
+          <option value="all">整张工作表</option>
+          <option value="selection">当前选择</option>
+        </select>
+      </label>
+      <span class="conditional-format-float-spacer"></span>
+      <button
+        type="button"
+        class="bgm-btn small"
+        id="conditionalFormatFloatUp"
+        disabled
+        title="上移所选规则（提高优先级）"
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        class="bgm-btn small"
+        id="conditionalFormatFloatDown"
+        disabled
+        title="下移所选规则（降低优先级）"
+      >
+        ↓
+      </button>
+      <button
+        type="button"
+        class="bgm-btn small danger"
+        id="conditionalFormatFloatDelete"
+        disabled
+        title="删除所选规则"
+      >
+        ✕ 删除
+      </button>
     </div>
 
     <!-- ===================== 双策略确认模态框 ===================== -->

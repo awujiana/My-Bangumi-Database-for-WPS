@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/highlight.css" />
   </head>
   <body data-page="highlight">
@@ -52,7 +53,7 @@
       <!-- ===================== 主区 ===================== -->
       <main class="main">
         <!-- 匹配条件 -->
-        <section class="section" id="sec-condition">
+        <section class="section" id="sec-condition" data-detachable>
           <h3>
             🎯 匹配条件<button
               type="button"
@@ -104,7 +105,7 @@
         </section>
 
         <!-- 高亮列 -->
-        <section class="section" id="sec-columns">
+        <section class="section" id="sec-columns" data-detachable>
           <h3>
             ☑️ 高亮列<button
               type="button"
@@ -124,7 +125,7 @@
         </section>
 
         <!-- 实时预览 -->
-        <section class="section section-wide" id="sec-preview">
+        <section class="section section-wide" id="sec-preview" data-detachable>
           <h3>
             👁️ 实时预览<button
               type="button"
@@ -150,7 +151,7 @@
         </section>
 
         <!-- 应用与清除 -->
-        <section class="section" id="sec-run">
+        <section class="section" id="sec-run" data-detachable>
           <h3>
             🖌️ 应用与清除<button
               type="button"
