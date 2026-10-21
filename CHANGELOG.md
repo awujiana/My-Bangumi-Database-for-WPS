@@ -24,7 +24,21 @@
   那时宿主早已 attach，稀疏同步 COM 只要几百毫秒，不再撞窗口、也不轮询。
 - **去掉自动轮询**：移除「自动跟随」开关随页面打开自动注册的逻辑（仅保留手动勾选才生效）。
 - **选择被记住**：选中的工作簿::工作表键写入 PluginStorage（`highlight.sheet`），下次直接定位。
-- `createHighlightPagePhases` 现在只返回 2 个轻分片；`heavy` 按需机制保留给其它页面。
+- `createHighlightPagePhases` 现在只返回 2 个轻分片。
+
+### 清理 com-ready 死代码：删除已无调用方的 heavy 机制（2026-10-21）
+
+显式选择方案落地后，高亮页不再给任何分片标 `heavy: true`，`com-ready.ts` 里的
+`heavy` 按需机制（重分片挂起 / `点此加载数据` / 自愈 / stall 优先）成了**死代码**——
+既无调用方，又引用已删的 bisect 探针概念。按「不保留假防御」原则清掉：
+
+- 删除：`ComPhase.heavy` 字段、`ComPendingMode` 的 `awaiting` 分支、`HEAVY_KEY_PREFIX` /
+  `HEAVY_AUTO_BUDGET_MS` 常量、`readHeavyCostMs` / `recordHeavyCost` / `clearStall` /
+  `isHeavyAutoAllowed` 导出函数、`HeavyRun` / `finishHeavyRun` / `runHeavyRun` 及
+  `runComPhases` 里的重段 split 逻辑；降级兜底 UI 只剩 `点此继续初始化`（degraded）一条路径。
+- **保留**：light 闸门路径（首屏零 COM + 分片 + 单片超预算降级）与降级兜底按钮，
+  仍被全部 6 个页面复用，属真实兜底而非死代码。
+- 单测 23 → 15（删除 8 个 heavy 专属用例及 `capturePending` 辅助）。
 
 ### 重分片改为按需：闸门延迟绕不开窗口，重活交给用户点击（2026-10-21）
 

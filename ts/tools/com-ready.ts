@@ -15,20 +15,13 @@
  *
  * 结论：**卡多久取决于「首次 COM 落在窗口内多久」，而不是代码本身**。靠固定
  * `setTimeout(0)` 挪不动窗口（离 load 只有几毫秒，宿主还在等 attach），所以本模块
- * 用三层组合拳而不是猜时间：
+ * 用两层组合拳而不是猜时间：
  *
  *   1. **首屏零 COM**：闸门开启前，任何 COM 任务只排队不执行 → 骨架先渲染出来，
  *      用户看到的是「加载中」而不是「卡死」；
- *   2. **分片执行**：初始化拆成若干小片，片间让出主线程；单片超时即记 stall；
- *   3. **自适应延迟 + 降级按钮**：把观测到的 stall 时长记进 PluginStorage，下次开
- *      该页时闸门延迟 = 上次 stall + 余量（上限 15s）；
- *   4. **重分片（heavy）按需**：光靠延迟**绕不开窗口** —— 真机实测（2026-10-21）
- *      闸门 800ms 开启后，轻分片 1057ms 全跑完，但自动跑「读取工作表」仍卡 69735ms，
- *      而降级后用户点击继续只花 642ms。即：窗口不是几秒级的，自动跑重 COM 必然撞。
- *      所以分片可标 `heavy: true`：轻分片照常自动跑，**重分片默认挂起**，首屏直接
- *      给「点此加载数据」按钮；只有当该页上次实测重活耗时 <= 1500ms 且从未 stall 过，
- *      才恢复自动。同步 COM 一旦阻塞 JS 自己无法中断，用户点击时宿主主线程必然空闲
- *      （点击是宿主派发的输入事件），因此点击路径不会互锁。
+ *   2. **分片执行 + 卡顿降级**：初始化拆成若干小片，片间让出主线程；单片超时即
+ *      停止后续自动分片并派发降级事件，由页面插「点此继续初始化」按钮 —— 用户点击时
+ *      宿主主线程必然空闲（点击是宿主派发的输入事件），因此点击路径不会互锁。
  *
  * 依赖说明：本模块是**底层**（被各页 bootstrap 使用），不得反向 import
  * tools/util/index（bgmLog/getApp 都在那，会构成运行时循环，被 check:cycles 拦截）
@@ -43,21 +36,7 @@ export interface ComPhase {
   name: string
   /** 分片本体（内部允许含同步 COM） */
   run: () => void
-  /**
-   * 是否重分片（含大 Range 读 / getDataSheet 这类会撞宿主初始化窗口的 COM）
-   *
-   * 标了 true 的分片段**默认挂起**，等用户点「加载数据」再跑；
-   * 只有该页上次实测整段 <= 1500ms 且从未 stall 过才自动跑。
-   */
-  heavy?: boolean
 }
-
-/** 挂起/降级提示条的两种成因 */
-export type ComPendingMode =
-  /** 自动跑重分片时撞上窗口（已付出 stall 代价） */
-  | 'degraded'
-  /** 还没跑就先挂起（依据历史 stall 主动避让） */
-  | 'awaiting'
 
 /** 降级事件携带的信息 */
 export interface ComDegradedDetail {
@@ -66,8 +45,6 @@ export interface ComDegradedDetail {
   reason: string
   /** 用户点击「继续」时调用：接着跑剩余分片（此时宿主必然空闲） */
   resume: () => void
-  /** 成因：degraded=跑崩了 / awaiting=主动避让（默认 degraded） */
-  mode?: ComPendingMode
 }
 
 /** 闸门前排队任务 */
@@ -82,10 +59,9 @@ const GATE_DELAY_DEFAULT_MS = 800
 /**
  * 闸门延迟上限 3s
  *
- * 延迟的作用只是「等宿主 attach 完」：真机实测 800ms 闸门下轻分片 1057ms 就全跑完、
- * 按钮已可用，说明轻活根本不需要十几秒。真正撞窗口的是重活，而已改由 `heavy` 按需
- * 承担，所以这里刻意不追着 stall 抬到 15s —— 否则轻分片（按钮启用）也要陪着等，
- * 那是纯 UX 倒退。
+ * 延迟的作用只是「等宿主 attach 完」。真机实测 800ms 闸门下轻分片 1057ms 就全跑完、
+ * 按钮已可用，说明轻活根本不需要十几秒。所以这里刻意不追着 stall 抬到更高，否则
+ * 轻分片（按钮启用）也要陪着等，那是纯 UX 倒退。
  */
 const GATE_DELAY_MAX_MS = 3000
 
@@ -97,17 +73,6 @@ const STALL_MARGIN_MS = 200
 
 /** stall 观测值存储前缀（完整键：`bgm_com_stall_<pageKey>`） */
 const STALL_KEY_PREFIX = 'bgm_com_stall_'
-
-/** 重分片实测耗时存储前缀（完整键：`bgm_com_heavy_<pageKey>`） */
-const HEAVY_KEY_PREFIX = 'bgm_com_heavy_'
-
-/**
- * 重分片自动跑的门槛：上次整段实测耗时 <= 1500ms 才认为「这页的重活是安全的」
- *
- * 真机参照：高亮页撞窗口时 69735ms，用户点击时 642ms —— 差两个数量级，
- * 1500ms 足够把两种情形分开，且不会误伤正常页面（正常重活都在几十毫秒）。
- */
-const HEAVY_AUTO_BUDGET_MS = 1500
 
 /** 降级事件名（各页 bootstrap 用 installComInitFallback 监听） */
 export const COM_DEGRADED_EVENT = 'bgm:comInitDegraded'
@@ -159,48 +124,6 @@ function recordStall(pageKey: string, costMs: number): void {
   } catch {
     // 写不进去不影响本次降级（内存里已有本次观测，页面内重试点得动）
   }
-}
-
-/**
- * 读某页上一次重分片段的实测总耗时（毫秒）；无记录 / 脏值一律 0
- *
- * 用于决定「这页的重活能不能自动跑」：0 = 从未成功跑过，不冒险自动跑。
- */
-export function readHeavyCostMs(pageKey: string): number {
-  const raw = readHost()?.PluginStorage?.getItem?.(HEAVY_KEY_PREFIX + pageKey)
-  if (!raw) return 0
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
-}
-
-/** 记一次重分片实测耗时（至少记 1ms：0 会被 readHeavyCostMs 当成「没跑过」） */
-function recordHeavyCost(pageKey: string, costMs: number): void {
-  try {
-    readHost()?.PluginStorage?.setItem?.(HEAVY_KEY_PREFIX + pageKey, String(Math.max(1, costMs)))
-  } catch {
-    // 写不进去只是失去「下次自动跑」的能力，不影响本次功能
-  }
-}
-
-/** 清掉 stall 记录：重活实测已经够快，说明窗口已过，恢复自动 */
-function clearStall(pageKey: string): void {
-  try {
-    readHost()?.PluginStorage?.setItem?.(STALL_KEY_PREFIX + pageKey, '0')
-  } catch {
-    // 同上：清不掉最坏结果是下次仍走「点此加载」，不报错
-  }
-}
-
-/**
- * 本页重分片能否自动跑
- *
- * 规则：从未 stall 过 **且** 上次实测耗时在预算内。两个条件缺一不可 ——
- * 没跑过就自动跑等于拿用户赌 70 秒，stall 过则说明这页确实会撞窗口。
- */
-export function isHeavyAutoAllowed(pageKey: string): boolean {
-  if (readLastStallMs(pageKey) > 0) return false
-  const cost = readHeavyCostMs(pageKey)
-  return cost > 0 && cost <= HEAVY_AUTO_BUDGET_MS
 }
 
 /**
@@ -304,22 +227,15 @@ export function scheduleComTask(name: string, run: () => void): void {
   if (pendingTasks.length === 1) drainPending()
 }
 
-/** 派发降级 / 挂起事件（供页面渲染「点此继续」按钮） */
-function dispatchDegraded(
-  pageKey: string,
-  reason: string,
-  resume: () => void,
-  mode: ComPendingMode = 'degraded',
-): void {
+/** 派发降级事件（供页面渲染「点此继续」按钮） */
+function dispatchDegraded(pageKey: string, reason: string, resume: () => void): void {
   if (typeof document === 'undefined' || typeof CustomEvent !== 'function') return
-  const detail: ComDegradedDetail = { pageKey, reason, resume, mode }
+  const detail: ComDegradedDetail = { pageKey, reason, resume }
   document.dispatchEvent(new CustomEvent(COM_DEGRADED_EVENT, { detail }))
 }
 
 /**
  * 跑 [startIndex, endIndex) 这一段分片：一片一个宏任务，单片超预算即停止并降级
- *
- * @param onRangeDone 整段跑完后回调（用于接着处理重分片段）
  */
 function runPhaseRange(
   pageKey: string,
@@ -327,17 +243,10 @@ function runPhaseRange(
   startIndex: number,
   endIndex: number,
   budgetMs: number,
-  onRangeDone?: () => void,
 ): void {
-  if (startIndex >= endIndex) {
-    onRangeDone?.()
-    return
-  }
+  if (startIndex >= endIndex) return
   const phase = phases[startIndex]
-  if (!phase) {
-    onRangeDone?.()
-    return
-  }
+  if (!phase) return
 
   const startAt = Date.now()
   try {
@@ -357,92 +266,26 @@ function runPhaseRange(
     logger.warn(`[comReady] ${pageKey} ${reason} —— 停止自动初始化，等待用户点击继续`)
     dispatchDegraded(pageKey, reason, () => {
       window.setTimeout(() => {
-        runPhaseRange(pageKey, phases, nextIndex, endIndex, budgetMs, onRangeDone)
+        runPhaseRange(pageKey, phases, nextIndex, endIndex, budgetMs)
       }, 0)
     })
     return
   }
 
-  if (nextIndex >= endIndex) {
-    onRangeDone?.()
-    return
-  }
+  if (nextIndex >= endIndex) return
   window.setTimeout(() => {
-    runPhaseRange(pageKey, phases, nextIndex, endIndex, budgetMs, onRangeDone)
-  }, 0)
-}
-
-/** 重分片段的运行态（跨片复用，只描述「跑哪些片、预算多少」） */
-interface HeavyRun {
-  pageKey: string
-  phases: ComPhase[]
-  budgetMs: number
-}
-
-/** 重分片段跑完：记耗时；够快就清掉 stall 记录，下次恢复自动 */
-function finishHeavyRun(run: HeavyRun, startAt: number): void {
-  const totalMs = Date.now() - startAt
-  logger.info(`[comReady] ${run.pageKey} 重分片段完成，实测 ${String(totalMs)}ms`)
-  if (totalMs <= HEAVY_AUTO_BUDGET_MS) clearStall(run.pageKey)
-  recordHeavyCost(run.pageKey, totalMs)
-}
-
-/**
- * 跑重分片段：一片一个宏任务，单片超预算即停止并降级
- *
- * @param startAt 本段计时起点（resume 时传入新的 Date.now()，避免把等用户的时间算进去）
- */
-function runHeavyRun(run: HeavyRun, fromIndex: number, startAt: number): void {
-  if (fromIndex >= run.phases.length) {
-    finishHeavyRun(run, startAt)
-    return
-  }
-  const phase = run.phases[fromIndex]
-  if (!phase) {
-    finishHeavyRun(run, startAt)
-    return
-  }
-
-  const phaseStartAt = Date.now()
-  try {
-    phase.run()
-  } catch (error: unknown) {
-    logger.warn(
-      `[comReady] ${run.pageKey} 重分片「${phase.name}」抛出异常: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
-  const costMs = Date.now() - phaseStartAt
-  const nextIndex = fromIndex + 1
-
-  if (costMs > run.budgetMs) {
-    recordStall(run.pageKey, costMs)
-    const reason = `重分片「${phase.name}」耗时 ${String(costMs)}ms，疑似撞上宿主初始化窗口`
-    logger.warn(`[comReady] ${run.pageKey} ${reason} —— 停止自动初始化，等待用户点击继续`)
-    dispatchDegraded(run.pageKey, reason, () => {
-      window.setTimeout(() => {
-        runHeavyRun(run, nextIndex, Date.now())
-      }, 0)
-    })
-    return
-  }
-
-  if (nextIndex >= run.phases.length) {
-    finishHeavyRun(run, startAt)
-    return
-  }
-  window.setTimeout(() => {
-    runHeavyRun(run, nextIndex, startAt)
+    runPhaseRange(pageKey, phases, nextIndex, endIndex, budgetMs)
   }, 0)
 }
 
 /**
  * 分片执行初始化：闸门开启后一片一片跑，片间让出主线程
  *
- * 分片数组按依赖顺序排列，第一个 `heavy: true` 及其之后的分片构成**重段**：
- *   - 轻段（含轮询启动）照常自动跑，保证按钮尽早可用；
- *   - 重段默认**挂起**并弹「点此加载数据」，只有本页实测够快才自动跑。
+ * 分片数组按依赖顺序排列（越重的放越后面）。单片超预算即停止后续自动分片、
+ * 派发降级事件，由页面插「点此继续初始化」按钮；用户点击时宿主必然空闲，点击
+ * 路径不会互锁（真机实测：自动跑 69735ms，点击跑 642ms）。
  *
- * @param pageKey 页面标识（用于读写 stall / 重活耗时观测值）
+ * @param pageKey 页面标识（用于读写 stall 观测值）
  * @param phases 初始化分片，按依赖顺序排列（越重的放越后面）
  * @param budgetMs 单片预算，默认 800ms；超过即降级为「点击继续」
  */
@@ -452,40 +295,13 @@ export function runComPhases(
   budgetMs: number = STALL_BUDGET_MS,
 ): void {
   if (phases.length === 0) return
-
-  const heavyStart = phases.findIndex((phase) => phase.heavy === true)
-  const lightEnd = heavyStart === -1 ? phases.length : heavyStart
-
   scheduleComTask(`${pageKey}:startup`, () => {
-    runPhaseRange(pageKey, phases, 0, lightEnd, budgetMs, () => {
-      if (lightEnd >= phases.length) return
-      const run: HeavyRun = { pageKey, phases, budgetMs }
-      if (isHeavyAutoAllowed(pageKey)) {
-        runHeavyRun(run, lightEnd, Date.now())
-        return
-      }
-      const lastCost = readHeavyCostMs(pageKey)
-      const reason =
-        lastCost > 0
-          ? `本页上次读取耗时 ${String(lastCost)}ms，为避开宿主初始化窗口先挂起`
-          : '本页尚未实测过读取耗时，为避开宿主初始化窗口先挂起'
-      logger.info(`[comReady] ${pageKey} 重分片挂起，等待用户点击（${reason}）`)
-      dispatchDegraded(
-        pageKey,
-        reason,
-        () => {
-          window.setTimeout(() => {
-            runHeavyRun(run, lightEnd, Date.now())
-          }, 0)
-        },
-        'awaiting',
-      )
-    })
+    runPhaseRange(pageKey, phases, 0, phases.length, budgetMs)
   })
 }
 
 /**
- * 安装挂起/降级兜底 UI：收到本页事件时插入提示条 + 「点此加载」按钮
+ * 安装降级兜底 UI：收到本页降级事件时插入提示条 + 「点此继续」按钮
  *
  * 为什么必须留这条兜底：同步 COM 一旦阻塞，JS 线程自己无法中断或超时，
  * 只能**事先不跑**。而用户点击时宿主主线程必然空闲（点击是宿主派发的输入事件），
@@ -502,9 +318,6 @@ export function installComStartupFallback(pageKey: string): void {
     if (detail?.pageKey !== pageKey) return
     if (document.getElementById('bgm-com-fallback')) return
 
-    // awaiting = 主动避让（还没跑，用户零等待）；degraded = 已经撞了（说明原因）
-    const isAwaiting = detail.mode === 'awaiting'
-
     const banner = document.createElement('div')
     banner.id = 'bgm-com-fallback'
     banner.setAttribute('role', 'status')
@@ -514,13 +327,11 @@ export function installComStartupFallback(pageKey: string): void {
       'font-size:12px;line-height:1.5;display:flex;gap:8px;align-items:center;flex-wrap:wrap'
 
     const text = document.createElement('span')
-    text.textContent = isAwaiting
-      ? '数据尚未读取（等宿主空闲后再读，避免卡住界面）。'
-      : `初始化撞上宿主忙（${detail.reason}）。`
+    text.textContent = `初始化撞上宿主忙（${detail.reason}）。`
 
     const button = document.createElement('button')
     button.type = 'button'
-    button.textContent = isAwaiting ? '点此加载数据' : '点此继续初始化'
+    button.textContent = '点此继续初始化'
     button.style.cssText =
       'flex:0 0 auto;padding:4px 10px;border:1px solid #d98c2b;border-radius:4px;' +
       'background:#ffb35c;color:#3a2200;cursor:pointer;font-size:12px'
@@ -531,9 +342,7 @@ export function installComStartupFallback(pageKey: string): void {
 
     banner.append(text, button)
     document.body.prepend(banner)
-    logger.info(
-      `[comReady] ${pageKey} 已显示「${isAwaiting ? '点此加载数据' : '点此继续初始化'}」兜底按钮`,
-    )
+    logger.info(`[comReady] ${pageKey} 已显示「点此继续初始化」兜底按钮`)
   })
 }
 
