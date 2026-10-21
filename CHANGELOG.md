@@ -8,6 +8,21 @@
 
 ## [未发布]
 
+### 回退：wpsjs 热更新注入恢复默认开启（2026-10-21）
+
+上一轮为消除 `Main resource content verification failed` 而「默认关闭
+`hot-update-inject.js` 注入」，真机上出现**整个插件卡住、调试器都不出日志**。
+按「忽略弹窗」方案回退：注入恢复为默认开启，patch 回到**只补响应头**
+（`Content-Type` 补 charset + 补 `Content-Length`）的状态。
+
+`Main resource content verification failed` 这条红字会回来 —— 它是 WPS 宿主
+对「主资源内容被改写」的提示，官方确认无功能影响，页面本身加载正常。
+
+**保留**的改动：CSP 放行 WPS 本地服务端口（`check:csp` 门禁在位）。
+**若回退后仍卡**，下一步候选是这一项（放行后 rpcsdk 才真的去连 58890）；
+届时可单独回退，或直接在页面里去掉 `wpsjsrpcsdk.js` 引用（本项目
+`getApp()` 读宿主注入的 `window.Application`，并不依赖 rpcsdk）。
+
 ### 目标工作表拆成两级：先选工作簿、再选工作表（2026-10-21）
 
 条件格式页（含独立窗口版规则管理器）的「目标工作表」下拉，原来把所有已打开
