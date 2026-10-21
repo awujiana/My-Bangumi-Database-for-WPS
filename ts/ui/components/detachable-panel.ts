@@ -36,6 +36,13 @@
  * - 位置钳制在视口内：不允许把窗口拖到屏幕外（否则找不回来，只能刷新任务窗格）。
  */
 
+import {
+  isWebDialogSupported,
+  openWebDialog,
+  resolveDialogUrl,
+} from '../../tools/wps-web-dialog.js'
+import type { WebDialogSession } from '../../tools/wps-web-dialog.js'
+
 /** 视口尺寸（拖动 / 缩放开始时读一次） */
 export interface ViewportSize {
   width: number
@@ -181,6 +188,20 @@ export interface DetachablePanelOptions {
   toolbar?: HTMLElement | null | undefined
   /** 外部已有的触发按钮（例：条件格式页的「🔍 规则管理器」） */
   trigger?: HTMLElement | null | undefined
+  /**
+   * 拖出方式
+   * - `float`（默认）：任务窗格内的浮动窗口，可拖动 / 缩放，但出不了窗格边界；
+   * - `native`：宿主原生独立窗口，能浮到 WPS 表格上面、能最大化。
+   *   宿主不支持时**自动回落**到 `float`，不会变成点了没反应。
+   */
+  mode?: DetachableMode | undefined
+  /**
+   * `native` 模式下窗口要加载的页面（相对当前页面解析，见 `resolveDialogUrl`）
+   *
+   * 必须是**独立页面**：原生对话框是另一个 WebView，拿不到本页的 DOM，
+   * 搬不了节点。页面里要自己装配同一套逻辑（对话框页复用 `conditional-format-page.js`）。
+   */
+  nativeUrl?: string | undefined
   /** 拖出后回调（页面可借此刷新一次数据） */
   onDetach?: (() => void) | undefined
   /** 收回后回调 */
@@ -195,6 +216,15 @@ export const PLACEHOLDER_CLASS = 'detachable-placeholder'
 
 /** 浮动窗口根元素类名 */
 export const PANEL_CLASS = 'detachable-panel'
+
+/** 区块被拖出后加在它身上的类（原生模式用它隐藏区块，不用 hidden 属性：section 的 display 会盖掉它） */
+const DETACHED_CLASS = 'detachable-detached'
+
+/** 拖出方式 */
+export type DetachableMode = 'float' | 'native'
+
+/** 原生对话框存活轮询间隔（ms） */
+const NATIVE_POLL_INTERVAL = 1000
 
 /** 标记「该区块已装配」的属性（通用扫描据此跳过，避免重复注入） */
 const DETACHABLE_READY_ATTRIBUTE = 'data-detachable-ready'
@@ -240,6 +270,120 @@ function makeIconButton(
   button.setAttribute('aria-label', label)
   button.addEventListener('click', onClick)
   return button
+}
+
+/**
+ * 造一个「已拖出」占位块
+ *
+ * float 与 native 两种模式共用，只是文案不同 —— 两者对用户的回路是一样的：
+ * 原位置不会凭空塌陷，且都给一个「收回」按钮（少了它用户只能刷新任务窗格找回来）。
+ */
+function makePlaceholder(message: string, onRecall: () => void): HTMLElement {
+  const placeholder = makeDiv(PLACEHOLDER_CLASS)
+  const icon = document.createElement('span')
+  icon.className = 'detachable-placeholder-icon'
+  icon.textContent = '⧉'
+  icon.setAttribute('aria-hidden', 'true')
+  const text = document.createElement('span')
+  text.className = 'detachable-placeholder-text'
+  text.textContent = message
+  const recall = document.createElement('button')
+  recall.type = 'button'
+  recall.className = 'bgm-btn small detachable-placeholder-recall'
+  recall.textContent = '收回'
+  recall.addEventListener('click', onRecall)
+  placeholder.append(icon, text, recall)
+  return placeholder
+}
+
+/**
+ * 造一个 native 模式句柄：把区块换成宿主原生独立窗口
+ *
+ * ## 与 float 模式的两处本质差异
+ * 1. **不搬 DOM**：原生对话框是另一个 WebView，本页节点搬不过去。所以
+ *    区块本体留在页面上（加 `.detachable-detached` 隐藏），窗口里加载
+ *    `nativeUrl` 指向的独立页面 —— 那份页面自己装配同一套逻辑。
+ * 2. **窗口能被用户在 WPS 里直接关掉**（系统关闭按钮），任务窗格无从得知。
+ *    故开窗口后轮询 `isAlive()`，发现关了就自动收回 ——
+ *    否则占位块会永久卡在「已拖出」，而窗口早没了（比塌陷更难发现）。
+ */
+function createNativeDetachable(
+  section: HTMLElement,
+  resolved: DetachablePanelOptions,
+): DetachablePanelHandle {
+  const title = resolved.title ?? '浮动窗口'
+  const homeParent = section.parentElement
+  const homeNextSibling = section.nextElementSibling
+  const placeholder = makePlaceholder(`「${title}」已拖出为独立窗口`, attach)
+
+  let session: WebDialogSession | null = null
+  let pollTimer: number | null = null
+  let isDetached = false
+
+  function stopPolling(): void {
+    if (pollTimer === null) return
+    window.clearInterval(pollTimer)
+    pollTimer = null
+  }
+
+  function attach(): void {
+    if (!isDetached) return
+    stopPolling()
+    if (session) session.close()
+    session = null
+    isDetached = false
+    // 用 class 而非 hidden 属性：`.section` 自带 display 会盖掉 [hidden]
+    section.classList.remove(DETACHED_CLASS)
+    placeholder.remove()
+    resolved.onAttach?.()
+  }
+
+  function detach(): void {
+    // 已经开着就别再开第二个：原生窗口没有「置顶」回调，重复开只会叠一屏窗口
+    if (session?.isAlive()) return
+    const { nativeUrl } = resolved
+    if (!nativeUrl) return
+    const opened = openWebDialog({
+      url: resolveDialogUrl(nativeUrl, window.location.href),
+      title,
+      width: resolved.width ?? DEFAULT_PANEL_WIDTH,
+      height: resolved.height ?? DEFAULT_PANEL_HEIGHT,
+      isModal: false,
+    })
+    if (!opened) return
+    session = opened
+    isDetached = true
+    section.classList.add(DETACHED_CLASS)
+    if (homeParent?.isConnected) {
+      if (homeNextSibling?.isConnected) homeNextSibling.before(placeholder)
+      else homeParent.append(placeholder)
+    }
+    // 用户在 WPS 里点系统关闭按钮时，本页收不到任何事件 —— 只能轮询。
+    // 1 秒一次足够快，开销可忽略（一次 COM 属性读取）。
+    pollTimer = window.setInterval(() => {
+      if (session?.isAlive() === false) attach()
+    }, NATIVE_POLL_INTERVAL)
+    resolved.onDetach?.()
+  }
+
+  const trigger = resolved.trigger ?? injectTrigger(section, title)
+  const onTriggerClick = (): void => {
+    if (isDetached) attach()
+    else detach()
+  }
+  trigger?.addEventListener('click', onTriggerClick)
+
+  return {
+    detach,
+    attach,
+    toggle: onTriggerClick,
+    isDetached: () => isDetached,
+    destroy: () => {
+      attach()
+      trigger?.removeEventListener('click', onTriggerClick)
+      section.removeAttribute(DETACHABLE_READY_ATTRIBUTE)
+    },
+  }
 }
 
 /**
@@ -323,6 +467,8 @@ function readOptionsFromDataset(section: HTMLElement): DetachablePanelOptions {
     title: readSectionTitle(section),
     width: readNumberAttribute(section, 'width'),
     height: readNumberAttribute(section, 'height'),
+    mode: section.dataset.detachableMode === 'native' ? 'native' : 'float',
+    nativeUrl: section.dataset.detachableUrl,
     toolbar: elementById(section.dataset.detachableToolbar),
     trigger: elementById(section.dataset.detachableTrigger),
   }
@@ -350,10 +496,18 @@ export function createDetachablePanel(
     title: options.title ?? readSectionTitle(section),
     width: options.width ?? readNumberAttribute(section, 'width') ?? DEFAULT_PANEL_WIDTH,
     height: options.height ?? readNumberAttribute(section, 'height') ?? DEFAULT_PANEL_HEIGHT,
+    mode: options.mode ?? readOptionsFromDataset(section).mode,
+    nativeUrl: options.nativeUrl ?? section.dataset.detachableUrl,
     toolbar: options.toolbar ?? elementById(section.dataset.detachableToolbar),
     trigger: options.trigger ?? elementById(section.dataset.detachableTrigger),
     onDetach: options.onDetach,
     onAttach: options.onAttach,
+  }
+
+  // native 需要宿主支持；不支持时**静默回落** float —— 用户照样能拖出，
+  // 只是窗口在任务窗格内。功能不丢比「点了没反应」重要。
+  if (resolved.mode === 'native' && resolved.nativeUrl && isWebDialogSupported()) {
+    return createNativeDetachable(section, resolved)
   }
 
   const panelId = section.id || `detachable-${String(geometryMemory.size + 1)}`
@@ -439,22 +593,7 @@ export function createDetachablePanel(
   root.append(header, body, resizeHandle)
 
   // ---- 占位块：拖出后顶在原位置，避免正文塌陷 ----
-  const placeholder = makeDiv(PLACEHOLDER_CLASS)
-  const placeholderIcon = document.createElement('span')
-  placeholderIcon.className = 'detachable-placeholder-icon'
-  placeholderIcon.textContent = '⧉'
-  placeholderIcon.setAttribute('aria-hidden', 'true')
-  const placeholderText = document.createElement('span')
-  placeholderText.className = 'detachable-placeholder-text'
-  placeholderText.textContent = `「${title}」已拖出为浮动窗口`
-  const placeholderRecall = document.createElement('button')
-  placeholderRecall.type = 'button'
-  placeholderRecall.className = 'bgm-btn small detachable-placeholder-recall'
-  placeholderRecall.textContent = '收回'
-  placeholderRecall.addEventListener('click', () => {
-    attach()
-  })
-  placeholder.append(placeholderIcon, placeholderText, placeholderRecall)
+  const placeholder = makePlaceholder(`「${title}」已拖出为浮动窗口`, attach)
 
   bindDrag(header, root, DRAGGING_CLASS, (deltaX, deltaY) => {
     const next = clampPosition(

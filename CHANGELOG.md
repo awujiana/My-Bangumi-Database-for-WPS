@@ -8,6 +8,34 @@
 
 ## [未发布]
 
+### 规则管理器可拖出为 **WPS 原生独立窗口**（native 模式）（2026-10-21）
+
+任务窗格内的浮动窗口是 `position: fixed`，相对的是窗格 WebView 的视口 ——
+**最大宽度就是任务窗格宽度**，做不到「浮在 WPS 表格上面」。故给通用组件加
+`mode="native"`：条件格式的「既有规则」区块走宿主原生对话框，真浮到 WPS 上。
+
+- **新模块 `ts/tools/wps-web-dialog.ts`**：封装 `Application.CreateWebDialog`
+  （首选：返回句柄，可 `Visible` / `IsModal` / `Resize` / `Delete`，可凭 `ID` 用
+  `GetWebDialog` 查存活）与 `Application.ShowDialog`（老版本降级通路）。
+  两条都不存在时返回 null，组件**自动回落**到窗格内浮动窗口 —— 功能不丢，
+  不会变成「点了没反应」。宽高按 `devicePixelRatio` 换算物理像素。
+- **新页面 `ui/conditional-format-manager.html`**：原生对话框是**另一个 WebView**，
+  本页 DOM 搬不过去，故窗口加载独立页面。但**逻辑不复制** —— 该页 id 与任务窗格
+  页完全一致，复用同一份 `conditional-format-page.ts`（那份代码取元素全是
+  `?.` / `if (!x) return`，缺哪个区块就跳过哪个）。
+- **放得回去**：① 占位块上的「收回」按钮 → `Delete()`；② 再点「🔍 规则管理器」
+  → 收回；③ **在 WPS 里直接点系统关闭按钮** → 任务窗格轮询 `isAlive()` 发现
+  窗口没了 → 自动收回占位块（否则占位块会永久卡在「已拖出」）。
+- **非模态**（`IsModal = false`）：用户能边看规则边回表格框选区，
+  「显示其格式规则 = 当前选择」才用得起来。
+- **工条绑定从拖出逻辑里拆出**（`bindExistingToolbar`）：工具条在任务窗格
+  和独立窗口两个宿主里都要能用，跟着拖出逻辑绑的话，独立窗口里下拉和按钮是死的。
+- **门禁 `check:detachable` 扩到 native**：`mode=native` 必须给出
+  `data-detachable-url` 且文件真实存在（url 写错的表现就是点了没反应）、
+  不允许带 `-toolbar`（DOM 跨不了 WebView，写了等于永远不显示）。
+- 单测：会话行为 24 例（含降级链路）+ 组件 native 分支 9 例（含「用户关窗后
+  自动收回」「收回后停止轮询」）。
+
 ### 新组件：任意区块可「拖出」为浮动窗口（detachable panel）（2026-10-21）
 
 用户诉求：弹窗化是**可选项**——默认就在页面上，想放大看时再拖出去；

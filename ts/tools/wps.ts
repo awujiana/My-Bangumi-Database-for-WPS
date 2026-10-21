@@ -47,6 +47,21 @@ export interface WpsApp {
   DoEvents?: () => void
   CreateTaskPane?: (url: string) => WpsTaskPane
   GetTaskPane?: (id: string) => WpsTaskPane
+  /**
+   * 创建独立 Web 对话框（新版本宿主）。建出来不可见且无尺寸，
+   * 需自行 `Visible = true` + `Resize(...)` —— 见 `tools/wps-web-dialog.js`
+   */
+  CreateWebDialog?: (url: string) => WpsWebDialog | null
+  /** 按 id 取回对话框，用于查存活 / 关闭 */
+  GetWebDialog?: (id: number) => WpsWebDialog | null
+  /** 一步创建并显示的旧接口；返回值是否可用句柄因版本而异 */
+  ShowDialog?: (
+    url: string,
+    caption: string,
+    width: number,
+    height: number,
+    isModal: boolean,
+  ) => WpsWebDialog | null
   Enum?: Record<string, number>
   ribbonUI?: unknown
   Selection?: WpsSelection
@@ -313,6 +328,30 @@ export interface WpsOAAssist {
 export interface WpsTaskPane {
   ID: string
   Visible: boolean
+}
+
+/**
+ * 宿主原生的独立 Web 对话框（WebDialog）
+ *
+ * 各版本暴露的成员差异较大，因此方法一律可选：缺失时 `wps-web-dialog.js`
+ * 会降级（关不掉就提示手动关），不会因为「类型说有、运行时没有」而抛错。
+ */
+export interface WpsWebDialog {
+  /** 实例 id（只读）；部分版本拿不到，取不到时按「无句柄」处理 */
+  readonly ID?: number
+  Url?: string
+  /** 是否可见（读写）。`CreateWebDialog` 建出来默认 false，必须显式置 true */
+  Visible?: boolean
+  IsModal?: boolean
+  /** 是否允许用户用系统关闭按钮关掉（我们要 true，用户得能自己关） */
+  IsCloseable?: boolean
+  readonly Width?: number
+  readonly Height?: number
+  readonly Xpos?: number
+  readonly Ypos?: number
+  Resize?: (width: number, height: number) => void
+  Move?: (x: number, y: number) => void
+  Delete?: () => void
 }
 
 // ========== 类型守卫函数 ==========

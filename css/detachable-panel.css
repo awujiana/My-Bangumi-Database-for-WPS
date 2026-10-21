@@ -223,3 +223,8 @@
 .detachable-panel.is-collapsed .detachable-panel-toolbar {
   display: none;
 }
+/* 原生窗口模式：区块本体留在页面上（另一个 WebView 搬不过去，只能隐藏）。
+   用 class 而非 hidden 属性 —— .section 自带 display 会盖掉 [hidden]。 */
+.detachable-detached {
+  display: none !important;
+}

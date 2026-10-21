@@ -18,12 +18,14 @@
  *   3. 同一页面不重复装配同一 id（重复会被组件的幂等标记吞掉，属配置冗余）；
  *   4. 六个页面都引入了 `css/detachable-panel.css`（少一个页面就是该页完全没样式，
  *      窗口会变成一堆裸 div，且不会报错）；
- *   5. 解析结果非空 —— 否则说明本脚本的解析失效，必须报错而不是「0 问题」空转。
+ *   5. `mode=native` 必须给出 `data-detachable-url` 且该文件真的存在 ——
+ *      原生对话框是**另一个 WebView**，url 写错或文件改名，表现就是「点了没反应」；
+ *   6. 解析结果非空 —— 否则说明本脚本的解析失效，必须报错而不是「0 问题」空转。
  *
  * 退出码：0 一致；1 不一致（并打印修复指引）。
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -80,13 +82,21 @@ for (const page of PAGES) {
       }
     }
 
-    // ② 尺寸必须是正数
-    for (const kind of ['width', 'height']) {
-      const raw = new RegExp(`data-detachable-${kind}="([^"]+)"`, 'u').exec(attributeText)?.[1]
-      if (raw === undefined) continue
-      const value = Number(raw)
-      if (!Number.isFinite(value) || value <= 0) {
-        problems.push(`${where} 的 data-detachable-${kind}=" ${raw} "不是正数（会静默退回默认尺寸）`)
+    // ⑤ 原生窗口模式：必须给出真实存在的页面
+    const mode = /data-detachable-mode="([^"]+)"/u.exec(attributeText)?.[1] ?? 'float'
+    if (mode !== 'float' && mode !== 'native') {
+      problems.push(`${where} 的 data-detachable-mode="${mode}" 非法（只接受 float / native）`)
+    }
+    const nativeUrl = /data-detachable-url="([^"]+)"/u.exec(attributeText)?.[1]
+    if (mode === 'native') {
+      if (!nativeUrl) {
+        problems.push(`${where} 是 native 模式但没有 data-detachable-url（拖不出任何窗口）`)
+      } else if (!existsSync(join(projectRoot, 'ui', nativeUrl))) {
+        problems.push(`${where} 的 data-detachable-url="${nativeUrl}" 指向的文件不存在`)
+      }
+      // 工具条是 DOM 节点，跨不了 WebView：写在 native 上等于永远不显示
+      if (/data-detachable-toolbar=/u.test(attributeText)) {
+        problems.push(`${where} 是 native 模式却带 data-detachable-toolbar（工具条搬不进另一个 WebView）`)
       }
     }
   }

@@ -1215,6 +1215,20 @@ function importForeign(): void {
 
 export function initializeConditionalFormatPage(): void {
   markConditionalFormatPaneLoaded()
+  // 独立窗口页（原生对话框）是另一个 WebView：宿主对象能不能注入进去，
+  // 各版本不一致。取不到就必须明说 —— 否则用户看到一张永远空白的表，
+  // 分不清是「这张表没规则」还是「根本没连上宿主」。
+  if (document.body.dataset.detachablePage === 'true') {
+    const offline = byId('conditionalFormatDialogOffline')
+    if (!getApp()) {
+      setText(
+        'conditionalFormatDialogOffline',
+        '未连接到 WPS 宿主：本窗口取不到 Application，读不了条件格式。' +
+          '请关掉本窗口，从任务窗格的「🔍 规则管理器」重新打开。',
+      )
+      offline?.removeAttribute('hidden')
+    }
+  }
   initializeShellNav()
   initializeTheme()
   startThemeSync()
@@ -1255,6 +1269,7 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatExistingPanel')?.addEventListener('change', handleExistingTableChange)
 
   // 浮动「规则管理器」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
+  bindExistingToolbar()
   setupExistingDetachable()
 
   // 规则操作
@@ -1310,20 +1325,13 @@ export function initializeConditionalFormatPage(): void {
 // ===== 「既有规则」拖出为浮动「规则管理器」窗口 =====
 
 /**
- * 把「既有规则」区注册成可拖出面板（复用通用组件 detachable-panel，见 UI 组件目录）
+ * 绑定「规则管理器」工具条（显示其格式规则 + ↑↓ 调序 + 删除）
  *
- * 这里只做三件本页特有的事，拖动 / 缩放 / 收起 / 最大化 / Esc 全在组件里：
- *   1. 复用正文里已有的「🔍 规则管理器」按钮作触发器（不另注入 ⧉，避免两个入口）；
- *   2. 挂上本页专属工具条（「显示其格式规则」下拉 + ↑↓ + 删除）；
- *   3. 拖出时重渲染一次，确保窗口里是当前工作表的快照。
- *
- * **为什么搬的是整个 section 而不是里面的面板**：组件统一按「区块」搬家，
- * 这样搜索框、计数、分页跟着一起走，不会出现「窗口里有表格但没搜索框」。
- * 正文侧仍是同一份 DOM —— 页面代码照旧 `byId('conditionalFormatExistingList')` 读写，
- * 这就是「原页面在变化」：不是同步两份视图，是本来就只有一份。
+ * 与 `setupExistingDetachable` 分开：工具条在**两个宿主**里都要能用 ——
+ * 任务窗格页（拖出后挂进窗口标题栏）和独立窗口页（常显在页面顶部）。
+ * 跟着拖出逻辑绑的话，独立窗口里下拉和按钮就是死的。
  */
-function setupExistingDetachable(): void {
-  const section = byId('sec-existing')
+function bindExistingToolbar(): void {
   const scopeSelect = selectById('conditionalFormatFloatScope')
 
   // 「显示其格式规则」：整表 / 当前选择。
@@ -1345,15 +1353,32 @@ function setupExistingDetachable(): void {
   byId('conditionalFormatFloatDelete')?.addEventListener('click', () => {
     batchDeleteForeignRules()
   })
+}
 
+/**
+ * 把「既有规则」区注册成可拖出面板（复用通用组件 detachable-panel）
+ *
+ * 走 `mode: 'native'`：区块被换成宿主**原生独立窗口**（能浮到 WPS 表格上面、
+ * 能最大化，不受任务窗格视口限制）。宿主不支持时组件自动回落成任务窗格内
+ * 浮动窗口，功能不丢。
+ *
+ * ⚠️ native 模式**不搬 DOM**（另一个 WebView 拿不到本页节点），窗口里加载
+ * `ui/conditional-format-manager.html`，那份页面复用本文件的全部逻辑。
+ */
+function setupExistingDetachable(): void {
+  const section = byId('sec-existing')
   if (!section) return
+  // 本页面自己就是被拖出来的那个窗口时不再注册 —— 否则会开出「窗口里的窗口」
+  if (document.body.dataset.detachablePage === 'true') return
+
   createDetachablePanel(section, {
     title: '条件格式规则管理器',
-    width: 860,
-    height: 560,
-    toolbar: byId('conditionalFormatFloatToolbar'),
+    mode: 'native',
+    nativeUrl: './conditional-format-manager.html',
+    width: 900,
+    height: 600,
     trigger: byId('conditionalFormatFloatBtn'),
-    // 拖出时重渲染一次：用户可能已经切过工作表，窗口里不能是旧表的快照
-    onDetach: renderExistingRules,
+    // 收回时重读一次：窗口里可能删过规则，正文那份快照已经过期
+    onAttach: loadExistingRules,
   })
 }
