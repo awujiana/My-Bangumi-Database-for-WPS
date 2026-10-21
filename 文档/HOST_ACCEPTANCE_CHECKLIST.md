@@ -180,6 +180,28 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
 
 ---
 
+#### A-11 启动控制台「零红字」（CSP 放行 + 关闭热更新注入）
+
+> **为什么必须手工**：Node 侧只能校验 HTML 里写了什么（`check:csp`），
+> 验不了宿主 WebView 实际执行时还拦不拦。
+
+- [ ] **重启 dev server**（改的是 `node_modules/wpsjs` 与 `ui/*.html`，旧进程用的是旧代码，
+      不重启就看不到效果）
+- [ ] **预期：控制台不再出现** `Refused to connect to 'http://127.0.0.1:58890/version'`
+      和 `ws://127.0.0.1:58892/version`（CSP 已放行 WPS 本地服务端口）
+  - 结果：______
+- [ ] **预期：控制台不再出现** `Main resource content verification failed`
+      （已默认关闭 wpsjs 的 `hot-update-inject.js` 注入）
+  - 结果：______
+- [ ] **热更新回归**（可选）：以 `WPSJS_HOT_UPDATE=1 npm run debug` 启动 →
+      改一个 `ui/*.html` 存盘 → 任务窗格应自动刷新。确认开关仍然有效
+  - 结果：______
+- [ ] **功能未受损**：随便点几个按钮（刷新预览 / 重新读取），确认 `window.Application`
+      照常可用（放行 CSP 与关闭注入都不应影响它）
+  - 结果：______
+
+---
+
 ### B 组 · 性能（第 21 批 COM 往返基线的**宿主侧**证据）
 
 > **为什么必须手工**：`check:com-in-loop` 能证明「代码不再每轮读 `Count`」，

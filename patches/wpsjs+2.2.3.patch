@@ -1,25 +1,39 @@
 diff --git a/node_modules/wpsjs/src/lib/debug_publish.js b/node_modules/wpsjs/src/lib/debug_publish.js
-index 77f1019..836157f 100644
+index 77f1019..9726010 100644
 --- a/node_modules/wpsjs/src/lib/debug_publish.js
 +++ b/node_modules/wpsjs/src/lib/debug_publish.js
-@@ -73,7 +73,7 @@ function startNormalServer(serverPort){
+@@ -72,8 +72,13 @@ function startNormalServer(serverPort){
+                 pos = htmlData.indexOf("<html>")
                  pos += 6
              }
-             htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
+-            htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
 -            response.writeHead(200, "OK", { "Content-Type": "text/html" })
++            // BGM patch: 默认不再注入 hot-update-inject.js —— 它会改写 HTML 内容，
++            // 触发 WPS 宿主的 "Main resource content verification failed"（每页一条红字）。
++            // 需要热更新时以 WPSJS_HOT_UPDATE=1 启动即可恢复注入。
++            if (process.env.WPSJS_HOT_UPDATE === '1') {
++                htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
++            }
 +            response.writeHead(200, "OK", { "Content-Type": "text/html; charset=utf-8", "Content-Length": Buffer.byteLength(htmlData) })
              response.end(htmlData)
          } else if (req.originalUrl.endsWith("/hot-update-inject.js")) {
              response.writeHead(200, "OK", { "Content-Type": "application/javascript; charset=utf-8" })
 diff --git a/node_modules/wpsjs/src/lib/debug_xmlplugin.js b/node_modules/wpsjs/src/lib/debug_xmlplugin.js
-index 56dfbb2..0824573 100644
+index 56dfbb2..bd0fe2e 100644
 --- a/node_modules/wpsjs/src/lib/debug_xmlplugin.js
 +++ b/node_modules/wpsjs/src/lib/debug_xmlplugin.js
-@@ -205,7 +205,7 @@ function StartServer(jspluginsXml, callback) {
+@@ -204,8 +204,13 @@ function StartServer(jspluginsXml, callback) {
+ 				pos = htmlData.indexOf("<html>")
  				pos += 6
  			}
- 			htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
+-			htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
 -			response.writeHead(200, "OK", { "Content-Type": "text/html" })
++			// BGM patch: 默认不再注入 hot-update-inject.js —— 它会改写 HTML 内容，
++			// 触发 WPS 宿主的 "Main resource content verification failed"（每页一条红字）。
++			// 需要热更新时以 WPSJS_HOT_UPDATE=1 启动即可恢复注入。
++			if (process.env.WPSJS_HOT_UPDATE === '1') {
++				htmlData = htmlData.slice(0, pos) + `<script type="text/javascript" src="./hot-update-inject.js"></script>` + htmlData.slice(pos)
++			}
 +			response.writeHead(200, "OK", { "Content-Type": "text/html; charset=utf-8", "Content-Length": Buffer.byteLength(htmlData) })
  			response.end(htmlData)
  		} else if (req.originalUrl.endsWith("/hot-update-inject.js")) {

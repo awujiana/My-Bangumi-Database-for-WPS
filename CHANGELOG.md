@@ -8,6 +8,38 @@
 
 ## [未发布]
 
+### 控制台两条启动红字已消除（CSP 放行 + 关闭 wpsjs 热更新注入）（2026-10-21）
+
+**问题**：调试启动后控制台稳定刷三类红字，其中两条是真配置问题：
+
+| 日志                                                                     | 定性                                      |
+| ------------------------------------------------------------------------ | ----------------------------------------- |
+| `Refused to connect to 'http://127.0.0.1:58890/version' ... connect-src` | **真问题**（CSP 漏配，本次修）            |
+| `Refused to connect to 'ws://127.0.0.1:58892/version' ... connect-src`   | **真问题**（同上，ws 协议另需放行）       |
+| `Main resource content verification failed: .../ui/*.html`               | 无害但刺眼（wpsjs 改写 HTML，本次加开关） |
+
+**① CSP 放行 WPS 客户端本地服务端口**（7 个页面统一）
+
+`wpsjsrpcsdk.js` 初始化会向 WPS 客户端本地服务探测 `/version`，三个端口在 rpcsdk 源码里硬编码：
+HTTP `58890` / HTTPS `58891` / WS `58892`。原 `connect-src 'self' ...` **既不匹配这三个端口，也不匹配
+`ws://` scheme**（`'self'` 要求 scheme + host + port 全同，http 页面下 ws 不算 self），于是每页必刷一条。
+
+已在 7 个页面的 CSP meta 里补 `http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892`
+（只放行本机）。新增 `check:csp` 门禁：新页面漏配会红（已反向验证）。
+
+> 注意：本项目 `getApp()` 读的是宿主注入的 `window.Application`，**并不依赖 rpcsdk**，
+> 所以这条报错不会让功能直接挂；放行的目的是消灭噪音，并避免 rpcsdk 重试后走到
+> `InitWpsCloudSvr()` → 唤醒云服务 → `status:2 "请允许浏览器打开WPS Office"` 这条会影响初始化时序的分支。
+
+**② wpsjs 热更新注入加开关，默认关闭**
+
+`Main resource content verification failed` 的根因不是响应头（上次的 charset/Content-Length patch 已生效），
+而是 wpsjs 对每个 `.html` 请求都在 `<body>` 前插一段 `<script src="./hot-update-inject.js">`，
+**改写了 HTML 内容**，触发宿主的「主资源内容校验」。已扩 `patches/wpsjs+2.2.3.patch`：
+默认不再注入；需要热更新时以 `WPSJS_HOT_UPDATE=1 npm run debug` 启动即恢复。
+
+**验证**：重启 dev server 后，控制台应只剩业务 INFO（`[getColumnMap]`、`最后数据行` 等）。
+
 ### 规则管理器可拖出为 **WPS 原生独立窗口**（native 模式）（2026-10-21）
 
 任务窗格内的浮动窗口是 `position: fixed`，相对的是窗格 WebView 的视口 ——
