@@ -566,3 +566,45 @@
 .conditional-format-float-spacer {
   flex: 1 1 auto;
 }
+
+/* ===== 独立窗口版规则管理器（ui/conditional-format-manager.html） =====
+   由宿主原生对话框加载：没有任务窗格那套外壳容器，内容要自己占满窗口，
+   表格区吃掉剩余高度并独立滚动（347 条规则下不能把整页撑长）。 */
+.conditional-format-dialog {
+  margin: 0;
+  padding: var(--sp-3, 10px);
+  overflow: hidden;
+}
+
+.conditional-format-dialog-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 6px);
+  height: 100%;
+  min-height: 0;
+}
+
+.conditional-format-dialog-label {
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 工具条在窗口页是常显的（任务窗格里只在拖出后挂进标题栏，故默认 hidden） */
+.conditional-format-dialog .conditional-format-float-toolbar {
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.conditional-format-dialog #conditionalFormatExistingPanel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 200px;
+  overflow: auto;
+}
+
+.conditional-format-dialog-hint {
+  flex: 0 0 auto;
+  margin: 0;
+}
