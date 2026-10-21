@@ -25,6 +25,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/settings-entry.js'
+import { startPaneHeartbeat } from '../tools/pane-alive.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js'
 import { installActionButtonsGate } from './action-buttons-gate.js'
@@ -58,5 +59,7 @@ if (typeof document !== 'undefined') {
   // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========
   installModalA11y()
   // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
+  startPaneHeartbeat('settings')
   setupDetachablePanels()
 }

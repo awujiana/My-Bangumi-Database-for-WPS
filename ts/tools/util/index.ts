@@ -33,6 +33,7 @@ import { columnNumberToLetter } from '../string-utilities.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
 import type { WpsApp, WpsWorksheet } from '../wps.js'
+import { isPanePageAlive } from '../pane-alive.js'
 
 // re-export 字符串工具保持向后兼容
 
@@ -1055,14 +1056,27 @@ export function showCleanPanel(): void {
   if (cleanId) {
     const pane = app.GetTaskPane?.(cleanId)
     if (pane) {
-      pane.Visible = !pane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showCleanPanel] 清理面板可见性切换: ${String(pane.Visible)}`)
-      return
+      // 拿到窗格对象 ≠ 页面内容活着：WebView 加载失败（dev server 停了 / 页面早崩）
+      // 时对象依然在，直接切 Visible 会显示一块黑屏窗格且无任何报错。
+      // 用页面心跳区分：心跳停 → 隐藏旧窗格、清 ID，落到下方重建。
+      if (isPanePageAlive('clean')) {
+        pane.Visible = !pane.Visible
+        bgmLog(LOG_LEVELS.INFO, `[showCleanPanel] 清理面板可见性切换: ${String(pane.Visible)}`)
+        return
+      }
+      pane.Visible = false
+      app.PluginStorage?.setItem('clean_pane_id', '')
+      app.PluginStorage?.setItem('clean_pane_url', '')
+      bgmLog(
+        LOG_LEVELS.WARN,
+        '[showCleanPanel] 清理窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+      )
+    } else {
+      // 面板 ID 失效（用户手动关闭）→ 清空存储，本次直接重建
+      app.PluginStorage?.setItem('clean_pane_id', '')
+      app.PluginStorage?.setItem('clean_pane_url', '')
+      bgmLog(LOG_LEVELS.WARN, '[showCleanPanel] 清理面板ID失效，已清除存储')
     }
-    // 面板 ID 失效（用户手动关闭）→ 清空存储，本次直接重建
-    app.PluginStorage?.setItem('clean_pane_id', '')
-    app.PluginStorage?.setItem('clean_pane_url', '')
-    bgmLog(LOG_LEVELS.WARN, '[showCleanPanel] 清理面板ID失效，已清除存储')
   }
 
   const pane = app.CreateTaskPane?.(buildTaskPaneUrl('clean.html'))
@@ -1139,16 +1153,27 @@ export function showConditionalFormatPanel(): void {
   if (conditionalFormatId) {
     const pane = app.GetTaskPane?.(conditionalFormatId)
     if (pane) {
-      pane.Visible = !pane.Visible
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('conditionalFormat')) {
+        pane.Visible = !pane.Visible
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[showConditionalFormatPanel] 条件格式面板可见性切换: ${String(pane.Visible)}`,
+        )
+        return
+      }
+      pane.Visible = false
+      app.PluginStorage?.setItem('conditionalFormat_pane_id', '')
+      app.PluginStorage?.setItem('conditionalFormat_pane_url', '')
       bgmLog(
-        LOG_LEVELS.INFO,
-        `[showConditionalFormatPanel] 条件格式面板可见性切换: ${String(pane.Visible)}`,
+        LOG_LEVELS.WARN,
+        '[showConditionalFormatPanel] 条件格式窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
       )
-      return
+    } else {
+      app.PluginStorage?.setItem('conditionalFormat_pane_id', '')
+      app.PluginStorage?.setItem('conditionalFormat_pane_url', '')
+      bgmLog(LOG_LEVELS.WARN, '[showConditionalFormatPanel] 条件格式面板ID失效，已清除存储')
     }
-    app.PluginStorage?.setItem('conditionalFormat_pane_id', '')
-    app.PluginStorage?.setItem('conditionalFormat_pane_url', '')
-    bgmLog(LOG_LEVELS.WARN, '[showConditionalFormatPanel] 条件格式面板ID失效，已清除存储')
   }
 
   const pane = app.CreateTaskPane?.(buildTaskPaneUrl('conditional-format.html'))
@@ -1197,13 +1222,24 @@ export function showHighlightPanel(): void {
   if (highlightId) {
     const pane = app.GetTaskPane?.(highlightId)
     if (pane) {
-      pane.Visible = !pane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showHighlightPanel] 高亮面板可见性切换: ${String(pane.Visible)}`)
-      return
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('highlight')) {
+        pane.Visible = !pane.Visible
+        bgmLog(LOG_LEVELS.INFO, `[showHighlightPanel] 高亮面板可见性切换: ${String(pane.Visible)}`)
+        return
+      }
+      pane.Visible = false
+      app.PluginStorage?.setItem('highlight_pane_id', '')
+      app.PluginStorage?.setItem('highlight_pane_url', '')
+      bgmLog(
+        LOG_LEVELS.WARN,
+        '[showHighlightPanel] 高亮窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+      )
+    } else {
+      app.PluginStorage?.setItem('highlight_pane_id', '')
+      app.PluginStorage?.setItem('highlight_pane_url', '')
+      bgmLog(LOG_LEVELS.WARN, '[showHighlightPanel] 高亮面板ID失效，已清除存储')
     }
-    app.PluginStorage?.setItem('highlight_pane_id', '')
-    app.PluginStorage?.setItem('highlight_pane_url', '')
-    bgmLog(LOG_LEVELS.WARN, '[showHighlightPanel] 高亮面板ID失效，已清除存储')
   }
 
   const pane = app.CreateTaskPane?.(buildTaskPaneUrl('highlight.html'))
@@ -1261,13 +1297,30 @@ export function showBangumiPanel(): void {
   if (tsId) {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
-      // 切换可见性：从隐藏→显示时才触发刷新信号
-      if (!tskpane.Visible) {
-        isBecameVisible = true
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('panel')) {
+        // 切换可见性：从隐藏→显示时才触发刷新信号
+        if (!tskpane.Visible) {
+          isBecameVisible = true
+        }
+        tskpane.Visible = !tskpane.Visible
+      } else {
+        // 心跳已停：隐藏旧窗格、清 ID，落到下方重建（重建 = 变可见，触发刷新信号）
+        tskpane.Visible = false
+        app.PluginStorage?.setItem('panel_id', '')
+        bgmLog(
+          LOG_LEVELS.WARN,
+          '[showBangumiPanel] 主窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+        )
       }
-      tskpane.Visible = !tskpane.Visible
+    } else {
+      // 面板 ID 失效（用户手动关闭）→ 清除存储，落到下方重建
+      app.PluginStorage?.setItem('panel_id', '')
+      bgmLog(LOG_LEVELS.WARN, '[showBangumiPanel] 主面板ID失效，已清除存储')
     }
-  } else {
+  }
+  if (!app.PluginStorage?.getItem('panel_id')) {
+    // 没有可复用的活窗格（无 ID / ID 失效 / 心跳停被清）→ 重建
     const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
     if (tskpane) {
       const id = tskpane.ID
@@ -1311,10 +1364,26 @@ export function showEnrichPanel(): void {
   if (tsId) {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
-      tskpane.Visible = !tskpane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${String(tskpane.Visible)}`)
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('enrich')) {
+        tskpane.Visible = !tskpane.Visible
+        bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${String(tskpane.Visible)}`)
+        return
+      }
+      // 心跳已停：隐藏旧窗格、清 ID，落到下方重建
+      tskpane.Visible = false
+      app.PluginStorage?.setItem('enrich_pane_id', '')
+      bgmLog(
+        LOG_LEVELS.WARN,
+        '[showEnrichPanel] 富化窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+      )
+    } else {
+      // 面板 ID 失效（用户手动关闭）→ 清除存储，落到下方重建
+      app.PluginStorage?.setItem('enrich_pane_id', '')
+      bgmLog(LOG_LEVELS.WARN, '[showEnrichPanel] 富化面板ID失效，已清除存储')
     }
-  } else {
+  }
+  if (!app.PluginStorage?.getItem('enrich_pane_id')) {
     const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/enrich.html`)
     if (tskpane) {
       const id = tskpane.ID
@@ -1382,13 +1451,25 @@ export function showSettingsPanel(): void {
     // 已存在：显示并更新停靠位置
     const settingsPane = app.GetTaskPane?.(settingsId)
     if (settingsPane) {
-      if (settingsPane.Visible) {
-        settingsPane.Visible = false
-        bgmLog(LOG_LEVELS.INFO, '[showSettingsPanel] 设置面板已隐藏')
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('settings')) {
+        if (settingsPane.Visible) {
+          settingsPane.Visible = false
+          bgmLog(LOG_LEVELS.INFO, '[showSettingsPanel] 设置面板已隐藏')
+        } else {
+          settingsPane.DockPosition = targetPosition
+          settingsPane.Visible = true
+          bgmLog(LOG_LEVELS.INFO, `[showSettingsPanel] 设置面板已显示(停靠:${positionLabel})`)
+        }
       } else {
-        settingsPane.DockPosition = targetPosition
-        settingsPane.Visible = true
-        bgmLog(LOG_LEVELS.INFO, `[showSettingsPanel] 设置面板已显示(停靠:${positionLabel})`)
+        // 心跳已停：隐藏旧窗格、清 ID，落到下方重建
+        settingsPane.Visible = false
+        app.PluginStorage?.setItem('settings_pane_id', '')
+        app.PluginStorage?.setItem('settings_pane_url', '')
+        bgmLog(
+          LOG_LEVELS.WARN,
+          '[showSettingsPanel] 设置窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+        )
       }
     } else {
       // 面板ID失效（可能被用户手动关闭），清除存储以便下次重新创建
@@ -1396,8 +1477,9 @@ export function showSettingsPanel(): void {
       app.PluginStorage?.setItem('settings_pane_url', '')
       bgmLog(LOG_LEVELS.WARN, '[showSettingsPanel] 设置面板ID失效，已清除存储')
     }
-  } else {
-    // 首次创建设置面板
+  }
+  if (!app.PluginStorage?.getItem('settings_pane_id')) {
+    // 首次创建设置面板（或刚被心跳校验清掉重建）
     const settingsPane = app.CreateTaskPane?.(buildTaskPaneUrl('settings.html'))
     if (settingsPane) {
       settingsPane.DockPosition = targetPosition

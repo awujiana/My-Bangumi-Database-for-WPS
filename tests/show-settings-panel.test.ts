@@ -487,7 +487,7 @@ describe('showSettingsPanel — 边界情况', () => {
     }
   })
 
-  it('设置面板 ID 失效（GetTaskPane 返回 null）→ 清除存储', () => {
+  it('设置面板 ID 失效（GetTaskPane 返回 null）→ 清除存储并立即重建', () => {
     const app = createMockApp()
     app.PluginStorage.setItem('settings_pane_id', 'invalid-settings-id')
     // 标记为已成功加载过，确保走「ID 失效」分支而非自愈重建分支
@@ -498,8 +498,11 @@ describe('showSettingsPanel — 边界情况', () => {
 
     showSettingsPanel()
 
-    // settings_pane_id 应被清除
-    expect(app.PluginStorage.getItem('settings_pane_id')).toBe('')
+    // settings_pane_id 应被清除并换成新建面板的 ID（一键直达，不再要求点两次；
+    // CreateTaskPane 失败时不会写入新 ID，所以「新 ID 存在」本身就证明重建发生了）
+    const rebuiltPaneId = app.PluginStorage.getItem('settings_pane_id')
+    expect(rebuiltPaneId).not.toBe('invalid-settings-id')
+    expect(rebuiltPaneId).not.toBe('')
   })
 
   it('CreateTaskPane 返回 null → 不存储 settings_pane_id', () => {

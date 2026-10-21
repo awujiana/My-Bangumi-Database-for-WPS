@@ -9,6 +9,7 @@
  *   导入路径相对 ts/ 目录，编译后相对 dist-ts/，运行时正确解析。
  */
 
+import { startPaneHeartbeat } from '../tools/pane-alive.js'
 import '../index.js'
 import '../core/constants.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
@@ -49,6 +50,8 @@ if (typeof document !== 'undefined') {
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
   startModuleStateSync('enrich')
   // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
+  startPaneHeartbeat('enrich')
   setupDetachablePanels()
 
   // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）

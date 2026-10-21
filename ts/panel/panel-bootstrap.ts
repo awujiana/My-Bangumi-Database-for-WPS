@@ -9,6 +9,7 @@
  */
 
 // 加载依赖模块（含 panel-entry，其导入时自动启动面板）
+import { startPaneHeartbeat } from '../tools/pane-alive.js'
 import '../index.js'
 import '../core/constants.js'
 import '../tools/config.js'
@@ -66,6 +67,8 @@ if (typeof window !== 'undefined') {
   // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
   startModuleStateSync('panel')
   // 区块拖出为浮动窗口：扫描 [data-detachable]，默认在页面上、点「⧉」才拖出
+  // 页面心跳：COM 侧开关面板前校验窗格内容是否真活着（黑屏窗格自愈，见 tools/pane-alive.ts）
+  startPaneHeartbeat('panel')
   setupDetachablePanels()
 }
 

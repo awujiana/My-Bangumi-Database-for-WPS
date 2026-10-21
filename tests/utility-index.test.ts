@@ -91,7 +91,10 @@ interface FakeAppOptions {
 
 interface FakeApp {
   ActiveWorkbook: Record<string, never>
-  PluginStorage: { getItem: (key: string) => string | null; setItem: (key: string, value: string) => void }
+  PluginStorage: {
+    getItem: (key: string) => string | null
+    setItem: (key: string, value: string) => void
+  }
   CreateTaskPane?: (url: string) => FakePane | null
   GetTaskPane?: (id: string) => FakePane | null
   OAAssist?: { ShellExecute: (parameter: string) => void }
@@ -345,19 +348,25 @@ describe('util · copyTokenToClipboard', () => {
   it('execCommand 成功 → true，且临时 textarea 被清理', () => {
     const { app } = createFakeApp({ storage: { bgm_token: 'tok' } })
     mountApp(app)
-    Reflect.set(document, 'execCommand', vi.fn(() => true))
+    Reflect.set(
+      document,
+      'execCommand',
+      vi.fn(() => true),
+    )
 
     expect(copyTokenToClipboard()).toBe(true)
     expect(document.querySelector('textarea')).toBeNull()
-    expect(loggerSpies.info).toHaveBeenCalledWith(
-      expect.stringContaining('已复制到剪贴板'),
-    )
+    expect(loggerSpies.info).toHaveBeenCalledWith(expect.stringContaining('已复制到剪贴板'))
   })
 
   it('execCommand 返回 false → 失败并告警', () => {
     const { app } = createFakeApp({ storage: { bgm_token: 'tok' } })
     mountApp(app)
-    Reflect.set(document, 'execCommand', vi.fn(() => false))
+    Reflect.set(
+      document,
+      'execCommand',
+      vi.fn(() => false),
+    )
 
     expect(copyTokenToClipboard()).toBe(false)
     expect(loggerSpies.warn).toHaveBeenCalled()
@@ -421,7 +430,9 @@ describe('util · 用户 ID / 用户名', () => {
   })
 
   it('缓存为空时回退 PluginStorage，并回填缓存', () => {
-    const { app } = createFakeApp({ storage: { bgm_user_id: 'stored-id', bgm_username: 'stored-name' } })
+    const { app } = createFakeApp({
+      storage: { bgm_user_id: 'stored-id', bgm_username: 'stored-name' },
+    })
     mountApp(app)
 
     expect(_getBgmUserId()).toBe('stored-id')
@@ -484,7 +495,9 @@ describe('util · getUrlPath / buildTaskPaneUrl', () => {
   })
 
   it('调用方已在 /ui 目录内时不会拼出 /ui/ui（历史 bug 回归）', () => {
-    mountApp(createFakeApp({ storage: { manifest_base_path: 'https://cdn.example/plugin/ui' } }).app)
+    mountApp(
+      createFakeApp({ storage: { manifest_base_path: 'https://cdn.example/plugin/ui' } }).app,
+    )
     expect(buildTaskPaneUrl('clean.html')).toBe('https://cdn.example/plugin/ui/clean.html')
   })
 })
@@ -575,9 +588,7 @@ describe('util · showCleanPanel', () => {
 
     expect(store.get('clean_pane_id')).not.toBe('gone')
     expect(createdUrls).toHaveLength(1)
-    expect(loggerSpies.warn).toHaveBeenCalledWith(
-      expect.stringContaining('面板ID失效'),
-    )
+    expect(loggerSpies.warn).toHaveBeenCalledWith(expect.stringContaining('面板ID失效'))
   })
 
   it('自愈：缓存 ID 存在但页面从未加载成功 → 隐藏旧面板并重建', () => {
@@ -593,18 +604,14 @@ describe('util · showCleanPanel', () => {
     expect(stalePane.Visible).toBe(false)
     expect(store.get('clean_pane_id')).not.toBe('stale')
     expect(createdUrls).toHaveLength(1)
-    expect(loggerSpies.warn).toHaveBeenCalledWith(
-      expect.stringContaining('已重建'),
-    )
+    expect(loggerSpies.warn).toHaveBeenCalledWith(expect.stringContaining('已重建'))
   })
 
   it('创建面板失败时报错', () => {
     const { app } = createFakeApp({ isCreateFailing: true })
     mountApp(app)
     showCleanPanel()
-    expect(loggerSpies.error).toHaveBeenCalledWith(
-      expect.stringContaining('创建清理面板失败'),
-    )
+    expect(loggerSpies.error).toHaveBeenCalledWith(expect.stringContaining('创建清理面板失败'))
   })
 })
 
@@ -681,9 +688,7 @@ describe('util · showBangumiPanel', () => {
       showBangumiPanel()
     }).not.toThrow()
     expect(pane.Visible).toBe(true)
-    expect(loggerSpies.warn).toHaveBeenCalledWith(
-      expect.stringContaining('写入面板显示信号失败'),
-    )
+    expect(loggerSpies.warn).toHaveBeenCalledWith(expect.stringContaining('写入面板显示信号失败'))
   })
 
   it('宿主无 CreateTaskPane 时静默返回（不写信号）', () => {
@@ -720,11 +725,12 @@ describe('util · showEnrichPanel', () => {
     expect(createdUrls).toHaveLength(0)
   })
 
-  it('面板 ID 失效 → 与清理面板不同，这里不重建（保持现状）', () => {
+  it('面板 ID 失效 → 清空存储并立即重建（与清理面板同款一键直达，不再要求点两次）', () => {
     const { app, createdUrls } = createFakeApp({ storage: { enrich_pane_id: 'gone' } })
     mountApp(app)
     showEnrichPanel()
-    expect(createdUrls).toHaveLength(0)
+    expect(createdUrls).toHaveLength(1)
+    expect(createdUrls[0]).toMatch(/\/ui\/enrich\.html$/)
   })
 
   it('首次打开 → 创建并显示，记录 ID', () => {
@@ -793,18 +799,17 @@ describe('util · showSettingsPanel', () => {
     expect(pane.DockPosition).toBe(WPS_ENUM.msoCTPDockPositionRight)
   })
 
-  it('面板 ID 失效 → 清空存储并告警', () => {
-    const { app, store } = createFakeApp({
+  it('面板 ID 失效 → 清空存储并立即重建（停靠右侧，与首次创建一致）', () => {
+    const { app, store, createdUrls } = createFakeApp({
       storage: { settings_pane_id: 'gone', settings_pane_url: 'x/settings.html' },
     })
     mountApp(app)
 
     showSettingsPanel()
 
-    expect(store.get('settings_pane_id')).toBe('')
-    expect(loggerSpies.warn).toHaveBeenCalledWith(
-      expect.stringContaining('设置面板ID失效'),
-    )
+    expect(store.get('settings_pane_id')).not.toBe('gone')
+    expect(createdUrls).toHaveLength(1)
+    expect(loggerSpies.warn).toHaveBeenCalledWith(expect.stringContaining('设置面板ID失效'))
   })
 
   it('首次创建 → 停靠右侧、显示、记录 ID', () => {
@@ -823,29 +828,29 @@ describe('util · showSettingsPanel', () => {
   it('主面板可见性会写入日志（用于排查停靠位置）', () => {
     const main: FakePane = { ID: 'main-1', Visible: true }
     const { app } = createFakeApp({
-      storage: { panel_id: 'main-1', settings_pane_id: 'set-1', settings_pane_url: 'x/settings.html' },
+      storage: {
+        panel_id: 'main-1',
+        settings_pane_id: 'set-1',
+        settings_pane_url: 'x/settings.html',
+      },
       panes: { 'main-1': main, 'set-1': { ID: 'set-1', Visible: false } },
     })
     mountApp(app)
 
     showSettingsPanel()
 
-    expect(loggerSpies.info).toHaveBeenCalledWith(
-      expect.stringContaining('主面板状态: 可见'),
-    )
+    expect(loggerSpies.info).toHaveBeenCalledWith(expect.stringContaining('主面板状态: 可见'))
   })
 
   it('创建面板失败时报错', () => {
     const { app } = createFakeApp({ isCreateFailing: true })
     mountApp(app)
     showSettingsPanel()
-    expect(loggerSpies.error).toHaveBeenCalledWith(
-      expect.stringContaining('创建设置面板失败'),
-    )
+    expect(loggerSpies.error).toHaveBeenCalledWith(expect.stringContaining('创建设置面板失败'))
   })
 
-  it('宿主无 GetTaskPane 时按「ID 失效」处理', () => {
-    const { app, store } = createFakeApp({
+  it('宿主无 GetTaskPane 时按「ID 失效」处理 → 清除存储并重建', () => {
+    const { app, store, createdUrls } = createFakeApp({
       storage: { settings_pane_id: 'set-1', settings_pane_url: 'x/settings.html' },
       isGetTaskPaneMissing: true,
     })
@@ -853,7 +858,8 @@ describe('util · showSettingsPanel', () => {
 
     showSettingsPanel()
 
-    expect(store.get('settings_pane_id')).toBe('')
+    expect(store.get('settings_pane_id')).not.toBe('set-1')
+    expect(createdUrls).toHaveLength(1)
   })
 })
 
@@ -1129,10 +1135,10 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', async () => {
 
   it('不传 callback 时不抛错（调用方可只关心副作用）', async () => {
     const xhr = startUserInfoRequest()
-      expect(() => {
-        xhr.emit('load')
-      }).not.toThrow()
-      await flushMicrotasks()
+    expect(() => {
+      xhr.emit('load')
+    }).not.toThrow()
+    await flushMicrotasks()
     // 默认 responseText 是空对象 → 用户 ID 为空 → 按「无值」落成 null
     expect(_getBgmUserId()).toBeNull()
   })
@@ -1147,11 +1153,11 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', async () => {
     const xhr = FakeXhr.instances[0]
     if (!xhr) throw new Error('未发起请求')
     xhr.responseText = JSON.stringify({ id: 9, nickname: 'noPersist' })
-      expect(() => {
-        xhr.emit('load')
-      }).not.toThrow()
-      await flushMicrotasks()
-      expect(_getBgmUserId()).toBe('9')
+    expect(() => {
+      xhr.emit('load')
+    }).not.toThrow()
+    await flushMicrotasks()
+    expect(_getBgmUserId()).toBe('9')
     expect(callback).toHaveBeenCalledWith(
       expect.objectContaining({ id: '9', username: 'noPersist' }),
       'none',
