@@ -206,8 +206,12 @@ export function readForeignRules(
         const interior = readInteriorColor(fc)
         const fontColor = readFontColor(fc)
         const stopIfTrue = readStopIfTrue(fc)
+        // Address 也按 Formula1 的口径做类型守卫：COM 偶发返回非字符串时，
+        // 裸值会一路带到渲染层的 escapeHtml().replace() 抛 TypeError，
+        // 把表格渲染中断在半路（计数已更新、列表还是旧内容）。
+        const address = fc.AppliesTo?.Address
         snapshots.push({
-          range: fc.AppliesTo?.Address ?? '',
+          range: typeof address === 'string' ? address : '',
           formula: typeof fc.Formula1 === 'string' ? fc.Formula1 : '',
           kind: fc.Type === XL_EXPRESSION ? 'expression' : 'other',
           ...(typeof fc.Type === 'number' && { type: fc.Type }),

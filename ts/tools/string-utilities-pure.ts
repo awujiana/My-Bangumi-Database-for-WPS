@@ -43,11 +43,16 @@ export function columnNumberToLetter(column: number): string {
  *
  * 转义字符表：`< > " ' &` 共 5 个字符。
  *
- * @param text - 待转义的字符串，可为 null/undefined
- * @returns 转义后的 HTML 安全字符串；输入为空值时返回空字符串
+ * 非字符串输入按空值处理（返回 ''）而不是抛错：本函数的入参里有相当一部分来自
+ * COM / JSON 等外部来源，类型标注拦不住运行时的意外值；裸值会让 `.replace` 抛
+ * TypeError，把调用方的渲染流程中断在半路（表现为「计数已更新、列表还是旧内容」
+ * 这种自相矛盾的界面）。宁可少显示一个字符，不要中断整段渲染。
+ *
+ * @param text - 待转义的字符串，可为 null/undefined 或任何意外类型
+ * @returns 转义后的 HTML 安全字符串；输入为空值或非字符串时返回空字符串
  */
-export function escapeHtml(text: string | null | undefined): string {
-  if (!text) return ''
+export function escapeHtml(text: unknown): string {
+  if (typeof text !== 'string' || text === '') return ''
   return text
     .replace(/&/gu, '&amp;')
     .replace(/</gu, '&lt;')

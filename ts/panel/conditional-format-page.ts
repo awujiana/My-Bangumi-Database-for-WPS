@@ -221,13 +221,36 @@ function selectedSheet(): SheetEntry | null {
   return state.sheets.find((entry) => entry.key === state.selectedKey) ?? null
 }
 
-/** 重新枚举并定位选中表（选中失效时回退第一张） */
+/**
+ * 取当前活动工作表对象（用于「默认选中活动表」）
+ *
+ * 走 `Application.ActiveSheet`；部分版本只暴露 `ActiveWorkbook.ActiveSheet`，
+ * 两条都试。取不到返回 null（调用方退回首张表，不报错）。
+ */
+function activeWorksheet(): WpsWorksheet | null {
+  const app = getApp() as {
+    ActiveSheet?: WpsWorksheet
+    ActiveWorkbook?: { ActiveSheet?: WpsWorksheet }
+  } | null
+  try {
+    return app?.ActiveSheet ?? app?.ActiveWorkbook?.ActiveSheet ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 重新枚举并定位选中表（无历史选择时默认选中**活动工作表**） */
 function reloadSheets(): void {
   state.sheets = collectSheets()
   const isSelectionValid = state.sheets.some((entry) => entry.key === state.selectedKey)
   if (!isSelectionValid && state.sheets.length > 0) {
-    const first = state.sheets[0]
-    state.selectedKey = first ? first.key : ''
+    // 默认选中活动表：用户是在活动表上点开面板的，第一张往往是别的表，
+    // 于是「既有规则」区显示空、而用户明明看到活动表上有规则（真机反馈）。
+    // 活动表匹配不到（未打开 / 取不到）才退回首张。
+    const active = activeWorksheet()
+    const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
+    const fallback = state.sheets[0]
+    state.selectedKey = (matched ?? fallback)?.key ?? ''
   }
   renderSheetSelect()
   // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
@@ -256,6 +279,12 @@ function loadExistingRules(): void {
   try {
     state.existing = readForeignRules(entry.worksheet)
     state.existingError = null
+    // 读了多少条必须留痕：真机出现过「界面显示没有规则、用户坚称表上有 38 条」
+    // 的争议，没有这行日志时双方都无法判断是 COM 没读到还是渲染丢了。
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[conditionalFormat] 工作表「${entry.sheet}」读到 ${String(state.existing.length)} 条既有规则`,
+    )
   } catch (error: unknown) {
     state.existing = []
     state.existingError = `读取失败：${(error as Error).message}`
@@ -265,11 +294,31 @@ function loadExistingRules(): void {
   renderExistingRules()
 }
 
-/** 渲染既有规则表格（分页 + 搜索 + 行内管理） */
+/**
+ * 渲染既有规则表格（分页 + 搜索 + 行内管理）
+ *
+ * ⚠️ 整个函数体包在 try 里：`setText(count)` 在 `container.innerHTML` **之前**执行，
+ * 渲染中途抛异常会留下「计数已更新、列表还是上一次内容」的半截状态 ——
+ * 表现为「显示 38 条却同时显示没有规则」这种自相矛盾的界面，
+ * 而异常被上层调用栈吞掉，控制台之外看不出来（真机踩过）。
+ * 故失败时显式渲染错误行，绝不静默保留旧内容。
+ */
 function renderExistingRules(): void {
   const container = byId('conditionalFormatExistingList')
   if (!container) return
 
+  try {
+    renderExistingRulesInner(container)
+  } catch (error: unknown) {
+    container.innerHTML = `<p class="conditional-format-empty">既有规则渲染失败：${escapeHtml(
+      (error as Error).message,
+    )}<br>请点「重新读取」重试；持续失败请把此信息反馈给开发者。</p>`
+    setText('conditionalFormatExistingCount', '—')
+    renderExistingPagination(1, 1)
+  }
+}
+
+function renderExistingRulesInner(container: HTMLElement): void {
   if (state.existingError !== null) {
     container.innerHTML = `<p class="conditional-format-empty">${escapeHtml(state.existingError)}</p>`
     setText('conditionalFormatExistingCount', '—')
@@ -277,7 +326,13 @@ function renderExistingRules(): void {
     return
   }
   if (state.existing.length === 0) {
-    container.innerHTML = '<p class="conditional-format-empty">这张表当前没有条件格式规则。</p>'
+    // 带上工作表名：默认选中漂移时（选中了另一张表）用户能立刻看出选错了表，
+    // 而不是以为「我的规则丢了」
+    const selected = selectedSheet()
+    const sheetLabel = selected ? `「${selected.sheet}」` : '当前选中的工作表'
+    container.innerHTML = `<p class="conditional-format-empty">${escapeHtml(
+      sheetLabel,
+    )}上没有条件格式规则。<br>若你正在看的表上有规则，请在上方「目标工作表」里切换到它。</p>`
     setText('conditionalFormatExistingCount', '0 条')
     renderExistingPagination(1, 1)
     return

@@ -138,6 +138,17 @@ describe('空值边界', () => {
       expect(escapeHtml('')).toBe('')
     })
 
+    // 真机踩过：COM 偶发把 Address / Formula1 返回成非字符串，裸值一路带到
+    // escapeHtml().replace() 抛 TypeError，把表格渲染中断在半路 ——
+    // 表现为「计数显示 38 条、列表却显示没有规则」这种自相矛盾的界面。
+    it('非字符串（number / object / array）返回空字符串而不是抛错', () => {
+      expect(escapeHtml(42)).toBe('')
+      expect(escapeHtml(0)).toBe('')
+      expect(escapeHtml({ a: 1 })).toBe('')
+      expect(escapeHtml(['<script>'])).toBe('')
+      expect(escapeHtml(true)).toBe('')
+    })
+
     it('应转义 < > & " \' 五个字符', () => {
       const input = '<script>alert("xss")</script> & \'single\''
       const result = escapeHtml(input)
