@@ -288,6 +288,37 @@ describe('日志面板', () => {
     expect(log.textContent).not.toContain('line-0\n')
     expect(log.textContent).toContain('line-519')
   })
+
+  it('多行日志合帧滚动：一帧只读一次 scrollHeight（不逐行强制布局）', async () => {
+    const controller = createProgress({
+      mode: 'inline',
+      title: 'A',
+      hostId: makeHost().id,
+      enableLogs: true,
+    })
+    const log = pickElement('[data-el="log"]')
+    // jsdom 不做布局（scrollHeight 恒 0），用计数 getter 观测读取次数
+    let reads = 0
+    Object.defineProperty(log, 'scrollHeight', {
+      get: () => {
+        reads += 1
+        return 0
+      },
+      configurable: true,
+    })
+
+    controller?.log('一')
+    controller?.log('二')
+    controller?.log('三')
+    // 同一任务内三行日志：scrollHeight 一次都没读（写 style 不强制布局）
+    expect(reads).toBe(0)
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+    // 帧末只读一次，一次布局服务全部行
+    expect(reads).toBe(1)
+  })
 })
 
 describe('暂停状态', () => {

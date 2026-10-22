@@ -8,6 +8,24 @@
 
 ## [未发布]
 
+### 日志区滚动合帧：一行日志一次强制布局 → 一帧一次（2026-10-22）
+
+与浮动窗口卡顿同源的第二个热点：进度日志 / 清理日志**每追加一行**就执行一次
+`box.scrollTop = box.scrollHeight`。**读 `scrollHeight` 会强制同步布局（reflow）**
+—— 一行一读，4000 行同步日志就是 4000 次强制布局，日志刷起来时任务窗格卡成
+幻灯片。（写 style 不强制布局，浏览器在一帧的绘制点统一算一次；**读**才强制。）
+
+- 新增 `ts/ui/dom-scroll.ts`：`scrollToBottomCoalesced(element)` —— 把
+  「读 scrollHeight + 写 scrollTop」合帧，同一帧内的多行日志只读一次、帧末统一
+  滚动；元素粒度去重（WeakMap，无需调用方管理生命周期）；无 rAF 的环境退化为
+  同步执行（单测 node env 行为不变）。
+- 接入两处逐行滚动：`ui/components/progress.ts` 的 `log()`（同步进度弹窗实时
+  日志）与 `panel/clean-page.ts` 的 `appendLog()`（清理页日志区）。
+- 单测：新增 `tests/dom-scroll.test.ts`（4 用例：一帧一次 / 元素粒度隔离 /
+  跨帧各滚一次 / 无 rAF 降级）；`progress.test.ts` 补「三行日志零读取、帧末一次」
+  的计数 getter 观测用例。
+- 说明：`log-panel.ts` 的日志弹窗是整面板重渲染后只滚一次，本就不热，未改动。
+
 ### 浮动窗口卡顿根治：拖动走 transform 合成层 + 顶栏去逐帧模糊（2026-10-22）
 
 上一轮修了「越拖越快」与 rAF 合帧，但**拖动仍掉帧**——真机拖着预览表几百行的

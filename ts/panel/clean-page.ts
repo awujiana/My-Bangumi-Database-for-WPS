@@ -34,6 +34,7 @@ import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import { mountDataContextNotice } from '../tools/data-context.js'
 import { createProgress } from '../ui/components/progress.js'
 import type { ProgressController } from '../ui/components/progress.js'
+import { scrollToBottomCoalesced } from '../ui/dom-scroll.js'
 
 // ========== 状态 ==========
 
@@ -521,7 +522,9 @@ function appendLog(message: string, level: 'info' | 'ok' | 'warn' | 'error' = 'i
   line.className = `clean-log-line clean-log-${level}`
   line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
   box.appendChild(line)
-  box.scrollTop = box.scrollHeight
+  // 合帧滚动：读 scrollHeight 会强制同步布局，逐行读 = 逐行一次 reflow
+  // （清理扫描按目标逐条打日志，规则多时日志区直接卡成幻灯片）
+  scrollToBottomCoalesced(box)
   bgmLog(LOG_LEVELS.INFO, `[cleanPage] ${message}`)
 }
 

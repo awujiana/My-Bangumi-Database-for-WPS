@@ -16,6 +16,7 @@
 
 import { sanitizeHtml } from '../../tools/sanitize.js'
 import { formatDuration } from '../../tools/util/duration.js'
+import { scrollToBottomCoalesced } from '../dom-scroll.js'
 
 /** 进度组件渲染模式 */
 export type ProgressMode = 'modal' | 'inline' | 'detach'
@@ -360,9 +361,8 @@ export function createProgress(options: ProgressShowOptions): ProgressController
   const hasLogs = options.enableLogs ?? false
 
   // 日志区「是否跟随尾部」用滚动事件维护，而不是每条日志都读 scrollHeight：
-  // 读 scrollHeight / scrollTop / clientHeight 会强制同步布局（reflow），
-  // 同步流程每行一条日志时就是 O(n) 次 reflow（4000 行 ≈ 4000 次）。
-  // 这里只在用户真正滚动时读一次，日志追加只做写入。
+  // 读 scrollHeight / scrollTop / clientHeight 会强制同步布局（reflow）。
+  // 用户主动滚动才读一次；日志追加只做写入 + 合帧滚动（见 scrollToBottomCoalesced）。
   let isFollowTail = true
   els.log.addEventListener(
     'scroll',
@@ -587,7 +587,9 @@ export function createProgress(options: ProgressShowOptions): ProgressController
     log(line: string): void {
       if (!isVisible || !hasLogs) return
       logCount = appendLogLine(els.log, line, logCount)
-      if (isFollowTail) els.log.scrollTop = els.log.scrollHeight
+      // 跟随尾部时合帧滚动：读 scrollHeight 会强制同步布局，一行一读就是
+      // O(n) 次 reflow（4000 行 ≈ 4000 次）；合帧后一帧最多读一次。
+      if (isFollowTail) scrollToBottomCoalesced(els.log)
     },
     setPaused(isPausedNext: boolean): void {
       if (!isVisible) return
