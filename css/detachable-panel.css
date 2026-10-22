@@ -88,6 +88,18 @@
   transition: none;
 }
 
+/* 拖动期图层提示：transform 命中合成层后每帧只平移层，不再重排 + 重绘面板内容。
+   只挂在 is-dragging 上（拖动结束即撤），不常驻占显存。 */
+.detachable-panel.is-dragging {
+  will-change: transform;
+}
+
+/* 拖动时正文禁指针：鼠标扫过表格行触发的 :hover 背景重绘一并省掉。
+   pointer capture 已在标题栏上，禁掉正文指针不影响拖动本身。 */
+.detachable-panel.is-dragging .detachable-panel-body {
+  pointer-events: none;
+}
+
 .detachable-panel.is-maximized {
   left: 2%;
   top: 2%;
@@ -106,6 +118,8 @@
   border-bottom: 1px solid var(--border);
   cursor: move;
   user-select: none;
+  /* 触屏 / 触控笔拖窗口时不让浏览器把手势当成页面平移 */
+  touch-action: none;
 }
 
 .detachable-panel-grip {
@@ -223,6 +237,7 @@
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
+  touch-action: none;
   background: linear-gradient(
     135deg,
     transparent 0%,

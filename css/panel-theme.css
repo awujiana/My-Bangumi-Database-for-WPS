@@ -106,7 +106,9 @@ body {
   gap: var(--gap);
   padding: clamp(10px, 0.9vw, 16px) clamp(16px, 1.4vw, 28px);
   background: var(--bg-topbar);
-  backdrop-filter: blur(10px);
+  /* 不用 backdrop-filter: blur() 做毛玻璃：sticky 顶栏在滚动时要对背后内容
+     逐帧模糊，WebView 里这一项就能让整页滚动掉帧；浮动窗口拖过顶栏区域时
+     每帧还要再模糊一次。已换成不透明 --bg-topbar，观感几乎不变。 */
   border-bottom: 1px solid var(--border);
 }
 .brand {

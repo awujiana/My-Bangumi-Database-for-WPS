@@ -113,7 +113,10 @@
   --focus-ring:      rgba(255, 255, 255, 0.18);
 
   /* ---- 主题化表面（随深浅色切换，避免硬编码深色孤岛）---- */
-  --bg-topbar:     rgba(12, 12, 12, 0.85);   /* 吸顶顶栏（深色半透明 + backdrop-blur） */
+  /* 吸顶顶栏底色。刻意用不透明色：曾用半透明 + backdrop-filter: blur() 做毛玻璃，
+     sticky 顶栏滚动时浏览器要对背后内容逐帧模糊（WebView 里足以让整页滚动掉帧，
+     浮动窗口拖过顶栏区域时更明显），视觉效果换成不透明底色后该开销归零。 */
+  --bg-topbar:     #141414;
   --bg-hero:       linear-gradient(135deg, rgba(31, 31, 31, 0.9), rgba(20, 20, 20, 0.95)); /* 指令中心焦点卡 */
   --bg-btn-hover:  #363636;                  /* 主/成功/警告按钮 hover 底色 */
   --border-btn-hover: rgba(255, 255, 255, 0.28); /* 按钮 hover 描边 */
@@ -178,8 +181,8 @@
   /* 重点列：浅底上 #ff9f43 对比度不足，换成深琥珀 */
   --accent-amber:    #a15c00;
 
-  /* ---- 主题化表面（浅色：浅色半透明顶栏 / 白→浅灰焦点卡）---- */
-  --bg-topbar:     rgba(245, 246, 248, 0.88);
+  /* ---- 主题化表面（浅色：不透明顶栏 / 白→浅灰焦点卡）---- */
+  --bg-topbar:     #f5f6f8;
   --bg-hero:       linear-gradient(135deg, #ffffff 0%, #eceef1 100%);
   --bg-btn-hover:  #d3d7de;
   --border-btn-hover: rgba(0, 0, 0, 0.24);
