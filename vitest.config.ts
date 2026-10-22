@@ -9,6 +9,16 @@ export default defineConfig({
     // 抬到 30s 只影响本来就该失败的慢钩子，快路径零成本。
     hookTimeout: 30_000,
     include: ['tests/**/*.test.ts'],
+    // 不设 `isolate: false`（vitest 每轮都会提示"可再省约 49s/轮"）——2026-10-22 实测三轮：
+    //   基线（isolate 默认 true）：153 文件 / 4837 用例全过，60.6s；
+    //   `--no-isolate`：① 12 文件 / 272 用例失败，134.7s；② 48.1s 处异常中断；
+    //               ③ 8 文件 / 102 用例失败，192.3s。没有一轮既通过又更快。
+    // 两轮失败的文件集不同（gitee-sync vs utility-index / nav-order / scraping），
+    // 污染对象随执行顺序漂移 —— worker 复用后**模块注册表跨文件共享**、模块级
+    // 单例互相污染（实测 gitee-sync 的 `getGithubConfig()` 读到上个文件留下的
+    // undefined）。本套件刻意依赖「每文件一个全新模块注册表」做隔离（见
+    // tests/enrich-page.test.ts 文件头：`enrichWatchTimer` 等模块级状态只能靠
+    // 独立文件保住初值）。那 ~3.8s/文件的启动成本换来的正是隔离性。
     // 测试环境保真：jsdom 环境下默认注入真实 DOMPurify，使单测走与生产一致的
     // 严格白名单路径（背景见 tests/setup/dompurify.ts 与 文档/TS_AUDIT_2026_09_10.md P0-2）
     setupFiles: ['tests/setup/dompurify.ts'],
