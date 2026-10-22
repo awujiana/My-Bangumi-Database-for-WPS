@@ -3719,6 +3719,100 @@ body {
     outline-offset: 2px;
 }
 
+/* ---- 专注模式：模块标题里的「只显示此模块」按钮 ---- */
+/* 与折叠按钮同规格同位置（紧跟其后），不另起一套视觉：两个按钮是一组操作。
+   注入而非写进 HTML 的理由见 module-state.ts 的 injectSoloButtons 注释。 */
+.mod-solo-btn {
+    padding: 0 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-3);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.mod-solo-btn:hover {
+    color: var(--text-1);
+    border-color: var(--border-strong);
+}
+
+.mod-solo-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+/* 正处于专注模式的模块：按钮高亮，让用户知道「现在只剩它」 */
+.mod-solo-btn.is-active {
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+/* ---- 专注模式浮动控制条 ---- */
+/* 底部居中：顶栏在各页都是吸顶的，会盖住它；底部不挡滚动区起点，
+   也不与「拖出浮动窗口」的标题栏抢位置。
+   z-index 800：高于正文（100）、低于浮动窗口（900）与模态框（1000）。 */
+.solo-mode-bar {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-2);
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.solo-mode-bar-title {
+    max-width: 40vw;
+    padding: 0 4px;
+    overflow: hidden;
+    color: var(--text-1);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.solo-mode-bar-btn {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-2);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.solo-mode-bar-btn:hover {
+    color: var(--text-1);
+    border-color: var(--border-strong);
+}
+
+.solo-mode-bar-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+.solo-mode-bar-btn--exit {
+    margin-left: 2px;
+    color: var(--danger, #f38ba8);
+}
+
+.solo-mode-bar-btn--exit:hover {
+    border-color: var(--danger, #f38ba8);
+}
+
 /* 主区模块被全部隐藏时的常驻占位块（toast 3 秒就消失，这里必须留得住） */
 .module-empty-hint {
     grid-column: 1 / -1;

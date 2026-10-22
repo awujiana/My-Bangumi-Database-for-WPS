@@ -71,6 +71,215 @@ const EMPTY_HINT_TEXT = '本页模块已全部隐藏。请打开设置页，在�
 /** 设置页「模块排序」编辑器自身所在模块：禁止隐藏，否则无法恢复其它模块 */
 const UNHIDEABLE = { page: 'settings', id: 'sec-modules' } as const
 
+// ========== 专注模式（只显示单个模块，可上下切换） ==========
+
+/** 模块标题里「只显示此模块」按钮的类名 */
+const SOLO_BUTTON_CLASS = 'mod-solo-btn'
+
+/** 专注模式浮动控制条的 id / 类名 */
+const SOLO_BAR_ID = 'solo-mode-bar'
+
+/**
+ * 专注模式状态：`{ page, moduleId }` 或 null。
+ *
+ * **为什么不持久化**：专注模式是「视图」不是「配置」。若写进
+ * `bgm_module_hidden`，退出时得把用户原来的隐藏集合原样还原（漏一个就丢配置），
+ * 而且会和设置页编辑器、跨页轮询、导入导出全缠在一起 —— 为「刷新后还在专注」
+ * 这一点收益背一身状态，不值。刷新即退出，符合「临时看一眼」的语义。
+ */
+let soloMode: { page: string; moduleId: string } | null = null
+
+/** 当前是否处于专注模式 */
+export function isSoloMode(): boolean {
+  return soloMode !== null
+}
+
+/** 当前专注的模块 id（未进入时为 null） */
+export function currentSoloModule(): string | null {
+  return soloMode?.moduleId ?? null
+}
+
+/** 取某页注册表里「可参与专注模式」的模块（按注册顺序 = 页面显示顺序） */
+function soloableModules(page: string): readonly NavModule[] {
+  const modules = PAGE_MODULES[page]
+  if (!modules) return []
+  return modules.filter((module) => canHideModule(page, module.id))
+}
+
+/**
+ * 进入专注模式：本页只显示 `moduleId` 一个模块。
+ *
+ * 目标模块同时被强制展开 —— 收起状态进专注模式只会看到一条标题栏，
+ * 用户会以为功能坏了。
+ */
+export function enterSoloMode(page: string, moduleId: string): void {
+  const isSoloable = soloableModules(page).some((module) => module.id === moduleId)
+  if (!isSoloable) {
+    bgmLog(LOG_LEVELS.WARN, `[moduleState] 拒绝进入专注模式: ${moduleId} 不在 ${page} 注册表`)
+    return
+  }
+  soloMode = { page, moduleId }
+  applyModuleState(page)
+  renderSoloBar(page)
+  bgmLog(LOG_LEVELS.INFO, `[moduleState] 进入专注模式: ${page} / ${moduleId}`)
+}
+
+/** 退出专注模式，恢复各模块本来的隐藏 / 折叠状态 */
+export function exitSoloMode(): void {
+  const previous = soloMode
+  soloMode = null
+  removeSoloBar()
+  if (previous) {
+    applyModuleState(previous.page)
+    bgmLog(LOG_LEVELS.INFO, `[moduleState] 退出专注模式: ${previous.page}`)
+  }
+}
+
+/**
+ * 在专注模式里上下切换模块。
+ *
+ * 跳过「不可参与」的模块（设置页排序编辑器自身）与当前不存在的模块 ——
+ * 注册表里有、DOM 里没有的模块（个别页面按需渲染）跳过去，
+ * 否则切到它屏幕上什么都不显示，像是切换坏了。
+ */
+export function stepSoloMode(delta: number): void {
+  if (!soloMode) return
+  const modules = soloableModules(soloMode.page).filter(
+    (module) => document.getElementById(module.id) !== null,
+  )
+  if (modules.length === 0) return
+  const current = modules.findIndex((module) => module.id === soloMode?.moduleId)
+  // 从 -1（当前模块不在可切换集合里）出发时按「第一项」算，保证有明确落点
+  const base = current === -1 ? 0 : current
+  const next = (base + delta + modules.length) % modules.length
+  const target = modules[next]
+  if (!target) return
+  soloMode = { page: soloMode.page, moduleId: target.id }
+  applyModuleState(soloMode.page)
+  renderSoloBar(soloMode.page)
+}
+
+/** 切换某模块的专注状态（按钮入口） */
+function toggleSoloMode(page: string, moduleId: string): void {
+  if (soloMode?.page === page && soloMode.moduleId === moduleId) exitSoloMode()
+  else enterSoloMode(page, moduleId)
+}
+
+/** 移除浮动控制条（重复调用安全） */
+function removeSoloBar(): void {
+  document.getElementById(SOLO_BAR_ID)?.remove()
+}
+
+/**
+ * 渲染专注模式浮动控制条：当前模块名 + ↑ / ↓ / 退出。
+ *
+ * 放在底部居中而非顶部：顶栏在各页都是吸顶的，会盖住它；
+ * 底部不挡滚动区起点，也不与「拖出浮动窗口」的标题栏抢位置。
+ */
+function renderSoloBar(page: string): void {
+  removeSoloBar()
+  if (!soloMode) return
+  const modules = soloableModules(page)
+  const current = modules.find((module) => module.id === soloMode?.moduleId)
+  const title = current?.label ?? soloMode.moduleId
+
+  const bar = document.createElement('div')
+  bar.id = SOLO_BAR_ID
+  bar.className = 'solo-mode-bar'
+  bar.setAttribute('role', 'toolbar')
+  bar.setAttribute('aria-label', '专注模式：只显示单个模块，可上下切换')
+
+  const label = document.createElement('span')
+  label.className = 'solo-mode-bar-title'
+  label.textContent = `🎯 ${title}`
+
+  const makeStep = (icon: string, ariaLabel: string, delta: number): HTMLButtonElement => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'solo-mode-bar-btn'
+    button.textContent = icon
+    button.title = ariaLabel
+    button.setAttribute('aria-label', ariaLabel)
+    button.addEventListener('click', () => {
+      stepSoloMode(delta)
+    })
+    return button
+  }
+
+  const exit = document.createElement('button')
+  exit.type = 'button'
+  exit.className = 'solo-mode-bar-btn solo-mode-bar-btn--exit'
+  exit.textContent = '✕ 退出专注'
+  exit.title = '退出专注模式，恢复全部模块'
+  exit.setAttribute('aria-label', exit.title)
+  exit.addEventListener('click', () => {
+    exitSoloMode()
+  })
+
+  bar.append(label, makeStep('↑', '上一个模块', -1), makeStep('↓', '下一个模块', 1), exit)
+  document.body.append(bar)
+}
+
+/** 造一个模块标题里的「只显示此模块」按钮 */
+function makeSoloButton(module: NavModule): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = SOLO_BUTTON_CLASS
+  button.textContent = '⛶'
+  button.dataset.modSolo = module.id
+  const label = `只显示「${module.label}」，其余模块暂时隐藏（可上下切换）`
+  button.title = label
+  button.setAttribute('aria-label', label)
+  return button
+}
+
+/**
+ * 给本页所有模块标题注入「只显示此模块」按钮（幂等）。
+ *
+ * **为什么是运行时注入而不是像折叠按钮那样写进 HTML**：折叠按钮与
+ * `PAGE_MODULES` 是一一对应的平行清单，必须静态可查（nav-order 门禁靠它
+ * 抓「漏一个按钮」）；专注按钮没有这种对应关系 —— 它对所有模块是同一套逻辑，
+ * 写 37 份纯属复制粘贴，漏一个也不影响其它模块工作。故用注入 + 事件委托。
+ */
+function injectSoloButtons(page: string): void {
+  const modules = PAGE_MODULES[page]
+  if (!modules) return
+  for (const module of modules) {
+    const element = document.getElementById(module.id)
+    const heading = element?.querySelector('h3, h2')
+    // 没有标题元素就跳过：不强行插到模块最前面，那会挡掉模块自己的首行内容。
+    // 已注入过的不重复加（幂等，模块被拖进浮动窗口再拖回来时这条会命中）。
+    if (heading !== null && heading !== undefined) {
+      const isInjected = heading.querySelector(`.${SOLO_BUTTON_CLASS}`) !== null
+      if (!isInjected) heading.append(makeSoloButton(module))
+    }
+  }
+}
+
+/** 点击委托是否已挂到 document（模块级，避免重复挂载导致一次点击切换两次） */
+let hasBoundSoloListener = false
+
+/** 点击委托：命中专注按钮就切换 */
+function onSoloClick(event: Event): void {
+  const { target } = event
+  if (!(target instanceof Element)) return
+  const button = target.closest<HTMLElement>(`.${SOLO_BUTTON_CLASS}`)
+  const moduleId = button?.dataset.modSolo ?? ''
+  if (!moduleId) return
+  const page = resolvePage()
+  if (!page) return
+  event.preventDefault()
+  toggleSoloMode(page, moduleId)
+}
+
+/** 挂上专注按钮的点击委托（幂等） */
+function bindSoloToggles(): void {
+  if (typeof document === 'undefined') return
+  if (hasBoundSoloListener) return
+  hasBoundSoloListener = true
+  document.addEventListener('click', onSoloClick)
+}
+
 /**
  * 该模块是否允许被隐藏。
  * 编辑器模块本身不可隐藏 —— 隐藏后就没有入口能把它（和其它模块）恢复了。
@@ -219,13 +428,19 @@ export function applyModuleState(page?: string): void {
 
   const hidden = new Set(getHiddenModules(pageKey, true))
   const collapsed = new Set(getCollapsedModules(pageKey, true))
+  // 专注模式：本页只放行 soloId 一个模块，其余一律按隐藏处理。
+  // 与 hidden 集合叠加（不是替换）—— 用户原本隐藏的模块退出专注后还是要藏回去。
+  const soloId = soloMode?.page === pageKey ? soloMode.moduleId : null
   // 一次性取好再按属性匹配：避免在循环里拼选择器（既慢，又要处理 CSS 转义）
   const navLinks = [...document.querySelectorAll<HTMLElement>('.nav a[href^="#"]')]
   const collapseButtons = [...document.querySelectorAll<HTMLElement>(`.${COLLAPSE_BUTTON_CLASS}`)]
+  const soloButtons = [...document.querySelectorAll<HTMLElement>(`.${SOLO_BUTTON_CLASS}`)]
 
   for (const module of modules) {
-    const isHidden = hidden.has(module.id)
-    const isCollapsed = collapsed.has(module.id)
+    const isSoloTarget = soloId !== null && module.id === soloId
+    const isHidden = hidden.has(module.id) || (soloId !== null && !isSoloTarget)
+    // 专注目标强制展开：收起状态进专注模式只看到一条标题栏，用户会以为功能坏了
+    const isCollapsed = isSoloTarget ? false : collapsed.has(module.id)
 
     const element = document.getElementById(module.id)
     if (element !== null) {
@@ -244,9 +459,17 @@ export function applyModuleState(page?: string): void {
       button.setAttribute('aria-controls', module.id)
       button.textContent = isCollapsed ? ICON_COLLAPSED : ICON_EXPANDED
     }
+
+    // 专注按钮高亮当前目标：用户要能一眼看出「现在只剩哪个模块」，
+    // 尤其切到下一项时，高亮跟着走是最直接的反馈
+    const soloButton = soloButtons.find((item) => item.dataset.modSolo === module.id)
+    if (soloButton !== undefined) {
+      soloButton.classList.toggle('is-active', isSoloTarget)
+      soloButton.setAttribute('aria-pressed', isSoloTarget ? 'true' : 'false')
+    }
   }
 
-  syncEmptyHint(pageKey, modules, hidden)
+  syncEmptyHint(pageKey, modules, hidden, soloId)
 }
 
 /** 点击委托是否已挂到 document（模块级，避免重复挂载导致一次点击切换两次） */
@@ -289,14 +512,25 @@ const warnedEmptyPages = new Set<string>()
  * 真正的风险是**把常用页面藏空后找不到恢复入口** —— 只要有明确回路就够。
  * 占位块必须常驻（toast 3 秒就消失，而用户回来看到的是一片空白），
  * 并复用设置页已有入口 `showSettingsPanel()`；用户在设置页改完，本页靠轮询自动恢复。
+ *
+ * `soloId` 非空表示正处于专注模式：此时「其它模块不可见」是用户主动选的，
+ * 不是误藏空，**不提示**（否则每进一次专注模式就弹一次 toast，很吵）。
  */
 function syncEmptyHint(
   page: string,
   modules: readonly NavModule[],
   hidden: ReadonlySet<string>,
+  soloId: string | null,
 ): void {
   const isAllHidden = modules.every((module) => hidden.has(module.id))
   const existing = document.getElementById(EMPTY_HINT_ID)
+
+  if (soloId !== null) {
+    // 专注模式有自己的出口（浮动控制条上的「退出专注」），不需要全隐藏兜底
+    if (existing !== null) existing.remove()
+    warnedEmptyPages.delete(page)
+    return
+  }
 
   if (!isAllHidden) {
     if (existing !== null) existing.remove()
@@ -359,6 +593,9 @@ function rawSnapshot(): string {
 export function startModuleStateSync(page: string): () => void {
   if (typeof window === 'undefined') return noopCleanup
   bindCollapseToggles()
+  // 专注模式：注入「只显示此模块」按钮 + 挂点击委托（幂等，与折叠按钮同套路）
+  injectSoloButtons(page)
+  bindSoloToggles()
   applyModuleState(page)
 
   let lastRaw = rawSnapshot()

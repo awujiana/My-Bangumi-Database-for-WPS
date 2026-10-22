@@ -11,9 +11,15 @@ import {
   applyModuleState,
   bindCollapseToggles,
   startModuleStateSync,
+  enterSoloMode,
+  exitSoloMode,
+  stepSoloMode,
+  isSoloMode,
+  currentSoloModule,
 } from '../ts/tools/module-state.js'
 import { CONFIG_KEYS } from '../ts/tools/config.js'
 import { PAGE_MODULES } from '../ts/tools/nav-order.js'
+import type { NavModule } from '../ts/tools/nav-order.js'
 import { registerNotifyApi } from '../ts/core/ui-bridge.js'
 
 /**
@@ -628,5 +634,218 @@ describe('全隐藏兜底', () => {
     }).not.toThrow()
     expect(emptyHint()).toBeNull()
     expect(toastSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ========== 专注模式（只显示单个模块，可上下切换） ==========
+
+/** panel 页注册表（`PAGE_MODULES.panel` 的类型是可选索引，直接下标会报 TS18048） */
+function panelModules(): readonly NavModule[] {
+  return PAGE_MODULES.panel ?? []
+}
+
+/** 取专注控制条（未进入时为 null） */
+function soloBar(): HTMLElement | null {
+  return document.getElementById('solo-mode-bar')
+}
+
+/** 取某模块标题里的专注按钮（注入式，需先跑过 startModuleStateSync） */
+function soloButtonOf(id: string): HTMLButtonElement {
+  const heading = moduleElement(id).querySelector('h3')
+  const button = heading?.querySelector<HTMLButtonElement>('.mod-solo-btn')
+  if (!button) throw new Error(`模块 ${id} 没有注入专注按钮`)
+  return button
+}
+
+describe('专注模式', () => {
+  beforeEach(() => {
+    // 每个用例都从「未进入专注」开始：soloMode 是模块级状态，跨用例不会自己复位
+    exitSoloMode()
+    buildPanelDom()
+  })
+
+  it('进入后只放行目标模块，其余模块与侧栏锚点全部隐藏', () => {
+    const first = panelModules()[1]
+    if (!first) throw new Error('panel 注册表为空')
+    enterSoloMode('panel', first.id)
+
+    expect(isSoloMode()).toBe(true)
+    expect(currentSoloModule()).toBe(first.id)
+    expect(moduleElement(first.id).hidden).toBe(false)
+    // 目标模块自身必须可见，其余一律藏（含侧栏锚点）
+    const others = panelModules().filter((module) => module.id !== first.id)
+    for (const module of others) {
+      expect(moduleElement(module.id).hidden).toBe(true)
+      expect(anchorOf(module.id).hidden).toBe(true)
+    }
+    // 控制条出现，且标题写着当前模块
+    expect(soloBar()).not.toBeNull()
+    expect(soloBar()?.textContent).toContain(first.label)
+  })
+
+  it('目标模块即使原本是收起状态，也被强制展开（否则只看到一条标题栏）', () => {
+    const target = panelModules()[1]
+    if (!target) throw new Error('panel 注册表为空')
+    setCollapsedModules('panel', [target.id])
+
+    enterSoloMode('panel', target.id)
+
+    expect(moduleElement(target.id).classList.contains('is-module-collapsed')).toBe(false)
+  })
+
+  it('退出后恢复各模块本来的隐藏 / 折叠状态', () => {
+    const target = panelModules()[1]
+    if (!target) throw new Error('panel 注册表为空')
+    // 先造一个「本来就隐藏了某模块」的基线
+    const other = panelModules()[2]
+    if (!other) throw new Error('panel 注册表模块不足')
+    setHiddenModules('panel', [other.id])
+    applyModuleState('panel')
+
+    enterSoloMode('panel', target.id)
+    expect(moduleElement(other.id).hidden).toBe(true)
+
+    exitSoloMode()
+
+    expect(isSoloMode()).toBe(false)
+    expect(currentSoloModule()).toBeNull()
+    expect(soloBar()).toBeNull()
+    // 目标模块回到默认可见；用户原本隐藏的仍然藏着（没被专注模式吃掉）
+    expect(moduleElement(target.id).hidden).toBe(false)
+    expect(moduleElement(other.id).hidden).toBe(true)
+  })
+
+  it('未注册的模块 id 被拒绝进入（不会把页面搞成只剩一个未知模块）', () => {
+    enterSoloMode('panel', 'sec-does-not-exist')
+    expect(isSoloMode()).toBe(false)
+    expect(soloBar()).toBeNull()
+  })
+
+  it('stepSoloMode 按注册顺序循环切换，越界回绕', () => {
+    // 口径与 stepSoloMode 内部一致：**全部** DOM 里存在的模块（含没有 h3 的跨栏
+    // 操作区）。↑/↓ 是「把每块都看一遍」的导航，不该因为某块没有标题按钮就跳过它 ——
+    // 跳过的结果是用户永远翻不到它，反而是缺陷。
+    const modules = panelModules().filter((module) => document.getElementById(module.id) !== null)
+    if (modules.length < 3) throw new Error('panel 可切换模块不足 3 个')
+    const [first, second, third, fourth] = modules
+    if (!first || !second || !third || !fourth) throw new Error('解构失败')
+
+    enterSoloMode('panel', first.id)
+    stepSoloMode(1)
+    expect(currentSoloModule()).toBe(second.id)
+
+    stepSoloMode(1)
+    expect(currentSoloModule()).toBe(third.id)
+
+    // 正向走到末尾再一步 → 回绕到第一个
+    const last = modules.at(-1)
+    if (!last) throw new Error('注册表为空')
+    enterSoloMode('panel', last.id)
+    stepSoloMode(1)
+    expect(currentSoloModule()).toBe(first.id)
+
+    // 在第一个上再反向一步 → 回绕到最后一个
+    stepSoloMode(-1)
+    expect(currentSoloModule()).toBe(last.id)
+    // 确认 fourth 确实参与了轮转（不是被 filter 掉的空引用）
+    expect(modules).toContainEqual(fourth)
+  })
+
+  it('未进入专注模式时 stepSoloMode 是空操作，不抛错', () => {
+    expect(() => {
+      stepSoloMode(1)
+    }).not.toThrow()
+    expect(isSoloMode()).toBe(false)
+  })
+
+  it('专注模式下不弹「全部隐藏」兜底提示（那是用户主动选的，不是误藏空）', () => {
+    const target = panelModules()[1]
+    if (!target) throw new Error('panel 注册表为空')
+    enterSoloMode('panel', target.id)
+
+    expect(emptyHint()).toBeNull()
+    expect(toastSpy).not.toHaveBeenCalled()
+  })
+
+  it('startModuleStateSync 给每个模块标题注入专注按钮（幂等，不重复注入）', () => {
+    startModuleStateSync('panel')
+    const before = document.querySelectorAll('.mod-solo-btn').length
+
+    startModuleStateSync('panel')
+    const after = document.querySelectorAll('.mod-solo-btn').length
+
+    // 只给有 h3 的模块注入：panel 的跨栏操作区没有 h3，故比注册表少一个
+    expect(before).toBe(panelModules().length - 1)
+    expect(after).toBe(before)
+  })
+
+  it('点模块标题里的专注按钮进入专注；再点一次退出', () => {
+    startModuleStateSync('panel')
+    const target = panelModules()[1]
+    if (!target) throw new Error('panel 注册表为空')
+    const button = soloButtonOf(target.id)
+
+    button.click()
+    expect(isSoloMode()).toBe(true)
+    expect(currentSoloModule()).toBe(target.id)
+    // 当前目标高亮，用户一眼看出「现在只剩它」
+    expect(button.classList.contains('is-active')).toBe(true)
+
+    button.click()
+    expect(isSoloMode()).toBe(false)
+  })
+
+  it('专注目标切换时，高亮跟着走', () => {
+    startModuleStateSync('panel')
+    const modules = panelModules().filter(
+      (module) => module.id !== NO_TOGGLE_ID && canHideModule('panel', module.id),
+    )
+    const first = modules[0]
+    const second = modules[1]
+    if (!first || !second) throw new Error('panel 可专注模块不足 2 个')
+
+    enterSoloMode('panel', first.id)
+    expect(soloButtonOf(first.id).classList.contains('is-active')).toBe(true)
+    expect(soloButtonOf(second.id).classList.contains('is-active')).toBe(false)
+
+    stepSoloMode(1)
+    expect(soloButtonOf(first.id).classList.contains('is-active')).toBe(false)
+    expect(soloButtonOf(second.id).classList.contains('is-active')).toBe(true)
+  })
+
+  it('控制条上的「退出专注」按钮真的退出', () => {
+    const target = panelModules()[1]
+    if (!target) throw new Error('panel 注册表为空')
+    enterSoloMode('panel', target.id)
+
+    const exit = soloBar()?.querySelector<HTMLButtonElement>('.solo-mode-bar-btn--exit')
+    if (!exit) throw new Error('控制条缺少退出按钮')
+    exit.click()
+
+    expect(isSoloMode()).toBe(false)
+    expect(soloBar()).toBeNull()
+  })
+
+  it('控制条上的 ↑ / ↓ 与 stepSoloMode 同一行为', () => {
+    const modules = panelModules().filter(
+      (module) => module.id !== NO_TOGGLE_ID && canHideModule('panel', module.id),
+    )
+    const first = modules[0]
+    const second = modules[1]
+    if (!first || !second) throw new Error('panel 可专注模块不足 2 个')
+    enterSoloMode('panel', first.id)
+
+    const buttons = [
+      ...(soloBar()?.querySelectorAll<HTMLButtonElement>('.solo-mode-bar-btn') ?? []),
+    ]
+    const down = buttons.find((button) => button.textContent === '↓')
+    const up = buttons.find((button) => button.textContent === '↑')
+    if (!down || !up) throw new Error('控制条缺少 ↑ / ↓')
+
+    down.click()
+    expect(currentSoloModule()).toBe(second.id)
+
+    up.click()
+    expect(currentSoloModule()).toBe(first.id)
   })
 })
