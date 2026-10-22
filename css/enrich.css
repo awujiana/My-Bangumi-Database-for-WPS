@@ -759,9 +759,9 @@
   border: 1px solid var(--border-strong);
 }
 
-/* 富化页内嵌进度：去掉组件默认外边距，避免与外层 padding 叠加 */
-#enrichProgressHost .bgm-progress--inline,
-#batchProgressHost .bgm-progress--inline {
+/* 富化页内嵌进度：去掉组件默认外边距，避免与外层 padding 叠加。
+   （批量富化进度是 detach 浮动卡片，挂 body 右下角，不走页面宿主，故不在此列） */
+#enrichProgressHost .bgm-progress--inline {
   margin: 0;
   padding: 0;
   border: none;
