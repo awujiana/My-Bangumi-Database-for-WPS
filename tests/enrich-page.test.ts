@@ -87,6 +87,7 @@ const m = vi.hoisted(() => ({
   loadRecentRecords: vi.fn(),
   // enrich-progress-hosts
   createInlineProgress: vi.fn(),
+  createFloatingProgress: vi.fn(),
   // enrich-conflict-dialog
   collectAllConflicts: vi.fn(),
   bindConflictDialogButtons: vi.fn(),
@@ -179,6 +180,7 @@ vi.mock('../ts/panel/enrich-record-view.js', () => ({
 vi.mock('../ts/panel/enrich-progress-hosts.js', () => ({
   progressHosts: { enrich: null, batch: null },
   createInlineProgress: m.createInlineProgress,
+  createFloatingProgress: m.createFloatingProgress,
 }))
 vi.mock('../ts/panel/enrich-conflict-dialog.js', () => ({
   collectAllConflicts: m.collectAllConflicts,
@@ -277,14 +279,12 @@ function mountEnrichControls(): void {
   for (const id of [
     'filePathDisplay',
     'batchFileList',
-    'batchProgress',
     'batchSummary',
     'batchSummaryContent',
     'autoDetectNotice',
     'sec-file',
     'enrichProgress',
     'enrichProgressHost',
-    'batchProgressHost',
     'enrichedCount',
     'skippedCount',
     'failedCount',
@@ -363,6 +363,12 @@ beforeEach(() => {
     callback(true)
   })
   m.createInlineProgress.mockImplementation(() => ({ update: vi.fn(), hide: vi.fn() }))
+  // 批量富化走 detach 浮卡：默认桩须带 complete（收尾切完成态），否则批量用例会炸
+  m.createFloatingProgress.mockImplementation(() => ({
+    update: vi.fn(),
+    complete: vi.fn(),
+    hide: vi.fn(),
+  }))
   m.getLockedEnrichSheet.mockReturnValue(null)
   m.collectDetectedWorkbookPaths.mockReturnValue([])
   m.autoSelectEnrichTarget.mockReturnValue('none')
@@ -1289,18 +1295,27 @@ describe('enrich-page · batchStartEnrichment', () => {
 
   it('批量进度「停止」按钮 → 置位批量取消标记并按停止收尾', async () => {
     const cancelHandlers: (() => void)[] = []
+    const controllers: { complete: ReturnType<typeof vi.fn> }[] = []
     primeBatch(['D:/a.xlsx'])
-    m.createInlineProgress.mockImplementation(
-      (_host: string, _title: string, _icon: string, onCancel?: () => void) => {
+    m.createFloatingProgress.mockImplementation(
+      (_title: string, _icon: string, onCancel?: () => void) => {
         if (onCancel) cancelHandlers.push(onCancel)
-        return { update: vi.fn(), hide: vi.fn() }
+        const controller = { update: vi.fn(), complete: vi.fn(), hide: vi.fn() }
+        controllers.push(controller)
+        return controller
       },
     )
 
     batchStartEnrichment()
 
-    // showBatchProgress(true) 在 runBatchEnrichment 的首个 await 之前同步执行
+    // showBatchProgress() 在 runBatchEnrichment 的首个 await 之前同步执行
     expect(cancelHandlers).toHaveLength(1)
+    // 批量进度是 detach 浮卡：只传 title/icon/onStop，不再有页面宿主 id
+    expect(m.createFloatingProgress).toHaveBeenCalledWith(
+      '批量富化进度',
+      '📦',
+      expect.any(Function),
+    )
     cancelHandlers[0]?.()
     expect(state.batchCancelRequested).toBe(true)
 
@@ -1308,6 +1323,129 @@ describe('enrich-page · batchStartEnrichment', () => {
       expect(state.isBatchEnriching).toBe(false)
     })
     expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已停止批量富化'), 'warning')
+    // 取消同样切完成态（ok=false）而不是直接 hide：卡片要告诉用户「停在哪」
+    expect(controllers[0]?.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ ok: false, doneTitle: '批量富化已停止' }),
+    )
+  })
+
+  it('批量完成 → 浮卡切完成态保留摘要，不 hide，槽位保留实例', async () => {
+    const controllers: {
+      complete: ReturnType<typeof vi.fn>
+      hide: ReturnType<typeof vi.fn>
+    }[] = []
+    primeBatch(['D:/动画A.xlsx', 'D:/动画B.xlsx'])
+    m.createFloatingProgress.mockImplementation(() => {
+      const controller = { update: vi.fn(), complete: vi.fn(), hide: vi.fn() }
+      controllers.push(controller)
+      return controller
+    })
+
+    batchStartEnrichment()
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(controllers).toHaveLength(1)
+    // 完成态刻意不 hide：用户可能已滚到别处，卡片是唯一的「跑完了」提示
+    expect(controllers[0]?.hide).not.toHaveBeenCalled()
+    expect(controllers[0]?.complete).toHaveBeenCalledTimes(1)
+    const options = controllers[0]?.complete.mock.calls[0]?.[0] as {
+      summary: string
+      ok: boolean
+      doneTitle: string
+    }
+    expect(options.ok).toBe(true)
+    expect(options.doneTitle).toBe('批量富化完成')
+    expect(options.summary).toContain('2/2 个文件')
+    expect(options.summary).toContain('成功 2')
+    expect(options.summary).toContain('失败 0')
+    expect(options.summary).toContain('匹配 2')
+    // 槽位仍持有完成态实例——回收责任在下一轮 / 清空列表
+    expect(progressHosts.batch).toBe(controllers[0])
+  })
+
+  it('连续两轮批量 → 第二轮先回收上一轮的完成态卡片（dock 不泄漏）', async () => {
+    const controllers: { hide: ReturnType<typeof vi.fn> }[] = []
+    primeBatch(['D:/动画A.xlsx'])
+    m.createFloatingProgress.mockImplementation(() => {
+      const controller = { update: vi.fn(), complete: vi.fn(), hide: vi.fn() }
+      controllers.push(controller)
+      return controller
+    })
+
+    batchStartEnrichment()
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(controllers[0]?.hide).not.toHaveBeenCalled()
+
+    // 第二轮：同样的文件列表再来一次
+    batchStartEnrichment()
+
+    // showBatchProgress() 在首个 await 前同步执行：旧卡片已回收、新卡片已创建
+    expect(controllers).toHaveLength(2)
+    expect(controllers[0]?.hide).toHaveBeenCalledTimes(1)
+    expect(progressHosts.batch).toBe(controllers[1])
+
+    // 必须等第二轮跑完再结束用例：runBatchEnrichment 是 async，提前返回会把
+    // 在飞的循环泄漏到后续用例——它的 finishBatchProgress 会对当时的
+    // progressHosts.batch（已是下一个用例的卡片）补调 complete，造成串扰。
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+  })
+
+  it('富化完成后清空列表 → 回收完成态卡片', async () => {
+    const controllers: { hide: ReturnType<typeof vi.fn> }[] = []
+    primeBatch(['D:/动画A.xlsx', 'D:/动画B.xlsx'])
+    m.createFloatingProgress.mockImplementation(() => {
+      const controller = { update: vi.fn(), complete: vi.fn(), hide: vi.fn() }
+      controllers.push(controller)
+      return controller
+    })
+    // primeBatch 只挂 DOM 不绑事件；「清空列表」的监听由 initializeEnrichPage 装
+    initializeEnrichPage()
+    const clearButton = document.getElementById('batchClearBtn') as HTMLButtonElement
+
+    batchStartEnrichment()
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+
+    // 跑完后清空列表：卡片失去对应文件，回收
+    clearButton.click()
+    expect(controllers[0]?.hide).toHaveBeenCalledTimes(1)
+    expect(progressHosts.batch).toBeNull()
+  })
+
+  it('富化中清空列表 → 保留浮动卡片（进度与「停止」不能消失）', async () => {
+    const controllers: {
+      complete: ReturnType<typeof vi.fn>
+      hide: ReturnType<typeof vi.fn>
+    }[] = []
+    primeBatch(['D:/动画A.xlsx', 'D:/动画B.xlsx'])
+    m.createFloatingProgress.mockImplementation(() => {
+      const controller = { update: vi.fn(), complete: vi.fn(), hide: vi.fn() }
+      controllers.push(controller)
+      return controller
+    })
+    initializeEnrichPage()
+    const clearButton = document.getElementById('batchClearBtn') as HTMLButtonElement
+
+    batchStartEnrichment()
+    // runBatchEnrichment 的首个 await 之前：卡片已建、isBatchEnriching 已置位
+    expect(controllers).toHaveLength(1)
+
+    // 模拟用户在富化途中把列表删空
+    clearButton.click()
+    expect(controllers[0]?.hide).not.toHaveBeenCalled()
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    // 收尾仍是 complete（卡片保留到用户关闭），不是 hide
+    expect(controllers[0]?.complete).toHaveBeenCalledTimes(1)
   })
 })
 

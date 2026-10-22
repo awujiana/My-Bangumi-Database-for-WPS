@@ -655,7 +655,10 @@ export function createProgress(options: ProgressShowOptions): ProgressController
         if (event.key === 'Escape') hide()
       }
       document.addEventListener('keydown', escHandler)
-      els.closeBtn.focus()
+      // 焦点移到「关闭」便于键盘用户 —— 但仅模态需要：detach 是非阻塞浮卡，
+      // 用户完成前可能正在页面别处输入，把焦点拽到角落会打断操作；
+      // inline 完成态只是页内区域的内容切换，同样不该抢焦点。
+      if (options.mode === 'modal') els.closeBtn.focus()
     },
     setPhase,
     hide,

@@ -462,6 +462,32 @@ describe('完成态', () => {
     expect(document.querySelector('.bgm-progress')).toBeNull()
   })
 
+  it('detach 完成态不抢焦点（非阻塞浮卡，用户可能正在别处输入）', () => {
+    const controller = createProgress({ mode: 'detach', title: '批量富化进度' })
+    const outside = document.createElement('input')
+    document.body.appendChild(outside)
+    outside.focus()
+    expect(document.activeElement).toBe(outside)
+
+    controller?.complete({ summary: '5/5 成功' })
+
+    // 焦点必须留在用户原来的元素上；卡片保留完成态等人关闭
+    expect(document.activeElement).toBe(outside)
+    expect(document.body.querySelector('.bgm-progress__dock')).not.toBeNull()
+    expect(pickElement('[data-el="closeBtn"]')).not.toBeNull()
+  })
+
+  it('modal 完成态把焦点移到「关闭」（模态需要收拢焦点）', () => {
+    const controller = createProgress({ mode: 'modal', title: '正在同步' })
+    const outside = document.createElement('input')
+    document.body.appendChild(outside)
+    outside.focus()
+
+    controller?.complete({ summary: 's' })
+
+    expect(document.activeElement).toBe(pickElement('[data-el="closeBtn"]'))
+  })
+
   it('结果 HTML 中的脚本与事件属性被清洗', () => {
     const controller = createProgress({ mode: 'inline', title: 'A', hostId: makeHost().id })
     controller?.complete({

@@ -72,6 +72,7 @@ const m = vi.hoisted(() => ({
   clearRecords: vi.fn(),
   loadRecentRecords: vi.fn(),
   createInlineProgress: vi.fn(),
+  createFloatingProgress: vi.fn(),
   collectAllConflicts: vi.fn(),
   bindConflictDialogButtons: vi.fn(),
   showConflictDialog: vi.fn(),
@@ -161,6 +162,7 @@ vi.mock('../ts/panel/enrich-record-view.js', () => ({
 vi.mock('../ts/panel/enrich-progress-hosts.js', () => ({
   progressHosts: { enrich: null, batch: null },
   createInlineProgress: m.createInlineProgress,
+  createFloatingProgress: m.createFloatingProgress,
 }))
 vi.mock('../ts/panel/enrich-conflict-dialog.js', () => ({
   collectAllConflicts: m.collectAllConflicts,
@@ -242,14 +244,12 @@ function mountEnrichControls(): void {
   for (const id of [
     'filePathDisplay',
     'batchFileList',
-    'batchProgress',
     'batchSummary',
     'batchSummaryContent',
     'autoDetectNotice',
     'sec-file',
     'enrichProgress',
     'enrichProgressHost',
-    'batchProgressHost',
     'enrichedCount',
     'skippedCount',
     'failedCount',

@@ -67,7 +67,11 @@ import {
   hideEnrichDetail,
 } from './enrich-result-view.js'
 import { openEnrichRecordSheet, clearRecords, loadRecentRecords } from './enrich-record-view.js'
-import { createInlineProgress, progressHosts } from './enrich-progress-hosts.js'
+import {
+  createFloatingProgress,
+  createInlineProgress,
+  progressHosts,
+} from './enrich-progress-hosts.js'
 import {
   collectAllConflicts,
   bindConflictDialogButtons,
@@ -518,7 +522,6 @@ function renderBatchFileList(): void {
   const listElement = safeGetElement('batchFileList')
   const startButton = safeGetButton('batchStartBtn')
   const clearButton = safeGetButton('batchClearBtn')
-  const progressElement = safeGetElement('batchProgress')
   const summaryElement = safeGetElement('batchSummary')
   const singleEnrichButton = safeGetButton('startEnrichBtn')
 
@@ -596,9 +599,14 @@ function renderBatchFileList(): void {
   if (startButton) startButton.style.display = n >= 2 ? '' : 'none'
   if (clearButton) clearButton.style.display = n >= 1 ? '' : 'none'
 
-  // 5) 进行中/汇总进度区域重置（清空时一并隐藏）
+  // 5) 汇总区域重置（清空时一并隐藏）
   if (n === 0) {
-    if (progressElement) progressElement.style.display = 'none'
+    // 上一轮批量富化的完成态浮动卡片此时已无对应文件，回收掉；
+    // 富化进行中不回收——用户可能正靠着卡片看进度、点「停止」。
+    if (!state.isBatchEnriching) {
+      progressHosts.batch?.hide()
+      progressHosts.batch = null
+    }
     if (summaryElement) summaryElement.style.display = 'none'
     state.batchResults = []
     state.filePath = ''
@@ -1251,22 +1259,45 @@ function batchRemoveFile(index: number): void {
   }
 }
 
-/** 展示/更新批量进度 UI */
-function showBatchProgress(isVisible: boolean): void {
-  const progressElement = safeGetElement('batchProgress')
+/**
+ * 展示批量进度 UI：右下角浮动卡片（detach）。
+ *
+ * 为什么不是 inline：批量富化循环里主动 `await` 让出主线程，用户期间可以
+ * 继续操作页面；浮动卡片 `position: fixed` 不占页面布局，进度与「停止」
+ * 按钮始终在视口里可见（inline 会随页面滚动滚出视野）。
+ */
+function showBatchProgress(): void {
+  // 上一轮的完成态卡片可能还挂在右下角，先回收再建，避免 dock 泄漏
+  progressHosts.batch?.hide()
+  // 「停止」按钮把此前不可达的批量取消路径接上（state.batchCancelRequested 原先无人置位）
+  progressHosts.batch = createFloatingProgress('批量富化进度', '📦', () => {
+    state.batchCancelRequested = true
+    bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户请求取消批量富化，将在当前文件处理完成后停止')
+  })
+}
 
-  if (isVisible) {
-    // 「停止」按钮把此前不可达的批量取消路径接上（state.batchCancelRequested 原先无人置位）
-    progressHosts.batch = createInlineProgress('batchProgressHost', '批量富化进度', '📦', () => {
-      state.batchCancelRequested = true
-      bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户请求取消批量富化，将在当前文件处理完成后停止')
-    })
-    if (progressElement) progressElement.style.display = ''
-  } else {
-    progressHosts.batch?.hide()
-    progressHosts.batch = null
-    if (progressElement) progressElement.style.display = 'none'
-  }
+/**
+ * 批量富化收尾：浮动卡片切完成态并保留结果摘要。
+ *
+ * 刻意不 `hide()`：批量可能跑好几分钟，用户早已滚动到页面别处，卡片是
+ * 唯一的「跑完了」提示（页面摘要在批量区块内，不一定在当前视口）。
+ * 卡片停留到用户点「关闭」/按 ESC，或被下一轮 / 清空列表回收。
+ */
+function finishBatchProgress(wasCancelled: boolean, total: number): void {
+  const controller = progressHosts.batch
+  if (controller === null) return
+  const done = state.batchResults.length
+  const successCount = state.batchResults.filter((result) => result.success).length
+  const failCount = done - successCount
+  const matched = state.batchResults.reduce((sum, result) => sum + result.matched, 0)
+  const scope = wasCancelled
+    ? `已停止（${String(done)}/${String(total)}）`
+    : `${String(done)}/${String(total)} 个文件`
+  controller.complete({
+    summary: `${scope} · 成功 ${String(successCount)} · 失败 ${String(failCount)} · 匹配 ${String(matched)}`,
+    ok: !wasCancelled,
+    doneTitle: wasCancelled ? '批量富化已停止' : '批量富化完成',
+  })
 }
 
 /** 更新批量进度条（百分比与计数由通用进度组件渲染） */
@@ -1488,7 +1519,7 @@ export function batchStartEnrichment(): void {
 
 /** 实际执行批量富化（避免阻塞 UI，循环中通过 await 让出主线程） */
 async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
-  showBatchProgress(true)
+  showBatchProgress()
 
   const total = state.batchFiles.length
 
@@ -1530,8 +1561,8 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
     )
   }
 
-  // 恢复 UI
-  showBatchProgress(false)
+  // 恢复 UI（浮动卡片切完成态保留摘要，由用户关闭或下一轮回收）
+  finishBatchProgress(state.batchCancelRequested, total)
   const startButton = safeGetButton('batchStartBtn')
   if (startButton) startButton.disabled = false
 

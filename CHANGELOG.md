@@ -8,6 +8,39 @@
 
 ## [未发布]
 
+### 批量富化进度改浮动卡片（detach）：跑多久都能继续操作页面（2026-10-22）
+
+批量富化此前的进度条是页面内嵌（inline）的：占页面布局，用户一滚动就滚出
+视野，想看进度得滚回来。`detach` 模式（右下角浮动卡片）自通用进度组件支持
+三模式起就**没有任何生产调用方**，本轮把它接到批量富化。
+
+- `ts/panel/enrich-progress-hosts.ts` 新增 `createFloatingProgress(title, icon, onStop?)`
+  工厂（`mode: 'detach'`，挂 body 右下角 `.bgm-progress__dock`）；文件头注释从
+  「三处内嵌进度」更正为「两处 inline + 一处 detach」。
+- `ts/panel/enrich-page.ts`：
+  - `showBatchProgress()` 改建浮卡；**创建前先回收上一轮的完成态卡片**，连续
+    两轮批量不会在右下角堆 dock。
+  - 收尾从 `hide()` 改为 `finishBatchProgress()`：卡片切**完成态并保留摘要**
+    （`N/N 个文件 · 成功 X · 失败 Y · 匹配 Z`，取消时 `ok: false` + 「批量富化
+    已停止」）。批量可能跑好几分钟，用户早已滚到别处，卡片是唯一的「跑完了」
+    提示；页面汇总（`batchSummary`）仍是详细视图，两者互补。
+  - `renderBatchFileList()` 清空列表时回收完成态卡片，但**富化进行中不回收**
+    （用户可能正靠着卡片看进度、点「停止」）。
+- `ts/ui/components/progress.ts`：`complete()` 的「焦点移到关闭按钮」收紧为
+  仅 `modal` —— detach 是非阻塞浮卡，用户完成前可能正在页面别处输入，把焦点
+  拽到角落会打断操作；inline 完成态同样不抢焦点。
+- 移除随之失效的页面宿主：`ui/enrich.html` 的 `#batchProgress` /
+  `#batchProgressHost` 与 `css/enrich.css` 对应规则（测试夹具同步移除）。
+- 单测：`enrich-progress-hosts.test.ts` 补 `createFloatingProgress` 4 用例
+  （detach 模式 / 不传 hostId / onStop 开关 / 返回值透传）；`enrich-page.test.ts`
+  的批量进度用例改走浮卡 mock，新增「完成态保留摘要不 hide / 取消态 ok:false /
+  两轮回收旧卡 / 跑完后清空回收 / 富化中清空保留」5 条；`progress.test.ts` 补
+  「detach 完成态不抢焦点」与「modal 完成态收拢焦点」两条对照。
+- 踩坑记录：新用例「连续两轮批量」若不在结尾 `await` 第二轮跑完，在飞的
+  `runBatchEnrichment` 会泄漏到后续用例——它的 `finishBatchProgress` 会对当时
+  的 `progressHosts.batch`（已是下一个用例的卡片桩）补调 `complete`，表现为
+  「单独跑通过、全文件跑挂」。**起了 async 流程的用例必须自己收尾。**
+
 ### 日志区滚动合帧：一行日志一次强制布局 → 一帧一次（2026-10-22）
 
 与浮动窗口卡顿同源的第二个热点：进度日志 / 清理日志**每追加一行**就执行一次
