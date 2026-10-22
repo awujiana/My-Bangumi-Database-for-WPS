@@ -48,6 +48,7 @@ import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
 import {
   mountDataContextNotice,
+  registerTargetSheetApplier,
   saveDataContext,
   snapshotFromWorksheet,
 } from '../tools/data-context.js'
@@ -63,6 +64,16 @@ const KEY_AUTO_WATCH = 'highlight.autoWatch'
 const KEY_LAST_APPLIED = 'highlight.lastApplied'
 /** 上次选中的工作表（稳定键：工作簿名::工作表名）；下次打开直接定位 */
 const KEY_SHEET = 'highlight.sheet'
+/**
+ * 目标表锁定开关（`1` = 锁定）。
+ *
+ * 语义**不是** locked-sheet 那种索引锁，而是「兜底策略」：
+ * 两级下拉的选中键失效时（目标簿被关 / 目标表被删），未锁定会静默跳到
+ * 活动表或第一张 —— 用户往往没注意，随后「加载并预览」读到的是另一张表。
+ * 锁定后**不跳**，改在下拉里放一条「⚠️ 原目标表已不存在，请重新选择」，
+ * 把「应用到哪张表」这个决定权交回用户，而不是替他猜。
+ */
+const KEY_SHEET_LOCK = 'highlight.sheetLock'
 
 /** 日期源候选（规范列名，按自动模式的优先级排列） */
 const SOURCE_CANDIDATES = ['开播季度', '开播日期', '完播日'] as const
@@ -115,6 +126,11 @@ interface PageState {
   sheets: SheetEntry[]
   /** 选中的工作表稳定键（工作簿名::工作表名） */
   selectedKey: string
+  /**
+   * 锁定态下「原选中键已失效」时记录的键（正常为空串）。
+   * 非空表示当前没有有效选中，且**不该**自动跳到活动表。
+   */
+  selectionMissing: string
 }
 
 const state: PageState = {
@@ -130,6 +146,7 @@ const state: PageState = {
   lastTarget: null,
   sheets: [],
   selectedKey: '',
+  selectionMissing: '',
 }
 
 /** 自动跟随（SheetChange 常驻监听）的清理函数；开关关闭时为 null */
@@ -343,8 +360,18 @@ function renderWorkbookSelect(): void {
 function renderSheetSelect(): void {
   const select = selectById('highlightSheet')
   if (!select) return
+  // 二级菜单只显示**当前工作簿下**的工作表（第一级选簿、第二级选表）
   const workbook = currentWorkbookName()
   const visible = state.sheets.filter((entry) => entry.workbook === workbook)
+  // 锁定态下选中键失效：不静默跳到别的表，放一条说明让用户自己重选
+  if (state.selectionMissing) {
+    const options = visible.map(
+      (entry) => `<option value="${escapeHtml(entry.key)}">${escapeHtml(entry.sheet)}</option>`,
+    )
+    const notice = `<option value="">⚠️ 原目标表 ${escapeHtml(state.selectionMissing)} 已不存在，请重新选择</option>`
+    select.innerHTML = notice + options.join('')
+    return
+  }
   if (visible.length === 0) {
     select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>'
     return
@@ -366,6 +393,7 @@ function onWorkbookChange(): void {
   if (first) {
     state.selectedKey = first.key
     state.worksheet = first.worksheet
+    state.selectionMissing = ''
     setConfig(KEY_SHEET, first.key)
   }
   renderSheetSelect()
@@ -378,6 +406,8 @@ function onSheetChange(): void {
   const entry = state.sheets.find((item) => item.key === select?.value)
   state.selectedKey = entry?.key ?? ''
   state.worksheet = entry?.worksheet ?? null
+  // 用户已经重新选了：退出「原表已不存在」状态
+  state.selectionMissing = ''
   if (entry) setConfig(KEY_SHEET, entry.key)
   resetSheetData()
 }
@@ -772,10 +802,69 @@ function highlightPhaseConfig(): void {
   const isSavedValid = state.sheets.some((entry) => entry.key === savedKey)
   if (isSavedValid) {
     state.selectedKey = savedKey
+  } else if (isSheetLocked()) {
+    // 锁定：选中键失效也不静默跳走（用户要去套用到别处的表时，
+    // 原表可能已被关掉），交给 renderSheetSelect 提示重选。
+    state.selectedKey = ''
+    state.selectionMissing = savedKey
   } else {
     const active = activeWorksheet()
     const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
     state.selectedKey = (matched ?? state.sheets[0])?.key ?? ''
+  }
+  state.worksheet = selectedSheetEntry()?.worksheet ?? null
+  renderWorkbookSelect()
+  renderSheetSelect()
+  resetSheetData()
+  // 「一键套用」：把别处选中的簿/表落到本页的 KEY_SHEET 上
+  registerTargetSheetApplier('highlight', (snap) => {
+    if (!snap.workbook || !snap.sheet) return false
+    const key = `${snap.workbook}::${snap.sheet}`
+    const isHit = state.sheets.some((entry) => entry.key === key)
+    if (!isHit) return false
+    state.selectedKey = key
+    state.worksheet = selectedSheetEntry()?.worksheet ?? null
+    state.selectionMissing = ''
+    setConfig(KEY_SHEET, key)
+    renderWorkbookSelect()
+    renderSheetSelect()
+    resetSheetData()
+    return true
+  })
+}
+
+/** 目标表锁定开关当前值（默认不锁，保持既有兜底行为） */
+function isSheetLocked(): boolean {
+  return getConfig(KEY_SHEET_LOCK, '0', true) === '1'
+}
+
+/** 设置目标表锁定开关 */
+function setSheetLock(isLocked: boolean): void {
+  setConfig(KEY_SHEET_LOCK, isLocked ? '1' : '0')
+  // 解锁的瞬间若正处于「原表已不存在」状态，立刻补一次兜底定位，
+  // 否则用户要等到下次刷新才能选到表（解锁却选不了，像是按钮失灵）。
+  if (!isLocked && state.selectionMissing) {
+    reloadSheetSelection()
+  }
+  renderSheetSelect()
+}
+
+/** 重新枚举并按既有优先级定位（锁定态不跳活动表） */
+function reloadSheetSelection(): void {
+  state.sheets = collectSheets()
+  const isSelectionValid = state.sheets.some((entry) => entry.key === state.selectedKey)
+  if (!isSelectionValid && state.sheets.length > 0) {
+    if (isSheetLocked()) {
+      state.selectedKey = ''
+      state.selectionMissing = state.selectedKey || '（未知）'
+    } else {
+      const active = activeWorksheet()
+      const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
+      state.selectedKey = (matched ?? state.sheets[0])?.key ?? ''
+      state.selectionMissing = ''
+    }
+  } else if (isSelectionValid) {
+    state.selectionMissing = ''
   }
   state.worksheet = selectedSheetEntry()?.worksheet ?? null
   renderWorkbookSelect()
@@ -822,6 +911,16 @@ function highlightPhaseBind(): void {
     watchBox.checked = getConfig(KEY_AUTO_WATCH, '0', true) === '1'
     watchBox.addEventListener('change', () => {
       setAutoWatch(watchBox.checked)
+    })
+  }
+
+  // 目标表锁定：默认不锁（选中键失效时兜底跳活动表，保持既有行为）。
+  // 勾选后失效不跳 —— 避免用户没注意时把高亮应用到另一张表上。
+  const lockBox = inputById('highlightSheetLock')
+  if (lockBox) {
+    lockBox.checked = isSheetLocked()
+    lockBox.addEventListener('change', () => {
+      setSheetLock(lockBox.checked)
     })
   }
 

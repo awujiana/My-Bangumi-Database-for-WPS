@@ -259,6 +259,42 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
   return true
 }
 
+/**
+ * 按**工作簿名 + 工作表名**定位并锁定（索引由名字反查）。
+ *
+ * 供「一键套用」使用：跨页数据上下文快照里存的是名字而非索引
+ * （索引跨会话会因用户增删表而漂移，名字不会）。簿或表不存在时返回 false，
+ * 由调用方把按钮置为「套用失败」——不静默锁定到别的表上。
+ */
+export function lockEnrichSheetByName(workbookName: string, sheetName: string): boolean {
+  const wb = findWorkbookByName(workbookName)
+  if (!wb) {
+    bgmLog(LOG_LEVELS.WARN, `lockEnrichSheetByName: 工作簿 "${workbookName}" 不存在`)
+    return false
+  }
+  const sheetCount = wb.Worksheets.Count
+  for (let index = 1; index <= sheetCount; index += 1) {
+    let name: string
+    try {
+      name = wb.Worksheets.Item(index).Name
+    } catch {
+      // 宿主正在切换工作表：这一项读不到就跳过（不是 finally 语义，只是容错）
+      name = ''
+    }
+    if (name === sheetName) {
+      applyLockedSheet({ index, name: sheetName, workbookName })
+      saveLockedSheet({ index, name: sheetName, workbookName }, 'enrich')
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[enrichLock] 按名锁定: ${workbookName} → ${sheetName} (索引 ${String(index)})`,
+      )
+      return true
+    }
+  }
+  bgmLog(LOG_LEVELS.WARN, `lockEnrichSheetByName: 工作表 "${sheetName}" 不在 "${workbookName}" 中`)
+  return false
+}
+
 // ========== 初始化 ==========
 
 /**

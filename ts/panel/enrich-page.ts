@@ -18,6 +18,7 @@ import {
   getLockedEnrichSheet,
   initializeEnrichLock,
   autoSelectEnrichTarget,
+  lockEnrichSheetByName,
 } from '../sync/enrich-lock.js'
 import { getOrCreateEnrichRecordSheet } from '../sync/enrich-record.js'
 import {
@@ -34,7 +35,7 @@ import { findHeaderRow, bgmLog, BGM, getApp } from '../tools/util/index.js'
 import { findWorkbookByName } from '../tools/locked-sheet.js'
 // 工作簿集合签名与面板 / 富化识别缓存共用同一实现（含活动工作簿名）
 import { readWorkbookSignature } from '../tools/target-detect-cache.js'
-import { mountDataContextNotice } from '../tools/data-context.js'
+import { mountDataContextNotice, registerTargetSheetApplier } from '../tools/data-context.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { recomputeScrollspy } from './shell-nav.js'
 import { extractFileName } from './enrich-file-name.js'
@@ -127,6 +128,19 @@ export function initializeEnrichPage(): void {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
     bgmLog(LOG_LEVELS.INFO, '[enrich] initializeEnrichPage 完成，bgm:modulesReady 已触发')
   }
+
+  // 「一键套用」：把别处选中的簿/表落到本页的锁定键上（索引按名字反查，
+  // 见 lockEnrichSheetByName）。成功后同步下拉与 state.bangumiSheet，
+  // 用户可直接点「开始富化」。
+  registerTargetSheetApplier('enrich', (snap) => {
+    if (!snap.workbook || !snap.sheet) return false
+    if (!lockEnrichSheetByName(snap.workbook, snap.sheet)) return false
+    refreshWorkbookList()
+    refreshSheetList()
+    updateEnrichLockButton('lockSheetBtn', 'lockStatus')
+    selectTargetSheet()
+    return true
+  })
 }
 
 function bindFileSelector(): void {
@@ -189,13 +203,9 @@ function bindTargetSheetControls(): void {
       } else {
         // 未锁定时重新尝试自动选择目标工作表
         // 手动刷新：强制全扫并回写识别缓存（缓存不会变成死角）
-        autoSelectEnrichTarget(
-          'workbookSelect',
-          'sheetSelect',
-          'lockSheetBtn',
-          'lockStatus',
-          { force: true },
-        )
+        autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus', {
+          force: true,
+        })
         refreshSheetList()
         selectTargetSheet()
       }

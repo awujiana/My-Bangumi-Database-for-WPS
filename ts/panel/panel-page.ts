@@ -30,8 +30,13 @@ import {
   onSelectModeChange,
   autoDetectAndLockSheet,
 } from './panel-lifecycle.js'
-import { saveLockedSheet, restoreLockedSheet } from '../tools/locked-sheet.js'
-import { mountDataContextNotice } from '../tools/data-context.js'
+import {
+  saveLockedSheet,
+  restoreLockedSheet,
+  findWorkbookByName,
+  applyLockedSheet,
+} from '../tools/locked-sheet.js'
+import { mountDataContextNotice, registerTargetSheetApplier } from '../tools/data-context.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
 import { registerSheetChangeAutoRefresh, registerVisibilityRefresh } from './panel-auto-refresh.js'
 
@@ -129,6 +134,35 @@ function initializePanelCore(): void {
   }
 
   window.setTimeout(bootstrapSheetSelection, 0)
+
+  // 「一键套用」：把别处（高亮/条件格式）选中的簿/表落到本页的锁定键上。
+  // 走 saveLockedSheet 而不是直接改 BGM.sheet —— 持久化也要跟上，
+  // 否则下次重开面板锁就丢了。
+  registerTargetSheetApplier('panel', (snap) => {
+    if (!snap.workbook || !snap.sheet) return false
+    const workbook = findWorkbookByName(snap.workbook)
+    if (!workbook) return false
+    const sheetCount = workbook.Worksheets.Count
+    let sheetIndex = 0
+    for (let index = 1; index <= sheetCount; index += 1) {
+      const worksheet = workbook.Worksheets.Item(index)
+      if (worksheet.Name === snap.sheet) {
+        sheetIndex = index
+        break
+      }
+    }
+    if (sheetIndex === 0) return false
+    applyLockedSheet({ index: sheetIndex, name: snap.sheet, workbookName: snap.workbook })
+    saveLockedSheet({ index: sheetIndex, name: snap.sheet, workbookName: snap.workbook }, 'panel')
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+    if (wbSelect) wbSelect.value = snap.workbook
+    refreshSheets()
+    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+    if (select) select.value = String(sheetIndex)
+    updateLockButton()
+    refreshData()
+    return true
+  })
 
   // 更新 Token 和用户 ID 状态显示
   updateTokenStatus()

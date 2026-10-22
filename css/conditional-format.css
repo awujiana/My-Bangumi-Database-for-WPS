@@ -23,6 +23,21 @@
   font-size: var(--fs-body);
 }
 
+/* 目标表锁定行：与工作表下拉同一列宽，checkbox 左、说明右 */
+.conditional-format-lock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.conditional-format-lock-row input {
+  cursor: pointer;
+}
+
 /* ---- 规则工具栏 ---- */
 .conditional-format-toolbar {
   display: flex;

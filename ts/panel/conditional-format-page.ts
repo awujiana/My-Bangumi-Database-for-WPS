@@ -68,11 +68,20 @@ import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
 import type { SheetEntry } from '../tools/sheet-list.js'
+import { mountDataContextNotice, registerTargetSheetApplier } from '../tools/data-context.js'
 
 // ===== 常量 =====
 
 /** 选中工作表持久化键 */
 const KEY_SHEET = 'conditionalFormat.sheet.v1'
+/**
+ * 目标表锁定开关（`1` = 锁定）。
+ *
+ * 语义**不是** locked-sheet 那种索引锁，而是「兜底策略」：选中键失效时
+ * （目标簿被关 / 目标表被删）不静默跳到活动表，改为提示重新选择 ——
+ * 条件格式是**写操作**，应用到错表的代价比选不到表更高。
+ */
+const KEY_SHEET_LOCK = 'conditionalFormat.sheetLock'
 
 // ===== 旧键迁移（cf.* → conditionalFormat.*）=====
 // 2026-10-20 命名规范化前的键名。直接换键会让用户已保存的规则库/策略/选中表凭空消失，
@@ -102,6 +111,11 @@ interface PageState {
   rules: ConditionalFormatRule[]
   sheets: SheetEntry[]
   selectedKey: string
+  /**
+   * 锁定态下「原选中键已失效」时记录的键（正常为空串）。
+   * 非空表示当前没有有效选中，且**不该**自动跳到活动表。
+   */
+  selectionMissing: string
   /** 复制粘贴的剪贴板（规则 id，会话内有效） */
   clipboard: string[]
   /** 正在编辑的规则 id；null = 编辑器收起 */
@@ -139,6 +153,7 @@ const state: PageState = {
   rules: [],
   sheets: [],
   selectedKey: '',
+  selectionMissing: '',
   clipboard: [],
   editingId: null,
   editingIsNew: false,
@@ -208,6 +223,15 @@ function renderSheetSelect(): void {
   // 二级菜单只显示**当前工作簿下**的工作表（第一级选簿、第二级选表）
   const workbook = currentWorkbookName()
   const visible = state.sheets.filter((entry) => entry.workbook === workbook)
+  // 锁定态下选中键失效：不静默跳到别的表，放一条说明让用户自己重选
+  if (state.selectionMissing) {
+    const options = visible.map(
+      (entry) => `<option value="${escapeHtml(entry.key)}">${escapeHtml(entry.sheet)}</option>`,
+    )
+    const notice = `<option value="">⚠️ 原目标表 ${escapeHtml(state.selectionMissing)} 已不存在，请重新选择</option>`
+    select.innerHTML = notice + options.join('')
+    return
+  }
   if (visible.length === 0) {
     select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>'
     return
@@ -224,24 +248,59 @@ function selectedSheet(): SheetEntry | null {
   return state.sheets.find((entry) => entry.key === state.selectedKey) ?? null
 }
 
-/** 重新枚举并定位选中表（无历史选择时默认选中**活动工作表**） */
+/**
+ * 重新枚举并定位选中表（无历史选择时默认选中**活动工作表**）。
+ *
+ * 「目标表锁定」勾选时，选中键失效（目标簿被关 / 目标表被删）**不静默跳**到
+ * 活动表或第一张 —— 那会让用户没注意就把条件格式应用到另一张表上。改为
+ * 记录 `selectionMissing`，由 renderSheetSelect 提示重新选择。
+ */
 function reloadSheets(): void {
   state.sheets = collectSheets()
   const isSelectionValid = state.sheets.some((entry) => entry.key === state.selectedKey)
   if (!isSelectionValid && state.sheets.length > 0) {
-    // 默认选中活动表：用户是在活动表上点开面板的，第一张往往是别的表，
-    // 于是「既有规则」区显示空、而用户明明看到活动表上有规则（真机反馈）。
-    // 活动表匹配不到（未打开 / 取不到）才退回首张。
-    const active = activeWorksheet()
-    const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
-    const fallback = state.sheets[0]
-    state.selectedKey = (matched ?? fallback)?.key ?? ''
+    if (isSheetLocked()) {
+      // 锁定：记住失效前选的是哪张表，供下拉里提示「原目标表 X 已不存在」
+      state.selectionMissing = state.selectedKey || getConfig(KEY_SHEET, '', true) || '（未知）'
+      state.selectedKey = ''
+    } else {
+      // 默认选中活动表：用户是在活动表上点开面板的，第一张往往是别的表，
+      // 于是「既有规则」区显示空、而用户明明看到活动表上有规则（真机反馈）。
+      // 活动表匹配不到（未打开 / 取不到）才退回首张。
+      const active = activeWorksheet()
+      const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
+      const fallback = state.sheets[0]
+      state.selectedKey = (matched ?? fallback)?.key ?? ''
+      state.selectionMissing = ''
+    }
+  } else if (isSelectionValid) {
+    state.selectionMissing = ''
   }
   renderWorkbookSelect()
   renderSheetSelect()
   // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
   // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
   loadExistingRules()
+}
+
+/**
+ * 目标表锁定开关（`1` = 锁定）。
+ *
+ * 语义**不是** locked-sheet 那种索引锁，而是「兜底策略」：见 reloadSheets 注释。
+ * 默认不锁，保持既有「失效即兜底到活动表」的行为。
+ */
+function isSheetLocked(): boolean {
+  return getConfig(KEY_SHEET_LOCK, '0') === '1'
+}
+
+/** 设置目标表锁定开关；解锁时若正处于缺失态，立刻补一次兜底定位 */
+function setSheetLock(isLocked: boolean): void {
+  setConfig(KEY_SHEET_LOCK, isLocked ? '1' : '0')
+  if (!isLocked && state.selectionMissing) {
+    reloadSheets()
+    return
+  }
+  renderSheetSelect()
 }
 
 // ===== 工作表既有规则（只读）=====
@@ -1201,6 +1260,8 @@ export function initializeConditionalFormatPage(): void {
 
   loadRules()
   state.selectedKey = readMigratedConfig(KEY_SHEET, LEGACY_SHEET_KEY)
+  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+  mountDataContextNotice('conditional-format')
   reloadSheets()
 
   // 搜索
@@ -1219,6 +1280,8 @@ export function initializeConditionalFormatPage(): void {
       state.selectedKey = inWorkbook[0]?.key ?? ''
       setConfig(KEY_SHEET, state.selectedKey)
     }
+    // 用户主动切了簿：退出「原表已不存在」状态（否则提示条会赖着不走）
+    state.selectionMissing = ''
     renderSheetSelect()
     loadExistingRules()
   })
@@ -1226,6 +1289,7 @@ export function initializeConditionalFormatPage(): void {
   // 工作表选择（第二级）
   selectById('conditionalFormatSheet')?.addEventListener('change', (event) => {
     state.selectedKey = (event.target as HTMLSelectElement).value
+    state.selectionMissing = ''
     setConfig(KEY_SHEET, state.selectedKey)
     loadExistingRules()
   })
@@ -1234,6 +1298,31 @@ export function initializeConditionalFormatPage(): void {
   })
   byId('conditionalFormatRefreshExistingBtn')?.addEventListener('click', () => {
     loadExistingRules()
+  })
+
+  // 目标表锁定：默认不锁（选中键失效时兜底跳活动表，保持既有行为）。
+  // 勾选后失效不跳 —— 条件格式是写操作，静默应用到错表的代价太高。
+  const lockBox = inputById('conditionalFormatSheetLock')
+  if (lockBox) {
+    lockBox.checked = isSheetLocked()
+    lockBox.addEventListener('change', () => {
+      setSheetLock(lockBox.checked)
+    })
+  }
+
+  // 「一键套用」：把别处选中的簿/表落到本页的 KEY_SHEET 上
+  registerTargetSheetApplier('conditional-format', (snap) => {
+    if (!snap.workbook || !snap.sheet) return false
+    const key = `${snap.workbook}::${snap.sheet}`
+    const isHit = state.sheets.some((entry) => entry.key === key)
+    if (!isHit) return false
+    state.selectedKey = key
+    state.selectionMissing = ''
+    setConfig(KEY_SHEET, key)
+    renderWorkbookSelect()
+    renderSheetSelect()
+    loadExistingRules()
+    return true
   })
 
   // 既有规则表格：搜索 + 事件委托（不给每行绑监听器，347 条规则下才不卡）

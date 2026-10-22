@@ -8,6 +8,63 @@
 
 ## [未发布]
 
+### 目标工作表：跨页「一键套用」+ 条件格式/高亮补「锁定」（2026-10-22）
+
+五个页面各有一份「目标工作表」选择，此前的共享只到「通知条展示」——
+高亮页选了表，跑到主面板还要把两级下拉重新点一遍。本轮补两块。
+
+**① 通知条升级为「一键套用」**
+
+`ts/tools/data-context.ts` 新增 applier 注册表（`registerTargetSheetApplier` /
+`applyDataContextToPage` / `hasTargetSheetApplier` / `resetTargetSheetAppliers`）：
+
+- 通知条上多一个「↧ 套用到本页」按钮，只在**本页注册过 applier** 时出现
+  （清理页是多选语义、设置页没有目标表，给了也做不到，不如不给）；
+- 点击后把快照里的 工作簿/工作表 落到**本页自己的键**上，按钮变「✓ 已套用」
+  并禁用；失败变「✗ 套用失败」并在文案里说明「当前不可用」；
+- applier 抛错不外溢（`applyDataContextToPage` 整体 try），便利功能不该把页面搞崩；
+- **为什么用注册表而不是在 tools 层直接写各页的键**：tools 层反向 import
+  panel/* 会成环（check:cycles 会红），且各页键格式不同、套用后往往还要
+  顺带刷新预览，落到页内最自然。
+
+四个页面注册了自己的实现：
+
+| 页面               | 落到哪里                                        | 成功后还做什么                               |
+| ------------------ | ----------------------------------------------- | -------------------------------------------- |
+| panel              | `saveLockedSheet(..., 'panel')`                 | 切下拉 + `refreshSheets()` + `refreshData()` |
+| enrich             | `lockEnrichSheetByName()`（新增，按名反查索引） | 刷两级下拉 + `selectTargetSheet()`           |
+| highlight          | `setConfig('highlight.sheet', 'wb::sheet')`     | 重渲下拉 + `resetSheetData()`                |
+| conditional-format | `setConfig(KEY_SHEET, ...)`                     | 重渲下拉 + `loadExistingRules()`             |
+
+面板/富化走 `saveLockedSheet` 而不是直接改 `BGM.sheet`：持久化要跟上，
+否则下次重开面板锁就丢了。索引**按名字反查**（新增
+`lockEnrichSheetByName`）—— 索引跨会话会因用户增删表而漂移，名字不会。
+
+**顺带修一个 bug**：`snapshotFromWorksheet` 曾把 `worksheet.Name` 同时填进
+`workbook` 和 `sheet`，通知条于是显示成「动画 / 动画」，「一键套用」也无从
+知道该切到哪个工作簿。现改为 `worksheet.Parent.Name`，取不到退
+`ActiveWorkbook.Name`。
+
+**② 条件格式 / 高亮补「锁定目标工作表」**
+
+先说清楚**没有做的部分**：这两页原本就只有「选中键失效时兜底跳到活动表」
+这一条路径会被活动表影响，用户手动选的表在有效期内本来就不会被覆盖 ——
+所以「锁定后不被活动表切换覆盖」这个需求，**代码层面已经满足了**。
+
+真正补的是**兜底策略**：勾选「锁定目标工作表」后，选中键失效（目标簿被关 /
+目标表被删）时**不静默跳**到活动表或第一张，而是在工作表下拉里放一条
+「⚠️ 原目标表 X 已不存在，请重新选择」。
+
+理由：条件格式是**写操作**，静默应用到错表的代价比选不到表更高；高亮同理
+（清/应用高亮都是写）。把「应用到哪张表」的决定权交回用户，而不是替他猜。
+
+- 新增配置键 `conditionalFormat.sheetLock` / `highlight.sheetLock`（默认 `0`，
+  保持既有兜底行为，升级无感）；
+- 勾选/取消都立即重渲；**解锁时若正处于「原表已不存在」状态，会立刻补一次
+  兜底定位**——否则用户要等到下次刷新才能选到表（解锁却选不了，像按钮失灵）；
+- 用户主动切簿/切表会退出该状态，提示条不会赖着不走；
+- 清理页**不加**：它是多选勾选语义，锁单张表没有意义。
+
 ### 修「主面板/设置打不开」：全局 wpsjs 绕过 patch，页面陷入刷新循环（2026-10-22）
 
 **症状**：控制台刷 `Main resource content verification failed: http://127.0.0.1:3889/ui/panel.html`，
