@@ -262,3 +262,47 @@
 .detachable-detached {
   display: none !important;
 }
+
+/* ===== 窗口右键菜单 ===== */
+/* 层级 950：压在浮动窗口（900）之上、仍低于各页模态框（1000）——
+   模态框打开时右键标题栏，菜单不该盖住确认对话框。 */
+.detachable-window-menu {
+  position: fixed;
+  z-index: 950;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  padding: 4px;
+  background: var(--bg-surface-2, #313244);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+.detachable-window-menu-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.detachable-window-menu-item:hover {
+  color: var(--text-1);
+  background: var(--bg-surface);
+}
+
+/* 「关闭所有」是批处理，用危险色提示它与单项关闭不同 */
+.detachable-window-menu-item--danger {
+  color: var(--danger, #f38ba8);
+}
+
+.detachable-window-menu-item--danger:hover {
+  color: var(--danger, #f38ba8);
+  background: rgba(243, 139, 168, 0.12);
+}

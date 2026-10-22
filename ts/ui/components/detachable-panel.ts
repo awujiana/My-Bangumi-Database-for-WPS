@@ -309,6 +309,45 @@ function makePlaceholder(message: string, onRecall: () => void): HTMLElement {
 }
 
 /**
+ * 量出区块的「栅格 Span + 高度」，供占位块继承。
+ *
+ * ## 为什么必须继承（真机反馈：拖出后原页面布局坏了）
+ * 各页主区 `.main` 在 960px / 1440px 等断点下是 `display: grid`，区块靠
+ * `grid-column: 1 / -1` 通栏（`.section-wide` / `.command-center`）。占位块是个
+ * 普通 div，**既不继承那个 Span 也没有原区块的高度**，于是：
+ *   1. 通栏区块塌成一个窄格，同行的其它区块被挤到奇怪的位置；
+ *   2. 原本 300px 高的区块换成 40px 的占位块，栅格行高整体重算，下方内容上跳。
+ * 用户看到的就是「布局坏了」——而内容其实一块没丢。
+ *
+ * 只继承「显式跨列」的 Span；`auto / auto`（普通单格区块）不继承 —— 写了反而
+ * 把栅格的自动放置逻辑钉死，还原后可能对不上。
+ *
+ * 取不到计算样式（极端宿主）时返回空对象：占位块塌一点比整页崩好。
+ */
+function measureSectionLayout(section: HTMLElement): {
+  minHeight?: string
+  gridColumn?: string
+  gridRow?: string
+} {
+  try {
+    const { height } = section.getBoundingClientRect()
+    const computed = window.getComputedStyle(section)
+    const layout: { minHeight?: string; gridColumn?: string; gridRow?: string } = {}
+    if (height > 0) layout.minHeight = `${String(Math.round(height))}px`
+    if (isExplicitGridSpan(computed.gridColumn)) layout.gridColumn = computed.gridColumn
+    if (isExplicitGridSpan(computed.gridRow)) layout.gridRow = computed.gridRow
+    return layout
+  } catch {
+    return {}
+  }
+}
+
+/** 判断栅格 Span 是否是「显式跨列」而非默认的 auto */
+function isExplicitGridSpan(value: string): boolean {
+  return value !== '' && value !== 'auto' && value !== 'auto / auto'
+}
+
+/**
  * 造一个 native 模式句柄：把区块换成宿主原生独立窗口
  *
  * ## 与 float 模式的两处本质差异
@@ -736,6 +775,12 @@ export function createDetachablePanel(
       if (homeNextSibling?.isConnected) homeNextSibling.before(placeholder)
       else homeParent.append(placeholder)
     }
+    // 必须在区块搬走**之前**量：搬进浮动窗口后它脱掉了卡片皮、也换了容器，
+    // 量到的是窗口里的高度，搬回去就对不上原布局了。
+    const layout = measureSectionLayout(section)
+    if (layout.minHeight !== undefined) placeholder.style.minHeight = layout.minHeight
+    if (layout.gridColumn !== undefined) placeholder.style.gridColumn = layout.gridColumn
+    if (layout.gridRow !== undefined) placeholder.style.gridRow = layout.gridRow
     body.append(section)
     root.hidden = false
     root.classList.remove(COLLAPSED_CLASS, MAXIMIZED_CLASS)
@@ -781,6 +826,24 @@ export function createDetachablePanel(
     else attach()
   }
   trigger?.addEventListener('click', onTriggerClick)
+
+  // ---- 右键菜单：绑标题栏（见 bindWindowMenu 的说明：不绑内容区）----
+  bindWindowMenu(header, () => [
+    { label: '✕ 关闭窗口（内容还原到页面）', run: attach },
+    {
+      label: root.classList.contains(COLLAPSED_CLASS) ? '▾ 展开' : '▸ 收起',
+      run: () => {
+        buttonCollapse.click()
+      },
+    },
+    {
+      label: root.classList.contains(MAXIMIZED_CLASS) ? '⤡ 还原大小' : '⤢ 最大化',
+      run: () => {
+        buttonMaximize.click()
+      },
+    },
+    { label: '⧉ 关闭所有浮动窗口', run: () => closeAllDetachedPanels() },
+  ])
 
   const handle: DetachablePanelHandle = {
     detach,
@@ -843,4 +906,131 @@ function bindEscapeToCloseTopmost(): void {
 export function resetDetachablePanelsForTest(): void {
   geometryMemory.clear()
   detachedClosers.length = 0
+  hideWindowMenu()
+}
+
+// ===== 窗口右键菜单 =====
+
+/** 菜单根元素类名（样式 + 测试定位） */
+export const WINDOW_MENU_CLASS = 'detachable-window-menu'
+
+/** 菜单项类名 */
+const WINDOW_MENU_ITEM_CLASS = 'detachable-window-menu-item'
+
+/**
+ * 窗口右键菜单（全局只建一个元素，随用随显示）。
+ *
+ * 为什么**只绑标题栏**而不绑整个窗口：窗格内容是用户的表格 / 表单，
+ * 在那里 `preventDefault()` 会连 CEF 原生的文本编辑菜单一起干掉。
+ * 标题栏是组件自己的 chrome，右键它不会和任何原生行为冲突 —— 这也是
+ * 浏览器标签页、IDE 窗口的一致约定。
+ *
+ * 菜单动作与标题栏右侧三个按钮**同一套回调**，不另起炉灶：
+ * 「关闭窗口」= 还原到页面原位（浮动窗口没有真正的"销毁"语义 ——
+ * 内容是搬进去的，关掉必须搬回来，否则正文里那块就永久消失了）。
+ */
+let windowMenu: HTMLDivElement | null = null
+
+/** 菜单当前是否可见（供测试与重复触发判断） */
+function isWindowMenuOpen(): boolean {
+  return windowMenu?.isConnected === true
+}
+
+/** 建一个菜单项按钮 */
+function makeMenuItem(label: string, onClick: () => void, isDanger = false): HTMLButtonElement {
+  const item = document.createElement('button')
+  item.type = 'button'
+  item.className = WINDOW_MENU_ITEM_CLASS
+  if (isDanger) item.classList.add(`${WINDOW_MENU_ITEM_CLASS}--danger`)
+  item.textContent = label
+  item.addEventListener('click', () => {
+    hideWindowMenu()
+    onClick()
+  })
+  return item
+}
+
+/**
+ * 在指定位置打开窗口右键菜单。
+ *
+ * 位置做视口钳制：菜单贴右边或贴底时往回拉，否则点在标题栏最右端
+ * 会让菜单溢出屏幕（任务窗格本身就可能很窄）。
+ */
+function showWindowMenu(x: number, y: number, items: { label: string; run: () => void }[]): void {
+  hideWindowMenu()
+  if (items.length === 0) return
+
+  const menu = makeDiv(WINDOW_MENU_CLASS)
+  menu.setAttribute('role', 'menu')
+  for (const item of items) {
+    menu.append(makeMenuItem(item.label, item.run))
+  }
+  document.body.append(menu)
+
+  // 先插入再量：菜单宽度由内容决定，不量就没法做钳制
+  const { offsetWidth: menuWidth, offsetHeight: menuHeight } = menu
+  const viewport = readViewport()
+  const left = Math.min(x, Math.max(0, viewport.width - menuWidth - 4))
+  const top = Math.min(y, Math.max(0, viewport.height - menuHeight - 4))
+  menu.style.left = `${String(left)}px`
+  menu.style.top = `${String(top)}px`
+  windowMenu = menu
+}
+
+/** 关闭菜单（重复调用安全） */
+function hideWindowMenu(): void {
+  if (windowMenu === null) return
+  windowMenu.remove()
+  windowMenu = null
+}
+
+/** 点菜单外任意处即收起（capture 阶段，早于页面自身处理器） */
+function bindWindowMenuDismiss(): void {
+  if (typeof document === 'undefined') return
+  document.addEventListener(
+    'pointerdown',
+    (event: PointerEvent) => {
+      const menu = windowMenu
+      if (menu === null) return
+      const { target } = event
+      if (target instanceof Node && menu.contains(target)) return
+      hideWindowMenu()
+    },
+    { capture: true },
+  )
+  // Esc 关菜单；若菜单已关则让既有逻辑关最上面的窗口
+  document.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return
+    if (isWindowMenuOpen()) {
+      event.stopPropagation()
+      hideWindowMenu()
+    }
+  })
+  // 滚动 / 失焦时菜单还挂在旧坐标会显得诡异，一并收掉
+  window.addEventListener('blur', hideWindowMenu)
+}
+
+/**
+ * 给浮动窗口标题栏绑右键菜单。
+ *
+ * @param getItems 每次右键时取菜单项（收起 / 最大化的文案要跟当前状态走）
+ */
+function bindWindowMenu(
+  header: HTMLElement,
+  getItems: () => { label: string; run: () => void }[],
+): void {
+  bindWindowMenuDismiss()
+  header.addEventListener('contextmenu', (event: MouseEvent) => {
+    event.preventDefault()
+    showWindowMenu(event.clientX, event.clientY, getItems())
+  })
+}
+
+/** 关闭所有已拖出的浮动窗口（内容各自还原回页面原位） */
+export function closeAllDetachedPanels(): number {
+  // 复制一份再遍历：attach() 内部会从 detachedClosers 里 splice 自己
+  const closers = [...detachedClosers]
+  for (const closer of closers) closer()
+  hideWindowMenu()
+  return closers.length
 }
