@@ -8,6 +8,56 @@
 
 ## [未发布]
 
+### 浮动窗口卡顿根治：拖动走 transform 合成层 + 顶栏去逐帧模糊（2026-10-22）
+
+上一轮修了「越拖越快」与 rAF 合帧，但**拖动仍掉帧**——真机拖着预览表几百行的
+浮动窗口明显卡。根因不在事件层，在样式层：每帧写 `left/top` 会让浏览器
+**重排 + 重绘整个面板内容**（几百行的预览表 / 规则表，一帧几十毫秒）。
+
+- **拖动只写 `transform: translate()`**：位移相对 pointerdown 时捕获的基准几何
+  计算（钳制逻辑不变，窗口仍永远完整留在视口内）；pointerup 时把「基准 + 最终
+  位移」一次性提交回 `left/top` 并撤掉 transform —— 几何的单一来源始终是 `rect`，
+  transform 只在拖动期存在。`bindDrag` 为此新增 `onEnd` 回调（保证先 flush 再提交，
+  一个 rAF 都没等到就松手也不丢最后几像素）。
+- **`.is-dragging` 挂 `will-change: transform`**：提示浏览器把面板提成合成层，
+  每帧只做层平移，内容一次都不用重画；类随拖动结束即撤，不常驻占显存。
+- **拖动期正文 `pointer-events: none`**：鼠标扫过表格行触发的 `:hover` 背景重绘
+  一并省掉（pointer capture 在标题栏上，不影响拖动本身）。
+- **缩放只写 `width/height`**（内容要重排，改不了定位方式），少两个属性的样式失效；
+  标题栏与缩放手柄补 `touch-action: none`（触屏拖窗口不当成页面平移）。
+- **顶栏去掉 `backdrop-filter: blur(10px)`**：sticky 顶栏滚动时要对背后内容逐帧
+  模糊，WebView 里足以让整页滚动掉帧；浮动窗口拖过顶栏区域时每帧还要再模糊一次。
+  换成不透明 `--bg-topbar`（`#141414` / `#f5f6f8`），观感几乎不变、开销归零。
+- **native 模式轮询 1s → 2s**：每轮两次 COM 往返（`GetWebDialog` + `Visible`），
+  占位块最多多留 1 秒，宿主演入减半。
+- 单测：新增 `tests/detachable-panel-drag.test.ts`（6 用例，jsdom 真实指针事件：
+  拖动中只写 transform / 提交落定 / 不等 rAF 松手不丢像素 / 拖动中仍受视口钳制 /
+  连续拖动不重复累加 / 还原后几何记忆无残留）；native 轮询间隔回归同步更新。
+
+### 目标表识别结果缓存：面板 / 富化打开不再全簿全表扫描（2026-10-22）
+
+面板与富化页打开时都调 `findBangumiTargetSheets()`：遍历每个已打开工作簿的每一张
+工作表（读表头、数数据行、比名称关键词），工作簿一多首帧就被 COM 扫描拖住。
+
+- 新增 `ts/tools/target-detect-cache.ts`（零 COM 依赖、存储可注入）：
+  `readWorkbookSignature(app)` 抽自富化页两页共用，签名 `Count|各簿Name|活动簿名`
+  —— **含活动簿是刻意的**：两页候选排序都把活动簿排最前，只有签名含它，才能保证
+  「命中缓存」≡「此刻全扫也会得到同一答案」。
+- `load / save / clearTargetCache`：PluginStorage 键 `bgm_target_detect_cache`，
+  按用途（panel / enrich）分开存；内容损坏 / 存储不可用一律视为未命中。
+- `locked-sheet.ts` 新增 `resolveCachedTarget()`：按「索引提示 + 名称复核」定位并
+  带回最新索引，再清一次该表缓存、读 1 次表头；表被删 / 表头丢失 → 判缓存失效。
+- `panel-lifecycle.autoDetectSheet` 与 `enrich-lock.autoSelectEnrichTarget` 先查缓存，
+  复核通过直接返回（≈ 3–5 次 COM），未命中才全扫并回写；新增 `options.force`。
+- **手动刷新强制重扫**：面板工作簿下拉切换、富化页刷新按钮都走 `force`，缓存不会
+  成为死角。
+- 富化页打开检查顺带删掉一次重复全簿扫描（日志复用 `mergeDetectedPathsIntoStorage()`
+  返回值）；`enrich-page.ts:726` 的「已锁定早退」语义风险已单独评估并处理。
+- 已知取舍：同组工作簿内**新增第二张追踪表**不会失效签名（点刷新即回到全扫语义）；
+  表头行变化会多 1 次矩形读复核。
+- 单测：新增 `tests/target-detect-cache.test.ts`（18 用例）；`panel-lifecycle` +3、
+  `enrich-lock` +4；vitest 151 文件 4816 用例全绿。
+
 ### 锁定各页独立键 + 数据上下文跨页重放 + 浮窗显式「还原」按钮（2026-10-21）
 
 - **锁定各页独立键**：panel 与 enrich 曾共用 `bgm_locked_sheet` 一把锁互相覆盖

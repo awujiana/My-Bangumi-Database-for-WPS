@@ -151,9 +151,10 @@ describe('native 模式：放回来', () => {
     trigger.click()
     expect(section.classList.contains('detachable-detached')).toBe(true)
 
-    // 宿主侧窗口没了（用户点了系统关闭按钮），任务窗格收不到任何事件
+    // 宿主侧窗口没了（用户点了系统关闭按钮），任务窗格收不到任何事件。
+    // 轮询间隔 2s（NATIVE_POLL_INTERVAL）：推进两轮内必须发现并收回。
     hostApp.GetWebDialog = () => null
-    vi.advanceTimersByTime(1000)
+    vi.advanceTimersByTime(2000)
 
     expect(section.classList.contains('detachable-detached')).toBe(false)
     expect(host.querySelector(`.${PLACEHOLDER_CLASS}`)).toBeNull()

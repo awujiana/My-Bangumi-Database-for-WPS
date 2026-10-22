@@ -33,6 +33,11 @@
  * - 视口尺寸读 `window.innerWidth/Height`：便宜且不触发重排；真正要避的是在 move
  *   回调里读 `offsetWidth` / `getBoundingClientRect()`（强制同步布局，每帧抖一次），
  *   故尺寸全程由 `rect` 状态维护，拖动只做加法；
+ * - 拖动写 `transform: translate()` 而不是 `left/top`：后者每帧变一次，浏览器就要
+ *   重排 + 重绘整个面板内容（预览表 / 规则表几百行时一帧几十毫秒，实测拖起来
+ *   明显掉帧）；transform 命中合成层（配合 `.is-dragging` 的 `will-change` 提示），
+ *   每帧只做一次层平移，内容一次都不用重画。位移在 pointerup 时一次性提交回
+ *   left/top —— 几何的单一来源始终是 `rect`，transform 只在拖动期存在；
  * - 位置钳制在视口内：不允许把窗口拖到屏幕外（否则找不回来，只能刷新任务窗格）。
  */
 
@@ -223,8 +228,11 @@ const DETACHED_CLASS = 'detachable-detached'
 /** 拖出方式 */
 export type DetachableMode = 'float' | 'native'
 
-/** 原生对话框存活轮询间隔（ms） */
-const NATIVE_POLL_INTERVAL = 1000
+/** 原生对话框存活轮询间隔（ms）。
+ *  一轮要两次 COM 往返（`GetWebDialog(id)` + 读 `Visible`），1 秒一轮在用户
+ *  操作原生窗口期间是持续的宿主演入；2 秒足够快（占位块最多多留 1 秒），
+ *  负担减半。 */
+const NATIVE_POLL_INTERVAL = 2000
 
 /** 标记「该区块已装配」的属性（通用扫描据此跳过，避免重复注入） */
 const DETACHABLE_READY_ATTRIBUTE = 'data-detachable-ready'
@@ -395,6 +403,10 @@ function createNativeDetachable(
  *
  * 用 pointer capture 而非 window 监听：capture 后即使指针移出把手甚至移出窗口，
  * 事件仍然派发给把手，不会脱轨。
+ *
+ * @param onEnd 拖动结束回调（在最后一次位移落定之后调用）：供调用方把
+ *   「拖动期临时状态」提交回正式状态。拖动可能一个 rAF 都没等到就结束，
+ *   所以这里保证先 flush 再 onEnd，调用方不会丢最后几像素。
  */
 function bindDrag(
   grip: HTMLElement,
@@ -402,6 +414,7 @@ function bindDrag(
   draggingClass: string,
   onStart: () => void,
   onDelta: (deltaX: number, deltaY: number) => void,
+  onEnd?: () => void,
 ): void {
   // 标题栏里嵌了按钮 / 下拉，按在这些控件上不应该启动拖动
   grip.addEventListener('pointerdown', (event: PointerEvent) => {
@@ -444,6 +457,9 @@ function bindDrag(
       grip.removeEventListener('pointercancel', onUp)
       // pointercancel 时浏览器已自动释放，未守卫直接 release 会抛 NotFoundError
       if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId)
+      // 提交放在撤类之后：两次样式写入在同一个任务里，浏览器只做一次重算，
+      // 不会出现「先看见窗口跳回基准位、再跳到终点」的中间帧。
+      onEnd?.()
     }
 
     grip.addEventListener('pointermove', onMove)
@@ -551,11 +567,23 @@ export function createDetachablePanel(
     ...defaultPanelRect(detachedClosers.length, readViewport(), resolved.width, resolved.height),
   }
 
-  function applyRect(): void {
+  function applyPosition(): void {
     root.style.left = `${String(rect.left)}px`
     root.style.top = `${String(rect.top)}px`
+  }
+
+  function applySize(): void {
     root.style.width = `${String(rect.width)}px`
     root.style.height = `${String(rect.height)}px`
+  }
+
+  function applyRect(): void {
+    applyPosition()
+    applySize()
+    // transform 是「只在拖动期存在」的临时偏移，任何一次全量落地都把它撤掉，
+    // 保证几何的单一来源始终是 rect + left/top（最大化前也必须撤，否则
+    // inset 定位会被残留位移顶偏）。
+    root.style.transform = ''
   }
 
   /** 记住几何，供下次打开恢复（只在收回时写一次，避免拖动过程频繁写 Map） */
@@ -589,10 +617,12 @@ export function createDetachablePanel(
     const isMaximized = root.classList.toggle(MAXIMIZED_CLASS)
     if (isMaximized) {
       // 最大化靠 CSS 的 inset，必须清掉内联几何，否则内联优先级更高撑不开
+      // （transform 同理：残留的拖动位移会把最大化窗口顶偏）
       root.style.left = ''
       root.style.top = ''
       root.style.width = ''
       root.style.height = ''
+      root.style.transform = ''
     } else {
       applyRect()
     }
@@ -628,6 +658,9 @@ export function createDetachablePanel(
   // 「当前 rect + 累计位移」，rect 已被上一帧改过，位移会被重复累加，窗口越拖越快。
   let dragViewport: ViewportSize = readViewport()
   let dragBase: PanelRect = { ...rect }
+  /** 拖动期相对基准位置的位移；只在拖动中非零，onEnd 提交后清零 */
+  let dragDeltaX = 0
+  let dragDeltaY = 0
 
   bindDrag(
     header,
@@ -636,6 +669,8 @@ export function createDetachablePanel(
     () => {
       dragBase = { ...rect }
       dragViewport = readViewport()
+      dragDeltaX = 0
+      dragDeltaY = 0
     },
     (deltaX, deltaY) => {
       const next = clampPosition(
@@ -643,8 +678,21 @@ export function createDetachablePanel(
         { width: dragBase.width, height: dragBase.height },
         dragViewport,
       )
-      rect.left = next.left
-      rect.top = next.top
+      dragDeltaX = next.left - dragBase.left
+      dragDeltaY = next.top - dragBase.top
+      // 只写 transform，不碰 left/top：left/top 每帧变一次，浏览器就要重排 +
+      // 重绘整个面板内容（预览表 / 规则表几百行时一帧几十毫秒，这就是「拖动
+      // 掉帧」的本因）。transform 命中合成层，配合 .is-dragging 的 will-change
+      // 提示，每帧只做一次层平移，内容一次都不用重画。
+      root.style.transform = `translate(${String(dragDeltaX)}px, ${String(dragDeltaY)}px)`
+    },
+    () => {
+      // 收尾提交：基准 + 最终位移写回 rect 与 left/top，撤掉临时 transform，
+      // 几何回到单一来源（rect + left/top）。
+      rect.left = dragBase.left + dragDeltaX
+      rect.top = dragBase.top + dragDeltaY
+      dragDeltaX = 0
+      dragDeltaY = 0
       applyRect()
     },
   )
@@ -664,7 +712,9 @@ export function createDetachablePanel(
       )
       rect.width = next.width
       rect.height = next.height
-      applyRect()
+      // 缩放必须改 width/height（内容要跟着重排），只写尺寸不写位置，
+      // 少两个属性的样式失效。
+      applySize()
     },
   )
 
