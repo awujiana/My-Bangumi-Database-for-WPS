@@ -1495,4 +1495,75 @@ export function showSettingsPanel(): void {
   }
 }
 
+/**
+ * 全部任务窗格页的 ID 存储键（「一键关闭所有页面」用）。
+ *
+ * 顺序即关闭顺序，也是日志顺序 —— 主面板放最前，与 ribbon 上按钮的排列一致。
+ * ⚠️ 新增页面时必须同步往这里加一项，否则新页面不响应一键关闭
+ * （静默失效：点了没反应，只在日志里少一行）。`tests/util-panes.test.ts`
+ * 与 ribbon.xml 的按钮清单各守一半。
+ */
+const ALL_PANE_ID_KEYS: readonly string[] = [
+  'panel_id',
+  'enrich_pane_id',
+  'clean_pane_id',
+  'highlight_pane_id',
+  'conditionalFormat_pane_id',
+  'settings_pane_id',
+]
+
+/**
+ * 一键关闭所有任务窗格页面（Ribbon「关闭所有页面」按钮）。
+ *
+ * ## 为什么是「置 Visible = false」而不是清存储 / Delete
+ * 1. **不能清 ID**：清了之后下次点「打开同步面板」会走 `CreateTaskPane` 分支，
+ *    重新建一个窗格 —— 旧的那个还挂着，只是看不见了，最后堆出一串孤儿窗格
+ *    （`tools/pane-alive.ts` 的注释记着这个坑）。
+ * 2. **不能 Delete**：WPS 的 TaskPane 没有可靠的销毁入口，且页面 JS 还在跑
+ *    （心跳、轮询），删了对象反而让 `GetTaskPane` 返回 null，下次打开又要重建。
+ * 3. 置不可见是**可逆的**：下次点任意「打开 XX」按钮，`showXxxPanel` 拿到缓存
+ *    ID、校验心跳（页面还活着）→ 直接切回 Visible，不重建、不丢页面状态。
+ *
+ * 页面里拖出的浮动窗口、以及条件格式的原生独立窗口（另一个 WebView）不在
+ * 管辖范围：前者在各页自己的 DOM 里，后者是宿主 WebDialog 而非 TaskPane。
+ *
+ * @returns 实际被置为不可面的窗格数量（已不可见 / 拿不到对象的不计入）
+ */
+export function closeAllPanels(): number {
+  const app = getApp() as {
+    PluginStorage?: { getItem: (k: string) => string | null }
+    GetTaskPane?: (id: string) => { Visible: boolean } | null
+  } | null
+  if (!app) {
+    bgmLog(LOG_LEVELS.WARN, '[closeAllPanels] 无法获取 WPS Application 对象')
+    return 0
+  }
+
+  let closed = 0
+  for (const key of ALL_PANE_ID_KEYS) {
+    const id = app.PluginStorage?.getItem(key)
+    // 没有缓存 ID = 该页从没打开过（或已被自愈清掉），没什么可关的。
+    // 不用 continue：仓库 lint 禁 continue，用 if 包住剩下的逻辑。
+    if (id !== null && id !== undefined && id !== '') {
+      try {
+        const pane = app.GetTaskPane?.(id)
+        // 读 Visible 也可能抛（宿主正忙 / 属性被占用），所以读和写放在同一个 try 里。
+        // 已不可见的不重复计数 —— 按钮的反馈文案是「已关闭 N 个」，把本来就没开的
+        // 算进去会让用户以为关掉了多余的东西。
+        if (pane?.Visible === true) {
+          pane.Visible = false
+          closed += 1
+          bgmLog(LOG_LEVELS.INFO, `[closeAllPanels] 已关闭窗格(${key}, ID:${id})`)
+        }
+      } catch (error: unknown) {
+        // 单个窗格失败不能中断其余窗格的关闭（用户要的是一次全关）
+        bgmLog(LOG_LEVELS.WARN, `[closeAllPanels] 关闭窗格失败(${key}): ${String(error)}`)
+      }
+    }
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[closeAllPanels] 完成，共关闭 ${String(closed)} 个页面`)
+  return closed
+}
+
 export { trim, escapeHtml, calcFingerprint, columnNumberToLetter } from '../string-utilities.js'

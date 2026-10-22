@@ -46,6 +46,7 @@ import {
   buildTaskPaneUrl,
   clearBgToken,
   clearTokenExpires,
+  closeAllPanels,
   copyTokenToClipboard,
   fetchBgmUserInfo,
   getUrlPath,
@@ -1256,5 +1257,114 @@ describe('util · fetchBgmUserInfo（Promise 包装）', () => {
     await flushMicrotasks()
 
     await expect(promise).resolves.toEqual({ userInfo: null, errorType: 'network' })
+  })
+})
+
+// ========== 一键关闭所有页面 ==========
+
+describe('closeAllPanels', () => {
+  /** 六页的 ID 存储键 → 人造 ID（与 ALL_PANE_ID_KEYS 同序） */
+  const PANE_KEYS = [
+    'panel_id',
+    'enrich_pane_id',
+    'clean_pane_id',
+    'highlight_pane_id',
+    'conditionalFormat_pane_id',
+    'settings_pane_id',
+  ] as const
+
+  /** 造「六页全开」的宿主：每个键各指一个可见窗格 */
+  function mountAllOpen(): { panes: Record<string, FakePane>; store: Map<string, string> } {
+    const panes: Record<string, FakePane> = {}
+    const storage: Record<string, string> = {}
+    for (const [index, key] of PANE_KEYS.entries()) {
+      const id = `pane-${String(index)}`
+      storage[key] = id
+      panes[id] = { ID: id, Visible: true }
+    }
+    const { app, store } = createFakeApp({ storage, panes })
+    mountApp(app)
+    return { panes, store }
+  }
+
+  it('六页全开时全部置为不可见，返回 6，且不清存储 ID', () => {
+    const { panes, store } = mountAllOpen()
+
+    expect(closeAllPanels()).toBe(6)
+    for (const pane of Object.values(panes)) {
+      expect(pane.Visible).toBe(false)
+    }
+    // ID 必须留着：清了下次打开会 CreateTaskPane 重建，旧窗格还在 → 堆孤儿窗格
+    for (const key of PANE_KEYS) {
+      expect(store.get(key)).toBeTruthy()
+    }
+  })
+
+  it('只统计「原本可见」的窗格；已不可见 / 拿不到对象的不计入', () => {
+    const panes: Record<string, FakePane> = {}
+    const storage: Record<string, string> = {
+      panel_id: 'p1',
+      enrich_pane_id: 'p2',
+      clean_pane_id: 'p3',
+      // ghost：存储里有 ID 但窗格对象已没了（用户手动关过）
+      highlight_pane_id: 'ghost',
+    }
+    panes.p1 = { ID: 'p1', Visible: true }
+    panes.p2 = { ID: 'p2', Visible: false }
+    panes.p3 = { ID: 'p3', Visible: true }
+    const { app } = createFakeApp({ storage, panes })
+    mountApp(app)
+
+    expect(closeAllPanels()).toBe(2)
+    expect(panes.p1.Visible).toBe(false)
+    expect(panes.p3.Visible).toBe(false)
+  })
+
+  it('完全没有窗格 ID 时返回 0，不抛错', () => {
+    mountApp(createFakeApp().app)
+    expect(closeAllPanels()).toBe(0)
+  })
+
+  it('单个窗格读取抛错不中断其余窗格的关闭（用户要的是一次全关）', () => {
+    const panes: Record<string, FakePane> = {}
+    const storage: Record<string, string> = { panel_id: 'p1', clean_pane_id: 'p2' }
+    panes.p1 = {
+      ID: 'p1',
+      get Visible(): boolean {
+        throw new Error('宿主正忙')
+      },
+    }
+    panes.p2 = { ID: 'p2', Visible: true }
+    const { app } = createFakeApp({ storage, panes })
+    mountApp(app)
+
+    expect(closeAllPanels()).toBe(1)
+    expect(panes.p2.Visible).toBe(false)
+  })
+
+  it('关闭单个窗格写 Visible 抛错时不影响返回计数与其它窗格', () => {
+    const panes: Record<string, FakePane> = {}
+    const storage: Record<string, string> = { panel_id: 'p1', clean_pane_id: 'p2' }
+    panes.p1 = { ID: 'p1', Visible: true }
+    // p2 的 Visible 可读但不可写（模拟宿主属性被占用）
+    const readOnlyPane: FakePane = { ID: 'p2', Visible: true }
+    Object.defineProperty(readOnlyPane, 'Visible', {
+      get: () => true,
+      set: () => {
+        throw new Error('只读属性')
+      },
+    })
+    panes.p2 = readOnlyPane
+    const { app } = createFakeApp({ storage, panes })
+    mountApp(app)
+
+    // p1 关成功计 1；p2 写失败被吞掉，不算成功也不外抛
+    expect(closeAllPanels()).toBe(1)
+    expect(panes.p1.Visible).toBe(false)
+  })
+
+  it('无宿主（Application 取不到）时返回 0', () => {
+    Reflect.set(window, 'Application', null)
+    expect(closeAllPanels()).toBe(0)
   })
 })

@@ -15,6 +15,9 @@ import {
   undoLastSyncForRibbon,
 } from './services/ribbon-service.js'
 
+// 对话框走依赖反转桥：ribbon 属上层入口，不得直接 runtime-import UI 层
+import { getNotifyApi } from './core/ui-bridge.js'
+
 import {
   WPS_ENUM,
   showBangumiPanel,
@@ -23,6 +26,7 @@ import {
   showCleanPanel,
   showHighlightPanel,
   showConditionalFormatPanel,
+  closeAllPanels,
   BGM,
   isIncrementalSyncEnabled,
   isSkipConflictsEnabled,
@@ -351,9 +355,25 @@ const SYNC_ACTIONS: Record<string, () => unknown> = {
   btnOpenCleanPanel: showCleanPanel,
   btnOpenHighlightPanel: showHighlightPanel,
   btnOpenConditionalFormatPanel: showConditionalFormatPanel,
+  btnCloseAllPanels: closeAllPanelsForRibbon,
   btnSetToken: setTokenForRibbon,
   btnSetUserId: setUserIdForRibbon,
   btnOpenCollection: openCollectionForRibbon,
+}
+
+/**
+ * 「关闭所有页面」按钮：关掉全部任务窗格，并按实际关掉的数量给一句反馈。
+ *
+ * 反馈是必须的：一个都没关时用户会以为按钮坏了（常见情形——页面早就手动关了）。
+ * 用 `toast` 而非 `alert`：这是状态播报，不该弹模态框挡人。
+ */
+function closeAllPanelsForRibbon(): void {
+  const closed = closeAllPanels()
+  if (closed === 0) {
+    getNotifyApi().toast('当前没有打开的工具页面', 'info')
+    return
+  }
+  getNotifyApi().toast(`已关闭 ${String(closed)} 个工具页面`, 'success')
 }
 
 /**
@@ -434,6 +454,7 @@ const ICON_PATHS: Record<string, string> = {
   btnSyncFromGithub: 'images/github.svg',
   btnUndoLastSync: 'images/undo.svg',
   btnOpenSettings: 'images/settings.svg',
+  btnCloseAllPanels: 'images/closeAllPanels.svg',
   btnOpenEnrichPanel: 'images/enrichPage.svg',
   btnOpenCleanPanel: 'images/cleanPage.svg',
   btnOpenHighlightPanel: 'images/highlightPage.svg',

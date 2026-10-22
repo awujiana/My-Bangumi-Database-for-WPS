@@ -26,6 +26,8 @@ const mockState = vi.hoisted(() => ({
   handleError: vi.fn(),
   showBangumiPanel: vi.fn(),
   syncWithConfirmation: vi.fn(() => Promise.resolve()),
+  closeAllPanels: vi.fn(() => 0),
+  notifyToast: vi.fn(),
 }))
 
 vi.mock('../ts/index.js', () => ({
@@ -36,6 +38,7 @@ vi.mock('../ts/index.js', () => ({
   showCleanPanel: vi.fn(),
   showHighlightPanel: vi.fn(),
   showConditionalFormatPanel: vi.fn(),
+  closeAllPanels: mockState.closeAllPanels,
   getApp: vi.fn(() => null),
   isIncrementalSyncEnabled: vi.fn(() => false),
   isSkipConflictsEnabled: vi.fn(() => false),
@@ -46,6 +49,11 @@ vi.mock('../ts/index.js', () => ({
   bgmLog: mockState.bgmLog,
   LOG_LEVELS: { DEBUG: 'DEBUG', INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
   BGM: { handleError: mockState.handleError, ErrorLevel: { WARN: 'WARN', ERROR: 'ERROR' } },
+}))
+
+// ribbon.ts 的 toast 走 ui-bridge 依赖反转桥，mock 掉以便断言反馈文案
+vi.mock('../ts/core/ui-bridge.js', () => ({
+  getNotifyApi: () => ({ toast: mockState.notifyToast }),
 }))
 
 vi.mock('../ts/services/ribbon-service.js', () => ({
@@ -119,6 +127,37 @@ describe('OnAction 分发', () => {
     await vi.waitFor(() => {
       expect(mockState.handleError).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('OnAction：一键关闭所有页面', () => {
+  it('命中同步分发表，按实际关闭数量播报', () => {
+    mockState.closeAllPanels.mockReturnValueOnce(3)
+
+    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+
+    expect(mockState.closeAllPanels).toHaveBeenCalledTimes(1)
+    expect(mockState.notifyToast).toHaveBeenCalledWith('已关闭 3 个工具页面', 'success')
+    expect(countUnknownButtonWarnings()).toBe(0)
+  })
+
+  it('一个都没关时明确播报「没有打开的工具页面」（否则用户以为按钮坏了）', () => {
+    mockState.closeAllPanels.mockReturnValueOnce(0)
+
+    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+
+    expect(mockState.notifyToast).toHaveBeenCalledWith('当前没有打开的工具页面', 'info')
+  })
+
+  it('closeAllPanels 抛错时被 OnAction 的 try/catch 捕获，不打断宿主', () => {
+    mockState.closeAllPanels.mockImplementationOnce(() => {
+      throw new Error('宿主不可用')
+    })
+
+    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+
+    expect(mockState.handleError).toHaveBeenCalledTimes(1)
+    expect(mockState.notifyToast).not.toHaveBeenCalled()
   })
 })
 
