@@ -153,8 +153,9 @@ function initializePanelCore(): void {
   if (wbSelect) {
     wbSelect.addEventListener('change', () => {
       refreshSheets()
-      // 自动检测新工作簿的表头
-      autoDetectAndLockSheet()
+      // 用户显式切换工作簿 → 强制全扫（识别缓存按工作簿集合签名命中，
+      // 但下拉框切换不代表签名变化，必须绕过缓存才能检测到新选中的工作簿）
+      autoDetectAndLockSheet({ force: true })
     })
   }
 

@@ -205,6 +205,8 @@ vi.mock('../ts/tools/util/index.js', () => ({
   BGM: sharedBGM,
   getCellValue: mockGetCellValue,
   findHeaderRow: mockFindHeaderRow,
+  // 识别缓存复核会清一次表缓存（resolveCachedTarget）
+  clearSheetCache: vi.fn(),
 }))
 
 // ========== 导入被测模块 ============
@@ -230,6 +232,7 @@ import {
   autoSelectEnrichTarget,
   initializeEnrichLock,
 } from '../ts/sync/enrich-lock.js'
+import { readWorkbookSignature, saveTargetCache } from '../ts/tools/target-detect-cache.js'
 
 // ========== 测试套件 ==========
 
@@ -1023,6 +1026,103 @@ describe('autoSelectEnrichTarget', () => {
     expect(
       autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus'),
     ).toBe('none')
+  })
+})
+
+// ============ 场景 11b: autoSelectEnrichTarget · 识别结果缓存 ============
+describe('autoSelectEnrichTarget · 识别结果缓存', () => {
+  it('命中缓存 → 只复核一次表头，锁定缓存目标（不走全簿扫描）', () => {
+    setupBasicDom()
+    setupScanMocks()
+    const sheetA = createScanSheet('bangumi A', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const sheetB = createScanSheet('bangumi B', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const storage = createMockPluginStorage()
+    const app = createScanApp({ wb1: [sheetA, sheetB] }, 'wb1', '', storage)
+    setMockApp(app)
+
+    // 预置缓存：指向排序第二的 B（全扫会选 A，两者可区分）
+    const signature = readWorkbookSignature(app)
+    saveTargetCache('enrich', signature, {
+      workbookName: 'wb1',
+      sheetIndex: 2,
+      sheetName: 'bangumi B',
+      headerRow: 1,
+    })
+    mockFindHeaderRow.mockClear()
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+
+    expect(result).toBe('locked')
+    expect(sharedBGM.sheet.lockedIndex).toBe(2)
+    expect(sharedBGM.sheet.lockedName).toBe('bangumi B')
+    // 复核只读 1 次表头；全扫会按工作表逐张读
+    expect(mockFindHeaderRow.mock.calls.length).toBeLessThanOrEqual(1)
+  })
+
+  it('签名不匹配（工作簿集合/活动簿变化）→ 缓存失效，回退全扫', () => {
+    setupBasicDom()
+    setupScanMocks()
+    const sheetA = createScanSheet('bangumi A', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const sheetB = createScanSheet('bangumi B', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const storage = createMockPluginStorage()
+    const app = createScanApp({ wb1: [sheetA, sheetB] }, 'wb1', '', storage)
+    setMockApp(app)
+
+    saveTargetCache('enrich', 'stale-signature', {
+      workbookName: 'wb1',
+      sheetIndex: 2,
+      sheetName: 'bangumi B',
+      headerRow: 1,
+    })
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+
+    // 两个候选 → 全扫走「预选首个、不自动锁定」路径
+    expect(result).toBe('preselected')
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+    expect(sheetSelect.value).toBe('1')
+  })
+
+  it('force: true → 跳过缓存（手动刷新强制重扫）', () => {
+    setupBasicDom()
+    setupScanMocks()
+    const sheetA = createScanSheet('bangumi A', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const sheetB = createScanSheet('bangumi B', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const storage = createMockPluginStorage()
+    const app = createScanApp({ wb1: [sheetA, sheetB] }, 'wb1', '', storage)
+    setMockApp(app)
+
+    const signature = readWorkbookSignature(app)
+    saveTargetCache('enrich', signature, {
+      workbookName: 'wb1',
+      sheetIndex: 2,
+      sheetName: 'bangumi B',
+      headerRow: 1,
+    })
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+      { force: true },
+    )
+
+    // force 绕过缓存 → 全扫（两个候选 → 预选首个）
+    expect(result).toBe('preselected')
+    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+    expect(sheetSelect.value).toBe('1')
   })
 })
 

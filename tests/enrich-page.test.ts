@@ -63,7 +63,8 @@ const m = vi.hoisted(() => ({
   // workbook-auto-detect
   collectDetectedWorkbookPaths: vi.fn(),
   describeOpenWorkbooks: vi.fn(() => ''),
-  mergeDetectedPathsIntoStorage: vi.fn(),
+  // 忠实桩：生产实现返回各检测目标的合并条数（日志复用），不能返回 undefined
+  mergeDetectedPathsIntoStorage: vi.fn(() => [{ label: 'Bangumi 数据表', count: 0 }]),
   // locked-sheet
   findWorkbookByName: vi.fn(),
   // shell-nav
@@ -1547,6 +1548,11 @@ describe('enrich-page · 兜底分支与边界补测', () => {
 
   it('页面打开检查抛错 → 两个检查点各自兜底，且不阻断初始化', () => {
     m.collectDetectedWorkbookPaths.mockImplementation(() => {
+      throw new Error('COM 不可用')
+    })
+    // 2026-10-22：checkBangumiAutoDetectRecords 已不再重复调用 collectDetectedWorkbookPaths
+    // （日志改复用 merge 的返回值），错误注入点随之改为 mergeDetectedPathsIntoStorage
+    m.mergeDetectedPathsIntoStorage.mockImplementation(() => {
       throw new Error('COM 不可用')
     })
 

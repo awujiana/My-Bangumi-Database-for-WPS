@@ -13,6 +13,7 @@ import {
   applyLockedSheet,
   isLockedAt,
   renderSheetLockUi,
+  resolveCachedTarget,
   saveLockedSheet,
   clearLockedSheet,
   restoreLockedSheet,
@@ -20,6 +21,11 @@ import {
   findBangumiTargetSheets,
   getOpenWorkbooks,
 } from '../tools/locked-sheet.js'
+import {
+  loadTargetCache,
+  readWorkbookSignature,
+  saveTargetCache,
+} from '../tools/target-detect-cache.js'
 
 /** 富化页面的锁定工作表引用解析（委托共享实现，保持向后兼容） */
 export { findBangumiTargetSheets, findWorkbookByName } from '../tools/locked-sheet.js'
@@ -310,8 +316,27 @@ export function autoSelectEnrichTarget(
   sheetSelectId = 'enrichSheetSelect',
   lockButtonId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
+  options: { force?: boolean } = {},
 ): 'locked' | 'preselected' | 'none' {
   if (BGM.sheet.isLocked) return 'locked'
+
+  const signature = readWorkbookSignature(getApp())
+
+  // 识别结果缓存（§ 性能）：签名未变时只复核「簿/表存在性 + 表头」，不扫全簿全表。
+  // 命中即按「唯一候选」处理（上一次识别时它已是排序后的最佳候选）。
+  if (options.force !== true) {
+    const cached = loadTargetCache('enrich', signature)
+    const resolved = cached ? resolveCachedTarget(cached) : null
+    if (resolved) {
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[enrichLock] 命中识别缓存: ${resolved.workbookName} → ${resolved.sheetName}（表头行 ${String(
+          resolved.headerRow,
+        )}）`,
+      )
+      return applyAutoSelectedTarget(resolved, wbSelectId, sheetSelectId, lockButtonId, statusId)
+    }
+  }
 
   const candidates = findBangumiTargetSheets()
   if (candidates.length === 0) {
@@ -322,25 +347,54 @@ export function autoSelectEnrichTarget(
   const best = candidates[0]
   if (!best) return 'none'
 
+  saveTargetCache('enrich', signature, {
+    workbookName: best.workbookName,
+    sheetIndex: best.sheetIndex,
+    sheetName: best.sheetName,
+    headerRow: best.headerRow,
+    matchCount: best.headerMatchCount,
+    columnCount: best.headerMatchCount,
+  })
+
+  if (candidates.length === 1) {
+    return applyAutoSelectedTarget(best, wbSelectId, sheetSelectId, lockButtonId, statusId)
+  }
+
   const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
   if (wbSelect) wbSelect.value = best.workbookName
   refreshEnrichSheets(best.workbookName, sheetSelectId, wbSelectId)
   const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
   if (sheetSelect) sheetSelect.value = String(best.sheetIndex)
 
-  if (candidates.length === 1) {
-    const isLocked = lockEnrichWorkbookByName(best.workbookName, best.sheetIndex)
-    if (isLocked) {
-      showToast(`已自动锁定: ${best.workbookName} → ${best.sheetName}`, 'success')
-      updateEnrichLockButton(lockButtonId, statusId)
-      return 'locked'
-    }
-    return 'preselected'
-  }
-
   showToast(
     `检测到 ${String(candidates.length)} 个候选追踪表，已预选 ${best.sheetName}，请确认后锁定`,
     'warn',
   )
+  return 'preselected'
+}
+
+/**
+ * 把自动选中的目标同步到下拉框并尝试锁定（唯一候选 / 缓存命中共用）。
+ * @returns 'locked' 已锁定 | 'preselected' 仅预选（锁定失败）
+ */
+function applyAutoSelectedTarget(
+  target: { workbookName: string; sheetIndex: number; sheetName: string },
+  wbSelectId: string,
+  sheetSelectId: string,
+  lockButtonId: string,
+  statusId: string,
+): 'locked' | 'preselected' {
+  const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
+  if (wbSelect) wbSelect.value = target.workbookName
+  refreshEnrichSheets(target.workbookName, sheetSelectId, wbSelectId)
+  const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
+  if (sheetSelect) sheetSelect.value = String(target.sheetIndex)
+
+  const isLocked = lockEnrichWorkbookByName(target.workbookName, target.sheetIndex)
+  if (isLocked) {
+    showToast(`已自动锁定: ${target.workbookName} → ${target.sheetName}`, 'success')
+    updateEnrichLockButton(lockButtonId, statusId)
+    return 'locked'
+  }
   return 'preselected'
 }

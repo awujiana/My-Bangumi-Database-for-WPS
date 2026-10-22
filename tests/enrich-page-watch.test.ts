@@ -53,7 +53,8 @@ const m = vi.hoisted(() => ({
   getOrCreateEnrichRecordSheet: vi.fn(),
   collectDetectedWorkbookPaths: vi.fn(),
   describeOpenWorkbooks: vi.fn(() => ''),
-  mergeDetectedPathsIntoStorage: vi.fn(),
+  // 忠实桩：生产实现返回各检测目标的合并条数（日志复用），不能返回 undefined
+  mergeDetectedPathsIntoStorage: vi.fn(() => [{ label: 'Bangumi 数据表', count: 0 }]),
   findWorkbookByName: vi.fn(),
   recomputeScrollspy: vi.fn(),
   openSourceWorkbook: vi.fn(),

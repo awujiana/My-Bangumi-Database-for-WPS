@@ -321,18 +321,23 @@ export function collectDetectedWorkbookPaths(detector: WorkbookDetector): string
  * 与 overwriteDetectedPathsInStorage 的区别：后者在 WPS 启动时全量覆盖，适用于「以当前事实为准」；
  * 本函数适用于页面打开等中途场景 —— 若此时 Workbooks 集合尚未就绪（例如只枚举到部分工作簿），
  * 覆盖写会把已经识别到的目标工作簿记录抹掉，导致后续页面更扫不到。
+ *
+ * @returns 各检测目标的合并后条数（调用方可直接用于日志，避免再单独扫一遍）
  */
-export function mergeDetectedPathsIntoStorage(): void {
+export function mergeDetectedPathsIntoStorage(): { label: string; count: number }[] {
+  const results: { label: string; count: number }[] = []
   for (const detector of ALL_DETECTORS) {
     const openPaths = scanMatchingWorkbooks(detector).map((wb) => wb.FullName)
     const persisted = loadDetectedPaths(detector)
     const merged = mergeCandidatePaths(persisted, openPaths, isWorkbookOpen)
     persistDetectedPaths(detector, merged)
+    results.push({ label: detector.label, count: merged.length })
     bgmLog(
       LOG_LEVELS.INFO,
       `[workbookDetect] ${detector.label} 合并识别记录：${String(merged.length)} 个`,
     )
   }
+  return results
 }
 
 // ========== WPS 启动检查（检查方式 A + 事件时机 C/D/E） ==========

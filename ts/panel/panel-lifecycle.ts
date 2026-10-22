@@ -29,11 +29,17 @@ import {
   applyLockedSheet,
   isLockedAt,
   renderSheetLockUi,
+  resolveCachedTarget,
   saveLockedSheet,
   findWorkbookByName,
   findBangumiTargetSheets,
   getOpenWorkbooks,
 } from '../tools/locked-sheet.js'
+import {
+  loadTargetCache,
+  readWorkbookSignature,
+  saveTargetCache,
+} from '../tools/target-detect-cache.js'
 import type { LockedSheetInfo } from '../tools/locked-sheet.js'
 
 interface CandidateHeader {
@@ -469,7 +475,7 @@ export function detectHeaderAndColumns(
   }
 }
 
-export function autoDetectSheet(): {
+export function autoDetectSheet(options: { force?: boolean } = {}): {
   workbookName: string
   sheetIndex: number
   sheetName: string
@@ -477,6 +483,31 @@ export function autoDetectSheet(): {
   matchCount: number
   columnCount: number
 } | null {
+  const signature = readWorkbookSignature(getApp())
+
+  // 识别结果缓存（§ 性能）：签名未变时只做「簿/表存在性 + 表头」复核（约 3–5 次 COM），
+  // 不扫其它工作簿的其它工作表；手动刷新传 force 跳过并回写。
+  if (options.force !== true) {
+    const cached = loadTargetCache('panel', signature)
+    const resolved = cached ? resolveCachedTarget(cached) : null
+    if (resolved) {
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `autoDetectSheet: 命中识别缓存 "${resolved.workbookName} → ${resolved.sheetName}"（表头行 ${String(
+          resolved.headerRow,
+        )}）`,
+      )
+      return {
+        workbookName: resolved.workbookName,
+        sheetIndex: resolved.sheetIndex,
+        sheetName: resolved.sheetName,
+        headerRow: resolved.headerRow,
+        matchCount: resolved.matchCount ?? 0,
+        columnCount: resolved.columnCount ?? 0,
+      }
+    }
+  }
+
   // 跨所有已打开工作簿扫描（表头 + 数据行数 + 名称关键词，优先活动工作簿/工作表）
   const candidates = findBangumiTargetSheets()
   const best = candidates[0]
@@ -493,7 +524,7 @@ export function autoDetectSheet(): {
       best.headerRow,
     )}, 关键词 ${String(best.headerMatchCount)}, 数据行 ${String(best.dataRowCount)})`,
   )
-  return {
+  const result = {
     workbookName: best.workbookName,
     sheetIndex: best.sheetIndex,
     sheetName: best.sheetName,
@@ -501,6 +532,8 @@ export function autoDetectSheet(): {
     matchCount: best.headerMatchCount,
     columnCount: best.headerMatchCount,
   }
+  saveTargetCache('panel', signature, result)
+  return result
 }
 // ========== 筛选状态 ==========
 
@@ -1103,8 +1136,8 @@ export function enlargePreview(): void {
  * 跨所有已打开工作簿自动检测追踪表，找到后锁定该工作表并刷新预览
  * 返回 true 表示成功检测并锁定，false 表示未找到有效追踪表
  */
-export function autoDetectAndLockSheet(): boolean {
-  const detected = autoDetectSheet()
+export function autoDetectAndLockSheet(options: { force?: boolean } = {}): boolean {
+  const detected = autoDetectSheet(options)
   if (detected) {
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
     if (wbSelect && detected.workbookName) wbSelect.value = detected.workbookName

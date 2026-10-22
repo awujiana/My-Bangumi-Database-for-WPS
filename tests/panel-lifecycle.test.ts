@@ -96,6 +96,8 @@ const mocks = vi.hoisted(() => ({
   saveLockedSheet: vi.fn(),
   findWorkbookByName: vi.fn<(name: string) => FakeWorkbook | null>(() => null),
   findBangumiTargetSheets: vi.fn(() => [] as unknown[]),
+  loadTargetCache: vi.fn<() => unknown>(() => null),
+  resolveCachedTarget: vi.fn<(target: unknown) => unknown>(() => null),
   getOpenWorkbooks: vi.fn(() => [] as FakeWorkbook[]),
 }))
 
@@ -161,7 +163,14 @@ vi.mock('../ts/tools/locked-sheet.js', async (importOriginal) => {
     findWorkbookByName: mocks.findWorkbookByName,
     findBangumiTargetSheets: mocks.findBangumiTargetSheets,
     getOpenWorkbooks: mocks.getOpenWorkbooks,
+    resolveCachedTarget: mocks.resolveCachedTarget,
   }
+})
+
+// 识别结果缓存：只桩「读缓存」，写入走真实实现（getApp 为 null 时自动 no-op）
+vi.mock('../ts/tools/target-detect-cache.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/tools/target-detect-cache.js')>()
+  return { ...actual, loadTargetCache: mocks.loadTargetCache }
 })
 
 import {
@@ -958,6 +967,45 @@ describe('panel-lifecycle · autoDetectSheet', () => {
       matchCount: 5,
       columnCount: 5,
     })
+  })
+})
+
+describe('panel-lifecycle · autoDetectSheet（识别结果缓存）', () => {
+  const cached = {
+    workbookName: 'BGM.xlsx',
+    sheetIndex: 3,
+    sheetName: '番剧',
+    headerRow: 2,
+    matchCount: 7,
+    columnCount: 7,
+  }
+
+  it('命中缓存 → 直接返回缓存目标，不再全簿扫描', () => {
+    mocks.loadTargetCache.mockReturnValue(cached)
+    mocks.resolveCachedTarget.mockImplementation((target) => target)
+    mocks.findBangumiTargetSheets.mockReturnValue([])
+
+    expect(autoDetectSheet()).toEqual(cached)
+    expect(mocks.findBangumiTargetSheets).not.toHaveBeenCalled()
+  })
+
+  it('force: true → 跳过缓存（手动刷新强制重扫）', () => {
+    mocks.loadTargetCache.mockReturnValue(cached)
+    mocks.findBangumiTargetSheets.mockReturnValue([])
+
+    autoDetectSheet({ force: true })
+
+    expect(mocks.loadTargetCache).not.toHaveBeenCalled()
+    expect(mocks.findBangumiTargetSheets).toHaveBeenCalled()
+  })
+
+  it('缓存复核失败（表被删 / 表头丢失）→ 回退全扫', () => {
+    mocks.loadTargetCache.mockReturnValue(cached)
+    mocks.resolveCachedTarget.mockReturnValue(null)
+    mocks.findBangumiTargetSheets.mockReturnValue([])
+
+    expect(autoDetectSheet()).toBeNull()
+    expect(mocks.findBangumiTargetSheets).toHaveBeenCalled()
   })
 })
 

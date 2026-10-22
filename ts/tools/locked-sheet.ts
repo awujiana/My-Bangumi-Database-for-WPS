@@ -6,12 +6,13 @@
  *              删除独立于 BGM.sheet 的富化锁定状态（方案一）。
  */
 
-import { getApp, bgmLog, BGM, getCellValue, findHeaderRow } from './util/index.js'
+import { getApp, bgmLog, BGM, getCellValue, findHeaderRow, clearSheetCache } from './util/index.js'
 // 直接依赖 util/sheet.js 的矩形读：它自带 try/catch，宿主/桩不支持区域读时返回 []，
 // 调用方据此回退逐格读（见 buildCandidate）。
 import { readRangeValues } from './util/sheet.js'
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js'
 import type { WpsWorkbook, WpsWorksheet, WpsWindow } from './wps.js'
+import type { CachedTarget } from './target-detect-cache.js'
 
 /** 锁定持久化键前缀（各页独立键：`bgm_locked_sheet_<page>`） */
 export const LOCKED_SHEET_KEY = 'bgm_locked_sheet'
@@ -300,17 +301,58 @@ function resolveSheetInWorkbook(
   sheetName: string | null,
   hintIndex: number | null,
 ): WpsWorksheet | null {
+  return resolveSheetWithIndex(wb, sheetName, hintIndex)?.sheet ?? null
+}
+
+/**
+ * 按名称解析工作表并同时返回其索引（1-based）。
+ *
+ * 与 {@link resolveSheetInWorkbook} 同一套「索引提示 + 名称复核」策略，
+ * 区别是**把命中的索引也带出来**——识别结果缓存需要回写最新的索引
+ * （用户重排工作表后，索引会变而名称不变）。
+ */
+function resolveSheetWithIndex(
+  wb: WpsWorkbook,
+  sheetName: string | null,
+  hintIndex: number | null,
+): { sheet: WpsWorksheet; index: number } | null {
   if (hintIndex != null) {
     const hinted = readSheetAtIndex(wb, hintIndex)
-    if (hinted?.Name === sheetName) return hinted
+    if (hinted?.Name === sheetName) return { sheet: hinted, index: hintIndex }
   }
   // 扫描边界先取值：`Count` 是 COM 属性，写在循环条件里会每轮多一次往返
   const sheetCount = wb.Worksheets.Count
   for (let index = 1; index <= sheetCount; index += 1) {
     const sheet = wb.Worksheets.Item(index)
-    if (sheet.Name === sheetName) return sheet
+    if (sheet.Name === sheetName) return { sheet, index }
   }
   return null
+}
+
+/**
+ * 校验识别结果缓存里的目标表是否仍然可用。
+ *
+ * 命中缓存后只花「找簿 + 找表 + 1 次表头矩形读」，不扫其它工作簿/工作表：
+ *  1. 工作簿仍打开（按名称）；
+ *  2. 工作表仍存在（索引提示 + 名称复核，重排/改名都不会解析到错表）；
+ *  3. 表头仍能识别（表头行可能因插行而上移/下移，故用**新读到的行号**覆盖缓存值）。
+ *
+ * @returns 复核通过的识别结果（索引/表头以本次复核为准）；任一环节失败返回 `null`
+ */
+export function resolveCachedTarget(target: CachedTarget): CachedTarget | null {
+  const wb = findWorkbookByName(target.workbookName)
+  if (!wb) return null
+
+  const resolved = resolveSheetWithIndex(wb, target.sheetName, target.sheetIndex)
+  if (!resolved) return null
+  const { sheet, index } = resolved
+
+  // 表头复核前清一次该表缓存：保证读到的是当前工作表内容（1 次 10×60 矩形读）
+  clearSheetCache(sheet)
+  const headerRow = findHeaderRow(sheet)
+  if (!headerRow) return null
+
+  return { ...target, sheetIndex: index, sheetName: sheet.Name, headerRow }
 }
 
 /**

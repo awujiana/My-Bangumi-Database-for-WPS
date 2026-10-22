@@ -32,6 +32,8 @@ import { escapeHtml } from '../tools/string-utilities.js'
 import { showToast } from '../ui/dialog.js'
 import { findHeaderRow, bgmLog, BGM, getApp } from '../tools/util/index.js'
 import { findWorkbookByName } from '../tools/locked-sheet.js'
+// 工作簿集合签名与面板 / 富化识别缓存共用同一实现（含活动工作簿名）
+import { readWorkbookSignature } from '../tools/target-detect-cache.js'
 import { mountDataContextNotice } from '../tools/data-context.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { recomputeScrollspy } from './shell-nav.js'
@@ -182,7 +184,14 @@ function bindTargetSheetControls(): void {
         refreshSheetList()
       } else {
         // 未锁定时重新尝试自动选择目标工作表
-        autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+        // 手动刷新：强制全扫并回写识别缓存（缓存不会变成死角）
+        autoSelectEnrichTarget(
+          'workbookSelect',
+          'sheetSelect',
+          'lockSheetBtn',
+          'lockStatus',
+          { force: true },
+        )
         refreshSheetList()
         selectTargetSheet()
       }
@@ -713,17 +722,23 @@ function autoAddOpenAnimeWorkbooks(): void {
  */
 function checkBangumiAutoDetectRecords(): void {
   try {
-    const paths = collectDetectedWorkbookPaths(BANGUMI_TARGET_DETECTOR)
-    const names = paths.length > 0 ? paths.map((path) => extractFileName(path)).join('、') : '无'
+    // § 性能：已锁定目标表时，自动定位不需要检测记录 —— 直接早退，
+    // 不再做「实时扫描 + 合并记录」两次全簿扫描。
+    // 记录本身由 WPS 启动时的 overwrite + WorkbookOpen/Activate 事件维护；
+    // 页面打开时的合并只为「未锁定 → 自动选表」服务。
+    if (BGM.sheet.isLocked) {
+      bgmLog(LOG_LEVELS.INFO, '[enrich] 页面打开检查：目标表已锁定，跳过识别记录扫描')
+      return
+    }
+
+    // 合并结果自带各检测目标的条数：日志直接复用，避免再单独扫一遍（原先重复扫描）
+    const merged = mergeDetectedPathsIntoStorage()
+    const bangumiCount =
+      merged.find((item) => item.label === BANGUMI_TARGET_DETECTOR.label)?.count ?? 0
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 页面打开检查：Bangumi 数据表识别记录 ${String(paths.length)} 个（${names}）；当前打开工作簿 ${describeOpenWorkbooks()}`,
+      `[enrich] 页面打开检查：Bangumi 数据表识别记录 ${String(bangumiCount)} 个；当前打开工作簿 ${describeOpenWorkbooks()}`,
     )
-
-    // 把本次实时扫描结果并入持久化记录（不覆盖历史记录），便于 Ribbon / 其他页面共享
-    mergeDetectedPathsIntoStorage()
-
-    if (BGM.sheet.isLocked) return
 
     const result = autoSelectEnrichTarget(
       'workbookSelect',
@@ -778,25 +793,6 @@ let isAutoSelectSuppressed = false
 /** 用户已手动选择 / 主动解锁后调用：停止自动选表（保留列表刷新） */
 function suppressEnrichAutoSelect(): void {
   isAutoSelectSuppressed = true
-}
-
-/**
- * 读工作簿集合签名：只读 Count 与各簿 `Name`（Count 提出循环，守 com-in-loop），
- * 不碰工作表内容 —— 成本比全量识别低一个数量级。
- */
-function readWorkbookSignature(app: ReturnType<typeof getApp> | null): string {
-  const workbooks = app?.Workbooks
-  const count = workbooks?.Count ?? 0
-  const names: string[] = []
-  for (let index = 1; index <= count; index += 1) {
-    try {
-      names.push((workbooks?.Item(index) as { Name?: string } | undefined)?.Name ?? '?')
-    } catch {
-      names.push('?')
-    }
-  }
-  const activeName = app?.ActiveWorkbook?.Name ?? ''
-  return `${String(count)}|${names.join(',')}|${activeName}`
 }
 
 /** 刷新工作簿列表并重新自动识别目标表（已锁定时仅同步列表与引用） */
