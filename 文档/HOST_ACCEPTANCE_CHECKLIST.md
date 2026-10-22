@@ -185,6 +185,14 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
 > **为什么必须手工**：Node 侧只能校验 HTML 里写了什么（`check:csp`），
 > 验不了宿主 WebView 实际执行时还拦不拦。
 
+- [ ] **确认 dev server 用的是本地 wpsjs**：跑 `npm run check:wpsjs-patch`。
+      若报「运行中的 dev server(3889) 仍在注入」，说明 3889 上是**未 patch 的
+      wpsjs**（典型是全局安装的那份，手工敲 `wpsjs debug` 起的）——
+      **这不是红字问题，页面会陷入刷新循环打不开**：结束该进程，
+      改用 `npm run debug` 重启（npm script 内 PATH 优先本地已 patch 的 wpsjs）。
+      注意 `npm run debug` 需在用户自己的终端执行：wpsjs 用 `reg.exe` 探测 WPS
+      是否安装，受限 shell 里会被拦成 `WPS未安装` 假报错。
+  - 结果：______
 - [ ] **重启 dev server**（改的是 `node_modules/wpsjs` 与 `ui/*.html`，旧进程用的是旧代码，
       不重启就看不到效果）
 - [ ] **预期：控制台不再出现** `Refused to connect to 'http://127.0.0.1:58890/version'`
@@ -192,6 +200,10 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
   - 结果：______
 - [ ] **预期：控制台不再出现** `Main resource content verification failed`
       （已默认关闭 wpsjs 的 `hot-update-inject.js` 注入）
+  - 结果：______
+- [ ] **主面板 / 设置页能正常打开**（这条是注入回归的硬指标：注入脚本的
+      `EventSource('/hot-update/')` 收到 update 就 `reload()`，
+      `tsc --watch` 重写 `dist-ts/` 会让模块链最长的两页永远加载不完）
   - 结果：______
 - [ ] **热更新回归**（可选）：以 `WPSJS_HOT_UPDATE=1 npm run debug` 启动 →
       改一个 `ui/*.html` 存盘 → 任务窗格应自动刷新。确认开关仍然有效

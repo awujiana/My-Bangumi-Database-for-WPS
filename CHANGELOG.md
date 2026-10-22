@@ -8,6 +8,45 @@
 
 ## [未发布]
 
+### 修「主面板/设置打不开」：全局 wpsjs 绕过 patch，页面陷入刷新循环（2026-10-22）
+
+**症状**：控制台刷 `Main resource content verification failed: http://127.0.0.1:3889/ui/panel.html`，
+且**主同步面板、设置页打不开**，其余 4 个页面正常。
+
+**根因不是 patch 失效，而是跑的根本不是打过 patch 的那份 wpsjs**：
+
+- `patches/wpsjs+2.2.3.patch`（`prepare: patch-package` 自动应用）只作用于
+  **项目本地** `node_modules/wpsjs`；
+- 而 3889 上实际跑的进程是 `C:\Program Files\nodejs\node.exe ...\AppData\Roaming\npm\node_modules\wpsjs\src\index.js debug`
+  —— **全局安装**的那份，没打 patch；
+- 于是 wpsjs 继续往每个 `.html` 的 `<body` 前注入
+  `<script src="./hot-update-inject.js">`，HTML 被改写 → 宿主报内容校验失败。
+
+这条注入**不只是红字**：注入脚本里
+`new EventSource('/hot-update/<rand>')` 收到 `{update:true}` 就执行
+`window.location.reload()`，而 wpsjs 的 `rcWatch` 监听项目根目录 ——
+`tsc --watch` 每次重写 `dist-ts/` 都推一次 update。**模块链最长的两个页面
+（主面板 / 设置，各 142 个模块）永远加载不完**，表现为「打不开」；模块短的
+页面在刷新间隙能被看到，所以另外 4 个页面看起来正常。
+
+**修复**：
+
+1. 新增门禁 `scripts/check-wpsjs-patch.mjs`（`npm run check:wpsjs-patch`），
+   守三条：① 本地 wpsjs 两个 server 文件都带 patch 标记（node_modules 被
+   重装即发现）；② **运行中的 3889** 返回的 panel.html 不含注入脚本 ——
+   这一条直接对应用户症状，能在 gate 里当场抓住；③ 全局 wpsjs 若存在且未
+   patch 则 WARN（提示 PATH 歧义风险：npm script 内优先本地，手工敲
+   `wpsjs debug` 会解析到全局）。
+2. 接入 `gate`；`debug` 脚本前置该自检（旧 server 还活着时会当场 FAIL 拦住）。
+3. 全局副本的检测同时探 `npm root -g` + `%APPDATA%/npm/node_modules` +
+   `C:\Program Files\nodejs\node_modules` —— 单靠 `npm root -g` 在
+   managed node 环境下会漏判（本次就是这么漏的）。
+
+**处置**：结束全局 wpsjs 进程，改用 `npm run debug` 重启（npm script 内 PATH
+优先本地已 patch 的 wpsjs）。**注意**：在受限 shell 里 `npm run debug` 起不来
+—— wpsjs 用 `REG QUERY HKEY_CLASSES_ROOT\KWPS.Document.12...` 探测 WPS 是否
+安装，`reg.exe` 被沙箱拦会导致 `WPS未安装` 假报错，需在用户自己的终端执行。
+
 ### 测试基建：`isolate: false` 实测不可用，结论写进配置（2026-10-22）
 
 vitest 每轮收尾都提示"至少可再省约 49s/轮"。本轮三轮实测证伪，把数据与理由
