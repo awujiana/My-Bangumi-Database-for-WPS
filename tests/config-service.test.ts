@@ -31,6 +31,7 @@ vi.mock('../ts/sync/github-config.js', () => ({
 
 // 在 mock 注册之后导入被测模块
 import { exportConfig, importConfig } from '../ts/services/config-service.js'
+import { CLEAN_RULES } from '../ts/panel/clean-rules.js'
 import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../ts/tools/util/index.js'
 import {
   getGithubConfig,
@@ -365,5 +366,94 @@ describe('configService', () => {
       })
       expect(setSyncStrategy).toHaveBeenCalledWith('add-update')
     })
+  })
+})
+
+// ========== 各页面配置纳入导出（2026-10-22） ==========
+
+/**
+ * 造一个带初始内容的存储，并挂成 window.Application.PluginStorage。
+ *
+ * 必须真挂：`tools/config.ts` 的 setConfig 读的是 `getApp().PluginStorage`，
+ * 只造对象不挂全局的话 setConfig 一律返回 false，导出永远收集不到东西。
+ */
+function mountStorage(initial: Record<string, string>): ReturnType<typeof createFakeStorage> {
+  const storage = createFakeStorage()
+  for (const [key, value] of Object.entries(initial)) storage.setItem(key, value)
+  vi.stubGlobal('window', { Application: { PluginStorage: storage } })
+  return storage
+}
+
+describe('configService - 各页面配置导出范围', () => {
+  it('高亮页与条件格式页的偏好键出现在导出的 preferences 里', () => {
+    mountStorage({
+      'highlight.source': '开播季度',
+      'highlight.sheet': 'wb.xlsx::动画',
+      'highlight.sheetLock': '1',
+      'conditionalFormat.rules.v1': '[]',
+      'conditionalFormat.sheetLock': '1',
+    })
+
+    const parsed = JSON.parse(exportConfig()) as {
+      preferences: Record<string, string>
+    }
+
+    expect(parsed.preferences['highlight.source']).toBe('开播季度')
+    expect(parsed.preferences['highlight.sheet']).toBe('wb.xlsx::动画')
+    expect(parsed.preferences['highlight.sheetLock']).toBe('1')
+    expect(parsed.preferences['conditionalFormat.rules.v1']).toBe('[]')
+    expect(parsed.preferences['conditionalFormat.sheetLock']).toBe('1')
+  })
+
+  it('清理页的规则开关（bgm_clean_on_<规则id>）按 CLEAN_RULES 枚举导出', () => {
+    // 规则 id 从 CLEAN_RULES 取而不是写死 —— 写死的 id 会随规则表变动而悄悄失效
+    // （曾经把 dup-name 写成 dup_name，用例红了半天才发现是测试自己猜错）。
+    const firstRule = CLEAN_RULES[0]
+    if (!firstRule) throw new Error('CLEAN_RULES 为空')
+    const key = `bgm_clean_on_${firstRule.id}`
+    mountStorage({ [key]: 'true' })
+
+    const parsed = JSON.parse(exportConfig()) as {
+      preferences: Record<string, string>
+    }
+
+    expect(parsed.preferences[key]).toBe('true')
+  })
+
+  it('清理页的 bgm_clean_sheets:<路径> 一族不导出（路径换机器对不上，无意义）', () => {
+    mountStorage({ 'bgm_clean_sheets:D://a.xlsx': '["动画"]' })
+
+    const parsed = JSON.parse(exportConfig()) as {
+      preferences: Record<string, string>
+    }
+
+    expect(parsed.preferences['bgm_clean_sheets:D://a.xlsx']).toBeUndefined()
+  })
+
+  it('导入时接受各页面的新键（含不导出的 bgm_clean_sheets: 一族，保证老文件能进）', () => {
+    const storage = mountStorage({})
+
+    const json = JSON.stringify({
+      version: 1,
+      exportedAt: '2026-07-21T00:00:00.000Z',
+      preferences: {
+        'highlight.sheetLock': '1',
+        'conditionalFormat.sheet.v1': 'wb.xlsx::动画',
+        [`bgm_clean_on_${CLEAN_RULES[0]?.id ?? 'dup-name'}`]: 'false',
+        'bgm_clean_sheets:D://a.xlsx': '["动画"]',
+        bgm_still_not_a_real_key: 'x',
+      },
+    })
+
+    expect(importConfig(json).isOk()).toBe(true)
+
+    const written = storage.snapshot()
+    expect(written['highlight.sheetLock']).toBe('1')
+    expect(written['conditionalFormat.sheet.v1']).toBe('wb.xlsx::动画')
+    expect(written[`bgm_clean_on_${CLEAN_RULES[0]?.id ?? 'dup-name'}`]).toBe('false')
+    // 不导出但导入接受：老文件里带着这一族时不能报错
+    expect(written['bgm_clean_sheets:D://a.xlsx']).toBe('["动画"]')
+    // 真正的野键仍然拒绝
+    expect(written.bgm_still_not_a_real_key).toBeUndefined()
   })
 })
