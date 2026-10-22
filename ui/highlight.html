@@ -70,6 +70,10 @@
           <select id="highlightWorkbook" class="highlight-select"></select>
           <label class="highlight-field-label" for="highlightSheet">工作表</label>
           <select id="highlightSheet" class="highlight-select"></select>
+          <label class="highlight-watch-row">
+            <input type="checkbox" id="highlightSheetLock" />
+            <span>锁定目标工作表（原表失效时不自动改选别的表）</span>
+          </label>
           <p class="hint">
             当前选择：<strong id="highlightSheetName">—</strong>。先选工作簿与工作表，再点下方
             「加载并预览」读取（<strong>不自动读、不轮询</strong>）。日期列三种格式都认（<code
