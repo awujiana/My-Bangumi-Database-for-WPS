@@ -15,12 +15,21 @@
 .conditional-format-select {
   flex: 1;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 7px 30px 7px 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: var(--bg-surface);
+  /* 自定义下拉箭头：原生箭头被自定义 background 盖住后，深色主题下看不清 /
+     不显示。故 appearance:none + 内联 SVG 箭头（中性灰 #9aa0b0，深浅主题均可见），
+     padding-right 30px 给箭头留位。 */
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--bg-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' fill='none' stroke='%239aa0b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   color: var(--text-1);
   font-size: var(--fs-body);
+  cursor: pointer;
 }
 
 /* 目标表锁定行：与工作表下拉同一列宽，checkbox 左、说明右 */
