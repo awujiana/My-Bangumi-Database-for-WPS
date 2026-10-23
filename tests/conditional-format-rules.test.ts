@@ -25,6 +25,7 @@ import {
   filterRules,
   firstRowOfRange,
   groupRules,
+  normalizeHexColor,
   parseRules,
   planApply,
   serializeRules,
@@ -350,5 +351,25 @@ describe('firstRowOfRange：范围首行号', () => {
     expect(firstRowOfRange('B5')).toBe(5)
     expect(firstRowOfRange('')).toBe(1)
     expect(firstRowOfRange('abc')).toBe(1)
+  })
+})
+
+describe('normalizeHexColor', () => {
+  it('6 位：补 # 并统一大写', () => {
+    expect(normalizeHexColor('00b050')).toBe('#00B050')
+    expect(normalizeHexColor('#00b050')).toBe('#00B050')
+    expect(normalizeHexColor('  #00B050  ')).toBe('#00B050')
+  })
+
+  it('3 位简写展开为 6 位', () => {
+    expect(normalizeHexColor('0f0')).toBe('#00FF00')
+    expect(normalizeHexColor('#abc')).toBe('#AABBCC')
+  })
+
+  it('非法输入返回 null（不把脏值写进规则库）', () => {
+    expect(normalizeHexColor('')).toBeNull()
+    expect(normalizeHexColor('xyz')).toBeNull()
+    expect(normalizeHexColor('#12345')).toBeNull()
+    expect(normalizeHexColor('#1234567')).toBeNull()
   })
 })

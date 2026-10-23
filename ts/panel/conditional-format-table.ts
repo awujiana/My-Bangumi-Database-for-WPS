@@ -345,7 +345,7 @@ export function buildForeignRuleRowHtml(row: ForeignRuleRow): string {
  */
 export function buildForeignRuleHeadHtml(isAllSelected = false): string {
   return `
-      <div class="conditional-format-row conditional-format-row-head" aria-hidden="true">
+      <div class="conditional-format-row conditional-format-row-head">
         <label class="conditional-format-col-check" title="全选 / 取消全选（当前页）">
           <input type="checkbox" data-action="select-all" ${isAllSelected ? 'checked' : ''} aria-label="全选当前页规则" />
         </label>

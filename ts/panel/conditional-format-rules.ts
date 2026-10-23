@@ -377,3 +377,25 @@ export function planApply(
 
   return { entries: pluginEntries, discarded: [...foreign], warnings }
 }
+
+/**
+ * 规范化十六进制颜色码：3 位展开、补 `#`、统一大写
+ *
+ * @returns 规范化后的 `#RRGGBB`；输入不是合法 hex 时返回 null
+ *
+ * 编辑器颜色字段用：用户可手输 `00b050` / `#00b050` / `0f0`，都收敛成
+ * `#00B050`；非法输入（`xyz` / 空串 / 5 位）返回 null，由调用方决定
+ * 提示还是回落，不把脏值写进规则库。
+ */
+export function normalizeHexColor(raw: string): string | null {
+  const text = raw.trim().replace(/^#/, '')
+  if (/^[0-9a-f]{3}$/i.test(text)) {
+    const expanded = text
+      .split('')
+      .map((char) => char + char)
+      .join('')
+    return `#${expanded.toUpperCase()}`
+  }
+  if (/^[0-9a-f]{6}$/i.test(text)) return `#${text.toUpperCase()}`
+  return null
+}

@@ -31,6 +31,7 @@ import {
   firstRowOfRange,
   foreignSnapshotToRule,
   groupRules,
+  normalizeHexColor,
   parseRules,
   planApply,
   serializeRules,
@@ -103,7 +104,16 @@ interface PageState {
   editingId: string | null
   /** 编辑器是否为「新建」模式 */
   editingIsNew: boolean
+  /** 搜索词（规则库） */
   searchQuery: string
+  /**
+   * 被收起的分组名集合（会话态，不持久化）
+   *
+   * 收起是「视图」不是「配置」：写进持久化会让换机器/重装后的规则库
+   * 带着一堆看不见的分组，用户以为规则丢了。与模块 hidden 同思路。
+   * 搜索时自动全部展开（折叠组里的命中也该可见）。
+   */
+  collapsedGroups: Set<string>
   /** 模态框里待定的策略选择（打开模态框时置位） */
   pendingStrategy: ApplyStrategy
   /** 目标工作表既有规则快照（只读展示，不参与规则库） */
@@ -146,6 +156,7 @@ const state: PageState = {
   existingPage: 1,
   existingSelection: new Set<number>(),
   existingScope: 'all',
+  collapsedGroups: new Set<string>(),
 }
 
 // ===== DOM 辅助 =====
@@ -884,6 +895,8 @@ function renderRuleList(): void {
   const groups = groupRules(visible)
   container.innerHTML = groups
     .map(([group, rules]) => {
+      // 搜索时忽略折叠态：折叠组里的命中也该可见，否则用户以为搜不到
+      const isCollapsed = state.searchQuery === '' && state.collapsedGroups.has(group)
       const rows = rules
         .map((rule) => {
           const isHidden = rule.hidden === true
@@ -910,12 +923,31 @@ function renderRuleList(): void {
         })
         .join('')
       return `
-      <div class="conditional-format-group">
-        <div class="conditional-format-group-title">${escapeHtml(group)}<span class="conditional-format-group-count">${String(rules.length)}</span></div>
+      <div class="conditional-format-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
+        <div class="conditional-format-group-title">
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+          <span class="conditional-format-group-name">${escapeHtml(group)}</span>
+          <span class="conditional-format-group-count">${String(rules.length)}</span>
+        </div>
         ${rows}
       </div>`
     })
     .join('')
+
+  container
+    .querySelectorAll<HTMLButtonElement>('button[data-action="toggle-group"]')
+    .forEach((button) => {
+      button.addEventListener('click', () => {
+        const group = button.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+        if (group === '') return
+        // 不可变更新：与 existingSelection 同口径，避免旧行模型与新 state 共享同一 Set
+        const next = new Set(state.collapsedGroups)
+        if (next.has(group)) next.delete(group)
+        else next.add(group)
+        state.collapsedGroups = next
+        renderRuleList()
+      })
+    })
 
   container.querySelectorAll<HTMLElement>('.conditional-format-rule').forEach((row) => {
     const id = row.dataset.ruleId ?? ''
@@ -957,7 +989,110 @@ function renderRuleList(): void {
   })
 }
 
-// ===== 规则编辑器（行内）=====
+// ===== 颜色字段（选择器 + 十六进制手输 + 吸管）=====
+
+/** 一个颜色字段的三件套 id（填充 / 字体各一套） */
+interface ColorFieldIds {
+  /** 原生 color 选择器 */
+  picker: string
+  /** 十六进制文本输入（权威值：用户可直接输码） */
+  text: string
+  /** 吸管按钮 */
+  pick: string
+}
+
+const COLOR_FIELD_FILL: ColorFieldIds = {
+  picker: 'conditionalFormatEditFill',
+  text: 'conditionalFormatEditFillText',
+  pick: 'conditionalFormatEditFillPick',
+}
+
+const COLOR_FIELD_FONT: ColorFieldIds = {
+  picker: 'conditionalFormatEditFont',
+  text: 'conditionalFormatEditFontText',
+  pick: 'conditionalFormatEditFontPick',
+}
+
+const COLOR_FIELDS: readonly ColorFieldIds[] = [COLOR_FIELD_FILL, COLOR_FIELD_FONT]
+
+/** EyeDropper 的最小构造签名（TS lib 未收；WPS 内嵌 CEF 随版本，用时须探测） */
+interface EyeDropperLike {
+  open: () => Promise<{ sRGBHex: string }>
+}
+
+/** 把颜色写进字段两件套（选择器 + 文本），保持两边永远一致 */
+function setColorField(field: ColorFieldIds, hex: string): void {
+  const picker = inputById(field.picker)
+  const text = inputById(field.text)
+  if (picker) picker.value = hex
+  if (text) text.value = hex
+}
+
+/** 读颜色字段的权威值（文本优先）；文本非法时回落选择器值，再不行给 fallback */
+function readColorField(field: ColorFieldIds, fallback: string): string {
+  const fromText = normalizeHexColor(inputById(field.text)?.value ?? '')
+  if (fromText !== null) return fromText
+  const fromPicker = normalizeHexColor(inputById(field.picker)?.value ?? '')
+  return fromPicker ?? fallback
+}
+
+/**
+ * 吸管取色（宿主不支持时按钮保持隐藏，见 bindColorField）
+ *
+ * 用户按 Esc 取消吸管时 `open()` 会 reject —— 静默返回即可，
+ * 不该弹错误（取消是正常操作，不是失败）。
+ */
+async function pickColorWithEyeDropper(field: ColorFieldIds): Promise<void> {
+  try {
+    const EyeDropperCtor = (window as Window & { EyeDropper?: new () => EyeDropperLike }).EyeDropper
+    if (!EyeDropperCtor) return
+    const result = await new EyeDropperCtor().open()
+    const normalized = normalizeHexColor(result.sRGBHex)
+    if (normalized !== null) setColorField(field, normalized)
+  } catch {
+    // 取消或宿主拒绝：不动当前颜色
+  }
+}
+
+/**
+ * 装配一个颜色字段：选择器 / 文本 / 吸管三边联动
+ *
+ * - 选择器 change → 同步文本；
+ * - 文本 input → 合法 hex 实时同步选择器（用户看着色块确认输对）；
+ * - 文本 blur → 规范化成 `#RRGGBB` 大写；非法则还原成选择器当前值
+ *   （不清空：清空像字段坏了，还原至少保住一个有效色）；
+ * - 吸管：仅 `EyeDropper` in window 时显示按钮，否则一直 hidden。
+ */
+function bindColorField(field: ColorFieldIds): void {
+  const picker = inputById(field.picker)
+  const text = inputById(field.text)
+  if (!picker || !text) return
+  const pick = byId(field.pick)
+
+  picker.addEventListener('change', () => {
+    setColorField(field, picker.value)
+  })
+
+  text.addEventListener('input', () => {
+    const normalized = normalizeHexColor(text.value)
+    if (normalized !== null) picker.value = normalized
+  })
+
+  text.addEventListener('blur', () => {
+    const normalized = normalizeHexColor(text.value)
+    text.value = normalized ?? picker.value
+  })
+
+  if (!pick) return
+  if ('EyeDropper' in window) {
+    pick.hidden = false
+    pick.addEventListener('click', () => {
+      void pickColorWithEyeDropper(field)
+    })
+  }
+}
+
+// ===== 规则编辑器（浮动弹窗）=====
 
 function blankRule(): ConditionalFormatRule {
   return {
@@ -979,26 +1114,25 @@ function openEditor(id: string | null, isNew: boolean): void {
   const groupInput = inputById('conditionalFormatEditGroup')
   const rangeInput = inputById('conditionalFormatEditRange')
   const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
-  const fillInput = inputById('conditionalFormatEditFill')
-  const fontInput = inputById('conditionalFormatEditFont')
   const boldInput = inputById('conditionalFormatEditBold')
   if (nameInput) nameInput.value = rule.name
   if (groupInput) groupInput.value = rule.group
   if (rangeInput) rangeInput.value = rule.appliesTo
   if (formulaInput) formulaInput.value = rule.formula
-  if (fillInput) fillInput.value = rule.interior
-  if (fontInput) fontInput.value = rule.fontColor ?? '#000000'
+  // 颜色两件套一起写：只写一边会让文本与色块不一致（用户看到的是旧色）
+  setColorField(COLOR_FIELD_FILL, normalizeHexColor(rule.interior) ?? '#00B050')
+  setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
   if (boldInput) boldInput.checked = rule.fontBold === true
-  const editor = byId('conditionalFormatEditor')
-  if (editor) editor.style.display = 'block'
+  const mask = byId('conditionalFormatEditorMask')
+  if (mask) mask.style.display = 'flex'
   setText('conditionalFormatEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
 }
 
 function closeEditor(): void {
   state.editingId = null
   state.editingIsNew = false
-  const editor = byId('conditionalFormatEditor')
-  if (editor) editor.style.display = 'none'
+  const mask = byId('conditionalFormatEditorMask')
+  if (mask) mask.style.display = 'none'
 }
 
 function saveEditor(): void {
@@ -1006,8 +1140,6 @@ function saveEditor(): void {
   const groupInput = inputById('conditionalFormatEditGroup')
   const rangeInput = inputById('conditionalFormatEditRange')
   const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
-  const fillInput = inputById('conditionalFormatEditFill')
-  const fontInput = inputById('conditionalFormatEditFont')
   const boldInput = inputById('conditionalFormatEditBold')
 
   const name = nameInput?.value.trim() ?? ''
@@ -1020,8 +1152,9 @@ function saveEditor(): void {
 
   const existing = state.editingId ? state.rules.find((r) => r.id === state.editingId) : undefined
   const groupText = groupInput?.value.trim() ?? ''
-  const fillText = fillInput?.value ?? ''
-  const fontText = fontInput?.value ?? ''
+  // 颜色走 readColorField：文本（可手输 hex）权威，非法时回落选择器值
+  const fillColor = readColorField(COLOR_FIELD_FILL, '#00B050')
+  const fontColor = readColorField(COLOR_FIELD_FONT, '#000000')
   const isBold = boldInput?.checked === true
   const rule: ConditionalFormatRule = {
     id: existing?.id ?? nextId(),
@@ -1029,8 +1162,8 @@ function saveEditor(): void {
     group: groupText === '' ? CONDITIONAL_FORMAT_GROUP_HIGHLIGHT : groupText,
     appliesTo,
     formula,
-    interior: fillText === '' ? '#00B050' : fillText,
-    ...(fontText !== '' && { fontColor: fontText }),
+    interior: fillColor,
+    fontColor,
     ...(isBold && { fontBold: true }),
     ...(existing?.hidden !== undefined && { hidden: existing.hidden }),
   }
@@ -1331,6 +1464,16 @@ export function initializeConditionalFormatPage(): void {
     closeEditor()
   })
 
+  // 编辑器浮层：点遮罩空白处关闭（与确认模态框同口径，点内容不关）
+  byId('conditionalFormatEditorMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatEditorMask')) closeEditor()
+  })
+
+  // 颜色字段：选择器 / 十六进制手输 / 吸管三边联动（吸管按钮不支持时保持隐藏）
+  for (const field of COLOR_FIELDS) {
+    bindColorField(field)
+  }
+
   // 确认模态框（双策略）
   byId('conditionalFormatConfirmClear')?.addEventListener('click', () => {
     closeConfirmModal()
@@ -1347,7 +1490,10 @@ export function initializeConditionalFormatPage(): void {
     if (event.target === byId('conditionalFormatConfirmMask')) closeConfirmModal()
   })
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeConfirmModal()
+    if (event.key !== 'Escape') return
+    closeConfirmModal()
+    // 编辑器也关：两个 close 都幂等，另一个弹窗没开时是 no-op
+    closeEditor()
   })
 
   renderRuleList()

@@ -120,6 +120,30 @@
   font-weight: 400;
 }
 
+/* 分组折叠：只藏规则行，标题与计数仍在——用户看得见「这组有多少条、收起着」 */
+.conditional-format-group.is-collapsed .conditional-format-rule {
+  display: none;
+}
+
+.conditional-format-group-toggle {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.conditional-format-group-toggle:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
 .conditional-format-existing-index {
   flex: 0 0 auto;
   min-width: 1.6em;
@@ -206,13 +230,18 @@
   color: var(--text-1);
 }
 
-/* ---- 行内编辑器 ---- */
+/* ---- 规则编辑器（浮动弹窗）---- */
+/* 浮层化后：外层 .conditional-format-modal 已是卡片，这里只做内容排布，
+   不再自带边框/背景/外边距（否则双重卡片）。 */
 .conditional-format-editor {
-  margin-top: var(--sp-4);
-  padding: var(--sp-4);
-  border: 0.5px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--bg-surface-2);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+/* 编辑器比确认框宽：公式文本框 + 颜色行需要横向空间 */
+.conditional-format-modal--editor {
+  width: min(520px, calc(100vw - 32px));
 }
 
 .conditional-format-editor h4 {
@@ -252,7 +281,8 @@
   gap: var(--sp-4);
 }
 
-.conditional-format-color {
+/* 颜色字段三件套：原生选择器 + 十六进制文本 + 吸管（见 bindColorField） */
+.conditional-format-color-picker {
   width: 48px;
   height: 30px;
   padding: 2px;
@@ -260,6 +290,41 @@
   border-radius: var(--r-sm);
   background: var(--bg-surface);
   cursor: pointer;
+}
+
+.conditional-format-color-input {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.conditional-format-color-text {
+  width: 92px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.conditional-format-eyedropper {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.conditional-format-eyedropper:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
 }
 
 .conditional-format-bold-box {
@@ -389,6 +454,12 @@
   color: var(--text-3);
   font-weight: 600;
   background: var(--bg-2, rgba(255, 255, 255, 0.03));
+  /* 不再整行 pointer-events:none：那会让表头的「全选」复选框点不动
+     （momo 实测：点了没反应）。表头没有别的交互，只需让纯展示的列标签
+     不吃事件，勾选列（label + checkbox）保持可点。 */
+}
+
+.conditional-format-row-head > span {
   pointer-events: none;
 }
 
