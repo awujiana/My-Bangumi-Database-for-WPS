@@ -23,7 +23,7 @@ const MODULES = [
     { src: 'dist-ts/ui/preview.js', type: 'module' },
     { src: 'dist-ts/sync/sync-record.js', type: 'module' },
     { src: 'dist-ts/sync/scraping.js', type: 'module' },
-    { src: 'dist-ts/sync/exceltobangumi.js', type: 'module' },
+    { src: 'dist-ts/sync/exceltobangumi/index.js', type: 'module' },
     { src: 'dist-ts/sync/github-sync-diff.js', type: 'module' },   // GitHub 同步纯函数（零依赖）
     { src: 'dist-ts/sync/github-config.js', type: 'module' },     // GitHub 仓库配置管理
     { src: 'dist-ts/sync/github-sync.js', type: 'module' },       // GitHub 仓库增量同步主模块
@@ -32,7 +32,7 @@ const MODULES = [
     // 改为通过 entry/ribbon-entry.ts 显式调用 initRibbon() 启动（入口模块内部
     // 含 typeof window !== 'undefined' 守卫，确保 Node 测试环境导入不会触发副作用）。
     { src: 'dist-ts/entry/ribbon-entry.js', type: 'module', critical: true },
-    { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
+    { src: 'dist-ts/ui/handlers/index.js', type: 'module', critical: true },
     { src: 'dist-ts/panel/panel-page.js', type: 'module', critical: true }
 ];
 
