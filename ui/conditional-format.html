@@ -184,74 +184,133 @@
             <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
           </div>
           <div id="conditionalFormatRuleList" class="conditional-format-rule-list"></div>
+        </section>
 
-          <!-- 行内编辑器 -->
-          <div id="conditionalFormatEditor" class="conditional-format-editor" style="display: none">
-            <h4 id="conditionalFormatEditorTitle">编辑规则</h4>
-            <label class="conditional-format-field-label" for="conditionalFormatEditName"
-              >名称</label
-            >
-            <input type="text" id="conditionalFormatEditName" class="conditional-format-input" />
-            <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
-              >分组</label
-            >
-            <input type="text" id="conditionalFormatEditGroup" class="conditional-format-input" />
-            <label class="conditional-format-field-label" for="conditionalFormatEditRange"
-              >应用范围（A1 风格）</label
-            >
-            <input
-              type="text"
-              id="conditionalFormatEditRange"
-              class="conditional-format-input"
-              placeholder="如 B3:B1048576"
-            />
-            <label class="conditional-format-field-label" for="conditionalFormatEditFormula"
-              >公式（xlExpression，锚定范围首行）</label
-            >
-            <textarea
-              id="conditionalFormatEditFormula"
-              class="conditional-format-textarea"
-              rows="4"
-              placeholder='如 =$R3="26年10月"'
-            ></textarea>
-            <div class="conditional-format-color-row">
-              <div>
-                <label class="conditional-format-field-label" for="conditionalFormatEditFill"
-                  >填充色</label
-                >
-                <input
-                  type="color"
-                  id="conditionalFormatEditFill"
-                  class="conditional-format-color"
-                  value="#00B050"
-                />
+        <!-- 规则编辑器（浮动弹窗：独立于任何 section，「规则管理器」拖成浮动窗时也能编辑） -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatEditorMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--editor"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatEditorTitle"
+          >
+            <div id="conditionalFormatEditor" class="conditional-format-editor">
+              <h4 id="conditionalFormatEditorTitle">编辑规则</h4>
+              <label class="conditional-format-field-label" for="conditionalFormatEditName"
+                >名称</label
+              >
+              <input type="text" id="conditionalFormatEditName" class="conditional-format-input" />
+              <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
+                >分组</label
+              >
+              <input type="text" id="conditionalFormatEditGroup" class="conditional-format-input" />
+              <label class="conditional-format-field-label" for="conditionalFormatEditRange"
+                >应用范围（A1 风格）</label
+              >
+              <input
+                type="text"
+                id="conditionalFormatEditRange"
+                class="conditional-format-input"
+                placeholder="如 B3:B1048576"
+              />
+              <label class="conditional-format-field-label" for="conditionalFormatEditFormula"
+                >公式（xlExpression，锚定范围首行）</label
+              >
+              <textarea
+                id="conditionalFormatEditFormula"
+                class="conditional-format-textarea"
+                rows="4"
+                placeholder='如 =$R3="26年10月"'
+              ></textarea>
+              <div class="conditional-format-color-row">
+                <div class="conditional-format-color-field">
+                  <label class="conditional-format-field-label" for="conditionalFormatEditFillText"
+                    >填充色</label
+                  >
+                  <div class="conditional-format-color-input">
+                    <input
+                      type="color"
+                      id="conditionalFormatEditFill"
+                      class="conditional-format-color-picker"
+                      value="#00B050"
+                      aria-label="填充色选择器"
+                    />
+                    <input
+                      type="text"
+                      id="conditionalFormatEditFillText"
+                      class="conditional-format-color-text"
+                      value="#00B050"
+                      maxlength="7"
+                      spellcheck="false"
+                      autocomplete="off"
+                      aria-label="填充色十六进制码，如 #00B050"
+                    />
+                    <button
+                      type="button"
+                      class="conditional-format-eyedropper"
+                      id="conditionalFormatEditFillPick"
+                      title="吸管：从屏幕上取色"
+                      aria-label="用吸管取填充色"
+                      hidden
+                    >
+                      💧
+                    </button>
+                  </div>
+                </div>
+                <div class="conditional-format-color-field">
+                  <label class="conditional-format-field-label" for="conditionalFormatEditFontText"
+                    >字体色</label
+                  >
+                  <div class="conditional-format-color-input">
+                    <input
+                      type="color"
+                      id="conditionalFormatEditFont"
+                      class="conditional-format-color-picker"
+                      value="#000000"
+                      aria-label="字体色选择器"
+                    />
+                    <input
+                      type="text"
+                      id="conditionalFormatEditFontText"
+                      class="conditional-format-color-text"
+                      value="#000000"
+                      maxlength="7"
+                      spellcheck="false"
+                      autocomplete="off"
+                      aria-label="字体色十六进制码，如 #000000"
+                    />
+                    <button
+                      type="button"
+                      class="conditional-format-eyedropper"
+                      id="conditionalFormatEditFontPick"
+                      title="吸管：从屏幕上取色"
+                      aria-label="用吸管取字体色"
+                      hidden
+                    >
+                      💧
+                    </button>
+                  </div>
+                </div>
+                <div class="conditional-format-bold-box">
+                  <label>
+                    <input type="checkbox" id="conditionalFormatEditBold" />
+                    <span>加粗</span>
+                  </label>
+                </div>
               </div>
-              <div>
-                <label class="conditional-format-field-label" for="conditionalFormatEditFont"
-                  >字体色</label
-                >
-                <input
-                  type="color"
-                  id="conditionalFormatEditFont"
-                  class="conditional-format-color"
-                  value="#000000"
-                />
+              <div class="bgm-btn-group bgm-btn-row">
+                <button class="bgm-btn small primary" id="conditionalFormatEditorSave">
+                  💾 保存
+                </button>
+                <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
               </div>
-              <div class="conditional-format-bold-box">
-                <label>
-                  <input type="checkbox" id="conditionalFormatEditBold" />
-                  <span>加粗</span>
-                </label>
-              </div>
-            </div>
-            <div class="bgm-btn-group bgm-btn-row">
-              <button class="bgm-btn small primary" id="conditionalFormatEditorSave">
-                💾 保存
-              </button>
-              <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
             </div>
           </div>
-        </section>
+        </div>
 
         <!-- 默认规则集 -->
         <section class="section" id="sec-defaults" data-detachable>
