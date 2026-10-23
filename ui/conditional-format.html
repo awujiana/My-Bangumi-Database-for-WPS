@@ -97,27 +97,13 @@
         <!--
           既有规则（可管理）：目标工作表当前的条件格式。
 
-          data-detachable-* 是通用浮动窗口组件（ui/components/detachable-panel.ts）的契约：
-            - 默认就在页面上，是普通 section；
-            - 点「🔍 规则管理器」拖出去；
-            - mode=native：走宿主原生独立窗口，能浮到 WPS 表格上面、能最大化，
-              不受任务窗格视口限制。宿主不支持时组件自动回落到窗格内浮动窗口。
-
-          ⚠️ native 模式加载的是 data-detachable-url 指向的**另一个页面**
-          （ui/conditional-format-manager.html）：原生对话框是另一个 WebView，
-          本页 DOM 搬不过去，故那个页面自带一份结构、复用本页同一套 JS 逻辑。
+          「🔍 规则管理器」按钮进入**专注模式**（module-state 的 enterSoloMode）：
+          本页只剩这一个模块（并隐藏顶栏占满任务窗格），底部控制条可 ↑↓ 切换 / 退出。
+          原先走宿主原生独立窗口（CreateWebDialog），但它即使非模态也会置顶挡住
+          表格框选区，故改用页面内专注模式替代（见 conditional-format-page.ts
+          的 setupRuleManagerEntry）。
         -->
-        <section
-          class="section section-wide"
-          id="sec-existing"
-          data-detachable
-          data-detachable-mode="native"
-          data-detachable-url="./conditional-format-manager.html"
-          data-detachable-title="条件格式规则管理器"
-          data-detachable-trigger="conditionalFormatFloatBtn"
-          data-detachable-width="900"
-          data-detachable-height="600"
-        >
+        <section class="section section-wide" id="sec-existing">
           <h3>
             👀 既有规则<button
               type="button"
@@ -133,9 +119,8 @@
             目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
             可以直接管理：勾选后批量导入 / 删除，或单条上移下移 / 「如果为真则停止」。 数据条 / 色阶
             / 图标集等类型插件无法重建，双策略会按你的选择处理。
-            <br />点「🔍 规则管理器」把它拖出成 WPS 的**独立窗口**：能浮在表格上面、 能拖动 / 最大化
-            / 缩放，你可以边看规则边回表格框选区。 拖出后正文原位留一块占位，点「收回」即回来（在
-            WPS 里直接关掉那个 窗口也会自动收回）。
+            <br />点「🔍 规则管理器」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
+            底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。
           </p>
           <div class="conditional-format-toolbar">
             <input
@@ -152,8 +137,7 @@
               🔍 规则管理器
             </button>
           </div>
-          <!-- 这一整块（工具栏 + 表格 + 分页 + 批量条）连同 section 一起在「正文」
-               与「浮动窗口」之间搬家，是唯一一份 DOM —— 见 detachable-panel.ts。 -->
+          <!-- 工具栏 + 表格 + 分页 + 批量条：常驻在本 section 内，任务窗格与专注模式共用同一份 DOM。 -->
           <div id="conditionalFormatExistingPanel">
             <div id="conditionalFormatExistingList" class="conditional-format-table"></div>
             <div
