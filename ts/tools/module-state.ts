@@ -31,6 +31,7 @@
 
 import { getNotifyApi } from '../core/ui-bridge.js'
 import { LOG_LEVELS } from '../core/constants.js'
+import { runBeforeEnterSolo } from '../core/solo-hooks.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
 import { PAGE_MODULES } from './nav-order.js'
 import { bgmLog, showSettingsPanel } from './util/index.js'
@@ -124,6 +125,11 @@ export function enterSoloMode(page: string, moduleId: string): void {
   soloMode = { page, moduleId }
   // 沉浸：隐藏顶栏（CSS 靠 body.solo-mode 命中 .topbar），让单个模块占满可视区
   document.body.classList.add(SOLO_BODY_CLASS)
+  // 进入专注前回调：供上层（detachable-panel）收回浮动窗 —— 否则目标模块若在浮动窗里，
+  // 专注只会得到「顶部小浮动窗 + 主区大片空白」，而非单组件铺满屏幕。
+  // 经 core/solo-hooks 触发「进入专注前」回调（UI 层 detachable 注册了收回浮动窗）——
+  // 不在本层直接 import detachable-panel：tools→UI/components 是分层反向依赖，门禁禁。
+  runBeforeEnterSolo()
   applyModuleState(page)
   renderSoloBar(page)
   bgmLog(LOG_LEVELS.INFO, `[moduleState] 进入专注模式: ${page} / ${moduleId}`)

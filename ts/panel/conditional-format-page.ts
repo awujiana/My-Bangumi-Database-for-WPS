@@ -169,16 +169,6 @@ function setText(id: string, text: string): void {
 
 // ===== 工作表枚举（collectSheets / activeWorksheet 见 ../tools/sheet-list.js）=====
 
-/**
- * 工作簿下拉显示名：去掉文件扩展名。
- * WPS 的 Workbook.Name 对已保存文件带扩展名（如「快递取件记录.xlsx」），未保存簿是
- * 「工作簿N」。下拉显示统一去扩展名，简洁一致；option 的 value / SheetEntry.key 仍用
- * 原名，持久化与跨页键不受影响。
- */
-function workbookDisplayName(name: string): string {
-  return name.replace(/\.(xlsx|xls|xlsm|xlsb|et)$/i, '')
-}
-
 /** 当前选中的工作簿名（工作簿下拉的值；从选中表反推，选中为空时读下拉兜底） */
 function currentWorkbookName(): string {
   const bySelected = selectedSheet()?.workbook
@@ -203,7 +193,7 @@ function renderWorkbookSelect(): void {
   select.innerHTML = workbookNames
     .map(
       (name) =>
-        `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(workbookDisplayName(name))}</option>`,
+        `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>`,
     )
     .join('')
 }

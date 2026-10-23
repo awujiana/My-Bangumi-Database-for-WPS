@@ -47,6 +47,7 @@ import {
   resolveDialogUrl,
 } from '../../tools/wps-web-dialog.js'
 import type { WebDialogSession } from '../../tools/wps-web-dialog.js'
+import { onBeforeEnterSolo } from '../../core/solo-hooks.js'
 
 /** 视口尺寸（拖动 / 缩放开始时读一次） */
 export interface ViewportSize {
@@ -889,6 +890,12 @@ export function setupDetachablePanels(scope: ParentNode = document): DetachableP
     if (handle) handles.push(handle)
   })
   bindEscapeToCloseTopmost()
+  // 进入专注模式前收回所有浮动窗：模块若在浮动窗里，专注只会得到「顶部小浮动窗 + 主区
+  // 大片空白」，而非单组件铺满。经 onBeforeEnterSolo 钩子注册（避免 module-state 反向
+  // import 本组件触发分层门禁）。幂等，重复调用不重复注册。
+  onBeforeEnterSolo(() => {
+    closeAllDetachedPanels()
+  })
   return handles
 }
 
