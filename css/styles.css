@@ -3772,36 +3772,35 @@ body.solo-mode .main > .command-center:not([hidden]) {
     min-height: 0;
 }
 
-/* ---- 专注模式浮动控制条 ---- */
-/* 底部居中：顶栏在各页都是吸顶的，会盖住它；底部不挡滚动区起点，
-   也不与「拖出浮动窗口」的标题栏抢位置。
-   z-index 800：高于正文（100）、低于浮动窗口（900）与模态框（1000）。 */
+/* ---- 专注模式控制条 ---- */
+/* 默认内联进专注模块标题（h3），接替被隐藏的「折叠 / 展开」按钮的位置：
+   标题是 flex 容器，控制条 margin-left:auto 顶到最右，视觉上正好替换折叠按钮。
+   拿不到标题（极端情况）时退回底部固定条（--fixed）兜底。 */
 .solo-mode-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: 12px;
+    color: var(--text-2);
+}
+
+.solo-mode-bar--inline {
+    margin-left: auto;
+    padding-left: 8px;
+}
+
+/* 底部固定兜底（无标题时）：z-index 800 高于正文（100）、低于浮动窗口（900）与模态框（1000） */
+.solo-mode-bar--fixed {
     position: fixed;
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 800;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
     padding: 6px 10px;
-    font-size: 12px;
-    color: var(--text-2);
     background: var(--bg-surface-2);
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-}
-
-.solo-mode-bar-title {
-    max-width: 40vw;
-    padding: 0 4px;
-    overflow: hidden;
-    color: var(--text-1);
-    font-weight: 600;
-    white-space: nowrap;
-    text-overflow: ellipsis;
 }
 
 .solo-mode-bar-btn {

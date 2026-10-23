@@ -183,10 +183,12 @@ function removeSoloBar(): void {
 }
 
 /**
- * 渲染专注模式浮动控制条：上下切换与退出（不显示当前组件名） + ↑ / ↓ / 退出。
+ * 渲染专注模式控制条：上下切换与退出（不显示当前组件名）。
  *
- * 放在底部居中而非顶部：顶栏在各页都是吸顶的，会盖住它；
- * 底部不挡滚动区起点，也不与「拖出浮动窗口」的标题栏抢位置。
+ * 不再做成底部固定条 —— momo 要求放到专注模块标题里「折叠 / 展开」按钮的原位置：
+ * 进入专注后那个折叠按钮已无意义（模块强制展开且独占视图），控制条就接它的位；
+ * 标题（h3）本身是 flex 容器，控制条 `margin-left:auto` 顶到最右，视觉上正好替换
+ * 折叠按钮。拿不到标题（极端情况）时退回底部固定条（--fixed）兜底。
  */
 function renderSoloBar(): void {
   removeSoloBar()
@@ -194,9 +196,9 @@ function renderSoloBar(): void {
 
   const bar = document.createElement('div')
   bar.id = SOLO_BAR_ID
-  bar.className = 'solo-mode-bar'
+  bar.className = 'solo-mode-bar solo-mode-bar--inline'
   bar.setAttribute('role', 'toolbar')
-  bar.setAttribute('aria-label', '专注模式：只显示单个模块，可上下切换')
+  bar.setAttribute('aria-label', '专注模式：只显示单个模块，可上下切换或退出')
 
   const makeStep = (icon: string, ariaLabel: string, delta: number): HTMLButtonElement => {
     const button = document.createElement('button')
@@ -223,7 +225,21 @@ function renderSoloBar(): void {
 
   // 不显示当前组件名（用户：不需要表示当前的组件名字）—— 控制条只留 切换 / 退出。
   bar.append(makeStep('↑', '上一个模块', -1), makeStep('↓', '下一个模块', 1), exit)
-  document.body.append(bar)
+
+  // 放进专注模块的标题：接替被隐藏的折叠按钮的位置（标题是 flex，margin-left:auto 顶到最右）。
+  // 折叠按钮本身只是 display:none，仍在 DOM，before 永远有可靠落点。
+  const section = document.getElementById(soloMode.moduleId)
+  const heading = section?.querySelector<HTMLElement>('h3, h2') ?? null
+  if (heading === null) {
+    // 兜底：极端情况下拿不到标题，退回底部固定条，至少功能可用
+    bar.classList.remove('solo-mode-bar--inline')
+    bar.classList.add('solo-mode-bar--fixed')
+    document.body.append(bar)
+    return
+  }
+  const collapseButton = heading.querySelector<HTMLElement>(`.${COLLAPSE_BUTTON_CLASS}`)
+  if (collapseButton === null) heading.append(bar)
+  else collapseButton.before(bar)
 }
 
 /** 造一个模块标题里的「只显示此模块」按钮 */
@@ -459,6 +475,8 @@ export function applyModuleState(page?: string): void {
 
     const button = collapseButtons.find((item) => item.dataset.modCollapse === module.id)
     if (button !== undefined) {
+      // 专注目标：折叠按钮无意义（模块强制展开且独占视图），藏掉、把位置让给专注控制条
+      button.hidden = isSoloTarget
       button.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
       // `aria-controls` 由这里补：它和 `data-mod-collapse` 是同一个 id，写进 HTML 属于重复，
       // 放在运行时补一次即可（幂等）。
@@ -467,12 +485,19 @@ export function applyModuleState(page?: string): void {
     }
 
     // 专注按钮高亮当前目标：用户要能一眼看出「现在只剩哪个模块」，
-    // 尤其切到下一项时，高亮跟着走是最直接的反馈
+    // 尤其切到下一项时，高亮跟着走是最直接的反馈。专注目标自身的这个按钮
+    // 已成多余（控制条上的 ↑↓ 就是切换），一并藏掉，避免一个亮着却点了没用的按钮。
     const soloButton = soloButtons.find((item) => item.dataset.modSolo === module.id)
     if (soloButton !== undefined) {
       soloButton.classList.toggle('is-active', isSoloTarget)
       soloButton.setAttribute('aria-pressed', isSoloTarget ? 'true' : 'false')
+      soloButton.hidden = isSoloTarget
     }
+
+    // 拖出按钮（⧉）在专注态同样多余：专注即「单组件铺满」，再浮出去无意义，
+    // 且 onBeforeEnterSolo 已会在进入专注时收掉所有浮动窗。藏掉保持标题整洁。
+    const detachTrigger = element?.querySelector<HTMLElement>('.detachable-trigger') ?? null
+    if (detachTrigger !== null) detachTrigger.hidden = isSoloTarget
   }
 
   syncEmptyHint(pageKey, modules, hidden, soloId)
