@@ -416,7 +416,7 @@ body.nav-icons-only .nav a:hover::after {
   padding: clamp(16px, 1.4vw, 24px);
   box-shadow: var(--shadow-card);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--sp-5);
   align-items: center;
 }
@@ -436,18 +436,19 @@ body.nav-icons-only .nav a:hover::after {
   color: var(--text-3);
   line-height: 1.5;
 }
+/* 5 个操作按钮等宽拉伸填满：grid auto-fit，宽屏一行 5 等分占满、窄屏自动减列换行；
+   （原 flex+右列 auto：按钮只按内容宽、靠右挤成一团，不拉伸。） */
 .command-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: var(--sp-3);
-  justify-content: flex-end;
 }
 /* 指令中心主按钮加大，作为视觉锚点 */
 .command-actions .bgm-btn {
   padding: clamp(12px, 1vw, 15px) clamp(18px, 1.4vw, 26px);
   font-size: var(--fs-ctrl);
-  min-width: 132px;
-  justify-content: flex-start;
+  min-width: 0;
+  justify-content: center; /* 等宽网格下居中，避免文字挤在左侧 */
   border-color: var(--border-strong); /* 浅色模式下焦点卡为浅底，按钮需描边保持辨识度 */
 }
 

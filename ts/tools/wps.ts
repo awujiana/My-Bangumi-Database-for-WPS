@@ -126,6 +126,8 @@ export interface WpsWorksheet {
   AutoFilter?: WpsAutoFilter
   AutoFilterMode?: boolean
   UsedRange?: WpsRange
+  /** 全表条件格式规则集合（Sheet 级；部分宿主版本不提供，用时须探测，见 readForeignRules 兜底） */
+  FormatConditions?: WpsFormatConditions
   Activate(): void
   Calculate(): void
   Range(address: string): WpsRange

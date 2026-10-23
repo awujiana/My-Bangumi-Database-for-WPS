@@ -185,14 +185,16 @@ export function moveForeignRule(
 /**
  * 读工作表既有条件格式规则快照
  *
- * 走 UsedRange.FormatConditions（规则各自带 AppliesTo，收集全表规则；
- * 完全在 UsedRange 之外的规则本就不生效，收不到也可接受）。
+ * 走 worksheet.FormatConditions（**全表**规则，各自带 AppliesTo）—— 对标 WPS 原生
+ * 规则管理器的全表口径。先前用 UsedRange.FormatConditions：只收与 UsedRange 相交的
+ * 规则，且相交规则的 AppliesTo 在部分 WPS 版本读不到 → 「应用于」列显示「（未读到范围）」。
+ * 兜底：个别 WPS 版本 Sheet 无 FormatConditions 时回退 UsedRange（不完整但不空）。
  * Count 提到循环外单次读取（com-in-loop 铁律：循环条件里不读 COM 属性）。
  */
 export function readForeignRules(
   worksheet: WpsWorksheet | null | undefined,
 ): ForeignRuleSnapshot[] {
-  const formatConditions = worksheet?.UsedRange?.FormatConditions
+  const formatConditions = worksheet?.FormatConditions ?? worksheet?.UsedRange?.FormatConditions
   if (!formatConditions?.Count || !formatConditions.Item) return []
 
   const count = formatConditions.Count
