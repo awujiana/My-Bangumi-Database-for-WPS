@@ -1110,8 +1110,8 @@ export function markConditionalFormatPaneLoaded(): void {
 /**
  * 显示 / 切换「条件格式管理」面板（独立面板，与设置 / 富化 / 清理 / 高亮并列）
  *
- * 面板 ID 缓存于 `cf_pane_id`；配合 `cf_pane_url` 标记做自愈：缓存 ID 存在但
- * 页面从未成功加载时，隐藏旧面板并重建。与清理 / 高亮面板同款机制。
+ * 面板 ID 缓存于 `conditionalFormat_pane_id`；配合 `conditionalFormat_pane_url` 标记做自愈：
+ * 缓存 ID 存在但页面从未成功加载时，隐藏旧面板并重建。与清理 / 高亮面板同款机制。
  */
 export function showConditionalFormatPanel(): void {
   const app = getApp() as {
@@ -1129,16 +1129,6 @@ export function showConditionalFormatPanel(): void {
 
   let conditionalFormatId = app.PluginStorage?.getItem('conditionalFormat_pane_id')
   const storedPaneUrl = app.PluginStorage?.getItem('conditionalFormat_pane_url')
-  // 命名规范化（cf → conditionalFormat）前的旧键：读一次并迁走，
-  // 否则升级后旧面板拿不到缓存 ID，会被重复 CreateTaskPane 成孤儿窗
-  if (!conditionalFormatId) {
-    const legacyId = app.PluginStorage?.getItem('cf_pane_id')
-    if (legacyId) {
-      conditionalFormatId = legacyId
-      app.PluginStorage?.setItem('conditionalFormat_pane_id', legacyId)
-      app.PluginStorage?.setItem('cf_pane_id', '')
-    }
-  }
 
   // 自愈：缓存 ID 存在但页面从未成功加载 → 隐藏并重建
   if (conditionalFormatId && !storedPaneUrl?.includes('conditional-format.html')) {

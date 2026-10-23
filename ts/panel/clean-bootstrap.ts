@@ -22,7 +22,7 @@ import '../ui/message.js'
 import '../ui/preview.js'
 import '../sync/sync-record.js'
 import '../sync/scraping.js'
-import '../sync/exceltobangumi.js'
+import '../sync/exceltobangumi/index.js'
 
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js'

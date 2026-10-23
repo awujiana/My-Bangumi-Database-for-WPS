@@ -8,7 +8,7 @@
  * 即可驱动机内真实实现，不需要拆文件（对应 MEMORY §8 的「依赖收敛单一 barrel → 就地测」）。
  *
  * ⚠️ barrel 必须用**全量 mock**（工厂不调 `importOriginal`）：`ts/index.ts` 会经
- * `ui/handlers.js` 把本模块再 re-export 回去，形成 `index.ts ↔ handlers/sync.ts` 循环；
+ * `ui/handlers/index.js` 把本模块再 re-export 回去，形成 `index.ts ↔ handlers/sync.ts` 循环；
  * 若在工厂里 `await importOriginal()`，加载真 barrel 时本模块回头 import barrel（工厂尚未
  * resolve）会死锁 → vitest 回退真实现 → mock 调用次数恒为 0、真实网络请求把用例拖到超时。
  * 同款坑已在 `ribbon-service.test.ts` 踩过（见该文件注释）。

@@ -150,7 +150,8 @@ export {
 } from './ui/message.js'
 
 // ============================================================================
-// 7. UI 事件处理（来自 ui/handlers.js）
+// 7. UI 事件处理（来自 ui/handlers/index.js —— 原 ui/handlers.ts 兼容入口已删，
+//    它只做 re-export，而本文件是该入口的唯一消费方）
 // ============================================================================
 export {
   // 显示用户 ID 设置对话框
@@ -164,7 +165,7 @@ export {
   // 资源清理（防止事件监听器与定时器泄漏）
   removeMessageListener,
   clearAllPendingTimeouts,
-} from './ui/handlers.js'
+} from './ui/handlers/index.js'
 
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/sync-record.js）
@@ -186,7 +187,7 @@ export {
 } from './sync/sync-record.js'
 
 // ============================================================================
-// 9. 同步引擎（来自 sync/exceltobangumi.js）
+// 9. 同步引擎（来自 sync/exceltobangumi/index.js）
 // ============================================================================
 export {
   // 提取 Subject ID
@@ -206,7 +207,7 @@ export {
   testTokenValidityForRibbon,
   buildTagsArray,
   addTagsFromString,
-} from './sync/exceltobangumi.js'
+} from './sync/exceltobangumi/index.js'
 
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）

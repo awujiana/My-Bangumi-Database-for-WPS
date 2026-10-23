@@ -591,50 +591,6 @@ describe('httpRequest - 输入校验', () => {
   })
 })
 
-// ========== 便捷方法 ==========
-describe('httpGet / httpPost / httpPut / httpDelete', () => {
-  it('httpGet 默认 GET 方法', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpGet 的兼容性
-    const { httpGet } = await import('../ts/tools/http.js')
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpGet 仍可用
-    const promise = httpGet('/v0/x')
-    expect(lastXhrCall?.method).toBe('GET')
-    lastMockXhr!._respondOk('{}')
-    await promise
-  })
-
-  it('httpPost 发送 POST 与 body', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpPost 的兼容性
-    const { httpPost } = await import('../ts/tools/http.js')
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpPost 仍可用
-    const promise = httpPost('/v0/x', '{"k":1}')
-    expect(lastXhrCall?.method).toBe('POST')
-    expect(lastXhrCall?.body).toBe('{"k":1}')
-    lastMockXhr!._respondOk('{}')
-    await promise
-  })
-
-  it('httpPut 发送 PUT 与 body', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpPut 的兼容性
-    const { httpPut } = await import('../ts/tools/http.js')
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpPut 仍可用
-    const promise = httpPut('/v0/x', '{"v":2}')
-    expect(lastXhrCall?.method).toBe('PUT')
-    lastMockXhr!._respondOk('{}')
-    await promise
-  })
-
-  it('httpDelete 发送 DELETE', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpDelete 的兼容性
-    const { httpDelete } = await import('../ts/tools/http.js')
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpDelete 仍可用
-    const promise = httpDelete('/v0/x')
-    expect(lastXhrCall?.method).toBe('DELETE')
-    lastMockXhr!._respondOk('{}')
-    await promise
-  })
-})
-
 // ============================================================
 //  补测（2026-09-15）：此前从未被触发的 XHR 层路径
 // ============================================================

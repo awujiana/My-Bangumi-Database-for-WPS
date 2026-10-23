@@ -83,25 +83,6 @@ const KEY_SHEET = 'conditionalFormat.sheet.v1'
  */
 const KEY_SHEET_LOCK = 'conditionalFormat.sheetLock'
 
-// ===== 旧键迁移（cf.* → conditionalFormat.*）=====
-// 2026-10-20 命名规范化前的键名。直接换键会让用户已保存的规则库/策略/选中表凭空消失，
-// 所以读一次旧键、写入新键、再清掉旧键——一次性，之后旧键即可弃。
-const LEGACY_STORE_KEY = 'cf.rules.v1'
-const LEGACY_STRATEGY_KEY = 'cf.strategy.v1'
-const LEGACY_SHEET_KEY = 'cf.sheet.v1'
-
-/** 读配置：新键有值直接用；否则回退旧键并迁到新键 */
-function readMigratedConfig(targetKey: string, legacyKey: string): string {
-  const current = getConfig(targetKey, '', true)
-  if (current) return current
-  const legacy = getConfig(legacyKey, '', true)
-  if (legacy) {
-    setConfig(targetKey, legacy)
-    setConfig(legacyKey, '')
-  }
-  return legacy
-}
-
 /** 从工作表导入的既有规则所在分组（与 rules.ts 的 IMPORTED_RULE_GROUP 同源） */
 const IMPORTED_GROUP = IMPORTED_RULE_GROUP
 
@@ -792,9 +773,7 @@ function moveForeignRuleRow(index: number, direction: -1 | 1): void {
 // ===== Store 读写 =====
 
 function loadRules(): void {
-  const { rules, dropped } = parseRules(
-    readMigratedConfig(CONDITIONAL_FORMAT_STORE_KEY, LEGACY_STORE_KEY),
-  )
+  const { rules, dropped } = parseRules(getConfig(CONDITIONAL_FORMAT_STORE_KEY, '', true))
   state.rules = rules
   if (dropped > 0) {
     bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 规则库有 ${String(dropped)} 条损坏记录已忽略`)
@@ -1100,7 +1079,7 @@ function generateDefaults(): void {
 // ===== 应用流程（双策略）=====
 
 function lastStrategy(): ApplyStrategy {
-  const stored = readMigratedConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, LEGACY_STRATEGY_KEY)
+  const stored = getConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, '', true)
   return stored === 'append-after' ? 'append-after' : 'clear-all'
 }
 
@@ -1259,7 +1238,7 @@ export function initializeConditionalFormatPage(): void {
   startThemeSync()
 
   loadRules()
-  state.selectedKey = readMigratedConfig(KEY_SHEET, LEGACY_SHEET_KEY)
+  state.selectedKey = getConfig(KEY_SHEET, '', true)
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('conditional-format')
   reloadSheets()

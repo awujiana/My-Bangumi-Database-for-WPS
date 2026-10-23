@@ -96,8 +96,8 @@ vi.mock('../ts/tools/wps.js', async (importOriginal) => {
 })
 
 // ---- 同步引擎层：AutoFilter 探测器是宿主对象，假工作表无法提供 → 用可控桩替代 ----
-vi.mock('../ts/sync/exceltobangumi.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ts/sync/exceltobangumi.js')>()
+vi.mock('../ts/sync/exceltobangumi/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/sync/exceltobangumi/index.js')>()
   return {
     ...actual,
     getFilterStatus: m.getFilterStatus,

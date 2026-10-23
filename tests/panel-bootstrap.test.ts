@@ -56,7 +56,7 @@ vi.mock('../ts/ui/message.js', () => ({}))
 vi.mock('../ts/ui/preview.js', () => ({}))
 vi.mock('../ts/sync/sync-record.js', () => ({}))
 vi.mock('../ts/sync/scraping.js', () => ({}))
-vi.mock('../ts/sync/exceltobangumi.js', () => ({}))
+vi.mock('../ts/sync/exceltobangumi/index.js', () => ({}))
 vi.mock('../ts/entry/panel-entry.js', () => ({}))
 vi.mock('../ts/entry/settings-entry.js', () => ({}))
 
