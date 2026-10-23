@@ -701,6 +701,8 @@ export function createDetachablePanel(
   /** 拖动期相对基准位置的位移；只在拖动中非零，onEnd 提交后清零 */
   let dragDeltaX = 0
   let dragDeltaY = 0
+  /** 本次拖动开始时窗口是否已收起：收起态拖动要按收起高度钳制并保高 */
+  let isDragCollapsed = false
 
   bindDrag(
     header,
@@ -711,11 +713,17 @@ export function createDetachablePanel(
       dragViewport = readViewport()
       dragDeltaX = 0
       dragDeltaY = 0
+      // 收起态拖动：钳制与最终高度都要按收起高度算，否则会（1）按展开高度限位
+      // 导致收起的小窗拖不到视口底部；（2）onEnd 把内联高度写回展开值，
+      // 收起窗口弹开一大片空白（body 被 is-collapsed 藏了，只剩标题栏却占着
+      // 展开高度的位置）。
+      isDragCollapsed = root.classList.contains(COLLAPSED_CLASS)
     },
     (deltaX, deltaY) => {
+      const dragHeight = isDragCollapsed ? COLLAPSED_HEIGHT : dragBase.height
       const next = clampPosition(
         { left: dragBase.left + deltaX, top: dragBase.top + deltaY },
-        { width: dragBase.width, height: dragBase.height },
+        { width: dragBase.width, height: dragHeight },
         dragViewport,
       )
       dragDeltaX = next.left - dragBase.left
@@ -734,6 +742,11 @@ export function createDetachablePanel(
       dragDeltaX = 0
       dragDeltaY = 0
       applyRect()
+      // 收起态：applyRect 会把内联高度写回展开值，这里压回收起高度，
+      // 保持「只剩标题栏一行」，且位置已按收起高度钳制、可拖到底部。
+      if (isDragCollapsed) {
+        root.style.height = `${String(COLLAPSED_HEIGHT)}px`
+      }
     },
   )
 
