@@ -29,6 +29,7 @@ import { clearTrackedListeners, trackedAddEventListener } from './resource-track
 import { _T } from './_constants.js'
 import { handleActionClick } from './action-handlers.js'
 import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js'
+import { loadHighlightSettingsIntoForm } from './highlight-settings.js'
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js'
 import { setupEventListeners, setupMessageListener } from './panel-events.js'
 import {
@@ -180,6 +181,8 @@ export function setupButtonListeners(): void {
 
   // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
   loadEnrichPreviewSettingsIntoForm()
+  // 设置页「⚙️ 功能开关」：表单回填
+  loadHighlightSettingsIntoForm()
   document.querySelectorAll<HTMLElement>('[data-theme-card]').forEach((card) => {
     trackedAddEventListener(card, 'click', handleThemePreviewClick)
   })

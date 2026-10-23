@@ -70,6 +70,7 @@ import {
   reloadEnrichPreviewSettings,
   saveEnrichPreviewSettings,
 } from './enrich-preview-settings.js'
+import { saveHighlightSettings, reloadHighlightSettings } from './highlight-settings.js'
 import {
   findMissingConfigField,
   readGithubConfigForm,
@@ -1150,6 +1151,15 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   reloadEnrichPreviewSettings: () => {
     reloadEnrichPreviewSettings()
+  },
+
+  // 设置页「⚙️ 功能开关」：保存 / 放弃修改
+  saveHighlightSettings: () => {
+    saveHighlightSettings()
+  },
+
+  reloadHighlightSettings: () => {
+    reloadHighlightSettings()
   },
 }
 

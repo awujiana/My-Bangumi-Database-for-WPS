@@ -265,10 +265,11 @@ describe('nav-order 页面注册表', () => {
     }
   })
 
-  it('settings 页登记了 9 个模块（含数据导出），且每个都能读到默认顺序', () => {
-    expect(PAGE_MODULES.settings).toHaveLength(9)
-    expect(getNavOrder('settings')).toHaveLength(9)
+  it('settings 页登记了 10 个模块（含功能开关与数据导出），且每个都能读到默认顺序', () => {
+    expect(PAGE_MODULES.settings).toHaveLength(10)
+    expect(getNavOrder('settings')).toHaveLength(10)
     expect(PAGE_MODULES.settings?.map((module) => module.id)).toContain('sec-export')
+    expect(PAGE_MODULES.settings?.map((module) => module.id)).toContain('sec-feature-toggles')
   })
 
   it('每个页面的模块 id 无重复', () => {

@@ -92,6 +92,9 @@
           <a href="#sec-enrich-preview" title="富化预览"
             ><span class="nav-ico">✨</span><span class="nav-text">富化预览</span></a
           >
+          <a href="#sec-feature-toggles" title="功能开关"
+            ><span class="nav-ico">⚙️</span><span class="nav-text">功能开关</span></a
+          >
           <a href="#sec-paths" title="默认路径"
             ><span class="nav-ico">📁</span><span class="nav-text">默认路径</span></a
           >
@@ -332,6 +335,42 @@
             <button class="bgm-btn small" data-action="reloadEnrichPreviewSettings">
               ↩️ 放弃修改
             </button>
+          </div>
+        </section>
+
+        <!-- 功能开关（原散在「番剧高亮」等页内的全局开关，集中到此管理） -->
+        <section class="section" id="sec-feature-toggles" data-detachable>
+          <h3>
+            ⚙️ 功能开关<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-feature-toggles"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「功能开关」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            原先散在各工具页面内的全局开关集中到此统一管理。各页面每次加载工作表前会重读此处配置，保存后切到对应页面操作即生效。
+          </p>
+          <label class="check-row">
+            <input type="checkbox" id="highlightAutoWatch" />
+            <span>高亮 · 自动关注（工作表变动时自动重算并跟随高亮；默认关闭）</span>
+          </label>
+          <div class="form-group">
+            <label for="highlightMode">高亮 · 高亮模式</label>
+            <select id="highlightMode" class="input">
+              <option value="auto">自动（按所选日期列识别最新一季）</option>
+              <option value="manual">手动（在页面内指定年月）</option>
+            </select>
+            <p class="hint">自动模式按日期源识别最新季度；手动模式切到高亮页后指定年月。</p>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" data-action="saveHighlightSettings">
+              💾 保存
+            </button>
+            <button class="bgm-btn small" data-action="reloadHighlightSettings">↩️ 放弃修改</button>
           </div>
         </section>
 

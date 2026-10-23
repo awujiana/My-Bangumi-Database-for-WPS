@@ -28,7 +28,7 @@ import {
   markHighlightPaneLoaded,
   readRangeValues,
 } from '../tools/util/index.js'
-import { getConfig, setConfig } from '../tools/config.js'
+import { CONFIG_KEYS, getConfig, setConfig } from '../tools/config.js'
 import {
   currentSeason,
   formatSeasonKey,
@@ -58,9 +58,7 @@ import type { SheetEntry } from '../tools/sheet-list.js'
 
 const KEY_SOURCE = 'highlight.source'
 const KEY_COLUMNS = 'highlight.columns'
-const KEY_MODE = 'highlight.mode'
 const KEY_MANUAL = 'highlight.manual'
-const KEY_AUTO_WATCH = 'highlight.autoWatch'
 const KEY_LAST_APPLIED = 'highlight.lastApplied'
 /** 上次选中的工作表（稳定键：工作簿名::工作表名）；下次打开直接定位 */
 const KEY_SHEET = 'highlight.sheet'
@@ -673,10 +671,12 @@ function clearHighlight(isSilent = false): void {
   if (!isSilent) showToast('已清除高亮', 'success')
 }
 
-// ===== 自动跟随（C 口径：默认关的可选开关）=====
+// ===== 自动关注（设置页统一管理，页面只读配置同步监听）=====
 
-function setAutoWatch(isEnabled: boolean): void {
-  setConfig(KEY_AUTO_WATCH, isEnabled ? '1' : '0')
+/** 按配置同步「自动关注」监听：开→注册 SheetChange 监听，关→注销。
+ *  不写配置 —— 配置只在设置页「功能开关」改；本页在 init 与每次 reloadSheet 时重读对齐。 */
+function syncAutoWatch(): void {
+  const isEnabled = getConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, '0', true) === '1'
   if (isEnabled) {
     if (disposeAutoWatch) return
     const app = getApp()
@@ -695,11 +695,10 @@ function setAutoWatch(isEnabled: boolean): void {
       },
       { debounceMs: 300 },
     )
-    bgmLog(LOG_LEVELS.INFO, '[highlight] 自动跟随已开启（SheetChange → 重算高亮）')
+    bgmLog(LOG_LEVELS.INFO, '[highlight] 自动关注已开启（SheetChange → 重算高亮）')
   } else {
     disposeAutoWatch?.()
     disposeAutoWatch = null
-    bgmLog(LOG_LEVELS.INFO, '[highlight] 自动跟随已关闭')
   }
 }
 
@@ -716,7 +715,7 @@ function buildManualSelectors(): void {
     yearSelect.value = String(state.manual.year)
     yearSelect.addEventListener('change', () => {
       state.manual = { ...state.manual, year: Number(yearSelect.value) }
-      persistMode()
+      persistManual()
       refreshPreview()
     })
   }
@@ -728,30 +727,37 @@ function buildManualSelectors(): void {
     monthSelect.value = String(state.manual.month)
     monthSelect.addEventListener('change', () => {
       state.manual = { ...state.manual, month: Number(monthSelect.value) }
-      persistMode()
+      persistManual()
       refreshPreview()
     })
   }
 }
 
-function persistMode(): void {
-  setConfig(KEY_MODE, state.mode)
+/** 手动年月变更只落 KEY_MANUAL（高亮模式归设置页管理，本页不再写 KEY_MODE） */
+function persistManual(): void {
   setConfig(
     KEY_MANUAL,
     `${String(state.manual.year)}-${String(state.manual.month).padStart(2, '0')}`,
   )
 }
 
-function setMode(mode: 'auto' | 'manual'): void {
-  state.mode = mode
-  persistMode()
+/** 按 state.mode 渲染模式按钮 active 与手动框显隐（只读反映配置，不在本页切换） */
+function renderModeUi(): void {
   const autoButton = byId('highlightModeAuto')
   const manualButton = byId('highlightModeManual')
   const manualBox = byId('highlightManualBox')
-  autoButton?.classList.toggle('active', mode === 'auto')
-  manualButton?.classList.toggle('active', mode === 'manual')
-  if (manualBox) manualBox.style.display = mode === 'manual' ? 'flex' : 'none'
-  refreshPreview()
+  autoButton?.classList.toggle('active', state.mode === 'auto')
+  manualButton?.classList.toggle('active', state.mode === 'manual')
+  if (manualBox) manualBox.style.display = state.mode === 'manual' ? 'flex' : 'none'
+}
+
+/** 从配置应用「高亮模式 / 自动关注」（设置页统一管理，init 与每次 reloadSheet 重读）。
+ *  不在此 refreshPreview —— 由调用链按需触发，避免 init 时数据未就绪的空跑。 */
+function applyFeatureTogglesFromConfig(): void {
+  const mode = getConfig(CONFIG_KEYS.HIGHLIGHT_MODE, 'auto', true)
+  state.mode = mode === 'manual' ? 'manual' : 'auto'
+  renderModeUi()
+  syncAutoWatch()
 }
 
 // ===== 初始化 =====
@@ -764,6 +770,8 @@ function reloadSheet(): void {
     renderPreviewEmpty('请先在上方选择工作簿与工作表，然后点「加载并预览」')
     return
   }
+  // 每次加载工作表前重读功能开关（设置页改的模式 / 自动关注在此对齐）
+  applyFeatureTogglesFromConfig()
   state.headerRow = findHeaderRow(worksheet)
   state.columnMap = getColumnMap(worksheet, state.headerRow)
   setText('highlightSheetName', worksheet.Name)
@@ -786,14 +794,14 @@ function highlightPhaseConfig(): void {
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('highlight')
 
-  const mode = getConfig(KEY_MODE, 'auto', true)
-  state.mode = mode === 'manual' ? 'manual' : 'auto'
   const manual = getConfig(KEY_MANUAL, '', true)
   const manualMatch = /^(\d{4})-(\d{1,2})$/.exec(manual)
   if (manualMatch) {
     state.manual = { year: Number(manualMatch[1]), month: Number(manualMatch[2]) }
   }
   buildManualSelectors()
+  // 高亮模式 / 自动关注从配置应用（设置页统一管理；renderModeUi 同步按钮态与手动框显隐）
+  applyFeatureTogglesFromConfig()
 
   // 枚举已打开的工作簿 / 工作表（轻量 COM），默认定位到：
   //   上次选中的表（KEY_SHEET）> 当前活动表 > 第一张表
@@ -887,11 +895,12 @@ function highlightPhaseBind(): void {
     refreshPreview()
     renderColumnListIfChanged()
   })
+  // 高亮模式已上移设置页「⚙️ 功能开关」统一管理；此处按钮只读展示当前模式，点击给指引
   byId('highlightModeAuto')?.addEventListener('click', () => {
-    setMode('auto')
+    showToast('高亮模式请在「设置 · 功能开关」中修改', 'info')
   })
   byId('highlightModeManual')?.addEventListener('click', () => {
-    setMode('manual')
+    showToast('高亮模式请在「设置 · 功能开关」中修改', 'info')
   })
   byId('highlightRefreshBtn')?.addEventListener('click', () => {
     reloadSheet()
@@ -904,13 +913,15 @@ function highlightPhaseBind(): void {
     clearHighlight()
   })
 
-  // 自动跟随开关：默认关，且**不再随页面打开自动注册**（不再轮询）。
-  // 用户手动勾选才生效，且本面板保持打开才会监听 SheetChange。
+  // 自动关注已上移设置页「⚙️ 功能开关」统一管理；此处复选框只读反映配置，
+  // 勾选态在 init/reloadSheet 的 syncAutoWatch 里按配置对齐。点击仅给指引，
+  // 并把勾选态还原成配置值，避免视觉与配置不一致。
   const watchBox = inputById('highlightAutoWatch')
   if (watchBox) {
-    watchBox.checked = getConfig(KEY_AUTO_WATCH, '0', true) === '1'
+    watchBox.checked = getConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, '0', true) === '1'
     watchBox.addEventListener('change', () => {
-      setAutoWatch(watchBox.checked)
+      watchBox.checked = getConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, '0', true) === '1'
+      showToast('自动关注请在「设置 · 功能开关」中修改', 'info')
     })
   }
 

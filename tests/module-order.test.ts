@@ -129,7 +129,7 @@ describe('渲染', () => {
     expect(itemsOf('panel')).toHaveLength(8)
     expect(itemsOf('enrich')).toHaveLength(6)
     expect(itemsOf('clean')).toHaveLength(5)
-    expect(itemsOf('settings')).toHaveLength(9)
+    expect(itemsOf('settings')).toHaveLength(10)
   })
 
   it('没有宿主容器时不渲染也不抛错（非设置页静默跳过）', () => {
