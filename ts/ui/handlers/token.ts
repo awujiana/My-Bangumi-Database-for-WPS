@@ -814,16 +814,3 @@ export function hideUserProfile(): void {
     profileExpiresElement.textContent = ''
   }
 }
-
-// ========== Token 续约（已合并到测试） ==========
-
-/**
- * Token 续约（已合并到 testTokenValidity）
- *
- * @deprecated 此函数保留用于向后兼容，内部委托给 testTokenValidity。
- * 测试和续约功能已统一：点击「测试」按钮即可同时验证 Token 并显示剩余天数。
- */
-export function renewToken(): void {
-  bgmLog(LOG_LEVELS.INFO, '[renewToken] 已合并到 testTokenValidity，调用测试流程')
-  testTokenValidity()
-}

@@ -2,7 +2,7 @@
  * 共享工作表锁定模块
  * @module tools/lockedSheet
  * @description 主面板与富化页面共用的目标工作表锁定与跨所有已打开工作簿的自动扫描。
- *              统一读写 BGM.sheet 状态，持久化到 `bgm_locked_sheet`，
+ *              统一读写 BGM.sheet 状态，持久化到 `bgm_locked_sheet_<page>`，
  *              删除独立于 BGM.sheet 的富化锁定状态（方案一）。
  */
 

@@ -1131,21 +1131,3 @@ describe('token · hideUserProfile', () => {
     expect(() => token.hideUserProfile()).not.toThrow()
   })
 })
-
-// ========== renewToken ==========
-
-describe('token · renewToken', () => {
-  it('委托给 testTokenValidity（未设置 Token 时表现一致）', () => {
-    m.loadBgToken.mockReturnValue(null)
-
-    // 刻意覆盖：验证 deprecated 兼容入口仍可用（生产已无 UI 触发）
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    token.renewToken()
-
-    expect(m.bgmLog).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.stringContaining('已合并到 testTokenValidity'),
-    )
-    expect(m.showAlert).toHaveBeenCalledWith(_T.pleaseSetTokenFirst)
-  })
-})

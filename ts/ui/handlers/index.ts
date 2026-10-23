@@ -62,9 +62,6 @@ export {
   testDebugConnection,
   showUserProfile,
   hideUserProfile,
-  // renewToken 已标记 @deprecated（内部委托给 testTokenValidity），此处为保持对外 API 而必须保留 re-export
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  renewToken,
 } from './token.js'
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js'
 export { cleanLockedDataSheet } from './sheet.js'

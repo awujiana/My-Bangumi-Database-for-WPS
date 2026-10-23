@@ -2,7 +2,7 @@
  * 富化功能 - 目标工作表锁定 UI 适配层
  * @module sync/enrichLock
  * @description 富化页面的目标工作表选择与锁定 UI 控制器。
- *              与主面板共用 BGM.sheet 锁定状态，持久化键 `bgm_locked_sheet`，
+ *              与主面板共用 BGM.sheet 锁定状态，持久化键 `bgm_locked_sheet_<page>`，
  *              底层读写/扫描逻辑统一委托给 tools/locked-sheet.js（方案一）。
  */
 

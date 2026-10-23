@@ -238,17 +238,6 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
-  // Token 续约：刷新用户信息和头像
-  renewToken: (context) => {
-    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 续约')
-    // renewToken 已废弃，其内部仅委托给 testTokenValidity，直接调用等价流程
-    testTokenValidity()
-    bgmLog(
-      LOG_LEVELS.DEBUG,
-      `[handleActionClick] Token 续约已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
-    )
-  },
-
   // 关闭连接测试弹窗
   closeConnectionTest: () => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭连接测试弹窗')

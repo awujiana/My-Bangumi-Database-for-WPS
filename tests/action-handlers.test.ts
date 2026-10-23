@@ -574,10 +574,9 @@ describe('ACTION_HANDLERS · Token 与用户', () => {
     )
   })
 
-  it('testToken / renewToken → 都走 Token 有效性检测', () => {
+  it('testToken → 走 Token 有效性检测', () => {
     runAction('testToken')
-    runAction('renewToken')
-    expect(mocks.testTokenValidity).toHaveBeenCalledTimes(2)
+    expect(mocks.testTokenValidity).toHaveBeenCalledTimes(1)
   })
 
   it('openTokenPage / showUserIdDialog / openUserCollection / testDebugConnection → 各自入口', () => {
