@@ -7,9 +7,21 @@
 
 /* ---- 目标工作表 ---- */
 .conditional-format-sheet-row {
-  display: flex;
-  gap: var(--sp-2);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2) var(--sp-3);
+  align-items: center;
   margin-top: var(--sp-3);
+}
+/* 两个下拉各自撑满所在格：选中的工作簿/工作表名完整显示、不截断。
+   （原 flex 单行里，下拉被右侧「锁定勾选 + 刷新按钮」挤压得很窄。） */
+.conditional-format-sheet-row > .conditional-format-select {
+  width: 100%;
+}
+/* 刷新按钮靠右、独占第 3 行第 2 列 */
+.conditional-format-sheet-row > .bgm-btn {
+  grid-column: 2;
+  justify-self: end;
 }
 
 .conditional-format-select {
@@ -32,12 +44,13 @@
   cursor: pointer;
 }
 
-/* 目标表锁定行：与工作表下拉同一列宽，checkbox 左、说明右 */
+/* 目标表锁定行：独占一整行（grid），checkbox 左、说明右 */
 .conditional-format-lock-row {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin-top: var(--sp-2);
+  grid-column: 1 / -1;
+  margin-top: 0;
   font-size: var(--fs-sm);
   color: var(--text-2);
   cursor: pointer;
