@@ -14,7 +14,7 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { bgmLog } from '../tools/util/index.js'
-import { readRangeAddress } from '../tools/wps-range.js'
+import { describeRangeForDiagnosis, readRangeAddress } from '../tools/wps-range.js'
 import { XL_EXPRESSION } from './conditional-format-rules.js'
 import type {
   ConditionalFormatApplyEntry,
@@ -171,7 +171,7 @@ function readAppliesToAddress(fc: WpsFormatCondition, index: number): string {
 
   logAppliesToDiagnosis(
     index,
-    `AppliesTo 形态 ${describeHostValue(appliesTo)}，Address 直读/函数调用/Areas 均失败`,
+    `AppliesTo 形态 ${describeHostValue(appliesTo)} | ${describeRangeForDiagnosis(appliesTo)}`,
   )
   return ''
 }

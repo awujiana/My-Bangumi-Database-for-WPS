@@ -220,6 +220,11 @@ export interface WpsRange {
    * 「（未读到范围）」。调用方统一走 readRangeAddress，别直接下标。
    */
   Address?: string | (() => unknown)
+  /**
+   * 本地化区域地址（部分 WPS 版本只有它可读；与 Address 同两副面孔）。
+   * 条件格式实测：AppliesTo 的 Address 属性/函数都读不出串时，它可能是备用路径。
+   */
+  AddressLocal?: string | (() => unknown)
   Count: number
 
   // 整行/整列
