@@ -79,6 +79,9 @@ const SOLO_BUTTON_CLASS = 'mod-solo-btn'
 /** 专注模式浮动控制条的 id / 类名 */
 const SOLO_BAR_ID = 'solo-mode-bar'
 
+/** 专注模式加在 body 上的类（供 CSS 隐藏顶栏，沉浸显示单个模块） */
+const SOLO_BODY_CLASS = 'solo-mode'
+
 /**
  * 专注模式状态：`{ page, moduleId }` 或 null。
  *
@@ -119,6 +122,8 @@ export function enterSoloMode(page: string, moduleId: string): void {
     return
   }
   soloMode = { page, moduleId }
+  // 沉浸：隐藏顶栏（CSS 靠 body.solo-mode 命中 .topbar），让单个模块占满可视区
+  document.body.classList.add(SOLO_BODY_CLASS)
   applyModuleState(page)
   renderSoloBar(page)
   bgmLog(LOG_LEVELS.INFO, `[moduleState] 进入专注模式: ${page} / ${moduleId}`)
@@ -128,6 +133,7 @@ export function enterSoloMode(page: string, moduleId: string): void {
 export function exitSoloMode(): void {
   const previous = soloMode
   soloMode = null
+  document.body.classList.remove(SOLO_BODY_CLASS)
   removeSoloBar()
   if (previous) {
     applyModuleState(previous.page)

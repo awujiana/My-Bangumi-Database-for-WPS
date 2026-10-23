@@ -3749,6 +3749,14 @@ body {
     border-color: var(--accent-blue);
 }
 
+/* ---- 专注模式：隐藏顶栏（沉浸显示单个模块）---- */
+/* body 是 grid（topbar / sidebar+main 两行），.topbar display:none 后该 auto 行
+   塌陷为 0，sidebar+main 自动上移占满可视区。顶栏的导出/导入等按钮退出专注后照常
+   可用，专注只是临时视图。 */
+body.solo-mode .topbar {
+    display: none;
+}
+
 /* ---- 专注模式浮动控制条 ---- */
 /* 底部居中：顶栏在各页都是吸顶的，会盖住它；底部不挡滚动区起点，
    也不与「拖出浮动窗口」的标题栏抢位置。

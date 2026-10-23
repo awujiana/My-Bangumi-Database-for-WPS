@@ -229,6 +229,19 @@
   transform: none;
 }
 
+/* 搬进来的区块自带的 h3/h2 标题隐藏：浮动窗标题栏已显示同一标题
+   （readSectionTitle 取的就是它），不隐藏会「外观与导航」出现两次。
+   标题里的折叠/拖出/专注按钮在浮动窗里也全部冗余（窗口 header 自带
+   收起/最大化/还原），一并藏掉。 */
+.detachable-panel-body > .section > h3,
+.detachable-panel-body > .section > h2,
+.detachable-panel-body > .enrich-section > h3,
+.detachable-panel-body > .enrich-section > h2,
+.detachable-panel-body > .command-center > h3,
+.detachable-panel-body > .command-center > h2 {
+  display: none;
+}
+
 /* ---- 右下角缩放手柄 ---- */
 .detachable-panel-resize {
   position: absolute;
@@ -256,6 +269,11 @@
 .detachable-panel.is-collapsed .detachable-panel-resize,
 .detachable-panel.is-collapsed .detachable-panel-toolbar {
   display: none;
+}
+/* 收起态必须放开 min-height：窗口基类有 min-height:200px，会压过内联的
+   height:40px，导致「收起后仍剩一大片空白」。收到只剩标题栏一行。 */
+.detachable-panel.is-collapsed {
+  min-height: 0;
 }
 /* 原生窗口模式：区块本体留在页面上（另一个 WebView 搬不过去，只能隐藏）。
    用 class 而非 hidden 属性 —— .section 自带 display 会盖掉 [hidden]。 */
