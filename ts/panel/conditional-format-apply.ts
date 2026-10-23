@@ -139,10 +139,14 @@ function logAppliesToDiagnosis(index: number, detail: string): void {
 /**
  * 读规则的应用范围地址（尽力而为，多路尝试 + 诊断）。
  *
- * ## 背景（momo 实测：Sheet 级读到 38 条规则，范围却全是「（未读到范围）」）
- * 条数读到了、单条读取也没抛错，只有范围是空的——即 `fc.AppliesTo?.Address`
- * 拿到的是非字符串（最可能是函数形式的 Address，属性读数恒为函数对象）。
- * 故依次尝试：属性直读 → 函数调用 → Areas 联合拼接。
+ * ## 背景（momo 实测两轮诊断）
+ * Sheet 级读到 38 条规则、范围却全是「（未读到范围）」。诊断确认 AppliesTo
+ * 是真 Range 对象，`Address`/`AddressLocal` 均为**函数**（无参调用抛错），
+ * 而 `Row/Column/Rows.Count/Columns.Count` 全是可读 number。
+ *
+ * 读取顺序：Areas 联合拼接（多区域唯一完整解）→ readRangeAddress
+ * （Address 属性/函数 → AddressLocal → 行列拼装）。每条路独立 try，
+ * 某条抛错不连坐后面的路。
  *
  * ## 诊断日志只打第 1 条
  * 38 条逐条打会把控制台刷爆，而第 1 条的宿主行为代表整批。修好后这里应恢复静默。
@@ -160,14 +164,14 @@ function readAppliesToAddress(fc: WpsFormatCondition, index: number): string {
     return ''
   }
 
+  // 先 Areas：多区域联合选区只有它能给出完整范围（"A1:C38,D1:D38"）；
+  // 单区域时它与直接拼装等价。readRangeAddress 内部每条路独立 try
+  // （Address() 无参调用会抛错），某条路失败不连坐后面的路。
+  const areas = readAreasAddress(appliesTo)
+  if (areas !== '') return areas
+
   const direct = readRangeAddress(appliesTo)
   if (direct !== '') return direct
-
-  const areas = readAreasAddress(appliesTo)
-  if (areas !== '') {
-    logAppliesToDiagnosis(index, `单 Address 读空，Areas 拼接成功: ${areas}`)
-    return areas
-  }
 
   logAppliesToDiagnosis(
     index,

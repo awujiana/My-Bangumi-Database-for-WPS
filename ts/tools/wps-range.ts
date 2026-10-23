@@ -19,8 +19,14 @@ import type { WpsRange } from './wps.js'
 function readStringish(raw: unknown): string {
   if (typeof raw === 'string') return raw
   if (typeof raw === 'function') {
-    const called = (raw as () => unknown)()
-    if (typeof called === 'string') return called
+    // 调用也要 try：COM 风格的 Address() 可能要参数，无参调用会抛错——
+    // 不保护的话异常会冲出外层、让后面的备用路（行列拼装等）根本没机会跑。
+    try {
+      const called = (raw as () => unknown)()
+      if (typeof called === 'string') return called
+    } catch {
+      // 宿主函数调用失败：落到下一条路
+    }
   }
   return ''
 }
