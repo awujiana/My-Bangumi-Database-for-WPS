@@ -131,7 +131,7 @@ export function enterSoloMode(page: string, moduleId: string): void {
   // 不在本层直接 import detachable-panel：tools→UI/components 是分层反向依赖，门禁禁。
   runBeforeEnterSolo()
   applyModuleState(page)
-  renderSoloBar(page)
+  renderSoloBar()
   bgmLog(LOG_LEVELS.INFO, `[moduleState] 进入专注模式: ${page} / ${moduleId}`)
 }
 
@@ -168,7 +168,7 @@ export function stepSoloMode(delta: number): void {
   if (!target) return
   soloMode = { page: soloMode.page, moduleId: target.id }
   applyModuleState(soloMode.page)
-  renderSoloBar(soloMode.page)
+  renderSoloBar()
 }
 
 /** 切换某模块的专注状态（按钮入口） */
@@ -183,27 +183,20 @@ function removeSoloBar(): void {
 }
 
 /**
- * 渲染专注模式浮动控制条：当前模块名 + ↑ / ↓ / 退出。
+ * 渲染专注模式浮动控制条：上下切换与退出（不显示当前组件名） + ↑ / ↓ / 退出。
  *
  * 放在底部居中而非顶部：顶栏在各页都是吸顶的，会盖住它；
  * 底部不挡滚动区起点，也不与「拖出浮动窗口」的标题栏抢位置。
  */
-function renderSoloBar(page: string): void {
+function renderSoloBar(): void {
   removeSoloBar()
   if (!soloMode) return
-  const modules = soloableModules(page)
-  const current = modules.find((module) => module.id === soloMode?.moduleId)
-  const title = current?.label ?? soloMode.moduleId
 
   const bar = document.createElement('div')
   bar.id = SOLO_BAR_ID
   bar.className = 'solo-mode-bar'
   bar.setAttribute('role', 'toolbar')
   bar.setAttribute('aria-label', '专注模式：只显示单个模块，可上下切换')
-
-  const label = document.createElement('span')
-  label.className = 'solo-mode-bar-title'
-  label.textContent = `🎯 ${title}`
 
   const makeStep = (icon: string, ariaLabel: string, delta: number): HTMLButtonElement => {
     const button = document.createElement('button')
@@ -228,7 +221,8 @@ function renderSoloBar(page: string): void {
     exitSoloMode()
   })
 
-  bar.append(label, makeStep('↑', '上一个模块', -1), makeStep('↓', '下一个模块', 1), exit)
+  // 不显示当前组件名（用户：不需要表示当前的组件名字）—— 控制条只留 切换 / 退出。
+  bar.append(makeStep('↑', '上一个模块', -1), makeStep('↓', '下一个模块', 1), exit)
   document.body.append(bar)
 }
 

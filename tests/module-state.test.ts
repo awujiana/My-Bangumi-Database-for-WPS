@@ -678,9 +678,9 @@ describe('专注模式', () => {
       expect(moduleElement(module.id).hidden).toBe(true)
       expect(anchorOf(module.id).hidden).toBe(true)
     }
-    // 控制条出现，且标题写着当前模块
+    // 控制条出现，且有「退出专注」出口（不再显示当前组件名）
     expect(soloBar()).not.toBeNull()
-    expect(soloBar()?.textContent).toContain(first.label)
+    expect(soloBar()?.textContent).toContain('退出专注')
   })
 
   it('目标模块即使原本是收起状态，也被强制展开（否则只看到一条标题栏）', () => {

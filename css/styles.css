@@ -3753,11 +3753,19 @@ body {
 /* body 是 grid（topbar / sidebar+main 两行），.topbar display:none 后该 auto 行
    塌陷为 0，sidebar+main 自动上移占满可视区。顶栏的导出/导入等按钮退出专注后照常
    可用，专注只是临时视图。 */
-body.solo-mode .topbar {
+/* 专注模式：隐藏顶栏与侧栏。仅 .sidebar display:none 不够 —— grid 的列定义还在，
+   会留一个空列；故直接覆盖 .global 的 grid 为单列单区域 main，占满不留空。 */
+body.solo-mode .topbar,
+body.solo-mode .sidebar {
     display: none;
 }
+body.solo-mode .global {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'main';
+}
 
-/* 专注模式：唯一可见模块撑满主区，单组件铺满屏幕（.main 是 flex column） */
+/* 唯一可见模块撑满主区，单组件铺满屏幕（.main 是 flex column） */
 body.solo-mode .main > .section:not([hidden]),
 body.solo-mode .main > .command-center:not([hidden]) {
     flex: 1 1 auto;
