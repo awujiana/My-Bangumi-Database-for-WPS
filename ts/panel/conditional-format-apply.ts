@@ -14,13 +14,14 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { bgmLog } from '../tools/util/index.js'
+import { readRangeAddress } from '../tools/wps-range.js'
 import { XL_EXPRESSION } from './conditional-format-rules.js'
 import type {
   ConditionalFormatApplyEntry,
   ConditionalFormatApplyPlan,
   ForeignRuleSnapshot,
 } from './conditional-format-rules.js'
-import type { WpsFormatCondition, WpsWorksheet } from '../tools/wps.js'
+import type { WpsFormatCondition, WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 /** 应用结果统计（进日志与完成提示） */
 export interface ConditionalFormatApplyResult {
@@ -88,6 +89,91 @@ function readStopIfTrue(fc: WpsFormatCondition): boolean | undefined {
   } catch {
     return undefined
   }
+}
+
+/** 读 Areas 联合选区：多个不连续区域拼成 "A1:C38,D1:D38"（对标 WPS 原生规则管理器） */
+function readAreasAddress(appliesTo: WpsRange): string {
+  try {
+    // 写法对齐 exceltobangumi 的 collectRowNumbersFromSelection：直接属性访问 +
+    // 可选链。勿改解构 `const { areas } = appliesTo` —— 可选属性解构会被
+    // typescript-eslint 判成 error typed（实测报一串 no-unsafe-*）。
+    const areas = appliesTo.Areas
+    const count = areas?.Count ?? 0
+    if (count <= 0) return ''
+    const parts: string[] = []
+    for (let index = 1; index <= count; index += 1) {
+      const address = readRangeAddress(areas?.Item(index))
+      if (address !== '') parts.push(address)
+    }
+    return parts.join(',')
+  } catch {
+    return ''
+  }
+}
+
+/** 宿主对象形态一句话（诊断日志用；宿主代理可能禁 keys，故 try） */
+function describeHostValue(value: unknown): string {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'object') {
+    let keys: string
+    try {
+      keys = Object.keys(value).slice(0, 24).join(',')
+    } catch {
+      keys = '<不可枚举>'
+    }
+    return `object keys=[${keys}]`
+  }
+  if (typeof value === 'string') return `string: ${value}`
+  if (typeof value === 'function') return 'function'
+  // number / boolean / bigint / symbol：只报类型名，不值（地址诊断用不到值）
+  return typeof value
+}
+
+/** AppliesTo 诊断日志（只记第 1 条，见 readAppliesToAddress 注释） */
+function logAppliesToDiagnosis(index: number, detail: string): void {
+  if (index !== 1) return
+  bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 第 1 条规则范围读取异常: ${detail}`)
+}
+
+/**
+ * 读规则的应用范围地址（尽力而为，多路尝试 + 诊断）。
+ *
+ * ## 背景（momo 实测：Sheet 级读到 38 条规则，范围却全是「（未读到范围）」）
+ * 条数读到了、单条读取也没抛错，只有范围是空的——即 `fc.AppliesTo?.Address`
+ * 拿到的是非字符串（最可能是函数形式的 Address，属性读数恒为函数对象）。
+ * 故依次尝试：属性直读 → 函数调用 → Areas 联合拼接。
+ *
+ * ## 诊断日志只打第 1 条
+ * 38 条逐条打会把控制台刷爆，而第 1 条的宿主行为代表整批。修好后这里应恢复静默。
+ */
+function readAppliesToAddress(fc: WpsFormatCondition, index: number): string {
+  let appliesTo: WpsRange | undefined
+  try {
+    appliesTo = fc.AppliesTo
+  } catch (error: unknown) {
+    logAppliesToDiagnosis(index, `AppliesTo 读取抛错: ${(error as Error).message}`)
+    return ''
+  }
+  if (appliesTo === undefined) {
+    logAppliesToDiagnosis(index, 'AppliesTo 为 undefined（该 WPS 版本不暴露规则范围）')
+    return ''
+  }
+
+  const direct = readRangeAddress(appliesTo)
+  if (direct !== '') return direct
+
+  const areas = readAreasAddress(appliesTo)
+  if (areas !== '') {
+    logAppliesToDiagnosis(index, `单 Address 读空，Areas 拼接成功: ${areas}`)
+    return areas
+  }
+
+  logAppliesToDiagnosis(
+    index,
+    `AppliesTo 形态 ${describeHostValue(appliesTo)}，Address 直读/函数调用/Areas 均失败`,
+  )
+  return ''
 }
 
 /**
@@ -208,12 +294,11 @@ export function readForeignRules(
         const interior = readInteriorColor(fc)
         const fontColor = readFontColor(fc)
         const stopIfTrue = readStopIfTrue(fc)
-        // Address 也按 Formula1 的口径做类型守卫：COM 偶发返回非字符串时，
-        // 裸值会一路带到渲染层的 escapeHtml().replace() 抛 TypeError，
-        // 把表格渲染中断在半路（计数已更新、列表还是旧内容）。
-        const address = fc.AppliesTo?.Address
+        // 范围走多路尝试 + 诊断（属性/函数两副面孔、Areas 联合拼接）；
+        // 全失败才为空串，渲染层有「（未读到范围）」占位兜底
+        const range = readAppliesToAddress(fc, index)
         snapshots.push({
-          range: typeof address === 'string' ? address : '',
+          range,
           formula: typeof fc.Formula1 === 'string' ? fc.Formula1 : '',
           kind: fc.Type === XL_EXPRESSION ? 'expression' : 'other',
           ...(typeof fc.Type === 'number' && { type: fc.Type }),

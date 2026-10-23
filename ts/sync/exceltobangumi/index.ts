@@ -39,6 +39,7 @@ import {
 import { createBatchFieldGetter, calcSyncRowFingerprint } from '../../tools/util/field-getter.js'
 import type { WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
 import { wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
+import { readRangeAddress } from '../../tools/wps-range.js'
 // 通知与同步进度弹窗走依赖反转桥：本模块属于底层（sync/），不得 runtime-import
 // 上层 UI 层（见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。实现由 ui/dialog.ts 注册。
 import { getNotifyApi, getSyncProgressApi } from '../../core/ui-bridge.js'
@@ -759,17 +760,12 @@ export async function SyncToBangumiAsync(
  */
 function collectRowNumbersFromSelection(sel: WpsRange, rawRows: number[]): void {
   // 记录选中区域地址用于调试
-  let selAddress: string
-  try {
-    selAddress = sel.Address ?? ''
-  } catch (error: unknown) {
-    bgmLog(
-      LOG_LEVELS.WARN,
-      `[exceltobangumi] 获取地址失败: ${error instanceof Error ? error.message : String(error)}`,
-    )
-    selAddress = '(无法获取)'
-  }
-  bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`)
+  // 走 readRangeAddress：Address 在部分 WPS 版本是函数形式，属性直读恒得函数对象
+  const selAddress = readRangeAddress(sel)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[syncSelectedRows] Selection.Address: ${selAddress === '' ? '(无法获取)' : selAddress}`,
+  )
 
   // 处理非连续选择（多区域）
   const areas = sel.Areas

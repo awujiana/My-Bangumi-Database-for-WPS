@@ -210,8 +210,16 @@ export interface WpsRange {
 
   // 区域属性
   Areas?: WpsAreas
-  /** 区域地址（如 "A1:B10"），可能为本地或绝对引用格式 */
-  Address?: string
+  /**
+   * 区域地址（如 "A1:B10" / "$B$3:$B$26958"）。
+   *
+   * 建模成「字符串属性 | 无参函数」联合：WPS 各版本下它有两副面孔——有的直接读
+   * 属性就是地址串，有的 `Address` 是 COM 风格的方法，**属性读数恒为函数对象**
+   * （`typeof` 是 function 而非 string），必须调用才返回地址。条件格式读
+   * `FormatCondition.AppliesTo.Address` 实测踩到后者：38 条规则全部显示
+   * 「（未读到范围）」。调用方统一走 readRangeAddress，别直接下标。
+   */
+  Address?: string | (() => unknown)
   Count: number
 
   // 整行/整列
