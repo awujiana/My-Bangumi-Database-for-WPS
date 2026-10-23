@@ -46,8 +46,7 @@ export interface GithubSyncConfig {
    *
    * 2026-09-18 起数据文件改为分片：插件按用户表头只下载需要的分片
    * （`data/anime.<shard>.jsonlines.gz`），Excel 实际用到的 28 列压完仅
-   * 3.42 MiB（相对旧单片 −83.6%）。旧单片路径不再支持，存量配置由
-   * {@link LEGACY_PATH_MIGRATIONS} 一次性迁移到清单路径。
+   * 3.42 MiB（相对旧单片 −83.6%）。旧单片路径不再支持。
    */
   path: string
   /**
@@ -98,22 +97,6 @@ export const DEFAULT_GITHUB_CONFIG: Readonly<GithubSyncConfig> = Object.freeze({
   branch: 'main',
   path: 'data/anime.manifest.json',
   sourceType: 'github',
-})
-
-/**
- * 旧数据文件路径 -> 新路径的一次性迁移表
- *
- * 两次历史变更：
- *   1. 2026-09-13 明文 `data/bangumi.jsonlines` → gzip `data/bangumi.jsonlines.gz`
- *      （明文 55.83 MiB 超过 GitHub 单文件 50 MB 建议上限，且 raw CDN 不做透明 gzip）；
- *   2. 2026-09-18 单片 → 分片清单 `data/anime.manifest.json`（按表头选片，
- *      只需简介等少量字段时不必拖下 infobox 那 47.6% 体积）。
- *
- * 只迁移本插件历史上作为默认值出现过的路径，不触碰用户自定义路径。
- */
-const LEGACY_PATH_MIGRATIONS: Readonly<Record<string, string>> = Object.freeze({
-  'data/bangumi.jsonlines': 'data/anime.manifest.json',
-  'data/bangumi.jsonlines.gz': 'data/anime.manifest.json',
 })
 
 // 内部引用（保持向后兼容）
@@ -190,27 +173,9 @@ export function getGithubConfig(): GithubSyncConfig {
   }
 
   // gistId 仅在非空时附加到返回值（满足 exactOptionalPropertyTypes: 不能赋 undefined 给可选属性）
-  const migratedPath = migrateLegacyPath(path, storage)
   return gistId
-    ? { owner, repo, branch, path: migratedPath, sourceType, gistId }
-    : { owner, repo, branch, path: migratedPath, sourceType }
-}
-
-/**
- * 把历史明文数据文件路径迁移为 gzip 路径（见 LEGACY_PATH_MIGRATIONS）
- *
- * @param path 存储中读到的原始路径
- * @param storage PluginStorage（可为 undefined，此时只改返回值不落盘）
- * @returns 迁移后的路径；无需迁移时原样返回
- */
-function migrateLegacyPath(path: string, storage: WpsPluginStorage | undefined): string {
-  const migrated = LEGACY_PATH_MIGRATIONS[path]
-  if (migrated === undefined) {
-    return path
-  }
-  bgmLog(LOG_LEVELS.INFO, `[githubConfig] 数据文件路径自动迁移: ${path} -> ${migrated}`)
-  storage?.setItem(GITHUB_CONFIG_KEYS.PATH, migrated)
-  return migrated
+    ? { owner, repo, branch, path, sourceType, gistId }
+    : { owner, repo, branch, path, sourceType }
 }
 
 /**
