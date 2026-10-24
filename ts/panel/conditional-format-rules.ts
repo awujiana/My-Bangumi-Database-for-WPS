@@ -277,6 +277,78 @@ export function parseRules(text: string): { rules: ConditionalFormatRule[]; drop
   return { rules, dropped }
 }
 
+// ===== 既有规则的本地分组（视图层：只归组展示，不写工作表）=====
+
+/** 既有规则分组映射的 PluginStorage 键（key = 公式@范围 → 组名） */
+export const EXISTING_GROUPS_STORE_KEY = 'conditionalFormat.existingGroups.v1'
+
+/** 未归组的规则在表格里显示的名字 */
+export const UNGROUPED_LABEL = '未分组'
+
+/**
+ * 既有规则分组的稳定 key：公式 + 范围
+ *
+ * 不用 1 基序号：序号会因工作表规则增删**整体漂移**（删掉第 3 条后原第 5 条
+ * 变第 4 条），按序号存的分组会错位到别的规则上。公式 + 范围是规则内容本身，
+ * 规则还在、键就对得上。` `（NUL）分隔防串键——公式里 legitimately
+ * 可含空格（`=IF(A1="x", 1, 2)`），用空格分隔会把两条不同规则撞成同一键。
+ *
+ * 签名只取 `{ formula, range }`：快照（ForeignRuleSnapshot）与表格行
+ * （ForeignRuleRow）都能直接传，不必为行模型再造一个 key 函数。
+ */
+export function snapshotGroupKey(snapshot: { formula: string; range: string }): string {
+  return `${snapshot.formula}\u{0}${snapshot.range}`
+}
+
+/** 序列化分组映射 */
+export function serializeExistingGroups(groups: Readonly<Record<string, string>>): string {
+  return JSON.stringify(groups)
+}
+
+/** 反序列化：整体不是纯对象就当空（不逐条救——分组是便利功能，坏了重置即可） */
+export function parseExistingGroups(text: string): Record<string, string> {
+  if (!text) return {}
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const groups: Record<string, string> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string' && value !== '') groups[key] = value
+    }
+    return groups
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 按公式模式自动聚类
+ *
+ * 模式 = 公式剥掉**字符串字面量**后的形状：`=$J2="饮品"` 与 `=$J2="大区"`
+ * 同模式（`=$J2="*"`）聚成一组；`=$K2<>""` 另一组。范围不参与——同一公式
+ * 模式就是同一「业务含义」，范围不同只是作用的列不一样。
+ *
+ * **只归一字面串，不动数字**：数字归一会把行锚（`$J2` 的 2）也吃掉，
+ * 组名变成 `=$J#="*"` 反而看不懂。没有字面串的公式（`=$A1>100`）原样成组，
+ * 同公式的规则仍会聚在一起。
+ *
+ * @returns key → 组名（组名即模式串，用户之后可手动改名）
+ */
+export function autoClusterGroups(
+  snapshots: readonly ForeignRuleSnapshot[],
+): Record<string, string> {
+  const groups: Record<string, string> = {}
+  // 空公式不聚（没有可识别的模式）。先 filter 再 for：no-continue 禁 continue、
+  // unicorn/prefer-continue 又禁把循环体包在 if 里，两条规则互斥，filter 是
+  // 同时满足两者的写法（2026-10-23 踩过同一对）。
+  const withFormula = snapshots.filter((snapshot) => snapshot.formula !== '')
+  for (const snapshot of withFormula) {
+    const pattern = snapshot.formula.replace(/"[^"]*"/g, '"*"')
+    groups[snapshotGroupKey(snapshot)] = pattern
+  }
+  return groups
+}
+
 // ===== 搜索 / 分组 =====
 
 /** 搜索：名称 / 公式 / 范围 / 分组，大小写不敏感子串 */
@@ -313,17 +385,20 @@ export function groupRules(
  * {@link planApply} 的 append-after 会因此降级），导进来只会得到一条看着像、
  * 实际不生效的规则，所以直接拒绝并让调用方提示原因。
  *
+ * @param group 导入后落进的分组；缺省「导入的规则」。既有规则表格里归好组的
+ *   （{@link snapshotGroupKey} → 组名）由调用方查出来传这里，组名随导入带进规则库。
  * @returns 可导入返回条目；不可导入返回 null
  */
 export function foreignSnapshotToRule(
   snapshot: ForeignRuleSnapshot,
   makeId: () => string,
+  group: string = IMPORTED_RULE_GROUP,
 ): ConditionalFormatRule | null {
   if (snapshot.kind !== 'expression' || !snapshot.formula) return null
   return {
     id: makeId(),
     name: `导入 ${snapshot.range || '未知范围'}`,
-    group: IMPORTED_RULE_GROUP,
+    group,
     appliesTo: snapshot.range,
     formula: snapshot.formula,
     // 读不到颜色时给中灰：规则库里必须有个可见色块，否则用户分不出是哪条

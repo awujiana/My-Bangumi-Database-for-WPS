@@ -120,6 +120,22 @@
   font-weight: 400;
 }
 
+/* 既有规则表格的本地分组：容器只加分隔，行本身仍是原来的表格栅格 */
+.conditional-format-existing-group {
+  margin-bottom: var(--sp-3);
+}
+
+.conditional-format-existing-group .conditional-format-group-title {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+/* 组名多半是公式模式串（=$J2="*"），等宽更好读 */
+.conditional-format-existing-group .conditional-format-group-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* 行内可编辑单元格（应用于 / 公式）：hover 给底色提示可点，点击原地变输入框 */
 .conditional-format-cell-editable {
   cursor: pointer;

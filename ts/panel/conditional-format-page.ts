@@ -25,17 +25,22 @@ import {
   CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
   CONDITIONAL_FORMAT_STORE_KEY,
   CONDITIONAL_FORMAT_STRATEGY_KEY,
+  EXISTING_GROUPS_STORE_KEY,
   IMPORTED_RULE_GROUP,
+  autoClusterGroups,
   buildDefaultRules,
   filterRules,
   firstRowOfRange,
   foreignSnapshotToRule,
   groupRules,
   normalizeHexColor,
+  parseExistingGroups,
   parseRules,
   planApply,
+  serializeExistingGroups,
   serializeRules,
   shiftFormulaRows,
+  snapshotGroupKey,
 } from './conditional-format-rules.js'
 import type {
   ApplyStrategy,
@@ -44,6 +49,7 @@ import type {
 } from './conditional-format-rules.js'
 import {
   FOREIGN_RULE_PAGE_SIZE,
+  buildForeignRuleGroupsHtml,
   buildForeignRuleHeadHtml,
   buildForeignRuleRowHtml,
   filterForeignRuleRows,
@@ -140,6 +146,16 @@ interface PageState {
    * 并在表格上方提示（不静默显示全部，否则用户以为「选择里没规则」）。
    */
   existingScope: 'all' | 'selection'
+  /**
+   * 既有规则的本地分组映射（snapshotGroupKey → 组名）
+   *
+   * 视图层功能：只影响表格的聚合展示与「导入时带组名进规则库」，
+   * **不写工作表**（COM 没有分组概念）。key 用公式@范围而非序号——
+   * 序号会因规则增删漂移。持久化到 PluginStorage：归好组的会话之间保留。
+   */
+  existingGroups: Record<string, string>
+  /** 既有规则表格里被收起的分组名（会话态，同规则库 collapsedGroups） */
+  existingGroupCollapsed: Set<string>
   /** 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing） */
   importForeignRules: ForeignRuleSnapshot[]
   /** 导入弹框里的勾选集（1 基序号，口径同 existingSelection） */
@@ -162,6 +178,8 @@ const state: PageState = {
   existingPage: 1,
   existingSelection: new Set<number>(),
   existingScope: 'all',
+  existingGroups: {},
+  existingGroupCollapsed: new Set<string>(),
   importForeignRules: [],
   importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
@@ -392,7 +410,12 @@ function renderExistingRulesInner(container: HTMLElement): void {
   // 不静默显示全部，否则用户会以为「我框的这条列上真没有规则」。
   const selectionRange = state.existingScope === 'selection' ? currentSelectionRange() : ''
   const scoped = filterRowsByScope(searched, state.existingScope, selectionRange)
-  const page = paginate(scoped, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
+  // 有本地分组时不分页：组标题跨页断裂比不分页更难读（一表 38 条一页装得下）。
+  // 分页器此时 pageCount=1 自动隐藏。
+  const hasGroups = Object.keys(state.existingGroups).length > 0
+  const page = hasGroups
+    ? { page: 1, pageCount: 1, items: scoped }
+    : paginate(scoped, state.existingPage, FOREIGN_RULE_PAGE_SIZE)
   // 分页后页码可能被收敛（删掉一页里的全部规则后），回写 state 让翻页按钮用同一页
   state.existingPage = page.page
 
@@ -412,9 +435,10 @@ function renderExistingRulesInner(container: HTMLElement): void {
 
   // 一次 innerHTML 写入（表头 + 本页行）；行内事件在容器上委托，见 handleExistingTableClick
   const summary = selectionSummary(page.items)
-  container.innerHTML = `${buildForeignRuleHeadHtml(summary.isAllSelected)}${page.items
-    .map((row) => buildForeignRuleRowHtml(row))
-    .join('')}`
+  const rowsHtml = hasGroups
+    ? buildForeignRuleGroupsHtml(page.items, state.existingGroups, state.existingGroupCollapsed)
+    : page.items.map((row) => buildForeignRuleRowHtml(row)).join('')
+  container.innerHTML = `${buildForeignRuleHeadHtml(summary.isAllSelected)}${rowsHtml}`
 
   // 全选复选框的三态：HTML 属性表达不了「部分选中」，必须走 DOM property。
   // 漏了这一步，半选时全选框显示未勾选，用户会以为「什么都没选」。
@@ -463,6 +487,7 @@ function renderExistingBatchBar(): void {
   }).length
   bar.innerHTML = `
     <span class="conditional-format-batch-count">已选 ${String(selectedCount)} 条</span>
+    <button type="button" class="bgm-btn small" data-batch-action="group" title="把所选规则归入一个分组（本地视图分组，可收起展开；导入时组名会带进规则库）">🏷 归入分组</button>
     <button type="button" class="bgm-btn small" data-batch-action="import" ${
       rebuildableCount === 0 ? 'disabled' : ''
     } title="${rebuildableCount === 0 ? '所选规则里没有可导入的公式类规则' : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
@@ -515,6 +540,20 @@ function handleExistingTableClick(event: MouseEvent): void {
     return
   }
 
+  // 分组的收起/展开（标题上的 ▾/▸）：只改视图折叠状态，不碰规则本身
+  const groupToggle = target.closest<HTMLElement>('[data-action="toggle-existing-group"]')
+  if (groupToggle) {
+    const group = groupToggle.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') {
+      const next = new Set(state.existingGroupCollapsed)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      state.existingGroupCollapsed = next
+      renderExistingRules()
+    }
+    return
+  }
+
   // 行内编辑：点「应用于 / 公式」单元格原地变输入框（momo：要能直接改）。
   // 放在 button 分支之前：这两个单元格不是 button，走 button 分支会直接 return。
   const editable = target.closest<HTMLElement>('.conditional-format-cell-editable')
@@ -557,9 +596,13 @@ function handleExistingTableClick(event: MouseEvent): void {
   }
 }
 
-/** 批量操作条的分流（导入 / 删除 / 取消选择） */
+/** 批量操作条的分流（归入分组 / 导入 / 删除 / 取消选择） */
 function handleBatchAction(action: string): void {
   switch (action) {
+    case 'group': {
+      openGroupNameModal()
+      break
+    }
     case 'import': {
       batchImportForeignRules()
       break
@@ -577,6 +620,123 @@ function handleBatchAction(action: string): void {
       break
     }
   }
+}
+
+/**
+ * 打开「归入分组」组名输入弹窗
+ *
+ * 预填：所选规则已全部属于同一组时，把该组名填进去（改名场景直接改）；
+ * 跨组多选时留空（用户要输新名）。
+ */
+function openGroupNameModal(): void {
+  const indices = [...state.existingSelection].sort((a, b) => a - b)
+  if (indices.length === 0) return
+  const names = new Set<string>()
+  for (const index of indices) {
+    const snapshot = state.existing[index - 1]
+    if (snapshot) {
+      const group = state.existingGroups[snapshotGroupKey(snapshot)]
+      if (group !== undefined) names.add(group)
+    }
+  }
+  const input = inputById('conditionalFormatGroupName')
+  if (input) {
+    const onlyName = names.size === 1 ? names.values().next().value : undefined
+    input.value = typeof onlyName === 'string' ? onlyName : ''
+  }
+  setText('conditionalFormatGroupCount', String(indices.length))
+  const mask = byId('conditionalFormatGroupMask')
+  if (mask) {
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+  }
+  lockModalScroll()
+  input?.focus()
+}
+
+function closeGroupNameModal(): void {
+  const mask = byId('conditionalFormatGroupMask')
+  if (mask) mask.style.display = 'none'
+  unlockModalScroll()
+}
+
+/** 确定归组：写映射 → 持久化 → 重渲染（组名会随导入带进规则库） */
+function confirmGroupName(): void {
+  const name = inputById('conditionalFormatGroupName')?.value.trim() ?? ''
+  if (name === '') {
+    showToast('分组名不能为空', 'warn')
+    return
+  }
+  const indices = [...state.existingSelection].sort((a, b) => a - b)
+  const groups = { ...state.existingGroups }
+  let count = 0
+  for (const index of indices) {
+    const snapshot = state.existing[index - 1]
+    if (snapshot) {
+      groups[snapshotGroupKey(snapshot)] = name
+      count += 1
+    }
+  }
+  state.existingGroups = groups
+  persistExistingGroups()
+  closeGroupNameModal()
+  renderExistingRules()
+  showToast(`已把 ${String(count)} 条规则归入「${name}」`, 'success')
+}
+
+/**
+ * 自动聚类：按公式模式重算所有分组
+ *
+ * 覆盖现有映射（含手动归的组）——自动聚类是「重来一遍」的语义，
+ * 在 toast 里明说覆盖了几组，避免用户以为手动分组被合并。
+ */
+function autoClusterExistingGroups(): void {
+  if (state.existing.length === 0) {
+    showToast('当前表没有既有规则', 'info')
+    return
+  }
+  state.existingGroups = autoClusterGroups(state.existing)
+  persistExistingGroups()
+  state.existingGroupCollapsed = new Set<string>()
+  renderExistingRules()
+  const groupCount = new Set(Object.values(state.existingGroups)).size
+  showToast(`已按公式模式聚成 ${String(groupCount)} 组（覆盖了原分组）`, 'success')
+}
+
+/** 清除所有分组：回到平铺分页视图 */
+function clearExistingGroups(): void {
+  if (Object.keys(state.existingGroups).length === 0) {
+    showToast('当前没有分组', 'info')
+    return
+  }
+  state.existingGroups = {}
+  persistExistingGroups()
+  state.existingGroupCollapsed = new Set<string>()
+  renderExistingRules()
+  showToast('已清除全部分组', 'success')
+}
+
+/** 快照在既有规则表格里的归组（没归过 → 默认「导入的规则」） */
+function groupOfSnapshot(snapshot: ForeignRuleSnapshot): string {
+  return state.existingGroups[snapshotGroupKey(snapshot)] ?? IMPORTED_RULE_GROUP
+}
+
+/**
+ * 行内编辑改了公式/范围后，把分组映射的 key 迁到新 key
+ *
+ * key 由「公式 + 范围」组成，字段一改旧 key 就失配——不迁移的话规则会
+ * 突然掉进「未分组」。迁移后组名跟着规则走。
+ */
+function migrateExistingGroupKey(oldKey: string, nextKey: string): void {
+  const group = state.existingGroups[oldKey]
+  if (group === undefined || oldKey === nextKey) return
+  // 不用 delete：no-dynamic-delete 禁动态键删除。filter 重建一份更直白
+  const groups = Object.fromEntries(
+    Object.entries(state.existingGroups).filter(([key]) => key !== oldKey),
+  )
+  groups[nextKey] = group
+  state.existingGroups = groups
+  persistExistingGroups()
 }
 
 /**
@@ -788,6 +948,9 @@ function commitCellEdit(
 ): void {
   const entry = selectedSheet()
   if (!entry) return
+  // 快照在写 COM 前取：key 迁移要用「改之前」的公式/范围（state.existing 在
+  // 成功后会被 loadExistingRules 刷新）
+  const snapshot = state.existing[index - 1]
   const result =
     kind === 'range'
       ? setForeignAppliesTo(entry.worksheet, index, next)
@@ -797,6 +960,13 @@ function commitCellEdit(
     showToast(`修改失败：${result.error}`, 'error')
     renderExistingRules()
     return
+  }
+  // 分组 key 由公式+范围组成，改了哪个就迁哪个（否则规则掉进「未分组」）
+  if (snapshot) {
+    const oldKey = snapshotGroupKey(snapshot)
+    // 只换被改的字段，另一个沿用原值（三元提到对象构造里，prefer-minimal-ternary）
+    const patched = kind === 'range' ? { ...snapshot, range: next } : { ...snapshot, formula: next }
+    migrateExistingGroupKey(oldKey, snapshotGroupKey(patched))
   }
   const synced = syncImportedRulesInStore(
     oldFormula,
@@ -912,6 +1082,14 @@ function loadRules(): void {
 
 function persistRules(): void {
   setConfig(CONDITIONAL_FORMAT_STORE_KEY, serializeRules(state.rules))
+}
+
+function loadExistingGroups(): void {
+  state.existingGroups = parseExistingGroups(getConfig(EXISTING_GROUPS_STORE_KEY, '', true))
+}
+
+function persistExistingGroups(): void {
+  setConfig(EXISTING_GROUPS_STORE_KEY, serializeExistingGroups(state.existingGroups))
 }
 
 function nextId(): string {
@@ -1586,7 +1764,8 @@ function importSnapshots(
     // 用条件包裹而非 continue（项目禁 continue）：snapshot 缺失说明序号越界，
     // 跳过这条继续处理其余选中项
     if (snapshot) {
-      const rule = foreignSnapshotToRule(snapshot, nextId)
+      // 组名随导入带进规则库：表格里归好的组不丢结构
+      const rule = foreignSnapshotToRule(snapshot, nextId, groupOfSnapshot(snapshot))
       if (rule) imported.push(rule)
       else skipped += 1
     }
@@ -1647,6 +1826,7 @@ export function initializeConditionalFormatPage(): void {
   startThemeSync()
 
   loadRules()
+  loadExistingGroups()
   state.selectedKey = getConfig(KEY_SHEET, '', true)
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('conditional-format')
@@ -1767,6 +1947,23 @@ export function initializeConditionalFormatPage(): void {
     bindColorField(field)
   }
 
+  // 既有规则分组：自动聚类 / 清除 / 归组弹窗
+  byId('conditionalFormatClusterBtn')?.addEventListener('click', () => {
+    autoClusterExistingGroups()
+  })
+  byId('conditionalFormatClearGroupsBtn')?.addEventListener('click', () => {
+    clearExistingGroups()
+  })
+  byId('conditionalFormatGroupConfirm')?.addEventListener('click', () => {
+    confirmGroupName()
+  })
+  byId('conditionalFormatGroupCancel')?.addEventListener('click', () => {
+    closeGroupNameModal()
+  })
+  byId('conditionalFormatGroupMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatGroupMask')) closeGroupNameModal()
+  })
+
   // 导入手工规则：选择弹框（全选 / 全不选 / 确认 / 取消 / 遮罩）
   byId('conditionalFormatImportConfirm')?.addEventListener('click', () => {
     const indices = [...state.importSelection].sort((a, b) => a - b)
@@ -1823,6 +2020,7 @@ export function initializeConditionalFormatPage(): void {
     // 编辑器也关：两个 close 都幂等，另一个弹窗没开时是 no-op
     closeEditor()
     closeImportModal()
+    closeGroupNameModal()
   })
 
   renderRuleList()

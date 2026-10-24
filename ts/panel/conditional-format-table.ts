@@ -17,6 +17,7 @@
  */
 
 import { escapeHtml } from '../tools/string-utilities.js'
+import { UNGROUPED_LABEL, snapshotGroupKey } from './conditional-format-rules.js'
 import type { ForeignRuleSnapshot } from './conditional-format-rules.js'
 
 // ===== 类型标签表 =====
@@ -357,4 +358,48 @@ export function buildForeignRuleHeadHtml(isAllSelected = false): string {
         <span class="conditional-format-col-stop">为真则停</span>
         <span class="conditional-format-col-actions">操作</span>
       </div>`
+}
+
+/**
+ * 既有规则表格的本地分组渲染
+ *
+ * 组序 = 组内首条规则的出现顺序（Map 插入序），「未分组」恒排最后。
+ * 标题复用规则库分组的 class（group-title / group-toggle / group-count），
+ * 两处观感天然一致；折叠只藏行、计数仍在（看得出这组有多少条）。
+ *
+ * @param groups snapshotGroupKey → 组名（页面层从 PluginStorage 读出）
+ * @param collapsed 被收起的分组名集合（会话态）
+ */
+export function buildForeignRuleGroupsHtml(
+  rows: readonly ForeignRuleRow[],
+  groups: Readonly<Record<string, string>>,
+  collapsed: ReadonlySet<string>,
+): string {
+  const buckets = new Map<string, ForeignRuleRow[]>()
+  for (const row of rows) {
+    const group = groups[snapshotGroupKey(row)] ?? UNGROUPED_LABEL
+    const bucket = buckets.get(group)
+    if (bucket) bucket.push(row)
+    else buckets.set(group, [row])
+  }
+  // 「未分组」移到最后：用户主动归好的组应该先看到
+  const ungrouped = buckets.get(UNGROUPED_LABEL)
+  if (ungrouped !== undefined) {
+    buckets.delete(UNGROUPED_LABEL)
+    buckets.set(UNGROUPED_LABEL, ungrouped)
+  }
+  return [...buckets]
+    .map(([group, groupRows]) => {
+      const isCollapsed = collapsed.has(group)
+      return `
+      <div class="conditional-format-group conditional-format-existing-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
+        <div class="conditional-format-group-title">
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-existing-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+          <span class="conditional-format-group-name">${escapeHtml(group)}</span>
+          <span class="conditional-format-group-count">${String(groupRows.length)}</span>
+        </div>
+        ${groupRows.map((row) => buildForeignRuleRowHtml(row)).join('')}
+      </div>`
+    })
+    .join('')
 }

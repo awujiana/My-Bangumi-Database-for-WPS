@@ -26,7 +26,11 @@ import {
   firstRowOfRange,
   groupRules,
   normalizeHexColor,
+  parseExistingGroups,
   parseRules,
+  serializeExistingGroups,
+  snapshotGroupKey,
+  autoClusterGroups,
   planApply,
   serializeRules,
   shiftFormulaRows,
@@ -371,5 +375,69 @@ describe('normalizeHexColor', () => {
     expect(normalizeHexColor('xyz')).toBeNull()
     expect(normalizeHexColor('#12345')).toBeNull()
     expect(normalizeHexColor('#1234567')).toBeNull()
+  })
+})
+
+const snap = (range: string, formula: string): ForeignRuleSnapshot => ({
+  range,
+  formula,
+  kind: 'expression',
+})
+
+describe('snapshotGroupKey / parseExistingGroups', () => {
+  it('键只看公式 + 范围内容，与序号无关', () => {
+    expect(snapshotGroupKey(snap('J2:J9', '=$J2="饮品"'))).toBe(
+      snapshotGroupKey(snap('J2:J9', '=$J2="饮品"')),
+    )
+    expect(snapshotGroupKey(snap('J2:J9', '=$J2="饮品"'))).not.toBe(
+      snapshotGroupKey(snap('J2:J9', '=$J2="大区"')),
+    )
+  })
+
+  it('公式含空格不串键（NUL 分隔）', () => {
+    expect(snapshotGroupKey(snap('A1', '=IF(A1="x", 1, 2)'))).not.toBe(
+      snapshotGroupKey(snap('1, 2)', '=IF(A1="x"')),
+    )
+  })
+
+  it('parseExistingGroups：坏 JSON / 数组 / 空组名都安全收敛', () => {
+    expect(parseExistingGroups('')).toEqual({})
+    expect(parseExistingGroups('{')).toEqual({})
+    expect(parseExistingGroups('[]')).toEqual({})
+    expect(parseExistingGroups('{"a":"x","b":"","c":3}')).toEqual({ a: 'x' })
+  })
+
+  it('serialize / parse 往返一致', () => {
+    const groups = { k1: '饮品', k2: '大区' }
+    expect(parseExistingGroups(serializeExistingGroups(groups))).toEqual(groups)
+  })
+})
+
+describe('autoClusterGroups', () => {
+  it('同模式公式聚成同组、不同模式分开', () => {
+    const groups = autoClusterGroups([
+      { range: 'J2:J9', formula: '=$J2="饮品"', kind: 'expression' },
+      { range: 'J2:J9', formula: '=$J2="大区"', kind: 'expression' },
+      { range: 'K2:K9', formula: '=$K2<>""', kind: 'expression' },
+    ])
+    const values = Object.values(groups)
+    expect(values).toHaveLength(3)
+    expect(values[0]).toBe(values[1])
+    expect(values[0]).toBe('=$J2="*"')
+    expect(values[2]).toBe('=$K2<>"*"')
+  })
+
+  it('数字不归一：行锚与比较值保持原样', () => {
+    const groups = autoClusterGroups([
+      { range: 'A1', formula: '=$A1>100', kind: 'expression' },
+      { range: 'A1', formula: '=$A1>200', kind: 'expression' },
+    ])
+    const values = Object.values(groups)
+    expect(values[0]).not.toBe(values[1])
+    expect(values[0]).toBe('=$A1>100')
+  })
+
+  it('空公式不聚类', () => {
+    expect(autoClusterGroups([{ range: 'A1', formula: '', kind: 'expression' }])).toEqual({})
   })
 })
