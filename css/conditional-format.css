@@ -313,7 +313,9 @@
 
 /* 行可拖拽排序（sortable-list）：行主体给抓手光标，按钮/输入/可编辑单元格除外 */
 .conditional-format-table .conditional-format-row,
-.conditional-format-rule-list .conditional-format-rule {
+.conditional-format-rule-list .conditional-format-rule,
+/* 组标题也可拖（整组调序）：标题里的按钮除外 */
+.conditional-format-rule-list .conditional-format-group-title {
   cursor: grab;
 }
 
@@ -321,7 +323,8 @@
 .conditional-format-table .conditional-format-row input,
 .conditional-format-table .conditional-format-row .conditional-format-cell-editable,
 .conditional-format-rule-list .conditional-format-rule button,
-.conditional-format-rule-list .conditional-format-rule input {
+.conditional-format-rule-list .conditional-format-rule input,
+.conditional-format-rule-list .conditional-format-group-title button {
   cursor: pointer;
 }
 
