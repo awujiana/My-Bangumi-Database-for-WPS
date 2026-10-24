@@ -1770,3 +1770,47 @@ describe('panel-lifecycle · autoDetectAndLockSheet', () => {
     expect(mocks.saveLockedSheet).toHaveBeenCalledWith({ index: 1, name: '动画' }, 'panel')
   })
 })
+
+describe('panel-lifecycle · autoDetectAndLockSheet（锁定短路）', () => {
+  it('已锁定 + 非 force → 跳过检测（momo：锁定了别再为开/关工作簿跑全链）', () => {
+    sheetState.isLocked = true
+    sheetState.lockedName = '番剧'
+    sheetState.lockedWorkbookName = 'BGM.xlsx'
+
+    expect(autoDetectAndLockSheet()).toBe(false)
+    expect(mocks.findBangumiTargetSheets).not.toHaveBeenCalled()
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('已锁定「番剧」，跳过自动检测'),
+    )
+  })
+
+  it('已锁定 + force → 照常全量重扫并覆盖锁定（手动入口）', () => {
+    sheetState.isLocked = true
+    sheetState.lockedName = '番剧'
+    sheetState.lockedWorkbookName = 'BGM.xlsx'
+    mocks.findBangumiTargetSheets.mockReturnValue([
+      {
+        workbookName: 'BGM.xlsx',
+        sheetIndex: 2,
+        sheetName: '动画',
+        headerRow: 1,
+        headerMatchCount: 5,
+        dataRowCount: 30,
+      },
+    ])
+
+    expect(autoDetectAndLockSheet({ force: true })).toBe(true)
+    expect(mocks.findBangumiTargetSheets).toHaveBeenCalled()
+    expect(sheetState.lockedName).toBe('动画')
+    expect(sheetState.lockedIndex).toBe(2)
+  })
+
+  it('未锁定 → 正常走检测（短路只挡已锁定）', () => {
+    sheetState.isLocked = false
+    mocks.findBangumiTargetSheets.mockReturnValue([])
+
+    expect(autoDetectAndLockSheet()).toBe(false)
+    expect(mocks.findBangumiTargetSheets).toHaveBeenCalled()
+  })
+})

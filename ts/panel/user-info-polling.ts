@@ -11,6 +11,7 @@ import {
   bgmLog,
   BGM,
   loadBgToken,
+  findWorkbookByName,
   _getBgmUserId,
   _getBgmUsername,
   updateTokenStatus,
@@ -62,6 +63,16 @@ export function restoreUserInfoFromStorage(): void {
  * 由于 WPS 中 Ribbon 和 Panel 是独立 iframe，postMessage 无法跨上下文通信，
  * 因此 Panel 需要定期从 PluginStorage 读取最新数据并更新 UI。
  */
+
+/**
+ * 工作簿开/关/切换的统一处理防抖（ms）
+ *
+ * 关闭工作簿时 WPS 主进程正在销毁簿，此间的 COM 往返全部排队——
+ * momo 实测：一关簿就卡，卡到「已自动检测表头」toast 才弹出来。
+ * 等 300ms 让主进程腾出手再访问；连续开关多个簿也合并成一次处理。
+ */
+export const WORKBOOK_CHANGE_DEBOUNCE_MS = 300
+
 export function startUserInfoPolling(): void {
   let lastUserId = BGM.cache.userId ?? null
   let lastUsername = BGM.cache.username ?? null
@@ -73,6 +84,56 @@ export function startUserInfoPolling(): void {
   let lastRequestUndoSync: string | null = null
   let lastWorkbookCount = -1
   let lastActiveWorkbookName: string | null = null
+  // 工作簿变化的防抖态（见 scheduleWorkbookChange）
+  let workbookChangeTimer: number | null = null
+  let workbookChangeKind = ''
+  let workbookChangeDetectedAt = 0
+
+  /**
+   * 统一处理「工作簿开/关/切换」（数量与活动簿两个检测源共用）
+   *
+   * 性能日志分段打：防抖等待 / 列表刷新 / 检测锁定，出卡顿时段直接看哪段贵。
+   */
+  const handleWorkbookChange = (kind: string, detectedAt: number): void => {
+    const waited = Math.round(performance.now() - detectedAt)
+    const listStart = performance.now()
+    bgmLog(LOG_LEVELS.INFO, `[perf] 工作簿变化处理开始（${kind}，防抖等待 ${String(waited)}ms）`)
+    refreshWorkbooks()
+    refreshSheets({ autoSelectActive: true })
+    // 锁定态下绝大多数开/关都是「别的簿」：目标还在 → 不 force，
+    // autoDetectAndLockSheet 内部对锁定态短路，整条检测链直接跳过。
+    // 关掉的正是锁定目标 → force 重检测（否则同步按钮指向已消失的表）。
+    const lockedName = BGM.sheet.lockedWorkbookName
+    const shouldForce =
+      BGM.sheet.isLocked && lockedName !== null && findWorkbookByName(lockedName) === null
+    if (shouldForce) {
+      bgmLog(LOG_LEVELS.WARN, `[perf] 锁定的工作簿「${lockedName}」已关闭，强制重新检测`)
+    }
+    const detectStart = performance.now()
+    autoDetectAndLockSheet(shouldForce ? { force: true } : {})
+    // 性能日志（momo：审查性能参数）：防抖等待 / 列表刷新 / 检测锁定三段
+    const listMs = Math.round(detectStart - listStart)
+    const detectMs = Math.round(performance.now() - detectStart)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[perf] 工作簿变化处理完成（${kind}）：列表 ${String(listMs)}ms + 检测 ${String(detectMs)}ms`,
+    )
+  }
+
+  /** 登记一次工作簿变化并（重）排防抖；连续变化只处理最后一次 */
+  const scheduleWorkbookChange = (kind: string): void => {
+    if (workbookChangeDetectedAt === 0) workbookChangeDetectedAt = performance.now()
+    workbookChangeKind = kind
+    if (workbookChangeTimer !== null) clearTimeout(workbookChangeTimer)
+    // 裸 setTimeout 而非 window.setTimeout：jsdom 下 window 自带一份实现，
+    // vitest fake timers 替换不了它，防抖在测试里永远不触发（真机无差别）。
+    workbookChangeTimer = setTimeout(() => {
+      workbookChangeTimer = null
+      const detectedAt = workbookChangeDetectedAt
+      workbookChangeDetectedAt = 0
+      handleWorkbookChange(workbookChangeKind, detectedAt)
+    }, WORKBOOK_CHANGE_DEBOUNCE_MS)
+  }
 
   // 单次轮询逻辑（从 setInterval 回调中上提，避免每次 tick 重建闭包）
   const pollOnce = (): void => {
@@ -87,11 +148,8 @@ export function startUserInfoPolling(): void {
         `[startUserInfoPolling] 检测到工作簿数量变化: ${String(lastWorkbookCount)} → ${String(currentWorkbookCount)}（打开新工作簿或关闭）`,
       )
       lastWorkbookCount = currentWorkbookCount
-      // 刷新工作簿和工作表列表
-      refreshWorkbooks()
-      refreshSheets({ autoSelectActive: true })
-      // 自动在新活动工作簿中搜索一次表头，并锁定它
-      autoDetectAndLockSheet()
+      // 防抖后统一处理：关闭簿的瞬间 COM 全在排队，立即访问就是卡顿源
+      scheduleWorkbookChange('workbook-count')
     }
 
     // 检测活动工作簿切换（用户直接在 WPS 中切换不同工作簿）
@@ -104,11 +162,7 @@ export function startUserInfoPolling(): void {
         `[startUserInfoPolling] 检测到活动工作簿切换: ${lastActiveWorkbookName} → ${activeWbName ?? ''}`,
       )
       lastActiveWorkbookName = activeWbName
-      // 刷新工作簿和工作表列表
-      refreshWorkbooks()
-      refreshSheets({ autoSelectActive: true })
-      // 自动检测新工作簿的表头
-      autoDetectAndLockSheet()
+      scheduleWorkbookChange('active-workbook')
     }
 
     const currentUserId = _getBgmUserId()

@@ -509,7 +509,13 @@ export function autoDetectSheet(options: { force?: boolean } = {}): {
   }
 
   // 跨所有已打开工作簿扫描（表头 + 数据行数 + 名称关键词，优先活动工作簿/工作表）
+  const scanStart = performance.now()
   const candidates = findBangumiTargetSheets()
+  const scanMs = Math.round(performance.now() - scanStart)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[perf] autoDetectSheet: 跨簿全量扫描 ${String(scanMs)}ms，候选 ${String(candidates.length)} 个`,
+  )
   const best = candidates[0]
   if (!best) {
     bgmLog(
@@ -1137,8 +1143,21 @@ export function enlargePreview(): void {
  * 返回 true 表示成功检测并锁定，false 表示未找到有效追踪表
  */
 export function autoDetectAndLockSheet(options: { force?: boolean } = {}): boolean {
+  // 已锁定 + 非强制：整条跳过（momo：识别到锁定后，再打开/关闭工作簿不需要
+  // 重新检测表头——锁定目标不会因别的簿开/关而变，检测 + refreshData 全链
+  // 在关簿瞬间还会和 WPS 的销毁流程抢 COM，卡顿源）。手动入口（工作簿下拉
+  // 切换 / 重新检测按钮）传 force 仍全量重扫。
+  if (options.force !== true && BGM.sheet.isLocked) {
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `autoDetectAndLockSheet: 已锁定「${BGM.sheet.lockedName ?? ''}」，跳过自动检测（force 可强制重扫）`,
+    )
+    return false
+  }
+  const detectStart = performance.now()
   const detected = autoDetectSheet(options)
   if (detected) {
+    const landStart = performance.now()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
     if (wbSelect && detected.workbookName) wbSelect.value = detected.workbookName
     BGM.sheet.lockedIndex = detected.sheetIndex
@@ -1159,6 +1178,16 @@ export function autoDetectAndLockSheet(options: { force?: boolean } = {}): boole
     updateLockButton()
     refreshData()
     showToast(`已自动检测表头: ${detected.sheetName}`, 'info')
+    // 性能日志（momo：审查性能参数）：检测段 / 落地段（列表 + 预览 + toast）分段打
+    const detectMs = Math.round(landStart - detectStart)
+    const landMs = Math.round(performance.now() - landStart)
+    const totalMs = Math.round(performance.now() - detectStart)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[perf] autoDetectAndLockSheet: 检测 ${String(detectMs)}ms + 落地（列表/预览）${String(
+        landMs,
+      )}ms = 总 ${String(totalMs)}ms`,
+    )
     return true
   }
   return false

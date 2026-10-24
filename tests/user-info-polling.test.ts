@@ -20,6 +20,7 @@ const m = vi.hoisted(() => ({
   bgmLog: vi.fn<(level: unknown, message: string) => void>(),
   getApp: vi.fn((): unknown => null),
   loadBgToken: vi.fn((): string | null => null),
+  findWorkbookByName: vi.fn<(name: string) => unknown>(() => null),
   getBgmUserId: vi.fn((): string | null => null),
   getBgmUsername: vi.fn((): string | null => null),
   updateTokenStatus: vi.fn(),
@@ -36,6 +37,13 @@ const { bgmStub, storage } = vi.hoisted(() => {
     bgmStub: {
       cache: { userId: null as string | null, username: null as string | null },
       abortController: { abort: vi.fn() },
+      // 工作表锁定态：轮询的工作簿变化处理要读它（锁定态跳过自动检测）
+      sheet: {
+        lockedIndex: null as number | null,
+        lockedName: null as string | null,
+        isLocked: false,
+        lockedWorkbookName: null as string | null,
+      },
     },
   }
 })
@@ -55,6 +63,7 @@ vi.mock('../ts/index.js', async () => {
     getApp: m.getApp,
     BGM: bgmStub,
     loadBgToken: m.loadBgToken,
+    findWorkbookByName: m.findWorkbookByName,
     _getBgmUserId: m.getBgmUserId,
     _getBgmUsername: m.getBgmUsername,
     updateTokenStatus: m.updateTokenStatus,
@@ -73,7 +82,11 @@ vi.mock('../ts/panel/panel-lifecycle.js', () => ({
 
 import { LOG_LEVELS } from '../ts/core/constants.js'
 import { BGM_EVENTS, eventBus } from '../ts/tools/events.js'
-import { restoreUserInfoFromStorage, startUserInfoPolling } from '../ts/panel/user-info-polling.js'
+import {
+  WORKBOOK_CHANGE_DEBOUNCE_MS,
+  restoreUserInfoFromStorage,
+  startUserInfoPolling,
+} from '../ts/panel/user-info-polling.js'
 
 /** 真实单例上的 spy：每个用例只清调用记录，不 restore（restore 后后续用例就没 spy 了） */
 const emitSpy = vi.spyOn(eventBus, 'emit')
@@ -313,6 +326,10 @@ describe('startUserInfoPolling · 工作簿数量与活动工作簿', () => {
     tick()
     app.Workbooks.Count = 2
     tick()
+    // 防抖：处理推迟 WORKBOOK_CHANGE_DEBOUNCE_MS。注意 vitest 的
+    // advanceTimersByTime 不触发「本轮 tick 执行期间注册」的 timer，
+    // 必须再推进一次防抖时长才能看到处理落地。
+    vi.advanceTimersByTime(WORKBOOK_CHANGE_DEBOUNCE_MS)
 
     expect(hasLog('检测到工作簿数量变化: 1 → 2（打开新工作簿或关闭）')).toBe(true)
     expect(lifecycle.refreshWorkbooks).toHaveBeenCalledTimes(1)
@@ -327,11 +344,48 @@ describe('startUserInfoPolling · 工作簿数量与活动工作簿', () => {
     tick()
     app.ActiveWorkbook.Name = 'Book2.xlsx'
     tick()
+    vi.advanceTimersByTime(WORKBOOK_CHANGE_DEBOUNCE_MS)
 
     expect(hasLog('检测到活动工作簿切换: Book1.xlsx → Book2.xlsx')).toBe(true)
     expect(lifecycle.refreshWorkbooks).toHaveBeenCalledTimes(1)
     expect(lifecycle.refreshSheets).toHaveBeenCalledWith({ autoSelectActive: true })
     expect(lifecycle.autoDetectAndLockSheet).toHaveBeenCalledTimes(1)
+  })
+
+  it('已锁定且目标簿还在 → 不 force（autoDetectAndLockSheet 内部短路）', () => {
+    const app = mountApp({ workbooks: 1 })
+    bgmStub.sheet.isLocked = true
+    bgmStub.sheet.lockedName = '番剧'
+    bgmStub.sheet.lockedWorkbookName = 'BGM.xlsx'
+    m.findWorkbookByName.mockReturnValue({ Name: 'BGM.xlsx' })
+
+    startUserInfoPolling()
+    tick()
+    app.Workbooks.Count = 2
+    tick()
+    vi.advanceTimersByTime(WORKBOOK_CHANGE_DEBOUNCE_MS)
+
+    // 列表照刷（新簿要进下拉），但不 force：锁定态由被调方内部短路
+    expect(lifecycle.refreshWorkbooks).toHaveBeenCalledTimes(1)
+    expect(lifecycle.autoDetectAndLockSheet).toHaveBeenCalledTimes(1)
+    expect(lifecycle.autoDetectAndLockSheet).toHaveBeenCalledWith({})
+  })
+
+  it('锁定目标正是被关掉的簿 → 传 force 重检测（否则同步指向已消失的表）', () => {
+    const app = mountApp({ workbooks: 1 })
+    bgmStub.sheet.isLocked = true
+    bgmStub.sheet.lockedName = '番剧'
+    bgmStub.sheet.lockedWorkbookName = 'BGM.xlsx'
+    // findWorkbookByName 默认返回 null = 目标簿已关
+
+    startUserInfoPolling()
+    tick()
+    app.Workbooks.Count = 0
+    tick()
+    vi.advanceTimersByTime(WORKBOOK_CHANGE_DEBOUNCE_MS)
+
+    expect(lifecycle.autoDetectAndLockSheet).toHaveBeenCalledWith({ force: true })
+    expect(hasLog('锁定的工作簿「BGM.xlsx」已关闭，强制重新检测')).toBe(true)
   })
 
   it('活动工作簿变为「无」→ 日志右侧落空串而非 undefined', () => {
