@@ -10,7 +10,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { showInput, showToast } from '../ui/dialog.js'
+import { showToast } from '../ui/dialog.js'
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js'
 import {
   bgmLog,
@@ -68,6 +68,7 @@ import {
 import { enterSoloMode } from '../tools/module-state.js'
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js'
 import {
+  bindModalCollapse,
   bindModalDrag,
   bringModalIntoView,
   resetModalPosition,
@@ -1331,28 +1332,76 @@ function pasteRules(): void {
     showToast('剪贴板里的规则已不存在', 'warn')
     return
   }
+  // 自有模态框而非通用 showInput：momo 要「可拖动的浮动窗口 + 可收起 +
+  // 按钮小一点离输入框远点」。通用弹窗是桥接的实现，不为单个场景改行为。
+  openPasteModal(sources)
+}
+
+/** 粘贴来源的会话态（弹窗开着期间的数据源；关闭即清） */
+let pasteSources: ConditionalFormatRule[] = []
+
+/** 打开「粘贴规则」弹窗：预填原范围，定位三件套与其它模态框一致 */
+function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
+  pasteSources = [...sources]
   const firstRange = sources[0]?.appliesTo ?? ''
-  showInput(
-    '粘贴规则',
-    `将粘贴 ${String(sources.length)} 条规则。目标范围（留空保持原范围）：`,
-    firstRange,
-    (value) => {
-      const targetRange = (value ?? '').trim() || firstRange
-      // 目标范围首行与原范围不同时，公式里的行号引用跟着平移（$R3 → $R10）
-      const rowDelta = firstRowOfRange(targetRange) - firstRowOfRange(firstRange)
-      const copies = sources.map((rule) => ({
-        ...rule,
-        id: nextId(),
-        name: `${rule.name} 副本`,
-        appliesTo: targetRange,
-        formula: shiftFormulaRows(rule.formula, rowDelta),
-      }))
-      state.rules = [...state.rules, ...copies]
-      persistRules()
-      renderRuleList()
-      showToast(`已粘贴 ${String(copies.length)} 条规则到 ${targetRange}`, 'success')
-    },
-  )
+  const hint = byId('conditionalFormatPasteHint')
+  if (hint) {
+    hint.textContent = `将粘贴 ${String(sources.length)} 条规则。目标范围（留空保持原范围）：`
+  }
+  const input = inputById('conditionalFormatPasteRange')
+  if (input) input.value = firstRange
+
+  const mask = byId('conditionalFormatPasteMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
+  if (mask) {
+    if (modal) resetModalPosition(modal)
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
+  }
+  lockModalScroll()
+  // 打开即聚焦：用户可以直接改范围回车确认，不用先点一下输入框
+  input?.focus()
+  input?.select()
+}
+
+/** 关闭「粘贴规则」弹窗（没开时 no-op：Esc 块连调五个 close，别乱解滚动锁） */
+function closePasteModal(): void {
+  const mask = byId('conditionalFormatPasteMask')
+  // 没开 = no-op：Esc 块连调五个 close，没开的不能解别人的滚动锁
+  if (mask?.style.display === 'none') return
+  if (mask) {
+    mask.style.display = 'none'
+    pasteSources = []
+    unlockModalScroll()
+  }
+}
+
+/** 确认粘贴：按弹窗里的目标范围生成副本（公式行号引用跟着平移） */
+function confirmPaste(): void {
+  const sources = pasteSources
+  if (sources.length === 0) {
+    closePasteModal()
+    return
+  }
+  const firstRange = sources[0]?.appliesTo ?? ''
+  const typedRange = (inputById('conditionalFormatPasteRange')?.value ?? '').trim()
+  // 留空 = 保持原范围（空串与 nullish 都要回退，故不用 ??）
+  const targetRange = typedRange === '' ? firstRange : typedRange
+  // 目标范围首行与原范围不同时，公式里的行号引用跟着平移（$R3 → $R10）
+  const rowDelta = firstRowOfRange(targetRange) - firstRowOfRange(firstRange)
+  const copies = sources.map((rule) => ({
+    ...rule,
+    id: nextId(),
+    name: `${rule.name} 副本`,
+    appliesTo: targetRange,
+    formula: shiftFormulaRows(rule.formula, rowDelta),
+  }))
+  state.rules = [...state.rules, ...copies]
+  persistRules()
+  closePasteModal()
+  renderRuleList()
+  showToast(`已粘贴 ${String(copies.length)} 条规则到 ${targetRange}`, 'success')
 }
 
 function renderRuleList(): void {
@@ -1572,8 +1621,7 @@ function deleteSelectedRules(ids: readonly string[]): void {
   }
   const removed = new Set(ids)
   state.rules = state.rules.filter((rule) => !removed.has(rule.id))
-  // ES2022 目标没有 Set#difference（ES2024）的类型与运行时保证，
-  // filter + has 在任何目标下都对——故不用规则建议的 difference
+  // ES2022 目标没有 Set#difference（ES2024）的类型与运行时保证
 
   state.ruleSelection = new Set([...state.ruleSelection].filter((id) => !removed.has(id)))
   persistRules()
@@ -2317,6 +2365,7 @@ export function initializeConditionalFormatPage(): void {
     ['conditionalFormatImportMask', 'conditionalFormatImportTitle'],
     ['conditionalFormatGroupMask', 'conditionalFormatGroupTitle'],
     ['conditionalFormatConfirmMask', 'conditionalFormatConfirmTitle'],
+    ['conditionalFormatPasteMask', 'conditionalFormatPasteTitle'],
   ]
   for (const [maskId, titleId] of MODAL_DRAG_TARGETS) {
     const mask = byId(maskId)
@@ -2324,6 +2373,21 @@ export function initializeConditionalFormatPage(): void {
     const grip = byId(titleId)
     if (modal && grip) bindModalDrag({ modal, grip })
   }
+
+  // 粘贴规则弹窗：收起 / 展开 + 确定 / 取消 / 遮罩关闭
+  const pasteMask = byId('conditionalFormatPasteMask')
+  const pasteModal = pasteMask?.querySelector<HTMLElement>('.conditional-format-modal')
+  const pasteCollapse = byId('conditionalFormatPasteCollapse')
+  if (pasteModal && pasteCollapse) bindModalCollapse({ modal: pasteModal, button: pasteCollapse })
+  byId('conditionalFormatPasteOk')?.addEventListener('click', () => {
+    confirmPaste()
+  })
+  byId('conditionalFormatPasteCancel')?.addEventListener('click', () => {
+    closePasteModal()
+  })
+  pasteMask?.addEventListener('click', (event) => {
+    if (event.target === pasteMask) closePasteModal()
+  })
 
   // 颜色字段：选择器 / 十六进制手输 / 吸管三边联动（吸管按钮不支持时保持隐藏）
   for (const field of COLOR_FIELDS) {
@@ -2403,10 +2467,11 @@ export function initializeConditionalFormatPage(): void {
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return
     closeConfirmModal()
-    // 编辑器也关：两个 close 都幂等，另一个弹窗没开时是 no-op
+    // 其余弹窗也关：各 close 幂等（没开时 no-op），一次 Esc 全收
     closeEditor()
     closeImportModal()
     closeGroupNameModal()
+    closePasteModal()
   })
 
   // ---- 宿主读取放在全部绑定之后：抛错也只损失首屏数据，不损失交互 ----

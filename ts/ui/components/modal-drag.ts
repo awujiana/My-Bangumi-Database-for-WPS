@@ -146,3 +146,22 @@ export function bringModalIntoView(mask: HTMLElement, modal: HTMLElement): void 
   window.scrollBy(0, delta)
   mask.style.setProperty('top', `${String(window.scrollY)}px`)
 }
+
+/**
+ * 给模态框标题栏的收起按钮绑「收起 / 展开」
+ *
+ * 收起 = 只留标题栏一行（body / footer 用 CSS 藏掉），再点展开——
+ * 与 detachable-panel 浮动窗的 ▾/▸ 同范式（momo：确认框要能收起，
+ * 范围看完先收起来，别一直挡着后面的表格）。
+ *
+ * 只切 class + 改 aria，不碰几何：拖过的位置（fixed + left/top）不受影响，
+ * 展开后还在原处。按钮文字 ▾↔▸ 与模块折叠按钮一致。
+ */
+export function bindModalCollapse(options: { modal: HTMLElement; button: HTMLElement }): void {
+  const { modal, button } = options
+  button.addEventListener('click', () => {
+    const isCollapsed = modal.classList.toggle('is-collapsed')
+    button.textContent = isCollapsed ? '▸' : '▾'
+    button.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
+  })
+}

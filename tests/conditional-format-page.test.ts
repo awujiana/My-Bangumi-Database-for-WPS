@@ -580,3 +580,86 @@ describe('规则库批量操作', () => {
     expect(payload.rules).toHaveLength(3)
   })
 })
+
+/** 先复制一条规则进剪贴板，再打开粘贴弹窗 */
+async function openPasteModalForTest(): Promise<void> {
+  mockConfigWithRules()
+  await openPage()
+  // 行内 ⧉ 复制（第一条规则 r1）
+  const copyButton = ruleRows()[0]!.querySelector<HTMLButtonElement>('button[data-action="copy"]')!
+  copyButton.click()
+  document.getElementById('conditionalFormatPasteBtn')!.click()
+}
+
+// ========== 粘贴规则弹窗（可拖动 + 可收起 + 按钮小） ==========
+
+describe('粘贴规则弹窗', () => {
+  it('点「粘贴」打开自有模态框（不再走通用 showInput），预填原范围', async () => {
+    await openPasteModalForTest()
+
+    const mask = document.getElementById('conditionalFormatPasteMask')!
+    expect(mask.style.display).toBe('flex')
+    expect(document.getElementById('conditionalFormatPasteTitle')?.textContent).toContain(
+      '粘贴规则',
+    )
+    expect(document.getElementById('conditionalFormatPasteHint')?.textContent).toContain(
+      '将粘贴 1 条规则',
+    )
+    // 预填源规则的范围（RULES[0].appliesTo = 'B:B'）
+    const rangeInput = document.getElementById(
+      'conditionalFormatPasteRange',
+    ) as HTMLInputElement | null
+    expect(rangeInput?.value).toBe('B:B')
+  })
+
+  it('标题栏是拖动把手（bindModalDrag 目标之一）', async () => {
+    await openPasteModalForTest()
+
+    const title = document.getElementById('conditionalFormatPasteTitle')!
+    expect(title.classList.contains('conditional-format-modal-grip')).toBe(true)
+  })
+
+  it('收起按钮：点一次只留标题栏，再点恢复', async () => {
+    await openPasteModalForTest()
+
+    const modal = document.querySelector<HTMLElement>(
+      '#conditionalFormatPasteMask .conditional-format-modal',
+    )!
+    const collapse = document.getElementById('conditionalFormatPasteCollapse')!
+    expect(modal.classList.contains('is-collapsed')).toBe(false)
+
+    collapse.click()
+    expect(modal.classList.contains('is-collapsed')).toBe(true)
+    expect(collapse.textContent).toBe('▸')
+    expect(collapse.getAttribute('aria-expanded')).toBe('false')
+
+    collapse.click()
+    expect(modal.classList.contains('is-collapsed')).toBe(false)
+    expect(collapse.textContent).toBe('▾')
+  })
+
+  it('确认粘贴：改目标范围 → 生成副本（公式行号平移）', async () => {
+    await openPasteModalForTest()
+
+    const rangeInput = document.getElementById('conditionalFormatPasteRange') as HTMLInputElement
+    rangeInput.value = 'D:D'
+    document.getElementById('conditionalFormatPasteOk')!.click()
+
+    // 弹窗关闭 + 多了一条副本
+    expect(document.getElementById('conditionalFormatPasteMask')!.style.display).toBe('none')
+    expect(ruleRows()).toHaveLength(4)
+    // 分组渲染：副本跟着源规则留在「番剧高亮」组里（第 3 行）
+    const names = ruleRows().map(
+      (row) => row.querySelector('.conditional-format-rule-name')?.textContent,
+    )
+    expect(names).toContain('当前季 副本')
+  })
+
+  it('取消：关弹窗不产生副本', async () => {
+    await openPasteModalForTest()
+
+    document.getElementById('conditionalFormatPasteCancel')!.click()
+    expect(document.getElementById('conditionalFormatPasteMask')!.style.display).toBe('none')
+    expect(ruleRows()).toHaveLength(3)
+  })
+})
