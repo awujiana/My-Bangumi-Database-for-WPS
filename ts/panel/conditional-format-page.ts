@@ -34,6 +34,7 @@ import {
   firstRowOfRange,
   foreignSnapshotToRule,
   groupRules,
+  moveItemNear,
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
@@ -68,6 +69,9 @@ import {
   bringModalIntoView,
   resetModalPosition,
 } from '../ui/components/modal-drag.js'
+import { attachDelegatedContextMenu } from '../ui/components/context-menu.js'
+import { createSortable } from '../ui/components/sortable-list.js'
+import type { SortableHandle } from '../ui/components/sortable-list.js'
 import {
   applyConditionalFormatPlan,
   checkFormatConditionsReadable,
@@ -173,6 +177,10 @@ interface PageState {
   importForeignRules: ForeignRuleSnapshot[]
   /** 导入弹框里的勾选集（1 基序号，口径同 existingSelection） */
   importSelection: Set<number>
+  /** 规则库列表的拖拽排序句柄（renderRuleList 后 refresh） */
+  ruleSortable: SortableHandle | null
+  /** 既有规则表格的拖拽排序句柄（renderExistingRules 后 refresh） */
+  existingSortable: SortableHandle | null
 }
 
 const state: PageState = {
@@ -197,6 +205,8 @@ const state: PageState = {
   importForeignRules: [],
   importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
+  ruleSortable: null,
+  existingSortable: null,
 }
 
 // ===== DOM 辅助 =====
@@ -464,6 +474,8 @@ function renderExistingRulesInner(container: HTMLElement): void {
   // 浮动窗口顶栏的 ↑↓ / 删除要跟随选中数放开 / 禁用：
   // 按钮在 DOM 搬家范围之外，只能在这里统一同步（渲染的终点）。
   syncFloatToolbarState()
+  // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
+  state.existingSortable?.refresh()
 }
 
 /** 浮动窗口顶栏按钮的可用性（选中数为 0 时 ↑↓ / 删除禁用） */
@@ -1317,7 +1329,7 @@ function renderRuleList(): void {
         .map((rule) => {
           const isHidden = rule.hidden === true
           return `
-        <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}">
+        <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}" title="拖拽调整优先级 · 右键打开操作菜单">
           <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
             <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
           </label>
@@ -1403,6 +1415,8 @@ function renderRuleList(): void {
       })
     })
   })
+  // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
+  state.ruleSortable?.refresh()
 }
 
 // ===== 颜色字段（选择器 + 十六进制手输 + 吸管）=====
@@ -2040,6 +2054,8 @@ export function initializeConditionalFormatPage(): void {
   // 浮动「规则管理器」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
   bindExistingToolbar()
   setupRuleManagerEntry()
+  // 两个列表的拖拽排序 + 行右键菜单（通用组件接入，只建一次）
+  setupSortablesAndMenus()
 
   // 规则操作
   byId('conditionalFormatNewRuleBtn')?.addEventListener('click', () => {
@@ -2225,4 +2241,221 @@ function setupRuleManagerEntry(): void {
   byId('conditionalFormatFloatBtn')?.addEventListener('click', () => {
     enterSoloMode('conditional-format', 'sec-existing')
   })
+}
+
+// ===== 拖拽排序 + 行右键菜单（sortable-list / context-menu 两个通用组件接入）=====
+
+/**
+ * 装配两个列表的拖拽排序与行右键菜单
+ *
+ * - 规则库列表：重排 = 本地 moveItemNear + 持久化（零 COM，即时生效）；
+ * - 既有规则表格：重排 = 按「相邻交换」逐格调 COM 优先级（|Δ| 次
+ *   moveForeignRule），完成后重读整表。WPS 没有「移动一格」原语，逐格交换
+ *   是唯一不丢非公式规则（数据条 / 图标集）的办法——见 moveForeignRule 注释。
+ *
+ * 两个容器都是「子节点反复重渲染、容器本身不动」的形态，故 sortable 与委托
+ * 菜单都只建一次；渲染函数末尾调 handle.refresh() 重新扫描项即可。
+ */
+function setupSortablesAndMenus(): void {
+  // ---- 规则库列表 ----
+  const ruleList = byId('conditionalFormatRuleList')
+  if (ruleList) {
+    state.ruleSortable = createSortable({
+      container: ruleList,
+      itemSelector: '.conditional-format-rule[data-rule-id]',
+      getItemId: (item) => item.dataset.ruleId ?? '',
+      onReorder: (event) => {
+        const next = moveItemNear(state.rules, event.fromId, event.overId, event.placeAfter)
+        // 顺序没变（放到原位的邻居上）→ 不持久化不重渲染
+        const hasChanged = next.some((rule, index) => rule.id !== state.rules[index]?.id)
+        if (!hasChanged) return
+        state.rules = next
+        persistRules()
+        renderRuleList()
+      },
+    })
+    attachDelegatedContextMenu(ruleList, '.conditional-format-rule[data-rule-id]', (item) => {
+      const id = item.dataset.ruleId ?? ''
+      const rule = state.rules.find((candidate) => candidate.id === id)
+      if (!rule) return []
+      const index = state.rules.indexOf(rule)
+      const isHidden = rule.hidden === true
+      return [
+        {
+          id: 'edit',
+          label: '✎ 编辑',
+          onSelect: () => {
+            openEditor(id, false)
+          },
+        },
+        {
+          id: 'copy',
+          label: '⧉ 复制',
+          onSelect: () => {
+            copyRules([id])
+          },
+        },
+        { id: 'sep1', separator: true },
+        {
+          id: 'up',
+          label: '↑ 上移（提高优先级）',
+          disabled: index <= 0,
+          disabledReason: '已经是最高优先级',
+          onSelect: () => {
+            moveRule(id, -1)
+          },
+        },
+        {
+          id: 'down',
+          label: '↓ 下移（降低优先级）',
+          disabled: index >= state.rules.length - 1,
+          disabledReason: '已经是最低优先级',
+          onSelect: () => {
+            moveRule(id, 1)
+          },
+        },
+        { id: 'sep2', separator: true },
+        {
+          id: 'hide',
+          label: isHidden ? '👁 取消隐藏' : '👁 隐藏（留在库内不应用）',
+          onSelect: () => {
+            toggleHidden(id, !isHidden)
+          },
+        },
+        { id: 'sep3', separator: true },
+        {
+          id: 'delete',
+          label: '✕ 删除',
+          danger: true,
+          onSelect: () => {
+            deleteRule(id)
+          },
+        },
+      ]
+    })
+  }
+
+  // ---- 既有规则表格 ----
+  const existingPanel = byId('conditionalFormatExistingPanel')
+  if (existingPanel) {
+    state.existingSortable = createSortable({
+      container: existingPanel,
+      itemSelector: '.conditional-format-row[data-row-index]',
+      getItemId: (item) => item.dataset.rowIndex ?? '',
+      onReorder: (event) => {
+        reorderForeignRules(event.fromId, event.overId, event.placeAfter)
+      },
+    })
+    attachDelegatedContextMenu(
+      existingPanel,
+      '.conditional-format-row[data-row-index]',
+      (item) => {
+        const index = Number(item.dataset.rowIndex ?? '0')
+        const snapshot = state.existing[index - 1]
+        if (!snapshot) return []
+        const canImport = snapshot.kind === 'expression' && snapshot.formula !== ''
+        const isStopKnown = snapshot.stopIfTrue !== undefined
+        return [
+          {
+            id: 'import',
+            label: '⤵ 导入规则库',
+            disabled: !canImport,
+            disabledReason: '该类型插件无法重建，不能导入',
+            onSelect: () => {
+              importForeignRule(index)
+            },
+          },
+          {
+            id: 'group',
+            label: '🏷 归入分组',
+            onSelect: () => {
+              state.existingSelection = new Set<number>([index])
+              renderExistingRules()
+              openGroupNameModal()
+            },
+          },
+          {
+            id: 'stop',
+            label: snapshot.stopIfTrue === true ? '🚦 取消「如果为真则停」' : '🚦 如果为真则停',
+            disabled: !isStopKnown,
+            disabledReason: '当前 WPS 未暴露该属性',
+            onSelect: () => {
+              const entry = selectedSheet()
+              if (!entry) return
+              const result = setForeignStopIfTrue(entry.worksheet, index, snapshot.stopIfTrue !== true)
+              if (result.ok) loadExistingRules()
+              else showToast(`设置失败：${result.error}`, 'error')
+            },
+          },
+          { id: 'sep1', separator: true },
+          {
+            id: 'up',
+            label: '↑ 上移（提高优先级）',
+            disabled: index <= 1,
+            disabledReason: '已经是最高优先级',
+            onSelect: () => {
+              moveForeignRuleRow(index, -1)
+            },
+          },
+          {
+            id: 'down',
+            label: '↓ 下移（降低优先级）',
+            disabled: index >= state.existing.length,
+            disabledReason: '已经是最低优先级',
+            onSelect: () => {
+              moveForeignRuleRow(index, 1)
+            },
+          },
+          { id: 'sep2', separator: true },
+          {
+            id: 'delete',
+            label: '✕ 从工作表删除',
+            danger: true,
+            onSelect: () => {
+              deleteForeignRuleRow(index)
+            },
+          },
+        ]
+      },
+    )
+  }
+}
+
+/**
+ * 既有规则拖拽提交：从 from 逐格交换到目标位（COM 无「移动一格」原语）
+ *
+ * 目标位由落点推算：placeAfter ? over : over - 1；over 为 null = 移到最后。
+ * 逐步调用 moveForeignRule（每次一格、写后回读校验），中途失败即停并 toast
+ * 说明已完成步数——不假装成功，也不丢弃已完成的步骤。
+ */
+function reorderForeignRules(fromId: string, overId: string | null, isPlaceAfter: boolean): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const from = Number(fromId)
+  if (!Number.isSafeInteger(from) || from < 1 || from > state.existing.length) return
+  let target = state.existing.length
+  if (overId !== null) {
+    const over = Number(overId)
+    if (!Number.isSafeInteger(over) || over < 1 || over > state.existing.length) return
+    target = isPlaceAfter ? over : over - 1
+  }
+  if (target === from || target < 1 || target > state.existing.length) return
+  const direction: -1 | 1 = target < from ? -1 : 1
+  let position = from
+  let failure: string | null = null
+  while (position !== target) {
+    const result = moveForeignRule(entry.worksheet, position, direction)
+    if (!result.ok) {
+      failure = result.error
+      break
+    }
+    position += direction
+  }
+  const done = Math.abs(position - from)
+  if (failure !== null) {
+    showToast(`调整中断：${failure}（已完成 ${String(done)} 步）`, 'error')
+  } else if (done > 0) {
+    showToast(`已移动 ${String(done)} 格`, 'success')
+  }
+  loadExistingRules()
 }

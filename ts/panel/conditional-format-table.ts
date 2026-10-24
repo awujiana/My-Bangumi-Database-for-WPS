@@ -327,7 +327,7 @@ export function buildForeignRuleRowHtml(row: ForeignRuleRow): string {
       ? `${row.formula.slice(0, FORMULA_PREVIEW_LIMIT)}…`
       : row.formula
   return `
-      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}">
+      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}" title="拖拽调整优先级 · 右键打开操作菜单">
         <label class="conditional-format-col-check" title="选中后可批量操作（删除 / 导入 / 复制）">
           <input type="checkbox" data-action="select" ${row.selected ? 'checked' : ''} aria-label="选择第 ${String(row.index)} 条规则" />
         </label>

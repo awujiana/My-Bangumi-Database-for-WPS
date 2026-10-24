@@ -94,7 +94,7 @@ describe('toForeignRuleRows', () => {
 describe('buildForeignRuleRowHtml', () => {
   const baseRow: ForeignRuleRow = {
     index: 3,
-    groupKey: '=$R3="26年10月"\u0000$B$3:$B$26958',
+    groupKey: '=$R3="26年10月"\u{0}$B$3:$B$26958',
     typeLabel: '公式',
     rebuildable: true,
     selected: false,
@@ -156,7 +156,7 @@ describe('formatSwatchHtml', () => {
   it('填充色与字体色都在（WPS 只显示填充）', () => {
     const html = formatSwatchHtml({
       index: 1,
-      groupKey: '\u0000A1',
+      groupKey: '\u{0}A1',
       typeLabel: '公式',
       rebuildable: true,
       selected: false,
@@ -173,7 +173,7 @@ describe('formatSwatchHtml', () => {
   it('读不到颜色时用斜纹占位（不是空白，用户看得出「没读到」）', () => {
     const html = formatSwatchHtml({
       index: 1,
-      groupKey: '\u0000A1',
+      groupKey: '\u{0}A1',
       typeLabel: '公式',
       rebuildable: true,
       selected: false,

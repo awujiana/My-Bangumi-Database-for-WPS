@@ -28,6 +28,7 @@ import {
   filterRules,
   firstRowOfRange,
   groupRules,
+  moveItemNear,
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
@@ -484,5 +485,37 @@ describe('dissolveGroupMapping', () => {
 
   it('解散最后一个组得到空映射（回到平铺视图）', () => {
     expect(dissolveGroupMapping({ k1: '饮品' }, '饮品')).toEqual({})
+  })
+})
+
+// ========== 拖拽重排（moveItemNear）==========
+
+describe('moveItemNear', () => {
+  const items = [
+    { id: 'a', name: 'A' },
+    { id: 'b', name: 'B' },
+    { id: 'c', name: 'C' },
+    { id: 'd', name: 'D' },
+  ]
+
+  it('移到某项之后 / 之前', () => {
+    expect(moveItemNear(items, 'a', 'c', true).map((item) => item.id)).toEqual(['b', 'c', 'a', 'd'])
+    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual(['a', 'd', 'b', 'c'])
+  })
+
+  it('overId 为 null = 移到最后', () => {
+    expect(moveItemNear(items, 'a', null, true).map((item) => item.id)).toEqual(['b', 'c', 'd', 'a'])
+  })
+
+  it('from / over 有一个不存在就原样返回（调用方跳过持久化）', () => {
+    expect(moveItemNear(items, 'x', 'b', true)).toEqual(items)
+    expect(moveItemNear(items, 'a', 'y', true)).toEqual(items)
+  })
+
+  it('from 在 over 之前时之后插入不受「移除位移」影响', () => {
+    // a 移到 c 之后：先移除 a（b,c,d）再插到 c 后 → b,c,a,d
+    expect(moveItemNear(items, 'a', 'c', true).map((item) => item.id)).toEqual(['b', 'c', 'a', 'd'])
+    // d 移到 b 之前：移除 d（a,b,c）再插到 b 前 → a,d,b,c
+    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual(['a', 'd', 'b', 'c'])
   })
 })

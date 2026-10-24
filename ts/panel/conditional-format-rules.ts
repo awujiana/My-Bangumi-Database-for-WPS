@@ -395,6 +395,32 @@ export function dissolveGroupMapping(
   return next
 }
 
+// ===== 拖拽重排（sortable-list 的提交语义：from 移到 over 旁）=====
+
+/**
+ * 把 fromId 项移到 overId 项旁边（placeAfter = 之后 / 之前）；overId 为 null = 移到最后
+ *
+ * 拖拽排序的提交语义（与 ui/components/sortable-list.ts 的 SortableReorderEvent
+ * 对齐）：不传「目标下标」而传「落点项」——下标在分组 / 搜索视图下会漂（DOM 序
+ * ≠ 全量序），落点 id 在任何视图下都稳定。找不到 from / over 时原样返回
+ * （调用方据此跳过持久化与重渲染）。
+ */
+export function moveItemNear<T extends { id: string }>(
+  items: readonly T[],
+  fromId: string,
+  overId: string | null,
+  isPlaceAfter: boolean,
+): T[] {
+  const from = items.find((item) => item.id === fromId)
+  if (from === undefined) return [...items]
+  const rest = items.filter((item) => item.id !== fromId)
+  if (overId === null) return [...rest, from]
+  const overIndex = rest.findIndex((item) => item.id === overId)
+  if (overIndex === -1) return [...items]
+  const at = isPlaceAfter ? overIndex + 1 : overIndex
+  return [...rest.slice(0, at), from, ...rest.slice(at)]
+}
+
 // ===== 搜索 / 分组 =====
 
 /** 搜索：名称 / 公式 / 范围 / 分组，大小写不敏感子串 */

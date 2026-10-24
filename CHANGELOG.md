@@ -8,6 +8,34 @@
 
 ## [未发布]
 
+### 可拖拽排序 + 通用右键菜单：两个新组件，条件格式页先行接入（2026-10-24）
+
+momo：「参考 dnd-kit 做出可拖拽的条件格式规则，还要有右键菜单，做通用的右键菜单模块，每个页面的组件可加」。
+
+**通用右键菜单** `ts/ui/components/context-menu.ts` + `css/context-menu.css`（六个页面 head 全部 link，任何组件一行接线可挂）：
+
+- **单例**：同时只存在一个菜单，开新的先关旧的（绝不叠罗汉）；
+- **视口翻转定位**：`resolveMenuPosition` 纯函数——默认指针处展开，右 / 下溢出翻另一侧，永不出屏；
+- **完整键盘**：↑↓ 循环导航、Home/End、Enter 执行、Esc 关闭并**还原焦点**、Tab 不困在菜单里；aria role=menu/menuitem；
+- **关闭时机**：Esc、外部 pointerdown（capture 阶段）、scroll/resize（页面滚走还原地挂着比没有更糟）、执行动作后；
+- 两种挂载：`attachContextMenu`（稳定元素）+ `attachDelegatedContextMenu`（动态列表——容器委托，行重渲染不丢监听，347 行也不用逐行解绑重挂）；
+- 危险项标红、禁用项保留可见（aria-disabled + 原因 title）、快捷键提示、分隔线。
+- 测试（jsdom，23 例）当场抓出两个真 bug：① 没有 onSelect 的项被偷偷标 aria-disabled（读屏念成「禁用」，而它只是没接线）；② Esc 在 `hideContextMenu()` **之后**才读 `focusReturn`（已被清空 → 焦点还原静默失效，键盘用户 Esc 后焦点掉去 body）。
+
+**可拖拽排序** `ts/ui/components/sortable-list.ts` + `css/sortable-list.css`（dnd-kit 核心范式的轻量实现，零依赖）：
+
+- **指针传感器**：按下移动超过 5px 才进入拖拽（dnd-kit 的 activation constraint）——单击 / 行内按钮 / 可编辑单元格完全不受扰；
+- **键盘传感器**（dnd-kit 招牌无障碍）：项可 Tab 聚焦，Space 拾起、↑↓ 移动（DOM 实时换位给预览）、Space 放置、Esc 取消并还原 DOM，全程 aria-live 播报「已拾起第 N 项 / 第 M 项 / 已放置」；
+- **中点碰撞检测**（`computeDropTarget` 纯函数）、克隆 overlay 跟手（transform 合成层，一帧至多写一次）、放置指示线、**放置动画**（松手后浮层飞到新位置再销毁，dnd-kit DropAnimation 同款）、指针贴边**自动滚动**、拖拽后吞掉那次 click（不误触发行内按钮）；
+- 视口钳制：横向允许露头但保证 ≥96px 可抓宽度——「拖出去找不回来」是最糟失败模式。
+
+**条件格式页接入**（两个列表都支持「拖 + 右键」）：
+
+- **规则库列表**：拖拽 = 本地 `moveItemNear` 重排 + 持久化（零 COM，即时生效）；右键菜单：✎ 编辑 / ⧉ 复制 / ↑↓ 上移下移（边界禁用 + 原因）/ 👁 隐藏 / ✕ 删除；
+- **既有规则表格**：拖拽 = 按「相邻交换」逐格调 COM 优先级（|Δ| 次 `moveForeignRule`，每次写后回读校验；中途失败即停并 toast 已完成步数——WPS 没有「移动一格」原语，逐格交换是唯一不丢数据条 / 图标集等非公式规则的办法）；右键菜单：⤵ 导入 / 🏷 归入分组 / 🚦 切换「如果为真则停」/ ↑↓ / ✕ 删除；
+- 行 title 提示「拖拽调整优先级 · 右键打开操作菜单」，行主体抓手光标（按钮 / 输入 / 可编辑单元格除外）。
+- 新增单测：sortable-list 19 例（纯函数 + jsdom 真实指针 / 键盘事件）、context-menu 23 例、moveItemNear 5 例。
+
 ### 规则管理器交互缺陷一轮修：分组收起 / 重命名 / 解散、上移下移、浮窗可拖（2026-10-24）
 
 momo 实测「规则管理器」（条件格式页「既有规则」表格 + 三个模态框）六个缺陷，
