@@ -107,6 +107,12 @@
   height: 96%;
 }
 
+/* 最大化 + 收起：位置与宽度仍是最大化的，只露标题栏一行。
+   TS 侧在最大化态不写内联高度，这条规则才能接管（否则被内联顶掉）。 */
+.detachable-panel.is-maximized.is-collapsed {
+  height: var(--detachable-collapsed-h, 40px);
+}
+
 /* ---- 标题栏 ---- */
 .detachable-panel-header {
   display: flex;
@@ -173,25 +179,6 @@
 }
 
 .detachable-panel-icon-btn:hover {
-  color: var(--text-1);
-  background: var(--bg-surface-2);
-}
-
-/* 还原按钮：文字而非图标 —— 三个并排小图标曾被当成「刷新窗口」，
-   显式文字让「放回页面原位」不用猜。 */
-.detachable-panel-restore-btn {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--text-2);
-  background: transparent;
-  border: 1px solid var(--border-1, transparent);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-}
-
-.detachable-panel-restore-btn:hover {
   color: var(--text-1);
   background: var(--bg-surface-2);
 }

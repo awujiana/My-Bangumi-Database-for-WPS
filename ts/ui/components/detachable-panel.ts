@@ -75,6 +75,14 @@ export const DEFAULT_PANEL_WIDTH = 720
 export const DEFAULT_PANEL_HEIGHT = 520
 
 /**
+ * 浮动窗比区块多出来的 chrome 高度估计（标题栏 + body 内边距 + 卡片皮差）
+ *
+ * 自适应尺寸时给区块测量值加这个余量：少了它窗口底部会差一两行、
+ * 出现本不该有的滚动条。
+ */
+export const PANEL_CHROME_ALLOWANCE = 48
+
+/**
  * 浮动窗口的层级：低于页面模态框（各页 modal-mask 都是 1000），
  * 高于正文（正文最高 100）。多窗口不靠 z-index 抢层级 —— 一律用同一个值，
  * 谁在上面由 DOM 顺序决定，「点谁谁置顶」就是把节点重新 append 到 body 末尾。
@@ -349,6 +357,31 @@ function isExplicitGridSpan(value: string): boolean {
 }
 
 /**
+ * 量区块的内容尺寸，供浮动窗口**初始大小自适应**
+ *
+ * 固定 720×520 对只有六个按钮的「开始同步」会留大片空白（momo 反馈：
+ * 浮动窗口体积太大、空出来的区域太多）。按内容量：区块多高窗口就多高，
+ * 宽度同理；量不到（宿主不给布局 / 区块隐藏）时兜底默认值。
+ *
+ * 必须在 `detach()` 里调（区块还挂在原页面、尺寸是页面里的真实尺寸）；
+ * 搬进窗口后它脱了卡片皮、换了容器，量到的就对不上原布局了。
+ */
+function measureSectionSize(section: HTMLElement): { width: number; height: number } {
+  try {
+    const box = section.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) {
+      return { width: DEFAULT_PANEL_WIDTH, height: DEFAULT_PANEL_HEIGHT }
+    }
+    return {
+      width: Math.round(box.width) + PANEL_CHROME_ALLOWANCE,
+      height: Math.round(box.height) + PANEL_CHROME_ALLOWANCE,
+    }
+  } catch {
+    return { width: DEFAULT_PANEL_WIDTH, height: DEFAULT_PANEL_HEIGHT }
+  }
+}
+
+/**
  * 造一个 native 模式句柄：把区块换成宿主原生独立窗口
  *
  * ## 与 float 模式的两处本质差异
@@ -509,12 +542,14 @@ function bindDrag(
   })
 }
 
-/** 从区块里取标题文本：优先 data 属性，其次 h3/h2 文本（去掉内嵌按钮的字） */
+/** 从区块里取标题文本：优先 data 属性，其次标题元素文本（去掉内嵌按钮的字） */
 function readSectionTitle(section: HTMLElement): string {
   const fromAttribute = section.dataset.detachableTitle
   if (fromAttribute) return fromAttribute.trim()
 
-  const heading = section.querySelector('h3, h2')
+  // .command-title 也要认：sec-command（开始同步）用的是 div 而不是 h3，
+  // 只找 h3/h2 会退化成「浮动窗口」——窗口标题与内容标题对不上（momo 反馈）。
+  const heading = section.querySelector('h3, h2, .command-title')
   if (!heading) return '浮动窗口'
 
   const clone = heading.cloneNode(true) as HTMLElement
@@ -575,8 +610,10 @@ export function createDetachablePanel(
 
   const resolved: DetachablePanelOptions = {
     title: options.title ?? readSectionTitle(section),
-    width: options.width ?? readNumberAttribute(section, 'width') ?? DEFAULT_PANEL_WIDTH,
-    height: options.height ?? readNumberAttribute(section, 'height') ?? DEFAULT_PANEL_HEIGHT,
+    // 不再 fallback 到 DEFAULT：undefined = 「按内容自适应」，由 detach 首开时
+    // 量区块尺寸决定（显式配了 width/height 的区块仍听配置）。
+    width: options.width ?? readNumberAttribute(section, 'width'),
+    height: options.height ?? readNumberAttribute(section, 'height'),
     mode: options.mode ?? readOptionsFromDataset(section).mode,
     nativeUrl: options.nativeUrl ?? section.dataset.detachableUrl,
     toolbar: options.toolbar ?? elementById(section.dataset.detachableToolbar),
@@ -613,11 +650,16 @@ export function createDetachablePanel(
   }
 
   function applySize(): void {
+    // 最大化期间不写内联尺寸：内联优先级高于 .is-maximized 的 inset，
+    // 一写就把最大化窗口顶回旧尺寸（momo 反馈：最大化还会自己变回去）。
+    // 所有写回路径（拖动结束 / 缩放 / 展开）都必须经过这里或 applyRect。
+    if (root.classList.contains(MAXIMIZED_CLASS)) return
     root.style.width = `${String(rect.width)}px`
     root.style.height = `${String(rect.height)}px`
   }
 
   function applyRect(): void {
+    if (root.classList.contains(MAXIMIZED_CLASS)) return
     applyPosition()
     applySize()
     // transform 是「只在拖动期存在」的临时偏移，任何一次全量落地都把它撤掉，
@@ -648,7 +690,11 @@ export function createDetachablePanel(
   const actions = makeDiv('detachable-panel-actions')
   const buttonCollapse = makeIconButton('▾', '收起 / 展开', 'detachable-panel-icon-btn', () => {
     const isCollapsed = root.classList.toggle(COLLAPSED_CLASS)
-    root.style.height = isCollapsed ? `${String(COLLAPSED_HEIGHT)}px` : `${String(rect.height)}px`
+    // 最大化态一律不写内联高度：inset 的 96% 与收起高度都交给 CSS 规则
+    // （.is-maximized / .is-maximized.is-collapsed），内联一写就顶掉它们
+    if (!root.classList.contains(MAXIMIZED_CLASS)) {
+      root.style.height = isCollapsed ? `${String(COLLAPSED_HEIGHT)}px` : `${String(rect.height)}px`
+    }
     buttonCollapse.textContent = isCollapsed ? '▸' : '▾'
     buttonCollapse.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
   })
@@ -668,12 +714,12 @@ export function createDetachablePanel(
     }
     buttonMaximize.textContent = isMaximized ? '⤡' : '⤢'
   })
-  // 还原按钮用**文字**而非图标：三个并排小图标（▾ ⤢ ✕）曾被当成「刷新窗口」，
-  // 没人猜得到 ✕ 是「放回页面原位」。文字按钮语义自明，不再依赖 tooltip。
+  // 还原按钮改用图标（⧉）而非文字：momo 要求与其它窗口按钮统一。
+  // 图标语义弱于文字，故 tooltip / aria-label 写全「放回页面原位」。
   const buttonRestore = makeIconButton(
-    '还原',
+    '⧉',
     '还原：把模块放回页面原位',
-    'detachable-panel-restore-btn',
+    'detachable-panel-icon-btn',
     () => {
       attach()
     },
@@ -744,7 +790,8 @@ export function createDetachablePanel(
       applyRect()
       // 收起态：applyRect 会把内联高度写回展开值，这里压回收起高度，
       // 保持「只剩标题栏一行」，且位置已按收起高度钳制、可拖到底部。
-      if (isDragCollapsed) {
+      // 最大化态跳过（写了就把最大化顶回去）。
+      if (isDragCollapsed && !root.classList.contains(MAXIMIZED_CLASS)) {
         root.style.height = `${String(COLLAPSED_HEIGHT)}px`
       }
     },
@@ -785,6 +832,29 @@ export function createDetachablePanel(
   function detach(): void {
     // 无条件 append（已连接时等于「移到末尾」）：后开的窗口排在后面，天然在上面
     document.body.append(root)
+    // 首次打开（无记忆几何、无显式尺寸配置）时按内容量尺寸：
+    // 固定默认值对内容少的区块会留大片空白（momo 反馈：体积太大、空区域太多）。
+    // 用户拖过/缩放过后几何进 memory，之后都听 memory。
+    if (
+      !geometryMemory.has(panelId) &&
+      resolved.width === undefined &&
+      resolved.height === undefined
+    ) {
+      const measured = measureSectionSize(section)
+      // defaultPanelRect 内部过 clampSize（下限 MIN_PANEL_*、上限视口），
+      // 拿回来的尺寸必须接住——直接把测量值赋给 rect 会绕过钳制
+      // （348px 的窗比 MIN_PANEL_WIDTH 还窄，拖把手都按不准）。
+      const centered = defaultPanelRect(
+        detachedClosers.length,
+        readViewport(),
+        measured.width,
+        measured.height,
+      )
+      rect.width = centered.width
+      rect.height = centered.height
+      rect.left = centered.left
+      rect.top = centered.top
+    }
     if (homeParent?.isConnected) {
       if (homeNextSibling?.isConnected) homeNextSibling.before(placeholder)
       else homeParent.append(placeholder)

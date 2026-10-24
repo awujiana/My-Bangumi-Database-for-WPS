@@ -258,3 +258,127 @@ describe('closeAllDetachedPanels', () => {
     expect(handleB!.isDetached()).toBe(false)
   })
 })
+
+/** 标题栏按钮按 title 找（文本会随状态变：▾↔▸、⤢�⤡） */
+function windowButton(label: string): HTMLButtonElement {
+  const buttons = [...one(`.${PANEL_CLASS}-header`).querySelectorAll<HTMLButtonElement>('button')]
+  const found = buttons.find((button) => button.title === label)
+  if (!found) throw new Error(`标题栏没有 title 为「${label}」的按钮`)
+  return found
+}
+
+describe('浮动窗口初始尺寸按内容自适应', () => {
+  it('未配置尺寸的区块：首开按「测量值 + chrome 余量」，仍受下限钳制', () => {
+    stubLayout(180)
+    const section = makeSection('sec-autosize')
+    const handle = createDetachablePanel(section)
+
+    handle!.detach()
+
+    const root = one(`.${PANEL_CLASS}`)
+    // 宽：测量 300 + 余量 48 = 348 → 被 MIN_PANEL_WIDTH(360) 钳到 360
+    expect(root.style.width).toBe('360px')
+    // 高：180 + 48 = 228（高于 MIN_PANEL_HEIGHT 200，原样落下）
+    expect(root.style.height).toBe('228px')
+  })
+
+  it('显式配了 data-detachable-width/height 的区块不听自适应', () => {
+    stubLayout(180)
+    const section = makeSection('sec-fixed')
+    section.dataset.detachableWidth = '500'
+    section.dataset.detachableHeight = '400'
+    const handle = createDetachablePanel(section)
+
+    handle!.detach()
+
+    const root = one(`.${PANEL_CLASS}`)
+    expect(root.style.width).toBe('500px')
+    expect(root.style.height).toBe('400px')
+  })
+
+  it('第二次打开听 memory：量到的内容变了也不重新自适应', () => {
+    stubLayout(180)
+    const section = makeSection('sec-memory')
+    const handle = createDetachablePanel(section)
+
+    handle!.detach()
+    const root = one(`.${PANEL_CLASS}`)
+    // 首次自适应：360 × 228（见上一用例）
+    expect(root.style.width).toBe('360px')
+    // 收回时 rememberRect 把几何写进 memory
+    handle!.attach()
+    // 内容长高了（比如展开了一组规则），再拖出仍用 memory，不重新量
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      height: 600,
+      width: 800,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    })
+    handle!.detach()
+
+    expect(root.style.width).toBe('360px')
+    expect(root.style.height).toBe('228px')
+  })
+})
+
+describe('最大化期间不写回内联几何', () => {
+  it('最大化后点展开不写内联高度（否则窗口弹回旧尺寸）', () => {
+    stubLayout(180)
+    const section = makeSection('sec-max')
+    const handle = createDetachablePanel(section)
+    handle!.detach()
+
+    const root = one(`.${PANEL_CLASS}`)
+    const collapse = windowButton('收起 / 展开')
+    const maximize = windowButton('最大化 / 还原')
+
+    // 收起 → 展开：既有路径，内联高度正常落
+    collapse.click()
+    expect(root.style.height).toBe('40px')
+    collapse.click()
+    expect(root.style.height).toBe('228px')
+
+    // 最大化：清内联几何，inset 接管
+    maximize.click()
+    expect(root.classList.contains('is-maximized')).toBe(true)
+    expect(root.style.height).toBe('')
+    expect(root.style.width).toBe('')
+
+    // 最大化态下展开：不写内联高度（写了就顶掉 inset，窗口弹回）
+    collapse.click()
+    expect(root.style.height).toBe('')
+    expect(root.classList.contains('is-maximized')).toBe(true)
+
+    // 取消最大化：applyRect 恢复内联几何
+    maximize.click()
+    expect(root.classList.contains('is-maximized')).toBe(false)
+    expect(root.style.height).toBe('228px')
+  })
+})
+
+describe('窗口标题读取', () => {
+  it('区块标题是 div.command-title 时也能读到（不再退化成「浮动窗口」）', () => {
+    document.body.replaceChildren()
+    const main = document.createElement('main')
+    document.body.append(main)
+    const section = document.createElement('section')
+    section.id = 'sec-command'
+    section.dataset.detachable = 'true'
+    // sec-command（开始同步）用的是 div 而不是 h3/h2
+    const title = document.createElement('div')
+    title.className = 'command-title'
+    title.textContent = '开始同步'
+    section.append(title)
+    main.append(section)
+    const handle = createDetachablePanel(section)
+
+    handle!.detach()
+
+    expect(one(`.${PANEL_CLASS}-title`).textContent).toBe('开始同步')
+  })
+})
