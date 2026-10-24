@@ -34,12 +34,14 @@ import {
   firstRowOfRange,
   foreignSnapshotToRule,
   groupRules,
+  moveGroupNear,
   moveItemNear,
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
   planApply,
   renameGroupMapping,
+  reorderGroups,
   serializeExistingGroups,
   serializeRules,
   shiftFormulaRows,
@@ -179,6 +181,8 @@ interface PageState {
   importSelection: Set<number>
   /** 规则库列表的拖拽排序句柄（renderRuleList 后 refresh） */
   ruleSortable: SortableHandle | null
+  /** 规则库列表「组标题」的拖拽排序句柄（拖组标题 = 整组调整次序） */
+  groupSortable: SortableHandle | null
   /** 既有规则表格的拖拽排序句柄（renderExistingRules 后 refresh） */
   existingSortable: SortableHandle | null
 }
@@ -206,6 +210,7 @@ const state: PageState = {
   importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
   ruleSortable: null,
+  groupSortable: null,
   existingSortable: null,
 }
 
@@ -1352,7 +1357,7 @@ function renderRuleList(): void {
         .join('')
       return `
       <div class="conditional-format-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
-        <div class="conditional-format-group-title">
+        <div class="conditional-format-group-title" title="拖动调整分组顺序（整组一起动）">
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(rules.length)}</span>
@@ -1417,6 +1422,7 @@ function renderRuleList(): void {
   })
   // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
   state.ruleSortable?.refresh()
+  state.groupSortable?.refresh()
 }
 
 // ===== 颜色字段（选择器 + 十六进制手输 + 吸管）=====
@@ -2267,6 +2273,24 @@ function setupSortablesAndMenus(): void {
       onReorder: (event) => {
         const next = moveItemNear(state.rules, event.fromId, event.overId, event.placeAfter)
         // 顺序没变（放到原位的邻居上）→ 不持久化不重渲染
+        const hasChanged = next.some((rule, index) => rule.id !== state.rules[index]?.id)
+        if (!hasChanged) return
+        state.rules = next
+        persistRules()
+        renderRuleList()
+      },
+    })
+    // 组标题也可拖：整组调整次序（组序 = 组内首条规则的位置，落成规则序即可）
+    state.groupSortable = createSortable({
+      container: ruleList,
+      itemSelector: '.conditional-format-group-title',
+      getItemId: (item) => item.closest<HTMLElement>('[data-group]')?.dataset.group ?? '',
+      onReorder: (event) => {
+        // 当前组序取**全量**规则（不是搜索后的可见序）：overId 可能只出现在
+        // 可见序里，但搬迁必须落在全量序上，否则未可见的组会被挤到队尾
+        const currentOrder = groupRules(state.rules).map(([group]) => group)
+        const nextOrder = moveGroupNear(currentOrder, event.fromId, event.overId, event.placeAfter)
+        const next = reorderGroups(state.rules, nextOrder)
         const hasChanged = next.some((rule, index) => rule.id !== state.rules[index]?.id)
         if (!hasChanged) return
         state.rules = next

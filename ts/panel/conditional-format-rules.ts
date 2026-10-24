@@ -421,6 +421,64 @@ export function moveItemNear<T extends { id: string }>(
   return [...rest.slice(0, at), from, ...rest.slice(at)]
 }
 
+// ===== 分组排序（拖组标题 → 按新组序重排规则）=====
+
+/**
+ * 按给定组序重排规则（组内相对顺序不变；未列出的组按原相对序追加在后）
+ *
+ * 语义：分组的次序 = 组内首条规则在数组里的位置（groupRules 的 Map 插入序）。
+ * 把组 G 拖到最前 = G 的全部成员（保持组内先后）整体移到数组前部。这样
+ * 「拖组标题」与「拖单条规则」落到同一个持久化结构上，不需要额外的组序状态。
+ *
+ * @param orderedGroups 新的组序（拖拽提交时的 DOM 序；只含当前可见的组）
+ * @returns 新数组；组序没变时返回原数组的副本（调用方比较后跳过持久化）
+ */
+export function reorderGroups<T extends { group: string }>(
+  items: readonly T[],
+  orderedGroups: readonly string[],
+): T[] {
+  const buckets = new Map<string, T[]>()
+  for (const item of items) {
+    const bucket = buckets.get(item.group)
+    if (bucket) bucket.push(item)
+    else buckets.set(item.group, [item])
+  }
+  // 新序：先按 orderedGroups（只取真实存在的组），再补未列出的组（原相对序）
+  const order = [
+    ...orderedGroups.filter((group) => buckets.has(group)),
+    ...[...buckets.keys()].filter((group) => !orderedGroups.includes(group)),
+  ]
+  // 同序短路：组序没变时原样返回——否则「拖到邻居位上」的无操作拖拽也会把
+  // 交错的分组整块化（A,B,A,C,B → A,A,B,B,C），用户没要求的重排被持久化
+  const currentOrder = [...buckets.keys()]
+  const isSameOrder =
+    order.length === currentOrder.length &&
+    order.every((group, index) => group === currentOrder[index])
+  if (isSameOrder) return [...items]
+  const next: T[] = []
+  for (const group of order) {
+    next.push(...(buckets.get(group) ?? []))
+  }
+  return next
+}
+
+/**
+ * 组序数组里把 from 组移到 over 组旁边（overGroup 为 null = 移到最后）
+ *
+ * 与 {@link moveItemNear} 同语义，作用于「组序」这一维：包一层 { id } 复用
+ * 同一套搬运逻辑，避免两处各写一遍 splice。调用方（页面）拿当前**全量**
+ * 组序（不是搜索后的可见序）做搬迁，再交给 {@link reorderGroups} 落成规则序。
+ */
+export function moveGroupNear(
+  groupOrder: readonly string[],
+  fromGroup: string,
+  overGroup: string | null,
+  isPlaceAfter: boolean,
+): string[] {
+  const wrapped = groupOrder.map((name) => ({ id: name }))
+  return moveItemNear(wrapped, fromGroup, overGroup, isPlaceAfter).map((entry) => entry.id)
+}
+
 // ===== 搜索 / 分组 =====
 
 /** 搜索：名称 / 公式 / 范围 / 分组，大小写不敏感子串 */

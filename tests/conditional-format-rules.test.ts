@@ -28,11 +28,13 @@ import {
   filterRules,
   firstRowOfRange,
   groupRules,
+  moveGroupNear,
   moveItemNear,
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
   renameGroupMapping,
+  reorderGroups,
   serializeExistingGroups,
   snapshotGroupKey,
   autoClusterGroups,
@@ -517,5 +519,47 @@ describe('moveItemNear', () => {
     expect(moveItemNear(items, 'a', 'c', true).map((item) => item.id)).toEqual(['b', 'c', 'a', 'd'])
     // d 移到 b 之前：移除 d（a,b,c）再插到 b 前 → a,d,b,c
     expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual(['a', 'd', 'b', 'c'])
+  })
+})
+
+// ========== 分组排序（reorderGroups / moveGroupNear）==========
+
+describe('reorderGroups', () => {
+  const rules = [
+    { id: '1', group: 'A' },
+    { id: '2', group: 'B' },
+    { id: '3', group: 'A' },
+    { id: '4', group: 'C' },
+    { id: '5', group: 'B' },
+  ]
+
+  it('按新组序整块搬迁，组内相对顺序不变', () => {
+    const next = reorderGroups(rules, ['C', 'B', 'A'])
+    expect(next.map((rule) => rule.id)).toEqual(['4', '2', '5', '1', '3'])
+    expect(next.map((rule) => rule.group)).toEqual(['C', 'B', 'B', 'A', 'A'])
+  })
+
+  it('未列出的组按原相对序追加在后（拖拽只搬了可见的组）', () => {
+    const next = reorderGroups(rules, ['C'])
+    // C 整块到最前，A/B 保持原相对序（A 的首次出现早于 B）
+    expect(next.map((rule) => rule.group)).toEqual(['C', 'A', 'A', 'B', 'B'])
+  })
+
+  it('组序没变时结果与原序一致', () => {
+    const next = reorderGroups(rules, ['A', 'B', 'C'])
+    expect(next.map((rule) => rule.id)).toEqual(['1', '2', '3', '4', '5'])
+  })
+})
+
+describe('moveGroupNear', () => {
+  it('把 from 组移到 over 组之后 / 之前', () => {
+    expect(moveGroupNear(['A', 'B', 'C'], 'A', 'C', true)).toEqual(['B', 'C', 'A'])
+    expect(moveGroupNear(['A', 'B', 'C'], 'C', 'A', false)).toEqual(['C', 'A', 'B'])
+  })
+
+  it('overGroup 为 null = 移到最后；组不存在原样返回', () => {
+    expect(moveGroupNear(['A', 'B'], 'A', null, true)).toEqual(['B', 'A'])
+    expect(moveGroupNear(['A', 'B'], 'X', 'B', true)).toEqual(['A', 'B'])
+    expect(moveGroupNear(['A', 'B'], 'A', 'X', true)).toEqual(['A', 'B'])
   })
 })
