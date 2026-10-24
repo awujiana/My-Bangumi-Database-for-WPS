@@ -5568,12 +5568,17 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
     expect(messages.some((message) => message.includes('已停止'))).toBe(true)
   })
 
-  it('删除过程中被取消：已删除的保留，未处理的计入 skipped', async () => {
+  it('删除过程中被取消：进行中的 run 原子完成，未开始的 run 整组跳过', async () => {
+    // P1（性能审计 2026-10-24）起删除阶段按「连续行合并成 run、一次 Range(max:min)
+    // .Delete()」执行——一次批量删是原子 COM 操作，做不到「删一半」。取消检查随之
+    // 移到 run 边界：信号到达时正在删的 run 整组完成（undo/记录/明细逐行记），
+    // 未开始的 run 整组保留并计入 skipped。这与新增/更新阶段「按批（50 条）检查
+    // 取消」的粒度一致——那两批同样是整批完成才检查。
     const mockWorksheet = createMockWorksheet()
     const controller = new AbortController()
     let hasDeletedOnce = false
 
-    // 第一次删除完成后用户点「停止」
+    // 第一个 run 的批量删除过程中用户点「停止」
     mockWorksheet.Range = asRangeMock((address: string) => {
       if (!/^\d+:\d+$/.test(address)) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
@@ -5591,7 +5596,7 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
 
     mockGetDataSheet.mockReturnValue(mockWorksheet)
     mockFindHeaderRow.mockReturnValue(1)
-    mockGetLastRow.mockReturnValue(5)
+    mockGetLastRow.mockReturnValue(20)
     mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
     mockGetCellValue.mockReturnValue('值')
     mockGetApp.mockReturnValue({
@@ -5601,15 +5606,19 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
       DoEvents: vi.fn(),
     })
 
+    // 两个连续 run（降序）：10-9-8 与 5-4，中间有缺口
     const diffs: GithubSyncDiff[] = [
-      { kind: 'delete', subjectId: 'd1', localRow: 5, changedFields: ['*'] },
-      { kind: 'delete', subjectId: 'd2', localRow: 4, changedFields: ['*'] },
-      { kind: 'delete', subjectId: 'd3', localRow: 3, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd1', localRow: 10, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd2', localRow: 9, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd3', localRow: 8, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd4', localRow: 5, changedFields: ['*'] },
+      { kind: 'delete', subjectId: 'd5', localRow: 4, changedFields: ['*'] },
     ]
 
     const result = await applyDiffToSheet(diffs, 'mirror', undefined, 'test', controller.signal)
 
-    expect(result.deleted).toBe(1)
+    // 第一个 run（Range "10:8"，3 行）原子完成；第二个 run（5-4）未开始
+    expect(result.deleted).toBe(3)
     expect(result.skipped).toBe(2)
   })
 })

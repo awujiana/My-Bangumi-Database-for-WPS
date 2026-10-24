@@ -1085,6 +1085,42 @@ function buildRemovalSnapshot(
 }
 
 /**
+ * 把**降序**行号的删除项按「连续」分组成 run（每组一次 `Range(max:min).Delete()`）
+ *
+ * 为什么：删除阶段原来是 n 个待删行 = n 次 COM `Delete`，每次宿主都要做行位移与
+ * 内部数据搬运（性能审计 2026-10-24 P1：删除阶段明显慢于新增/更新）。连续行合并后，
+ * 成片的 stale 行从 n 次 COM 调用压成 1 次；完全散乱的行仍各自成组（一次删一行），
+ * 与旧行为逐字一致——**永不比旧实现慢**。
+ *
+ * 语义等价性：连续块一次删 vs 逐行降序删，最终表状态相同（块内行全部消失、
+ * 块下方向上平移块大小）。非连续行各自成组，走原来的逐行路径。
+ *
+ * @param items 删除项（**必须已按行号降序**——调用方 deletedDiffs 已排过）
+ * @param rowOf 取行号；同行的多项会各自成组（行号相同不连续）
+ * @returns 每组保持降序；组内首元素是块内最大行、末元素是最小行
+ */
+export function groupContiguousDeleteRuns<T>(
+  items: readonly T[],
+  rowOf: (item: T) => number,
+): T[][] {
+  const runs: T[][] = []
+  let current: T[] | undefined
+  let previousRow: number | undefined
+  for (const item of items) {
+    const row = rowOf(item)
+    // 降序相邻：当前行恰是上一组末行的上一行 → 并入该组
+    if (current !== undefined && previousRow !== undefined && previousRow - row === 1) {
+      current.push(item)
+    } else {
+      current = [item]
+      runs.push(current)
+    }
+    previousRow = row
+  }
+  return runs
+}
+
+/**
  * 应用 diff 到 Excel 工作表
  *
  * 取消（P2-7）：`signal` 在**写入阶段同样生效**。每批写入前检查一次，已写入的部分
@@ -1365,7 +1401,7 @@ export async function applyDiffToSheet(
     }
   }
 
-  // ---- 阶段 2b: 逐行处理 delete diffs（需倒序执行）----
+  // ---- 阶段 2b: 处理 delete diffs（降序；连续行合并成 run 一次删）----
   let processedDeletes = 0
   const totalDeletes = deletedDiffs.length
   // 记录删除阶段开始时间，用于计算删除阶段专用速度（更准确地估算剩余时间）
@@ -1376,83 +1412,133 @@ export async function applyDiffToSheet(
     deletedDiffs.map((d) => d.localRow),
     [...columnMap.values()],
   )
-  for (const diff of deletedDiffs) {
-    // 每条删除前检查取消（P2-7）：删除是倒序逐行的，中断点即已删与未删的边界
+
+  /** 取一行删除的 undo 基底（快照优先；快照缺该行时回退逐格读） */
+  const snapshotRowValues = (row: number): Record<number, string> => {
+    const rowValues: Record<number, string> = {}
+    const snapshotCells = removalSnapshot?.get(row)
+    for (const column of columnMap.values()) {
+      rowValues[column] = snapshotCells?.get(column) ?? getCellValue(worksheet, row, column)
+    }
+    return rowValues
+  }
+
+  /** 一行删除成功：undo + 明细 + 同步记录（与旧逐行路径逐字一致） */
+  const recordRowDeleted = (
+    diff: { subjectId: string; localRow: number },
+    rowValues: Record<number, string>,
+  ): void => {
+    recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
+    result.deleted += 1
+    details.push({
+      kind: 'delete',
+      subjectId: diff.subjectId,
+      row: diff.localRow,
+      message: `删除行 ${String(diff.localRow)}`,
+    })
+    syncRecords.push({
+      subjectId: diff.subjectId,
+      source,
+      content: '仓库同步-删除',
+      status: '成功',
+      message: `删除行 ${String(diff.localRow)}`,
+      count: 1,
+    })
+  }
+
+  /** 一行删除失败：明细 + 同步记录（快照失败与 Delete 抛错共用） */
+  const recordRowDeleteFailed = (
+    diff: { subjectId: string; localRow: number },
+    errorMessage: string,
+    content: string,
+  ): void => {
+    result.failed += 1
+    details.push({
+      kind: 'fail',
+      subjectId: diff.subjectId,
+      row: diff.localRow,
+      message: errorMessage,
+    })
+    syncRecords.push({
+      subjectId: diff.subjectId,
+      source,
+      content,
+      status: '失败',
+      message: errorMessage,
+      count: 1,
+    })
+  }
+
+  /** 单行删除（批量删失败 / 快照失败的兜底路径） */
+  const deleteRowIndividually = (
+    diff: { subjectId: string; localRow: number },
+    rowValues: Record<number, string>,
+  ): void => {
+    try {
+      worksheet.Range(`${String(diff.localRow)}:${String(diff.localRow)}`).Delete()
+      recordRowDeleted(diff, rowValues)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${String(diff.localRow)} 失败: ${errorMessage}`)
+      recordRowDeleteFailed(diff, errorMessage, '仓库同步-删除失败')
+    }
+  }
+
+  // 连续行合并成 run：n 次 COM Delete → run 数次（P1，性能审计 2026-10-24）。
+  // 组内首元素是块内最大行、末元素是最小行（降序），一次 Range("max:min").Delete()。
+  // 分组结果提取成局部量：for-of 头部不放复杂表达式（unicorn/no-unreadable-for-of-expression）
+  const removalRuns = groupContiguousDeleteRuns(deletedDiffs, (diff) => diff.localRow)
+  for (const run of removalRuns) {
+    // 取消检查放 run 边界（P2-7）：未开始的 run 整组保留，中断点即已删与未删的边界
     if (isWriteCancelled()) {
       remainingDeletes = totalDeletes - processedDeletes
       break
     }
-    try {
-      const rowValues: Record<number, string> = {}
-      const snapshotCells = removalSnapshot?.get(diff.localRow)
-      for (const column of columnMap.values()) {
-        rowValues[column] =
-          snapshotCells?.get(column) ?? getCellValue(worksheet, diff.localRow, column)
-      }
-      recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
+    const maxRow = run[0]?.localRow ?? 0
+    const minRow = run.at(-1)?.localRow ?? maxRow
+
+    // 先逐行取 undo 基底（快照在删任何行前构建，行号仍有效）；取基底失败的行
+    // 不参与删除并标记失败——与旧路径「快照读抛错 → 该行不删」的保证一致
+    const rowValuesByRow = new Map<number, Record<number, string>>()
+    for (const diff of run) {
       try {
-        worksheet.Range(`${String(diff.localRow)}:${String(diff.localRow)}`).Delete()
-        result.deleted += 1
-        details.push({
-          kind: 'delete',
-          subjectId: diff.subjectId,
-          row: diff.localRow,
-          message: `删除行 ${String(diff.localRow)}`,
-        })
-        syncRecords.push({
-          subjectId: diff.subjectId,
-          source,
-          content: '仓库同步-删除',
-          status: '成功',
-          message: `删除行 ${String(diff.localRow)}`,
-          count: 1,
-        })
+        rowValuesByRow.set(diff.localRow, snapshotRowValues(diff.localRow))
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        bgmLog(
+          LOG_LEVELS.ERROR,
+          `[githubSync] 删除处理失败 subjectId=${diff.subjectId}: ${errorMessage}`,
+        )
+        recordRowDeleteFailed(diff, errorMessage, '仓库同步-失败')
+      }
+    }
+
+    const deletable = run.filter((diff) => rowValuesByRow.has(diff.localRow))
+    if (deletable.length > 0) {
+      let isBatchDeleted = false
+      try {
+        // 连续块一次删（ScreenUpdating 已关，省的是 n-1 次 COM 往返与行重排）
+        worksheet.Range(`${String(maxRow)}:${String(minRow)}`).Delete()
+        isBatchDeleted = true
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.WARN,
-          `[githubSync] 删除行 ${String(diff.localRow)} 失败: ${errorMessage}`,
+          `[githubSync] 批量删除行 ${String(maxRow)}-${String(minRow)} 失败，回退逐行: ${errorMessage}`,
         )
-        result.failed += 1
-        details.push({
-          kind: 'fail',
-          subjectId: diff.subjectId,
-          row: diff.localRow,
-          message: errorMessage,
-        })
-        syncRecords.push({
-          subjectId: diff.subjectId,
-          source,
-          content: '仓库同步-删除失败',
-          status: '失败',
-          message: errorMessage,
-          count: 1,
-        })
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      result.failed += 1
-      bgmLog(
-        LOG_LEVELS.ERROR,
-        `[githubSync] 删除处理失败 subjectId=${diff.subjectId}: ${errorMessage}`,
-      )
-      details.push({
-        kind: 'fail',
-        subjectId: diff.subjectId,
-        row: diff.localRow,
-        message: errorMessage,
-      })
-      syncRecords.push({
-        subjectId: diff.subjectId,
-        source,
-        content: '仓库同步-失败',
-        status: '失败',
-        message: errorMessage,
-        count: 1,
-      })
+      if (isBatchDeleted) {
+        for (const diff of deletable) {
+          recordRowDeleted(diff, rowValuesByRow.get(diff.localRow) ?? {})
+        }
+      } else {
+        for (const diff of deletable) {
+          deleteRowIndividually(diff, rowValuesByRow.get(diff.localRow) ?? {})
+        }
+      }
     }
 
-    processedDeletes += 1
+    processedDeletes += run.length
     const now = Date.now()
     if (now - lastProgressTime > 300 || processedDeletes >= totalDeletes) {
       const totalProcessed = totalAdds + updateTotal + processedDeletes

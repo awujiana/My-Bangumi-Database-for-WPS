@@ -366,8 +366,10 @@ function mergeRowAt(
     const { fields } = shard
     const row: unknown[] = shard.rows[rowIndex] ?? []
     if (row.length === fields.length) {
+      // 下标直取（性能审计 2026-10-24 P3：31k 行 × ~20 字段 ≈ 62 万次调用，
+      // .at() 比下标慢 2-3 倍；行长度已校验等于表头长，不存在越界）
       for (const [column, field] of fields.entries()) {
-        record[field] = row.at(column)
+        record[field] = row[column]
       }
     } else {
       errors.push(
