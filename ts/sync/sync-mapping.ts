@@ -99,6 +99,23 @@ const EXTENDED_GROUP_BY_COLUMN: Readonly<Record<string, SyncMappingGroup>> = {
 }
 
 /**
+ * 本地实际采用的列名：默认列在就用它，否则取第一个本地存在的别名
+ *
+ * 解决「标准列名 ≠ 用户表里的列名」：远程字段「动画制作公司」的默认列是
+ * 「制作公司」，但很多表（如 momo 的新番表）那列就叫「动画制作公司」——
+ * 不认别名就会把它标成「本地缺列」，明明有列却写不进去。
+ */
+function resolveLocalColumn(
+  defaultColumn: string,
+  aliases: readonly string[],
+  local: ReadonlySet<string>,
+): string {
+  if (local.has(defaultColumn)) return defaultColumn
+  const aliasHit = aliases.find((alias) => local.has(alias))
+  return aliasHit ?? defaultColumn
+}
+
+/**
  * 构建列映射行（同步前确认框的数据源）
  *
  * @param localColumns 本地表头列名集合（columnMap 的键）
@@ -128,7 +145,10 @@ export function buildSyncMappingRows(localColumns: readonly string[]): SyncMappi
     if (!isDuplicate) {
       const aliases = getExcelAliases(remoteField).filter((name) => name !== column)
       const group = EXTENDED_GROUP_BY_COLUMN[column] ?? 'meta'
-      rows.push(makeRow(column, remoteField, column, aliases, hasColumn(column), group))
+      // 目标列取本地实际存在的那个（默认列优先，别名兜底）：本地只有
+      // 「动画制作公司」列时，这行的目标列就是它，不再误报「本地缺列」
+      const targetColumn = resolveLocalColumn(column, aliases, local)
+      rows.push(makeRow(column, remoteField, targetColumn, aliases, local.has(targetColumn), group))
     }
   }
 

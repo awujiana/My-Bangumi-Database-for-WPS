@@ -286,8 +286,8 @@ function renderRowHtml(
       <span class="bgm-mapping-arrow">→</span>
       <select class="bgm-mapping-select" data-row-id="${escapeAttribute(row.id)}">${options}</select>
       ${badge}
-      <button type="button" class="bgm-dialog-btn bgm-dialog-btn-default" data-move="up" data-row-id="${escapeAttribute(row.id)}"${index === 0 ? ' disabled' : ''}>▲</button>
-      <button type="button" class="bgm-dialog-btn bgm-dialog-btn-default" data-move="down" data-row-id="${escapeAttribute(row.id)}"${index === total - 1 ? ' disabled' : ''}>▼</button>
+      <button type="button" class="bgm-mapping-move-btn" data-move="up" data-row-id="${escapeAttribute(row.id)}"${index === 0 ? ' disabled' : ''} title="上移（调整展示顺序）">▲</button>
+      <button type="button" class="bgm-mapping-move-btn" data-move="down" data-row-id="${escapeAttribute(row.id)}"${index === total - 1 ? ' disabled' : ''} title="下移（调整展示顺序）">▼</button>
     </div>`
 }
 

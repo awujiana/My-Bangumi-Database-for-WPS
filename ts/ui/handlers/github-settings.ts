@@ -27,14 +27,57 @@ import { trackedAddEventListener } from './resource-tracking.js'
  * 与数据仓库 `data/anime.manifest.json` 的 6 片一一对应。这里刻意用静态清单，
  * 而不是打开面板时去拉一次清单：拉清单会给「打开设置」引入网络失败面，而手动选片
  * 只是覆盖自动选片的兜底手段 —— 清单以后新增的分片在自动模式下仍会被正常选中。
+ *
+ * `detail` 是该片的完整字段清单与取舍说明，给「📋 分片清单」浮窗用：
+ * 复选框上那一两个词（「资料」「关联条目」）装不下这些细节，而用户需要
+ * 知道勾下去到底拖哪些字段下来（momo：选项太笼统，要完整写在分片清单里）。
  */
-export const SHARD_OPTIONS: readonly { name: string; label: string }[] = [
-  { name: 'base', label: '基础（SID/名称/时间）' },
-  { name: 'meta', label: '资料（话数/导演等）' },
-  { name: 'relations', label: '关联条目' },
-  { name: 'stats', label: '评分/排名/标签' },
-  { name: 'summary', label: '简介' },
-  { name: 'infobox', label: 'infobox 原文' },
+export const SHARD_OPTIONS: readonly { name: string; label: string; detail: string }[] = [
+  {
+    name: 'base',
+    label: '基础（SID/名称/时间）',
+    detail:
+      '字段：subjectId / name / name_original / updatedAt / date / meta_tags / nsfw。\n' +
+      '写入 Excel：SID、名称、别名、更新时间、播出日期、标签、NSFW 标记。\n' +
+      'SID 是各片的连接键，名称与更新时间是同步筛选的依据 —— 所以本片固定勾选、不可取消。',
+  },
+  {
+    name: 'meta',
+    label: '资料（话数/导演等）',
+    detail:
+      'infobox 解析出的 19 个中文列：话数、片长、动画制作公司、导演、音乐、声优阵容、' +
+      'OP / ED、制片国家、语言、类型、上映日期等，各写对应标准列。\n' +
+      '本地列名与标准列不一致时（如「动画制作公司」 vs 「制作公司」）按别名匹配，见同步前的列映射确认框。',
+  },
+  {
+    name: 'relations',
+    label: '关联条目',
+    detail:
+      '两个容易混的列，区别在「被关联条目的类型」：\n' +
+      '· 关联条目ID —— subject-relations 的全部关联条目 ID，不分类型（电影 / 小说 / 游戏 / 音乐都算）。\n' +
+      '· 关联的动漫ID —— 同一批关联条目里只挑 type=2（动画）的那部分。\n' +
+      '例：一部剧场版关联「原作小说 + 前作 TV」：前两行都在「关联条目ID」里，只有前作 TV 进「关联的动漫ID」。',
+  },
+  {
+    name: 'stats',
+    label: '评分/排名/标签',
+    detail:
+      '字段：platform / series / score / rank / score_details / favorite / tags。\n' +
+      '写入 Excel：播放平台、系列、Bangumi 站评分、排名、评分分布、收藏数、标签。\n' +
+      '注意「评分 / 排名」是站内公开数据，与你个人主观「打分」不是一回事。',
+  },
+  {
+    name: 'summary',
+    label: '简介',
+    detail: '字段：简介（剧情简介全文）。约占数据体积 29% —— 表里没有简介列时没必要下载它。',
+  },
+  {
+    name: 'infobox',
+    label: 'infobox 原文',
+    detail:
+      '字段：infobox 原文（未解析的原始文本，含全部制作人员明细）。约占数据体积 48%，' +
+      '是六片里最大的一片 —— 只在需要原文留档时才勾。',
+  },
 ] as const
 
 /**
@@ -120,6 +163,88 @@ function bindShardSelection(list: HTMLElement): void {
         ? `[handlers] 数据分片已手动指定: ${selected.join(', ')}`
         : '[handlers] 数据分片已恢复为按表头自动选择',
     )
+  })
+}
+
+// ===== 分片清单浮窗 =====
+
+/**
+ * 渲染清单正文：每片一节（标题 + 完整字段细节）
+ *
+ * 细节文本按 `\n` 分段渲染（pre-line 交给 CSS），保持「一行一个要点」的可读性。
+ */
+function renderShardListBody(): void {
+  const body = document.getElementById('shardListBody')
+  if (!body) return
+  body.textContent = ''
+  for (const option of SHARD_OPTIONS) {
+    const isRequired = REQUIRED_SHARDS.includes(option.name)
+    const item = document.createElement('div')
+    item.className = isRequired ? 'shard-list-item is-required' : 'shard-list-item'
+    const heading = document.createElement('h4')
+    heading.textContent = `${option.label}${isRequired ? '（必选）' : ''}`
+    const detail = document.createElement('p')
+    detail.textContent = option.detail
+    item.append(heading, detail)
+    body.append(item)
+  }
+}
+
+/**
+ * 打开「分片清单」浮窗（独立模态框）
+ *
+ * 为什么独立浮窗而不是塞进 hint：每片要写清完整字段清单（含「关联条目ID vs
+ * 关联的动漫ID」的区别、各片体积占比），hint 放不下（momo：选项太笼统）。
+ *
+ * 遮罩用 `absolute` + JS 写 `top = scrollY` 锚定**当前可见区**：WPS 任务窗格里
+ * `fixed` 会因 iframe 视口=内容高而飘到可见区外（detachable-panel 同款修法）。
+ */
+export function openShardListModal(): void {
+  const modal = document.getElementById('shardListModal')
+  if (!modal) return
+  renderShardListBody()
+  modal.style.setProperty('top', `${String(window.scrollY)}px`)
+  modal.style.display = 'flex'
+}
+
+/** 关闭「分片清单」浮窗 */
+export function closeShardListModal(): void {
+  const modal = document.getElementById('shardListModal')
+  if (modal) modal.style.display = 'none'
+}
+
+/**
+ * 注册分片清单浮窗的入口与关闭路径
+ *
+ * 按钮 / 关闭叉 / 点遮罩 / Esc 四条路都关。Esc 监听常驻但不抢事件：
+ * 浮窗没开（display:none）就直接放行，让页面其它 Esc 处理器（关弹窗那批）照常工作。
+ */
+export function bindShardListModal(): void {
+  const openButton = document.getElementById('shardListBtn')
+  const closeButton = document.getElementById('shardListCloseBtn')
+  const modal = document.getElementById('shardListModal')
+  if (!openButton || !closeButton || !modal) return
+  // DOM 标记幂等：loadGithubConfigIntoForm 可能被重复调用（面板重加载），
+  // trackedAddEventListener 不去重，重复绑会让「点一次开两次」。
+  // 标记挂在按钮上：任务窗格整体刷新时 DOM 重建，标记随之消失、自然重绑。
+  if (openButton.dataset.shardListBound === 'true') return
+  openButton.dataset.shardListBound = 'true'
+
+  trackedAddEventListener(openButton, 'click', () => {
+    openShardListModal()
+  })
+  trackedAddEventListener(closeButton, 'click', () => {
+    closeShardListModal()
+  })
+  trackedAddEventListener(modal, 'click', (event: Event) => {
+    if (event.target === modal) closeShardListModal()
+  })
+  trackedAddEventListener(document, 'keydown', (event: Event) => {
+    const keyboardEvent = event as KeyboardEvent
+    if (keyboardEvent.key !== 'Escape') return
+    // 只在浮窗开着时接管 Esc：没开就让给页面其它处理器
+    if (modal.style.display === 'none') return
+    closeShardListModal()
   })
 }
 
@@ -335,6 +460,8 @@ export function loadGithubConfigIntoForm() {
   // 渲染分片多选并回填勾选状态（清单里的分片以后可能增减，故每次打开都重建）
   renderShardOptions()
   refreshShardSelection()
+  // 分片清单浮窗：入口按钮 + 关闭路径（幂等，重复加载不重复绑）
+  bindShardListModal()
   if (config.owner || config.repo || config.path) {
     bgmLog(
       LOG_LEVELS.INFO,

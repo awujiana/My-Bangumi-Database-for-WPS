@@ -237,3 +237,37 @@ describe('remapColumnIndices', () => {
     expect(columnMap.get('导演')).toBe(3)
   })
 })
+
+describe('buildSyncMappingRows · 本地列名别名（动画制作公司）', () => {
+  it('本地只有「动画制作公司」列 → 制作公司行已匹配、目标列指向它（不再误报缺列）', () => {
+    const rows = buildSyncMappingRows(['名称', '动画制作公司'])
+    const studio = rows.find((row) => row.id === '制作公司')
+    expect(studio).toBeDefined()
+    expect(studio?.remoteField).toBe('动画制作公司')
+    expect(studio?.hasLocalColumn).toBe(true)
+    expect(studio?.targetColumn).toBe('动画制作公司')
+    // 有列就该默认勾上（makeRow 的 selected 跟随 hasLocalColumn）
+    expect(studio?.selected).toBe(true)
+  })
+
+  it('本地有标准列「制作公司」→ 目标列仍用标准列（别名不抢默认）', () => {
+    const rows = buildSyncMappingRows(['名称', '制作公司'])
+    const studio = rows.find((row) => row.id === '制作公司')
+    expect(studio?.targetColumn).toBe('制作公司')
+    expect(studio?.hasLocalColumn).toBe(true)
+  })
+
+  it('两个列名都没有 → 仍报本地缺列且不勾选（补列流程不变）', () => {
+    const rows = buildSyncMappingRows(['名称'])
+    const studio = rows.find((row) => row.id === '制作公司')
+    expect(studio?.hasLocalColumn).toBe(false)
+    expect(studio?.selected).toBe(false)
+    expect(studio?.targetColumn).toBe('制作公司')
+  })
+
+  it('标准列与别名列同时存在 → 优先标准列', () => {
+    const rows = buildSyncMappingRows(['制作公司', '动画制作公司'])
+    const studio = rows.find((row) => row.id === '制作公司')
+    expect(studio?.targetColumn).toBe('制作公司')
+  })
+})
