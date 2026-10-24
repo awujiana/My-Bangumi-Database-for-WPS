@@ -1426,6 +1426,65 @@ select.input {
   white-space: pre-line;
 }
 
+/* 示例数据来源说明（哪份数据、哪条样本） */
+.shard-list-meta {
+  margin: 0 0 var(--sp-4, 16px);
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2, #c0c0c0);
+  background: var(--bg-surface-2, rgba(255, 255, 255, 0.04));
+  border-radius: var(--r-sm, 4px);
+}
+
+/* 字段明细表：字段 / 类型 / 示例值 / 本地列 */
+.shard-list-table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.shard-list-table th {
+  padding: 4px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-3, #8a8a8a);
+  border-bottom: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
+}
+
+.shard-list-table td {
+  padding: 4px 8px;
+  color: var(--text-2, #c0c0c0);
+  border-bottom: 1px solid var(--border-faint, rgba(255, 255, 255, 0.06));
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+/* 列宽：字段名 / 类型 / 示例值（主角）/ 本地列 */
+.shard-list-table th:nth-child(1),
+.shard-list-table td:nth-child(1) {
+  width: 22%;
+  font-family: var(--font-mono, monospace);
+}
+
+.shard-list-table th:nth-child(2),
+.shard-list-table td:nth-child(2) {
+  width: 10%;
+  color: var(--text-3, #8a8a8a);
+}
+
+.shard-list-table th:nth-child(4),
+.shard-list-table td:nth-child(4) {
+  width: 20%;
+}
+
+/* 无本地列的字段：整行降权（这些字段下载了但不写任何列） */
+.shard-list-table tr.is-unmapped td {
+  opacity: 0.55;
+}
+
 .bgm-dialog-message {
     font-size: 14px;
     line-height: 1.6;

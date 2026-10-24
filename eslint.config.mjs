@@ -280,6 +280,10 @@ export default tseslint.config(
       '.trae/**',
       '.vscode/**',
       '__pycache__/**',
+      // 自动生成文件（scripts/build-shard-samples.mjs 输出）：内容是 JSON 字面量，
+      // 不合 prettier 风格且每次生成都会重新引入；勿手改，一致性由
+      // tests/shard-samples.test.ts 守护（localColumn 与映射表对齐）
+      'ts/ui/handlers/shard-samples.ts',
     ],
   },
 

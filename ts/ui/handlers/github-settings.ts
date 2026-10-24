@@ -20,6 +20,8 @@ import {
 import type { SyncStrategy, SyncSourceType } from '../../index.js'
 import { debounce } from '../../tools/debounce.js'
 import { trackedAddEventListener } from './resource-tracking.js'
+import { SHARD_SAMPLES } from './shard-samples.js'
+import type { ShardSampleField } from './shard-samples.js'
 
 /**
  * 可手动选择的数据分片（顺序即界面展示顺序）
@@ -56,7 +58,8 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
       '两个容易混的列，区别在「被关联条目的类型」：\n' +
       '· 关联条目ID —— subject-relations 的全部关联条目 ID，不分类型（电影 / 小说 / 游戏 / 音乐都算）。\n' +
       '· 关联的动漫ID —— 同一批关联条目里只挑 type=2（动画）的那部分。\n' +
-      '例：一部剧场版关联「原作小说 + 前作 TV」：前两行都在「关联条目ID」里，只有前作 TV 进「关联的动漫ID」。',
+      '实例（见下方示例行）：sid=243430《闪光的哈萨维》的关联条目ID 有 7 个' +
+      '（含小说与其它媒体），关联的动漫ID 只有 2 个（两部相关动画）。',
   },
   {
     name: 'stats',
@@ -169,14 +172,30 @@ function bindShardSelection(list: HTMLElement): void {
 // ===== 分片清单浮窗 =====
 
 /**
- * 渲染清单正文：每片一节（标题 + 完整字段细节）
+ * 渲染清单正文：每片一节（标题 + 取舍说明 + 字段明细表）
  *
- * 细节文本按 `\n` 分段渲染（pre-line 交给 CSS），保持「一行一个要点」的可读性。
+ * 字段表四列：远程字段 / 类型 / 示例值 / 本地列。示例值来自
+ * {@link SHARD_SAMPLES}（scripts/build-shard-samples.mjs 生成：2026 年播出、
+ * 字段最全的一条真实记录），无本地列的字段整行降权并附一句说明。
+ *
+ * 全部用 createElement + textContent 构建（不拼 innerHTML）：示例值是远端
+ * 数据，infobox 原文里全是 `{{...}}` 与引号，innerHTML 等于 XSS 入口。
  */
 function renderShardListBody(): void {
   const body = document.getElementById('shardListBody')
   if (!body) return
   body.textContent = ''
+
+  // 数据来源与样本条目说明（用户需要知道「示例值」是哪来的）
+  const meta = document.createElement('p')
+  meta.className = 'shard-list-meta'
+  meta.textContent =
+    `示例值取自 ${SHARD_SAMPLES.dataUpdatedAt} 的数据中 2026 年播出、字段最全的一条：` +
+    `sid=${SHARD_SAMPLES.sampleSid}《${SHARD_SAMPLES.sampleName}》（共 ${String(
+      SHARD_SAMPLES.shards.reduce((total, shard) => total + shard.fields.length, 0),
+    )} 个字段）。`
+  body.append(meta)
+
   for (const option of SHARD_OPTIONS) {
     const isRequired = REQUIRED_SHARDS.includes(option.name)
     const item = document.createElement('div')
@@ -186,8 +205,44 @@ function renderShardListBody(): void {
     const detail = document.createElement('p')
     detail.textContent = option.detail
     item.append(heading, detail)
+
+    // 字段明细表（该片在示例数据里的字段行；生成文件缺片时降级为仅文字）
+    const sample = SHARD_SAMPLES.shards.find((candidate) => candidate.name === option.name)
+    if (sample) item.append(buildShardFieldTable(sample.fields))
     body.append(item)
   }
+}
+
+/** 单片字段明细表（字段 / 类型 / 示例值 / 本地列） */
+function buildShardFieldTable(fields: readonly ShardSampleField[]): HTMLElement {
+  const table = document.createElement('table')
+  table.className = 'shard-list-table'
+
+  const headRow = document.createElement('tr')
+  for (const label of ['远程字段', '类型', '示例值', '本地列']) {
+    const cell = document.createElement('th')
+    cell.textContent = label
+    headRow.append(cell)
+  }
+  table.append(headRow)
+
+  for (const field of fields) {
+    const row = document.createElement('tr')
+    if (field.localColumn === null) row.className = 'is-unmapped'
+
+    const nameCell = document.createElement('td')
+    nameCell.textContent = field.name
+    const typeCell = document.createElement('td')
+    typeCell.textContent = field.type
+    const sampleCell = document.createElement('td')
+    sampleCell.textContent = field.sample === '' ? '（此条为空）' : field.sample
+    sampleCell.title = field.sample
+    const columnCell = document.createElement('td')
+    columnCell.textContent = field.localColumn ?? field.note ?? '不写入任何列'
+    row.append(nameCell, typeCell, sampleCell, columnCell)
+    table.append(row)
+  }
+  return table
 }
 
 /**
