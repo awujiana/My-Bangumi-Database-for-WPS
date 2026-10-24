@@ -120,6 +120,41 @@
   font-weight: 400;
 }
 
+/* 组标题右侧的组内批量三件套（全选 / 删除整组 / 导出整组）。
+   margin-left: auto 推到最右：组名 + 计数在左，动作在右，不挤成一团。 */
+.conditional-format-group-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.conditional-format-group-action {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.conditional-format-group-action:hover {
+  color: var(--text-1);
+  background: var(--bg-surface-2);
+  border-color: var(--border-strong);
+}
+
+/* 行的「勾选」复选框（批量删除/导出语义，与可见性 👁 分开）。 */
+.conditional-format-rule-pick {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
 /* 既有规则表格的本地分组：容器只加分隔，行本身仍是原来的表格栅格 */
 .conditional-format-existing-group {
   margin-bottom: var(--sp-3);
@@ -482,22 +517,19 @@
   font-size: 13px;
 }
 
-.conditional-format-eyedropper {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--bg-surface);
-  color: var(--text-2);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
+/* 规则行拖拽把手（⋮⋮）：从把手起拖，行内其余交互元素不抢手势。
+   吸管按钮样式（.conditional-format-eyedropper）已随吸管功能一并移除。 */
+.conditional-format-rule-handle {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  cursor: grab;
+  user-select: none;
+  font-size: 12px;
+  letter-spacing: -2px;
 }
 
-.conditional-format-eyedropper:hover {
-  background: var(--bg-surface-2);
-  color: var(--text-1);
+.conditional-format-rule-handle:active {
+  cursor: grabbing;
 }
 
 .conditional-format-bold-box {

@@ -19,7 +19,7 @@ import {
   getColumnMap,
   markConditionalFormatPaneLoaded,
 } from '../tools/util/index.js'
-import { getConfig, setConfig } from '../tools/config.js'
+import { getConfig, getExportPath, setConfig, setExportPath } from '../tools/config.js'
 import {
   CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
   CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
@@ -66,6 +66,7 @@ import {
   toggleSelection,
 } from './conditional-format-table.js'
 import { enterSoloMode } from '../tools/module-state.js'
+import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js'
 import {
   bindModalDrag,
   bringModalIntoView,
@@ -175,10 +176,22 @@ interface PageState {
    * 两个模式共用同一个弹窗，靠这个字段在 confirmGroupName 里分流。
    */
   renamingGroup: string | null
-  /** 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing） */
+  /**
+   * 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing）
+   *
+   * 弹框里的勾选**不单独存 state**：与表格共用 {@link existingSelection}
+   * （momo：规则管理器勾选与「选择要导入的规则」弹框要联动——两处勾的是
+   * 同一批工作表规则，各存一套必然「没联动」）。
+   */
   importForeignRules: ForeignRuleSnapshot[]
-  /** 导入弹框里的勾选集（1 基序号，口径同 existingSelection） */
-  importSelection: Set<number>
+  /**
+   * 规则库列表的勾选集（rule id）
+   *
+   * 与行的「👁 可见性复选框」是两回事：那个控制「隐藏/应用」，这个控制
+   * 「批量删除 / 导出」（momo：规则管理也要有全选之类的批量功能）。
+   * 跨搜索保留（与 existingSelection 同口径）。
+   */
+  ruleSelection: Set<string>
   /** 规则库列表的拖拽排序句柄（renderRuleList 后 refresh） */
   ruleSortable: SortableHandle | null
   /** 规则库列表「组标题」的拖拽排序句柄（拖组标题 = 整组调整次序） */
@@ -202,12 +215,12 @@ const state: PageState = {
   existingQuery: '',
   existingPage: 1,
   existingSelection: new Set<number>(),
+  ruleSelection: new Set<string>(),
   existingScope: 'all',
   existingGroups: {},
   existingGroupCollapsed: new Set<string>(),
   renamingGroup: null,
   importForeignRules: [],
-  importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
   ruleSortable: null,
   groupSortable: null,
@@ -528,6 +541,7 @@ function renderExistingBatchBar(): void {
     <button type="button" class="bgm-btn small" data-batch-action="import" ${
       rebuildableCount === 0 ? 'disabled' : ''
     } title="${rebuildableCount === 0 ? '所选规则里没有可导入的公式类规则' : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
+    <button type="button" class="bgm-btn small" data-batch-action="export" title="把所选规则导出为 JSON 文件（另存为对话框选保存位置）">📤 导出所选</button>
     <button type="button" class="bgm-btn small danger" data-batch-action="delete" title="从工作表删除所选规则">✕ 批量删除</button>
     <button type="button" class="bgm-btn small" data-batch-action="clear" title="取消选择">取消选择</button>`
 }
@@ -649,7 +663,7 @@ function handleExistingTableClick(event: MouseEvent): void {
   }
 }
 
-/** 批量操作条的分流（归入分组 / 导入 / 删除 / 取消选择） */
+/** 批量操作条的分流（归入分组 / 导入 / 导出 / 删除 / 取消选择） */
 function handleBatchAction(action: string): void {
   switch (action) {
     case 'group': {
@@ -658,6 +672,10 @@ function handleBatchAction(action: string): void {
     }
     case 'import': {
       batchImportForeignRules()
+      break
+    }
+    case 'export': {
+      batchExportForeignRules()
       break
     }
     case 'delete': {
@@ -672,6 +690,35 @@ function handleBatchAction(action: string): void {
     default: {
       break
     }
+  }
+}
+
+/**
+ * 批量导出所选既有规则为 JSON（选保存位置）
+ *
+ * 快照转规则与「导入」同一套判据（foreignSnapshotToRule）：不可重建的类型
+ * 逐条跳过并在结果里报数——不静默丢。id 用 nextId 现生成（导出文件只是
+ * 快照，导入时会再生成新 id，不与库内既有规则撞）。
+ */
+function batchExportForeignRules(): void {
+  const indices = [...state.existingSelection].sort((a, b) => a - b)
+  const rules: ConditionalFormatRule[] = []
+  let skipped = 0
+  for (const index of indices) {
+    const snapshot = state.existing[index - 1]
+    if (snapshot) {
+      const rule = foreignSnapshotToRule(snapshot, nextId, groupOfSnapshot(snapshot))
+      if (rule) rules.push(rule)
+      else skipped += 1
+    }
+  }
+  if (rules.length === 0) {
+    showToast('所选规则里没有可导出的公式类规则', 'warn')
+    return
+  }
+  saveRulesJson(rules, '所选规则')
+  if (skipped > 0) {
+    showToast(`${String(skipped)} 条类型不支持，未包含在导出文件里`, 'info')
   }
 }
 
@@ -1341,6 +1388,10 @@ function renderRuleList(): void {
           const isHidden = rule.hidden === true
           return `
         <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}" title="拖拽调整优先级 · 右键打开操作菜单">
+          <span class="conditional-format-rule-handle" title="拖拽调整优先级（也可用键盘：Space 拾起、↑↓ 移动）" aria-hidden="true">⋮⋮</span>
+          <label class="conditional-format-rule-pick" title="勾选以批量删除 / 导出">
+            <input type="checkbox" data-action="pick" ${state.ruleSelection.has(rule.id) ? 'checked' : ''} aria-label="勾选 ${escapeHtml(rule.name)}" />
+          </label>
           <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
             <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
           </label>
@@ -1367,6 +1418,11 @@ function renderRuleList(): void {
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(rules.length)}</span>
+          <span class="conditional-format-group-actions">
+            <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="全选 / 取消本组">☑</button>
+            <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="删除本组全部规则">🗑</button>
+            <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="导出本组所选规则">📤</button>
+          </span>
         </div>
         ${rows}
       </div>`
@@ -1388,8 +1444,60 @@ function renderRuleList(): void {
       })
     })
 
+  // 组标题三件套：组内全选 / 组内删除 / 组内导出（momo：分组内也要能批量）
+  container
+    .querySelectorAll<HTMLButtonElement>('button[data-action="pick-group"]')
+    .forEach((button) => {
+      button.addEventListener('click', () => {
+        const group = button.dataset.group ?? ''
+        if (group === '') return
+        const ids = state.rules.filter((rule) => rule.group === group).map((rule) => rule.id)
+        const next = new Set(state.ruleSelection)
+        // 组内已全勾 → 取消本组；否则补全本组（与「全选」按钮同语义）
+        const isAllPicked = ids.length > 0 && ids.every((id) => next.has(id))
+        for (const id of ids) {
+          if (isAllPicked) next.delete(id)
+          else next.add(id)
+        }
+        state.ruleSelection = next
+        renderRuleList()
+      })
+    })
+  container
+    .querySelectorAll<HTMLButtonElement>('button[data-action="delete-group"]')
+    .forEach((button) => {
+      button.addEventListener('click', () => {
+        const group = button.dataset.group ?? ''
+        if (group === '') return
+        deleteSelectedRules(state.rules.filter((rule) => rule.group === group).map((r) => r.id))
+      })
+    })
+  container
+    .querySelectorAll<HTMLButtonElement>('button[data-action="export-group"]')
+    .forEach((button) => {
+      button.addEventListener('click', () => {
+        const group = button.dataset.group ?? ''
+        if (group === '') return
+        exportSelectedRules(
+          state.rules.filter((rule) => rule.group === group),
+          `「${group}」分组`,
+        )
+      })
+    })
+
   container.querySelectorAll<HTMLElement>('.conditional-format-rule').forEach((row) => {
     const id = row.dataset.ruleId ?? ''
+    // 勾选（批量删除/导出语义，与可见性 toggle 分开）
+    row.querySelectorAll<HTMLInputElement>('input[data-action="pick"]').forEach((box) => {
+      box.addEventListener('change', () => {
+        const next = new Set(state.ruleSelection)
+        if (box.checked) next.add(id)
+        else next.delete(id)
+        state.ruleSelection = next
+        // 只刷批量条，不重渲列表（保住焦点：连勾十几条不用每次重新点）
+        renderRuleBatchBar()
+      })
+    })
     row.querySelectorAll<HTMLInputElement>('input[data-action="toggle"]').forEach((box) => {
       box.addEventListener('change', () => {
         toggleHidden(id, !box.checked)
@@ -1429,38 +1537,75 @@ function renderRuleList(): void {
   // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
   state.ruleSortable?.refresh()
   state.groupSortable?.refresh()
+  // 顶部批量条跟随勾选数显隐
+  renderRuleBatchBar()
 }
 
-// ===== 颜色字段（选择器 + 十六进制手输 + 吸管）=====
+/**
+ * 顶部批量操作条（规则管理）：全选 / 删除所选 / 导出所选
+ *
+ * 选中 0 条时整条隐藏——平时屏幕上只留「全选」一个入口，不添乱
+ * （与既有规则表格的批量条同范式）。
+ */
+function renderRuleBatchBar(): void {
+  const bar = byId('conditionalFormatRuleBatchBar')
+  if (!bar) return
+  const count = state.ruleSelection.size
+  if (count === 0) {
+    bar.replaceChildren()
+    bar.classList.remove('is-visible')
+    return
+  }
+  bar.classList.add('is-visible')
+  bar.innerHTML = `
+    <span class="conditional-format-batch-count">已选 ${String(count)} 条</span>
+    <button type="button" class="bgm-btn small" data-rule-batch="delete" title="删除所选规则">🗑 删除所选</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="export" title="导出所选规则为 JSON（选保存位置）">📤 导出所选</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="clear" title="取消选择">取消选择</button>`
+}
 
-/** 一个颜色字段的三件套 id（填充 / 字体各一套） */
+/** 批量删除所选规则（全选 / 组内 / 顶部批量条共用） */
+function deleteSelectedRules(ids: readonly string[]): void {
+  if (ids.length === 0) {
+    showToast('没有选中的规则', 'warn')
+    return
+  }
+  const removed = new Set(ids)
+  state.rules = state.rules.filter((rule) => !removed.has(rule.id))
+  // ES2022 目标没有 Set#difference（ES2024）的类型与运行时保证，
+  // filter + has 在任何目标下都对——故不用规则建议的 difference
+
+  state.ruleSelection = new Set([...state.ruleSelection].filter((id) => !removed.has(id)))
+  persistRules()
+  renderRuleList()
+  showToast(`已删除 ${String(ids.length)} 条规则`, 'success')
+}
+
+// ===== 颜色字段（选择器 + 十六进制手输）=====
+//
+// 吸管取色已移除（momo：当前环境不支持 EyeDropper，点了「就退出」——
+// WPS 内嵌 CEF 的 open() 直接抛错被静默 catch 吞掉）。不留个点了没反应的
+// 图标，统一走 color 选择器 + 十六进制输入。
+
+/** 一个颜色字段的两件套 id（填充 / 字体各一套） */
 interface ColorFieldIds {
   /** 原生 color 选择器 */
   picker: string
   /** 十六进制文本输入（权威值：用户可直接输码） */
   text: string
-  /** 吸管按钮 */
-  pick: string
 }
 
 const COLOR_FIELD_FILL: ColorFieldIds = {
   picker: 'conditionalFormatEditFill',
   text: 'conditionalFormatEditFillText',
-  pick: 'conditionalFormatEditFillPick',
 }
 
 const COLOR_FIELD_FONT: ColorFieldIds = {
   picker: 'conditionalFormatEditFont',
   text: 'conditionalFormatEditFontText',
-  pick: 'conditionalFormatEditFontPick',
 }
 
 const COLOR_FIELDS: readonly ColorFieldIds[] = [COLOR_FIELD_FILL, COLOR_FIELD_FONT]
-
-/** EyeDropper 的最小构造签名（TS lib 未收；WPS 内嵌 CEF 随版本，用时须探测） */
-interface EyeDropperLike {
-  open: () => Promise<{ sRGBHex: string }>
-}
 
 /** 把颜色写进字段两件套（选择器 + 文本），保持两边永远一致 */
 function setColorField(field: ColorFieldIds, hex: string): void {
@@ -1479,46 +1624,17 @@ function readColorField(field: ColorFieldIds, fallback: string): string {
 }
 
 /**
- * 吸管取色
- *
- * WPS 内嵌 CEF 对 EyeDropper 的支持不确定（momo 实测：点了「就退出」——
- * 大概率 open() 直接抛错、被旧的静默 catch 吞掉）。故：全程打诊断日志，
- * 失败时**明说 + 藏按钮**（不留个点了没反应的图标），引导回十六进制输入。
- * 用户按 Esc 取消吸管时 open() 也 reject，走同一分支，提示语保持中性。
- */
-async function pickColorWithEyeDropper(field: ColorFieldIds): Promise<void> {
-  const EyeDropperCtor = (window as Window & { EyeDropper?: new () => EyeDropperLike }).EyeDropper
-  if (!EyeDropperCtor) return
-  bgmLog(LOG_LEVELS.INFO, '[conditionalFormat] 吸管：调用 EyeDropper.open()')
-  try {
-    const result = await new EyeDropperCtor().open()
-    bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 吸管：取到 ${result.sRGBHex}`)
-    const normalized = normalizeHexColor(result.sRGBHex)
-    if (normalized !== null) setColorField(field, normalized)
-  } catch (error: unknown) {
-    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
-    bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 吸管不可用: ${message}`)
-    showToast('当前环境不支持吸管取色（或已取消），请直接用十六进制输入', 'info')
-    // 藏按钮：失败一次就够，别再让用户点第二次
-    const pick = byId(field.pick)
-    if (pick) pick.hidden = true
-  }
-}
-
-/**
- * 装配一个颜色字段：选择器 / 文本 / 吸管三边联动
+ * 装配一个颜色字段：选择器 / 文本两边联动
  *
  * - 选择器 change → 同步文本；
  * - 文本 input → 合法 hex 实时同步选择器（用户看着色块确认输对）；
  * - 文本 blur → 规范化成 `#RRGGBB` 大写；非法则还原成选择器当前值
- *   （不清空：清空像字段坏了，还原至少保住一个有效色）；
- * - 吸管：仅 `EyeDropper` in window 时显示按钮，否则一直 hidden。
+ *   （不清空：清空像字段坏了，还原至少保住一个有效色）。
  */
 function bindColorField(field: ColorFieldIds): void {
   const picker = inputById(field.picker)
   const text = inputById(field.text)
   if (!picker || !text) return
-  const pick = byId(field.pick)
 
   picker.addEventListener('change', () => {
     setColorField(field, picker.value)
@@ -1533,14 +1649,6 @@ function bindColorField(field: ColorFieldIds): void {
     const normalized = normalizeHexColor(text.value)
     text.value = normalized ?? picker.value
   })
-
-  if (!pick) return
-  if ('EyeDropper' in window) {
-    pick.hidden = false
-    pick.addEventListener('click', () => {
-      void pickColorWithEyeDropper(field)
-    })
-  }
 }
 
 /** 弹窗遮罩计数锁：多个弹窗同时开时，不能有一个关闭就解锁背景滚动 */
@@ -1846,6 +1954,19 @@ function isSnapshotImportable(snapshot: ForeignRuleSnapshot): boolean {
   return snapshot.kind === 'expression' && snapshot.formula !== ''
 }
 
+/**
+ * 导入弹框与表格的勾选联动：一处改动，三处视图同步
+ *
+ * 弹框列表 / 既有规则表格 / 批量操作条都读同一份 {@link existingSelection}，
+ * 改它之后必须把三处都重渲染，否则用户在一处勾了、另一处不亮——那就是
+ * momo 报的「没有联动」。
+ */
+function syncImportSelectionViews(): void {
+  renderImportList()
+  renderExistingRules()
+  setText('conditionalFormatImportConfirm', `导入所选（${String(state.existingSelection.size)}）`)
+}
+
 /** 弹框里可导入项的 1 基序号（全选用） */
 function selectableImportIndices(): number[] {
   return state.importForeignRules
@@ -1861,8 +1982,13 @@ function selectableImportIndices(): number[] {
  */
 function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: string): void {
   state.importForeignRules = [...snapshots]
-  state.importSelection = new Set(selectableImportIndices())
+  // 联动：弹框勾选 = 表格勾选（同一 Set）。表格已勾了就带着进弹框；
+  // 什么都没勾时默认全选可导入项，并回写表格（两边同时亮起，不再「没联动」）。
+  if (state.existingSelection.size === 0) {
+    state.existingSelection = new Set(selectableImportIndices())
+  }
   setText('conditionalFormatImportSheet', sheetName)
+  syncImportSelectionViews()
   renderImportList()
   const mask = byId('conditionalFormatImportMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
@@ -1878,14 +2004,15 @@ function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: s
 function closeImportModal(): void {
   const mask = byId('conditionalFormatImportMask')
   if (mask) mask.style.display = 'none'
-  state.importSelection = new Set<number>()
+  // 不清 existingSelection：弹框与表格共享它，清了就是「联动只做一半」
   unlockModalScroll()
 }
 
 function renderImportList(): void {
   const container = byId('conditionalFormatImportList')
   if (!container) return
-  const { importForeignRules: snapshots, importSelection: selection } = state
+  const { importForeignRules: snapshots } = state
+  const selection = state.existingSelection
   container.innerHTML = snapshots
     .map((snapshot, position) => {
       const index = position + 1
@@ -1944,35 +2071,73 @@ function importSnapshots(
 // ===== 导出规则 =====
 
 /**
- * 导出规则库为 JSON 文件（备份 / 迁移 / 分享）
+ * 规则导出的统一出口：选位置 → 写文件 →（FSO 不可用）回退下载
  *
- * Blob + a[download] 现导现下：不落服务端、不经剪贴板，用户拿到的就是文件。
- * 文件名带日期，重复导出不互相覆盖。revoke 延迟一拍：立即收会让个别
- * 浏览器取消刚起步的下载。
+ * momo：所有导出都要能选择保存的位置。通道见 tools/save-file：
+ * WPS 原生另存为对话框（预填默认导出位置）+ FSO 直写，失败才回退 Blob 下载。
+ *
+ * 「最近一次即默认」：用户这次选的目录若与记忆的不同，顺手写回
+ * 默认导出位置（设置页「默认导出位置」读同一配置键，即时同步）——
+ * 不用为了改默认再跑一趟设置页。
+ *
+ * @returns 是否成功保存（用户取消也是 false，调用方静默返回即可）
  */
+function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): boolean {
+  const today = new Date().toISOString().slice(0, 10)
+  const payload = {
+    format: 'bgm-conditional-format-rules',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    rules,
+  }
+  const result = saveTextFileWithDialog({
+    title: `导出${label}（选择保存位置）`,
+    defaultDir: getExportPath(true),
+    fileName: `bgm-${label}-${today}.json`,
+    content: JSON.stringify(payload, null, 2),
+    filterDescription: '规则文件 (*.json)',
+    filterExtensions: '*.json',
+  })
+  // 用户取消（null）：不提示、不动默认位置、返回 false
+  const isCancelled = result === null
+  if (isCancelled) return false
+
+  // 降级通道（FSO 不可用）：落浏览器下载目录，toast 明示落点
+  const isDownloadFallback = result.path === ''
+  if (isDownloadFallback) {
+    showToast(`已导出 ${String(rules.length)} 条${label}到浏览器下载目录`, 'success')
+    return true
+  }
+
+  const chosenDirectory = directoryNameOf(result.path)
+  // 「最近一次即默认」：这次选的目录与记忆不同 → 写回默认导出位置
+  // （设置页「默认导出位置」读同一配置键，即时同步）
+  const hasChosenDirectory = chosenDirectory !== ''
+  const isNewDefaultDirectory = hasChosenDirectory && chosenDirectory !== getExportPath(true)
+  if (isNewDefaultDirectory) {
+    setExportPath(chosenDirectory)
+    showToast(`已记住为默认导出位置: ${chosenDirectory}`, 'info')
+  }
+  showToast(`已导出 ${String(rules.length)} 条${label}到 ${result.path}`, 'success')
+  return true
+}
+
+/** 导出整个规则库（备份 / 迁移 / 分享） */
 function exportRules(): void {
   if (state.rules.length === 0) {
     showToast('规则库是空的，先新建或导入几条', 'warn')
     return
   }
-  const payload = {
-    format: 'bgm-conditional-format-rules',
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    rules: state.rules,
+  saveRulesJson(state.rules, '规则库')
+}
+
+/** 导出所选规则（规则管理勾选 / 分组内勾选 / 规则管理器批量条共用） */
+function exportSelectedRules(rules: readonly ConditionalFormatRule[], label: string): void {
+  if (rules.length === 0) {
+    showToast('没有选中的规则', 'warn')
+    return
   }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `bgm-条件格式规则-${new Date().toISOString().slice(0, 10)}.json`
-  document.body.append(link)
-  link.click()
-  link.remove()
-  window.setTimeout(() => {
-    URL.revokeObjectURL(url)
-  }, 1000)
-  showToast(`已导出 ${String(state.rules.length)} 条规则`, 'success')
+  saveRulesJson(rules, label)
 }
 
 // ===== 初始化 =====
@@ -2080,6 +2245,50 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatExportBtn')?.addEventListener('click', () => {
     exportRules()
   })
+  // 全选 / 取消全部：作用于当前**搜索后的可见集**（与既有规则表格的
+  // 全选同口径——跨搜索全选再一键删，搜不到想撤回来的项最危险）。
+  // 已全选时再点 = 取消，不用另找「取消选择」。
+  byId('conditionalFormatPickAllBtn')?.addEventListener('click', () => {
+    const visible = filterRules(state.rules, state.searchQuery)
+    if (visible.length === 0) {
+      showToast('没有可全选的规则', 'warn')
+      return
+    }
+    const visibleIds = visible.map((rule) => rule.id)
+    const isAllPicked = visibleIds.every((id) => state.ruleSelection.has(id))
+    const next = new Set(state.ruleSelection)
+    for (const id of visibleIds) {
+      if (isAllPicked) next.delete(id)
+      else next.add(id)
+    }
+    state.ruleSelection = next
+    renderRuleList()
+  })
+  // 批量条（勾选后才出现）：删除所选 / 导出所选 / 取消选择
+  byId('conditionalFormatRuleBatchBar')?.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null
+    const button = target?.closest<HTMLButtonElement>('[data-rule-batch]')
+    if (!button) return
+    switch (button.dataset.ruleBatch) {
+      case 'delete': {
+        deleteSelectedRules([...state.ruleSelection])
+        break
+      }
+      case 'export': {
+        const picked = state.rules.filter((rule) => state.ruleSelection.has(rule.id))
+        exportSelectedRules(picked, '所选规则')
+        break
+      }
+      case 'clear': {
+        state.ruleSelection = new Set<string>()
+        renderRuleList()
+        break
+      }
+      default: {
+        break
+      }
+    }
+  })
   byId('conditionalFormatDefaultsBtn')?.addEventListener('click', () => {
     generateDefaults()
   })
@@ -2140,7 +2349,7 @@ export function initializeConditionalFormatPage(): void {
 
   // 导入手工规则：选择弹框（全选 / 全不选 / 确认 / 取消 / 遮罩）
   byId('conditionalFormatImportConfirm')?.addEventListener('click', () => {
-    const indices = [...state.importSelection].sort((a, b) => a - b)
+    const indices = [...state.existingSelection].sort((a, b) => a - b)
     closeImportModal()
     importSnapshots(state.importForeignRules, indices)
   })
@@ -2151,12 +2360,12 @@ export function initializeConditionalFormatPage(): void {
     if (event.target === byId('conditionalFormatImportMask')) closeImportModal()
   })
   byId('conditionalFormatImportAll')?.addEventListener('click', () => {
-    state.importSelection = new Set(selectableImportIndices())
-    renderImportList()
+    state.existingSelection = new Set(selectableImportIndices())
+    syncImportSelectionViews()
   })
   byId('conditionalFormatImportNone')?.addEventListener('click', () => {
-    state.importSelection = new Set<number>()
-    renderImportList()
+    state.existingSelection = new Set<number>()
+    syncImportSelectionViews()
   })
   // 列表勾选走 change 委托；勾选只更新确认按钮计数，不重建列表（保住焦点，
   // 用户连勾十几条时不用每次重新点）
@@ -2166,10 +2375,13 @@ export function initializeConditionalFormatPage(): void {
     if (rawIndex === undefined) return
     const index = Number(rawIndex)
     if (!Number.isSafeInteger(index) || index < 1) return
-    const next = new Set(state.importSelection)
+    const next = new Set(state.existingSelection)
     if (target?.checked === true) next.add(index)
     else next.delete(index)
-    state.importSelection = next
+    state.existingSelection = next
+    // 联动：弹框里勾一条，表格与批量条同步亮起（不重建弹框列表——保住焦点，
+    // 用户连勾十几条时不用每次重新点）
+    renderExistingRules()
     setText('conditionalFormatImportConfirm', `导入所选（${String(next.size)}）`)
   })
 
@@ -2303,6 +2515,10 @@ function setupSortablesAndMenus(): void {
       container: ruleList,
       itemSelector: '.conditional-format-rule[data-rule-id]',
       getItemId: (item) => item.dataset.ruleId ?? '',
+      // 把手启动：行内有勾选 / 可见性 / ↑↓⧉✎✕ 一堆交互元素，整行可拖
+      // 会和它们抢手势（momo：现在都是可拖动的——误触排序）。从 ⋮⋮ 把手
+      // 起拖，其余位置该点的点、该选的选。
+      handleSelector: '.conditional-format-rule-handle',
       onReorder: (event) => {
         const next = moveItemNear(state.rules, event.fromId, event.overId, event.placeAfter)
         // 顺序没变（放到原位的邻居上）→ 不持久化不重渲染
@@ -2406,78 +2622,78 @@ function setupSortablesAndMenus(): void {
         reorderForeignRules(event.fromId, event.overId, event.placeAfter)
       },
     })
-    attachDelegatedContextMenu(
-      existingPanel,
-      '.conditional-format-row[data-row-index]',
-      (item) => {
-        const index = Number(item.dataset.rowIndex ?? '0')
-        const snapshot = state.existing[index - 1]
-        if (!snapshot) return []
-        const canImport = snapshot.kind === 'expression' && snapshot.formula !== ''
-        const isStopKnown = snapshot.stopIfTrue !== undefined
-        return [
-          {
-            id: 'import',
-            label: '⤵ 导入规则库',
-            disabled: !canImport,
-            disabledReason: '该类型插件无法重建，不能导入',
-            onSelect: () => {
-              importForeignRule(index)
-            },
+    attachDelegatedContextMenu(existingPanel, '.conditional-format-row[data-row-index]', (item) => {
+      const index = Number(item.dataset.rowIndex ?? '0')
+      const snapshot = state.existing[index - 1]
+      if (!snapshot) return []
+      const canImport = snapshot.kind === 'expression' && snapshot.formula !== ''
+      const isStopKnown = snapshot.stopIfTrue !== undefined
+      return [
+        {
+          id: 'import',
+          label: '⤵ 导入规则库',
+          disabled: !canImport,
+          disabledReason: '该类型插件无法重建，不能导入',
+          onSelect: () => {
+            importForeignRule(index)
           },
-          {
-            id: 'group',
-            label: '🏷 归入分组',
-            onSelect: () => {
-              state.existingSelection = new Set<number>([index])
-              renderExistingRules()
-              openGroupNameModal()
-            },
+        },
+        {
+          id: 'group',
+          label: '🏷 归入分组',
+          onSelect: () => {
+            state.existingSelection = new Set<number>([index])
+            renderExistingRules()
+            openGroupNameModal()
           },
-          {
-            id: 'stop',
-            label: snapshot.stopIfTrue === true ? '🚦 取消「如果为真则停」' : '🚦 如果为真则停',
-            disabled: !isStopKnown,
-            disabledReason: '当前 WPS 未暴露该属性',
-            onSelect: () => {
-              const entry = selectedSheet()
-              if (!entry) return
-              const result = setForeignStopIfTrue(entry.worksheet, index, snapshot.stopIfTrue !== true)
-              if (result.ok) loadExistingRules()
-              else showToast(`设置失败：${result.error}`, 'error')
-            },
+        },
+        {
+          id: 'stop',
+          label: snapshot.stopIfTrue === true ? '🚦 取消「如果为真则停」' : '🚦 如果为真则停',
+          disabled: !isStopKnown,
+          disabledReason: '当前 WPS 未暴露该属性',
+          onSelect: () => {
+            const entry = selectedSheet()
+            if (!entry) return
+            const result = setForeignStopIfTrue(
+              entry.worksheet,
+              index,
+              snapshot.stopIfTrue !== true,
+            )
+            if (result.ok) loadExistingRules()
+            else showToast(`设置失败：${result.error}`, 'error')
           },
-          { id: 'sep1', separator: true },
-          {
-            id: 'up',
-            label: '↑ 上移（提高优先级）',
-            disabled: index <= 1,
-            disabledReason: '已经是最高优先级',
-            onSelect: () => {
-              moveForeignRuleRow(index, -1)
-            },
+        },
+        { id: 'sep1', separator: true },
+        {
+          id: 'up',
+          label: '↑ 上移（提高优先级）',
+          disabled: index <= 1,
+          disabledReason: '已经是最高优先级',
+          onSelect: () => {
+            moveForeignRuleRow(index, -1)
           },
-          {
-            id: 'down',
-            label: '↓ 下移（降低优先级）',
-            disabled: index >= state.existing.length,
-            disabledReason: '已经是最低优先级',
-            onSelect: () => {
-              moveForeignRuleRow(index, 1)
-            },
+        },
+        {
+          id: 'down',
+          label: '↓ 下移（降低优先级）',
+          disabled: index >= state.existing.length,
+          disabledReason: '已经是最低优先级',
+          onSelect: () => {
+            moveForeignRuleRow(index, 1)
           },
-          { id: 'sep2', separator: true },
-          {
-            id: 'delete',
-            label: '✕ 从工作表删除',
-            danger: true,
-            onSelect: () => {
-              deleteForeignRuleRow(index)
-            },
+        },
+        { id: 'sep2', separator: true },
+        {
+          id: 'delete',
+          label: '✕ 从工作表删除',
+          danger: true,
+          onSelect: () => {
+            deleteForeignRuleRow(index)
           },
-        ]
-      },
-    )
+        },
+      ]
+    })
   }
 }
 

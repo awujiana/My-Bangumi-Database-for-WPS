@@ -36,6 +36,13 @@ const m = vi.hoisted(() => ({
   // tools/config.js
   getConfig: vi.fn<(key: string, fallback?: string, isGlobal?: boolean) => string>(),
   setConfig: vi.fn<(key: string, value: string, isGlobal?: boolean) => void>(),
+  // 默认导出位置（save-file 流程用；测试不关心位置，返回空 = 用对话框默认目录）
+  getExportPath: vi.fn<() => string>(),
+  setExportPath: vi.fn<(path: string) => boolean>(),
+  // tools/save-file.js（选位置 + 写文件；测试环境无 WPS COM，统一 mock）
+  saveTextFileWithDialog:
+    vi.fn<(options: unknown) => { path: string; via: 'fso' | 'download' } | null>(),
+  directoryNameOf: vi.fn<(path: string) => string>(),
   // panel/conditional-format-apply.js（COM 层全家）
   applyConditionalFormatPlan: vi.fn<(worksheet: unknown, plan: unknown) => unknown>(),
   checkFormatConditionsReadable: vi.fn<(worksheet: unknown) => string | null>(),
@@ -79,6 +86,13 @@ vi.mock('../ts/ui/dialog.js', () => ({
 vi.mock('../ts/tools/config.js', () => ({
   getConfig: m.getConfig,
   setConfig: m.setConfig,
+  getExportPath: m.getExportPath,
+  setExportPath: m.setExportPath,
+}))
+
+vi.mock('../ts/tools/save-file.js', () => ({
+  saveTextFileWithDialog: m.saveTextFileWithDialog,
+  directoryNameOf: m.directoryNameOf,
 }))
 
 vi.mock('../ts/panel/conditional-format-apply.js', () => ({
@@ -122,9 +136,30 @@ function loadPageSkeleton(): void {
 
 /** 三条规则（两个分组），用于验证分组渲染与拖拽 */
 const RULES: ConditionalFormatRule[] = [
-  { id: 'r1', name: '当前季', group: '番剧高亮', appliesTo: 'B:B', formula: '=1', interior: '#00B050' },
-  { id: 'r2', name: '错误标红', group: '数据质量', appliesTo: 'C:C', formula: '=2', interior: '#FF0000' },
-  { id: 'r3', name: '春季', group: '番剧高亮', appliesTo: 'D:D', formula: '=3', interior: '#0000FF' },
+  {
+    id: 'r1',
+    name: '当前季',
+    group: '番剧高亮',
+    appliesTo: 'B:B',
+    formula: '=1',
+    interior: '#00B050',
+  },
+  {
+    id: 'r2',
+    name: '错误标红',
+    group: '数据质量',
+    appliesTo: 'C:C',
+    formula: '=2',
+    interior: '#FF0000',
+  },
+  {
+    id: 'r3',
+    name: '春季',
+    group: '番剧高亮',
+    appliesTo: 'D:D',
+    formula: '=3',
+    interior: '#0000FF',
+  },
 ]
 
 /** 一套工作表条目（selectedSheet 能命中） */
@@ -230,9 +265,7 @@ function writtenRuleIds(): string[][] {
     .filter(([key]) => key === 'conditionalFormat.rules.v1')
     .map(([, value]) => {
       const parsed: unknown = JSON.parse(value)
-      return Array.isArray(parsed)
-        ? parsed.map((entry) => (entry as { id?: string }).id ?? '')
-        : []
+      return Array.isArray(parsed) ? parsed.map((entry) => (entry as { id?: string }).id ?? '') : []
     })
 }
 
@@ -297,8 +330,9 @@ describe('规则库拖拽提交链路', () => {
     const rows = ruleRows()
     stubRects(rows)
 
-    // 拖到全部项之下 → 落末尾
-    pointer(rows[0]!, 'pointerdown', 10, 10)
+    // 从行内 ⋮⋮ 把手起拖（把手启动：整行按下不再启动拖拽，防误触）
+    const handle = rows[0]!.querySelector<HTMLElement>('.conditional-format-rule-handle')!
+    pointer(handle, 'pointerdown', 10, 10)
     pointer(window, 'pointermove', 10, 200)
     await nextFrames()
     pointer(window, 'pointerup', 10, 200)
@@ -330,9 +364,27 @@ describe('规则库拖拽提交链路', () => {
 
 describe('既有规则表格', () => {
   const SNAPSHOTS = [
-    { range: 'B2:B9', formula: '=$B2="x"', kind: 'expression' as const, type: 2, interior: '#00B050' },
-    { range: 'C2:C9', formula: '=$C2="y"', kind: 'expression' as const, type: 2, interior: '#FF0000' },
-    { range: 'D2:D9', formula: '=$D2="z"', kind: 'expression' as const, type: 2, interior: '#0000FF' },
+    {
+      range: 'B2:B9',
+      formula: '=$B2="x"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#00B050',
+    },
+    {
+      range: 'C2:C9',
+      formula: '=$C2="y"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#FF0000',
+    },
+    {
+      range: 'D2:D9',
+      formula: '=$D2="z"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#0000FF',
+    },
   ]
 
   it('读到快照后渲染表格行；右键菜单含导入/归组/停止，边界禁用', async () => {
@@ -341,7 +393,9 @@ describe('既有规则表格', () => {
     m.readForeignRules.mockReturnValue(SNAPSHOTS)
     await openPage()
 
-    const rows = [...document.querySelectorAll<HTMLElement>('.conditional-format-row[data-row-index]')]
+    const rows = [
+      ...document.querySelectorAll<HTMLElement>('.conditional-format-row[data-row-index]'),
+    ]
     expect(rows).toHaveLength(3)
     expect(rows[0]?.getAttribute('title')).toContain('拖拽调整优先级')
 
@@ -368,7 +422,9 @@ describe('既有规则表格', () => {
     m.readForeignRules.mockReturnValue(SNAPSHOTS)
     await openPage()
 
-    const rows = [...document.querySelectorAll<HTMLElement>('.conditional-format-row[data-row-index]')]
+    const rows = [
+      ...document.querySelectorAll<HTMLElement>('.conditional-format-row[data-row-index]'),
+    ]
     stubRects(rows)
     const readCallsBefore = m.readForeignRules.mock.calls.length
 
@@ -413,14 +469,114 @@ describe('宿主读取失败时的韧性（2026-10-24 真机缺陷）', () => {
     // 关键断言：change 绑定仍生效（修复前这一段根本没执行）
     const sheetSelect = document.querySelector<HTMLSelectElement>('#conditionalFormatSheet')
     sheetSelect?.dispatchEvent(new Event('change', { bubbles: true }))
-    expect(
-      m.setConfig.mock.calls.some(([key]) => key === 'conditionalFormat.sheet.v1'),
-    ).toBe(true)
+    expect(m.setConfig.mock.calls.some(([key]) => key === 'conditionalFormat.sheet.v1')).toBe(true)
 
     // 刷新按钮也已绑定：点它不会抛（会再次尝试枚举并再次兜底）
-    const reloadButton = document.querySelector<HTMLButtonElement>('#conditionalFormatReloadSheetsBtn')
+    const reloadButton = document.querySelector<HTMLButtonElement>(
+      '#conditionalFormatReloadSheetsBtn',
+    )
     expect(() => {
       reloadButton?.click()
     }).not.toThrow()
+  })
+})
+
+// ========== 规则库批量操作（momo：全选 / 删除所选 / 导出所选） ==========
+
+describe('规则库批量操作', () => {
+  it('行带「勾选」复选框，与可见性 checkbox 是两个输入', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const row = ruleRows()[0]!
+    const pick = row.querySelector<HTMLInputElement>('input[data-action="pick"]')
+    const vis = row.querySelector<HTMLInputElement>('input[data-action="toggle"]')
+    expect(pick).not.toBeNull()
+    expect(vis).not.toBeNull()
+    // 初始都没勾（ruleSelection 空）；可见性默认应用中（勾着）
+    expect(pick?.checked).toBe(false)
+    expect(vis?.checked).toBe(true)
+  })
+
+  it('勾选行 → 批量条出现「已选 N 条」；删除所选后规则减少', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    // 勾前两条（r1 / r3，同组）
+    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[data-action="pick"]')]
+    boxes[0]!.checked = true
+    boxes[0]!.dispatchEvent(new Event('change', { bubbles: true }))
+    boxes[1]!.checked = true
+    boxes[1]!.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const bar = document.getElementById('conditionalFormatRuleBatchBar')!
+    expect(bar.classList.contains('is-visible')).toBe(true)
+    expect(bar.textContent).toContain('已选 2 条')
+
+    // 删除所选 → 只剩 r2
+    const batchDeleteButton = bar.querySelector<HTMLButtonElement>('[data-rule-batch="delete"]')!
+    batchDeleteButton.click()
+    expect(ruleRows()).toHaveLength(1)
+    expect(ruleRows()[0]?.dataset.ruleId).toBe('r2')
+    // 删除后批量条收起
+    expect(bar.classList.contains('is-visible')).toBe(false)
+  })
+
+  it('全选按钮：勾全部可见 → 再点取消', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const pickAll = document.getElementById('conditionalFormatPickAllBtn')!
+    pickAll.click()
+    const bar = document.getElementById('conditionalFormatRuleBatchBar')!
+    expect(bar.textContent).toContain('已选 3 条')
+
+    pickAll.click()
+    expect(bar.classList.contains('is-visible')).toBe(false)
+  })
+
+  it('组标题三件套：组内全选 / 删除整组 / 导出整组', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const groupTitle = [
+      ...document.querySelectorAll<HTMLElement>('.conditional-format-group-title'),
+    ][0]!
+    expect(groupTitle.querySelector('[data-action="pick-group"]')).not.toBeNull()
+    expect(groupTitle.querySelector('[data-action="delete-group"]')).not.toBeNull()
+    expect(groupTitle.querySelector('[data-action="export-group"]')).not.toBeNull()
+
+    // 组内全选（第一组 = 番剧高亮，2 条）
+    groupTitle.querySelector<HTMLButtonElement>('[data-action="pick-group"]')!.click()
+    const bar = document.getElementById('conditionalFormatRuleBatchBar')!
+    expect(bar.textContent).toContain('已选 2 条')
+  })
+
+  it('导出所选 → 走 saveTextFileWithDialog（选位置流程）', async () => {
+    mockConfigWithRules()
+    m.getExportPath.mockReturnValue('D:/默认导出')
+    m.saveTextFileWithDialog.mockReturnValue({ path: 'D:/备份/rules.json', via: 'fso' })
+    m.directoryNameOf.mockReturnValue('D:/备份')
+    await openPage()
+
+    const pickAll = document.getElementById('conditionalFormatPickAllBtn')!
+    pickAll.click()
+    const exportButton = document
+      .getElementById('conditionalFormatRuleBatchBar')!
+      .querySelector<HTMLButtonElement>('[data-rule-batch="export"]')!
+    exportButton.click()
+
+    expect(m.saveTextFileWithDialog).toHaveBeenCalledTimes(1)
+    const firstCall = m.saveTextFileWithDialog.mock.calls[0]?.[0] as {
+      title?: string
+      defaultDir?: string
+      content?: string
+    }
+    expect(firstCall.title).toContain('导出所选规则')
+    // 默认目录来自设置页的「默认导出位置」（getExportPath）
+    expect(firstCall.defaultDir).toBe('D:/默认导出')
+    // 规则序列化进 content（JSON 载荷）
+    const payload = JSON.parse(firstCall.content ?? '{}') as { rules?: unknown[] }
+    expect(payload.rules).toHaveLength(3)
   })
 })
