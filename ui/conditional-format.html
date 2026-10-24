@@ -399,6 +399,53 @@
           </div>
         </div>
 
+        <!--
+          粘贴规则确认框（可拖动 + 可收起）
+          标题栏是拖动把手（conditional-format-modal-grip + bindModalDrag），
+          ▾ 收起成只剩标题栏一行（bindModalCollapse，与浮动窗同范式）——
+          momo：确定/取消贴输入框太近、框不能动不能收。
+        -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatPasteMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--paste"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatPasteTitle"
+          >
+            <h4 id="conditionalFormatPasteTitle" class="conditional-format-modal-grip">
+              📋 粘贴规则<button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatPasteCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「粘贴规则」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
+            <p id="conditionalFormatPasteHint" class="conditional-format-import-hint"></p>
+            <input
+              type="text"
+              id="conditionalFormatPasteRange"
+              class="conditional-format-input"
+              placeholder="如 B3:B1048576"
+            />
+            <div class="conditional-format-modal-actions">
+              <button type="button" class="bgm-btn small primary" id="conditionalFormatPasteOk">
+                确定
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatPasteCancel">
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 默认规则集 -->
         <section class="section" id="sec-defaults" data-detachable>
           <h3>

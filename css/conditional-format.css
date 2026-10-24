@@ -939,3 +939,51 @@
   flex: 0 0 auto;
   margin: 0;
 }
+
+/* ---- 粘贴规则弹窗（可拖动 + 可收起）---- */
+/* 比确认框略宽：范围输入 + 说明文案一行放得下 */
+.conditional-format-modal--paste {
+  width: min(460px, calc(100vw - 32px));
+}
+
+/* 标题栏右侧的收起按钮（▾/▸）：与浮动窗 / 模块折叠按钮同范式 */
+.conditional-format-modal-collapse {
+  float: right;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.conditional-format-modal-collapse:hover {
+  color: var(--text-1);
+  background: var(--bg-surface-2);
+}
+
+/* 收起态：只留标题栏一行（hint / 输入框 / 按钮全藏）——与 detachable-panel
+   浮动窗的收起同语义（momo：范围看完先收起来，别一直挡着表格）。
+   拖过的 fixed 位置不受影响，展开后还在原处。 */
+.conditional-format-modal.is-collapsed .conditional-format-import-hint,
+.conditional-format-modal.is-collapsed .conditional-format-input,
+.conditional-format-modal.is-collapsed .conditional-format-modal-actions {
+  display: none;
+}
+
+/* 粘贴框按钮：小 + 右对齐不拉伸 + 与输入框保持距离。
+   基类 .conditional-format-modal-actions .bgm-btn 是 flex:1 满宽，
+   确认框那么排显大气，但 momoo 反馈「确定/取消离输入框太近、做大一点小」——
+   这里收成右下角一排小按钮（margin-top 由基类的 sp-4 提供）。 */
+.conditional-format-modal--paste .conditional-format-modal-actions {
+  justify-content: flex-end;
+}
+
+.conditional-format-modal--paste .conditional-format-modal-actions .bgm-btn {
+  flex: 0 0 auto;
+  min-width: 72px;
+}
