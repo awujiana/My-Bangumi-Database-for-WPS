@@ -440,13 +440,21 @@
 }
 
 /* ---- 双策略确认模态框 ---- */
+/* 弹窗遮罩。
+   为什么用 absolute 而不是 fixed：WPS 任务窗格里 iframe 视口常常等于
+   **内容全高**（长页面不产生窗格内滚动条，而是 iframe 本身被撑高），
+   fixed + inset:0 + flex-center 会把弹窗放到文档中部——落在任务窗格
+   可见区之外（momo 实测：弹窗出现在页面上方、窗口外）。
+   absolute 相对文档 + JS 打开时写 top=scrollY 锚定当前可见区顶部，
+   两种宿主模型下都落在可见区内；align-items 贴顶（不赌视口高度）。 */
 .conditional-format-modal-mask {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 1000;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: 20px 16px;
   background: var(--bg-overlay);
 }
 
