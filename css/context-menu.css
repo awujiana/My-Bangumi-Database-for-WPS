@@ -1,0 +1,102 @@
+/* ============================================================================
+ * BGM 加载项 · 通用右键菜单（css/context-menu.css）
+ * ----------------------------------------------------------------------------
+ * 六个页面共用（tokens / styles / panel-theme / detachable-panel 之后的第五份
+ * 基础样式）。任何组件 attachContextMenu 即可挂载，本文件只负责菜单自身观感：
+ * 弹出动画、悬浮高亮、危险项、分隔线、快捷键提示。位置由 JS 写 left/top
+ * （见 ts/ui/components/context-menu.ts 的 resolveMenuPosition 视口翻转）。
+ * ==========================================================================*/
+
+.bgm-context-menu {
+  position: fixed;
+  z-index: 1200; /* 模态框 1000 / 浮动窗 900 之上：菜单是瞬时的，必须盖住两者 */
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: var(--sp-1, 4px);
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-pop);
+  /* 与项目其它浮层一致的快入缓动 */
+  opacity: 1;
+  transform: scale(1);
+  transform-origin: top left;
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+/* 开场：从 96% 放大 + 淡入（class 在挂载后的下一帧被 JS 摘掉） */
+.bgm-context-menu.is-opening {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+.bgm-context-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ctrl);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bgm-context-menu-item:hover,
+.bgm-context-menu-item:focus-visible {
+  background: var(--bg-surface-2);
+  outline: none;
+}
+
+.bgm-context-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--border-emphasis);
+}
+
+.bgm-context-menu-item[aria-disabled='true'] {
+  color: var(--text-3);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bgm-context-menu-item[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+/* 危险项：删除类操作红色，hover 给一层红底（不抢焦点环） */
+.bgm-context-menu-item.is-danger {
+  color: var(--danger, #ef4444);
+}
+
+.bgm-context-menu-item.is-danger:hover,
+.bgm-context-menu-item.is-danger:focus-visible {
+  background: color-mix(in srgb, var(--danger, #ef4444) 14%, transparent);
+}
+
+.bgm-context-menu-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bgm-context-menu-shortcut {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+}
+
+.bgm-context-menu-separator {
+  height: 0.5px;
+  margin: var(--sp-1, 4px) var(--sp-2, 8px);
+  background: var(--border-faint);
+}

@@ -311,6 +311,20 @@
   touch-action: none;
 }
 
+/* 行可拖拽排序（sortable-list）：行主体给抓手光标，按钮/输入/可编辑单元格除外 */
+.conditional-format-table .conditional-format-row,
+.conditional-format-rule-list .conditional-format-rule {
+  cursor: grab;
+}
+
+.conditional-format-table .conditional-format-row button,
+.conditional-format-table .conditional-format-row input,
+.conditional-format-table .conditional-format-row .conditional-format-cell-editable,
+.conditional-format-rule-list .conditional-format-rule button,
+.conditional-format-rule-list .conditional-format-rule input {
+  cursor: pointer;
+}
+
 /* ---- 规则编辑器（浮动弹窗）---- */
 /* 浮层化后：外层 .conditional-format-modal 已是卡片，这里只做内容排布，
    不再自带边框/背景/外边距（否则双重卡片）。 */

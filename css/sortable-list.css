@@ -1,0 +1,70 @@
+/* ============================================================================
+ * BGM 加载项 · 可拖拽排序列表（css/sortable-list.css）
+ * ----------------------------------------------------------------------------
+ * 配合 ts/ui/components/sortable-list.ts（dnd-kit 轻量实现）。只负责拖拽三件
+ * 视觉：被拖项的虚线占位、跟手的克隆浮层、放置指示线；位置全部由 JS 写
+ * inline style（fixed 定位 + transform 位移），这里只给静态观感。
+ * 当前唯一使用方：条件格式页（规则库列表 + 既有规则表格），故只链进
+ * ui/conditional-format.html；其它页面如接入 sortable，把本文件加进 head。
+ * ==========================================================================*/
+
+/* 拖拽期间全局：禁文本选中 + 抓手光标（否则拖过文字会把内容选的一片蓝） */
+body.sortable-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* 被拖项的占位：原项留在列表里维持高度，虚线框告诉用户「它原来在这」 */
+.is-placeholder {
+  opacity: 0.35;
+  outline: 1px dashed var(--border-emphasis);
+  outline-offset: -1px;
+}
+
+/* 键盘拾起中的项：实线描边（键盘用户没有指针，描边是唯一「抓住了」反馈） */
+.is-keyboard-dragging {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: -1px;
+}
+
+/* 跟手的克隆浮层：抬升阴影 + 轻微放大，与占位虚线框形成因果对照 */
+.sortable-overlay {
+  pointer-events: none;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  opacity: 0.96;
+  /* 跟手用 transform（合成层，每帧只平移不重排内容） */
+  will-change: transform;
+}
+
+/* 放置动画：松手后浮层从指针处飞到新位置（JS 写 left/top transition） */
+.sortable-overlay.is-dropping {
+  transition:
+    left 140ms var(--ease),
+    top 140ms var(--ease);
+  opacity: 0;
+}
+
+/* 放置指示线：2px 品牌蓝细线，落在「将插入」的边界上 */
+.sortable-drop-indicator {
+  position: fixed;
+  z-index: 1250;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent-blue);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent-blue) 60%, transparent);
+  pointer-events: none;
+}
+
+/* 键盘播报 live region：视觉隐藏但读屏可读 */
+.sortable-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
