@@ -211,6 +211,21 @@ describe('指针拖拽', () => {
     expect(document.body.classList.contains('sortable-dragging')).toBe(false)
   })
 
+  it('animateDrop:false → 松手直接撤浮层（id 会漂的列表不能飞错位置）', async () => {
+    buildItems(3)
+    options.animateDrop = false
+    handles.push(createSortable(options))
+    const items = [...container.querySelectorAll<HTMLElement>('.row')]
+    pointer(items[0]!, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 10, 90)
+    await nextFrames()
+    pointer(window, 'pointerup', 10, 90)
+
+    expect(reorderEvents).toHaveLength(1)
+    // 浮层立即撤掉，不留在屏幕上飞
+    expect(document.querySelector('.sortable-overlay')).toBeNull()
+  })
+
   it('拖拽后那一次 click 被吞（行内按钮不会被误触发）', async () => {
     buildItems(3)
     handles.push(createSortable(options))
@@ -319,15 +334,36 @@ describe('键盘排序（dnd-kit 招牌无障碍）', () => {
     expect(items[0]?.classList.contains('is-keyboard-dragging')).toBe(false)
   })
 
-  it('未拖拽时方向键 = roving focus（在项间移焦点）', () => {
+  it('未拖拽时方向键 = roving focus（在项间移焦点，tabindex 跟着搬迁）', () => {
     buildItems(3)
     handles.push(createSortable(options))
     const items = [...container.querySelectorAll<HTMLElement>('.row')]
+    // roving：整列只有一个 Tab 停靠点（347 行不能有 347 个）
+    expect(items[0]?.tabIndex).toBe(0)
+    expect(items[1]?.tabIndex).toBe(-1)
     items[0]?.focus()
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
     expect(document.activeElement).toBe(items[1])
+    // 停靠点搬迁：旧项收起、新项升起
+    expect(items[0]?.tabIndex).toBe(-1)
+    expect(items[1]?.tabIndex).toBe(0)
     items[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
     expect(document.activeElement).toBe(items[0])
+    expect(items[1]?.tabIndex).toBe(-1)
+  })
+
+  it('拖拽 overlay 剥掉身份标识（同一时刻 DOM 里不出现两个「第 N 行」）', async () => {
+    buildItems(3)
+    handles.push(createSortable(options))
+    const items = [...container.querySelectorAll<HTMLElement>('.row')]
+    pointer(items[0]!, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 60, 60)
+    pointer(window, 'pointermove', 100, 100)
+    await nextFrames()
+
+    const overlay = document.querySelector<HTMLElement>('.sortable-overlay')
+    expect(overlay?.dataset.itemId).toBeUndefined()
+    expect(document.querySelectorAll('[data-item-id="id-0"]')).toHaveLength(1)
   })
 
   it('到边界播报「已经到顶/底」，不越界', () => {

@@ -2342,6 +2342,9 @@ function setupSortablesAndMenus(): void {
       container: existingPanel,
       itemSelector: '.conditional-format-row[data-row-index]',
       getItemId: (item) => item.dataset.rowIndex ?? '',
+      // 提交后整表重读、行号整体漂移：按旧行号找不到「移动后的项」，
+      // 落位动画会飞错位置——关掉，直接撤浮层（toast 已告知结果）
+      animateDrop: false,
       onReorder: (event) => {
         reorderForeignRules(event.fromId, event.overId, event.placeAfter)
       },

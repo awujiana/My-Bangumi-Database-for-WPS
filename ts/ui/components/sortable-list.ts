@@ -55,6 +55,14 @@ export interface SortableOptions {
   activationDistance?: number
   /** 禁用开关（返回 true 时拖拽与键盘排序都不响应，如 COM 忙 / 搜索态） */
   isDisabled?: () => boolean
+  /**
+   * 松手后是否播放「浮层飞到新位置」的落位动画（默认 true）。
+   *
+   * 关掉它的场景：**提交后项的 id 会变**——如既有规则表格用行号当 id，移动后
+   * 行号整体漂移，按旧 id 找不到「移动后的项」，动画会飞到占了旧行号的那个
+   * 规则上（视觉错位）。这种列表提交后整表重渲染，直接撤浮层即可。
+   */
+  animateDrop?: boolean
   /** 自定义播报（默认写进容器内的 live region） */
   announce?: (message: string) => void
 }
@@ -194,6 +202,7 @@ export function createSortable(options: SortableOptions): SortableHandle {
     handleSelector,
     activationDistance = DEFAULT_ACTIVATION_DISTANCE,
     isDisabled,
+    animateDrop = true,
     announce,
   } = options
 
@@ -365,14 +374,20 @@ export function createSortable(options: SortableOptions): SortableHandle {
   function commitReorder(event: SortableReorderEvent, overlay: HTMLElement | null): void {
     const result = onReorder(event)
     if (!(result instanceof Promise)) {
-      if (overlay !== null) playDropAnimation(overlay, event.fromId)
+      if (overlay !== null) {
+        if (animateDrop) playDropAnimation(overlay, event.fromId)
+        else overlay.remove()
+      }
       return
     }
     // 异步提交（COM 交换批处理）：等它 resolved 再播放放置动画；失败兜底摘浮层
     void (async (): Promise<void> => {
       try {
         await result
-        if (overlay !== null) playDropAnimation(overlay, event.fromId)
+        if (overlay !== null) {
+          if (animateDrop) playDropAnimation(overlay, event.fromId)
+          else overlay.remove()
+        }
       } catch (error: unknown) {
         // eslint-disable-next-line no-console -- 纯 DOM 组件不依赖日志后端，console 是重排失败兜底日志的唯一通道
         console.error('[sortable] 重排提交失败', error)
@@ -456,7 +471,16 @@ export function createSortable(options: SortableOptions): SortableHandle {
       if (isDisabled?.() === true) return
       const rect = item.getBoundingClientRect()
       const overlay = item.cloneNode(true) as HTMLElement
+      // 剥掉克隆上的身份标识：overlay 挂在 body 下（不在容器里），带着 data-*
+      // （行号 / rule id / data-action 钩子）会让同一时刻 DOM 里出现两个
+      // 「第 N 行」，devtools 与将来的全局查询都会认错。克隆是纯展示，全剥无害。
       overlay.removeAttribute('id')
+      // 两段式：先快照 data-* 属性名，再删。不能边迭代边删——attributes 是
+      // live 集合，删除会跳项；也不能 [...attributes] 直接 for-of（no-useless-spread）
+      const dataAttributeNames = [...overlay.attributes]
+        .map((attribute) => attribute.name)
+        .filter((name) => name.startsWith('data-'))
+      for (const name of dataAttributeNames) overlay.removeAttribute(name)
       overlay.querySelectorAll('[id]').forEach((node) => {
         node.removeAttribute('id')
       })
@@ -584,7 +608,12 @@ export function createSortable(options: SortableOptions): SortableHandle {
       const items = currentItems()
       const step = event.key === 'ArrowUp' ? -1 : 1
       const next = keyboardMoveIndex(items.indexOf(item), step, items.length)
-      items[next]?.focus()
+      const destination = items[next]
+      if (destination === undefined || destination === item) return
+      // tabindex 跟着焦点搬迁：旧项收起为 -1，新项升起为 0（停靠点始终只有一个）
+      item.tabIndex = -1
+      destination.tabIndex = 0
+      destination.focus()
       return
     }
     if (keyboardDrag.item !== item) return
@@ -613,8 +642,11 @@ export function createSortable(options: SortableOptions): SortableHandle {
 
   function refresh(): void {
     const items = container.querySelectorAll<HTMLElement>(itemSelector)
-    items.forEach((item) => {
-      item.tabIndex = 0
+    items.forEach((item, index) => {
+      // roving tabindex：整列只有一个 Tab 停靠点——实测用户的表有 347 条规则，
+      // 每项都可 Tab 就是 347 个停靠点，键盘用户 Tab 到手脱。方向键在项间移
+      // 焦点时同步搬迁 tabindex（见 keydown 的 roving 分支）
+      item.tabIndex = index === 0 ? 0 : -1
       item.setAttribute('aria-roledescription', '可拖拽排序项')
     })
   }
