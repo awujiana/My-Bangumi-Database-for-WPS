@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/detachable-panel.css" />
-<link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/context-menu.css" />
     <link rel="stylesheet" href="../css/diff.css" />
   </head>
   <body data-page="panel">
@@ -441,6 +441,32 @@
               更新时间都只在它里面。<br />
               数据仓库的清单文件是 <code>data/anime.manifest.json</code>，分片同目录。
             </p>
+            <button type="button" class="bgm-btn small" id="shardListBtn">📋 分片清单</button>
+          </div>
+
+          <!-- 分片清单浮窗：每片的完整字段清单与取舍说明（含关联条目ID / 关联的动漫ID 区别） -->
+          <div
+            class="shard-list-modal"
+            id="shardListModal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="数据分片清单"
+            style="display: none"
+          >
+            <div class="shard-list-modal-content">
+              <div class="shard-list-modal-header">
+                <h3>数据分片清单</h3>
+                <button
+                  type="button"
+                  class="modal-close-btn"
+                  id="shardListCloseBtn"
+                  aria-label="关闭"
+                >
+                  &times;
+                </button>
+              </div>
+              <div class="shard-list-modal-body" id="shardListBody"></div>
+            </div>
           </div>
 
           <div id="localFileFields" style="display: none">

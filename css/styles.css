@@ -1315,14 +1315,115 @@ select.input {
 }
 
 .bgm-mapping-select {
-    flex: 1 1 auto;
-    min-width: 0;
-    font-size: 13px;
-    background: var(--bg-surface, #2a2a2a);
-    color: var(--text-1, #f2f2f2);
-    border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
-    border-radius: 4px;
-    padding: 2px 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  background: var(--bg-surface, #2a2a2a);
+  color: var(--text-1, #f2f2f2);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+/* 行内上下移按钮：小而低调，且与左侧徽章/下拉保持距离。
+   曾经复用 .bgm-dialog-btn（对话框主按钮尺寸）：44px 高的大按钮贴着
+   数据排一排，整行像被按钮压住（momo：离数据太近、做大一点小一点）。 */
+.bgm-mapping-move-btn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-left: 10px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-3, #8a8a8a);
+  background: var(--bg-surface, #2a2a2a);
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.bgm-mapping-move-btn:hover:not(:disabled) {
+  color: var(--text-1, #f2f2f2);
+  background: var(--bg-surface-2, #333);
+}
+
+.bgm-mapping-move-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ===== 分片清单浮窗（GitHub 配置区「📋 分片清单」） =====
+   遮罩 absolute + JS 写 top=scrollY 锚定当前可见区：WPS 任务窗格里 fixed
+   会因 iframe 视口=内容高而飘到可见区外（detachable-panel 同款修法）。 */
+.shard-list-modal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px 16px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.shard-list-modal-content {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  background: var(--bg-base, #2d2d2d);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.shard-list-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
+}
+
+.shard-list-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-1, #f2f2f2);
+}
+
+.shard-list-modal-body {
+  padding: 16px 20px;
+  overflow: auto;
+}
+
+.shard-list-item {
+  margin-bottom: 16px;
+}
+
+.shard-list-item:last-child {
+  margin-bottom: 0;
+}
+
+.shard-list-item h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-1, #f2f2f2);
+}
+
+/* 必选片（base）用强调色标题，和复选框里的 is-required 呼应 */
+.shard-list-item.is-required h4 {
+  color: var(--accent, #4f8cff);
+}
+
+/* pre-line：detail 里的 \n 分段渲染，保持「一行一个要点」 */
+.shard-list-item p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-3, #b0b0b0);
+  white-space: pre-line;
 }
 
 .bgm-dialog-message {
