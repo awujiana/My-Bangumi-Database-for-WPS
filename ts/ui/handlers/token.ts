@@ -704,12 +704,11 @@ export function showUserProfile(): void {
 
     // 同步更新顶栏头像（窄页面时显示）
     const topbarAvatarElement = document.getElementById('topbarAvatar')
-    const topbarAvatarImage = document.getElementById(
-      'topbarAvatarImage',
-    ) as HTMLImageElement | null
+    const topbarAvatarImage = document.getElementById('topbarAvatarImg') as HTMLImageElement | null
     if (topbarAvatarElement) {
-      // 让 CSS 媒体查询控制显示/隐藏
-      topbarAvatarElement.style.display = ''
+      // 让 CSS 媒体查询控制显示/隐藏；没有头像 URL 时直接不显示——
+      // 否则窄页面会露出一个只显示 alt 文案的空 img（与 token 区同口径）
+      topbarAvatarElement.style.display = avatarUrl ? '' : 'none'
       topbarAvatarElement.title = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
       topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
       if (topbarAvatarImage && avatarUrl) {
@@ -723,7 +722,7 @@ export function showUserProfile(): void {
     const tokenStatusRight = document.getElementById('tokenStatusRight')
     const tokenUsernameElement = document.getElementById('tokenUserName')
     const tokenUserIdElement = document.getElementById('tokenUserId')
-    const tokenAvatarImage = document.getElementById('tokenAvatarImage') as HTMLImageElement | null
+    const tokenAvatarImage = document.getElementById('tokenAvatarImg') as HTMLImageElement | null
     if (tokenStatusRight) {
       if (username || userId || avatarUrl) {
         tokenStatusRight.style.display = 'flex'
