@@ -248,6 +248,51 @@ export function setForeignStopIfTrue(
 }
 
 /**
+ * 改第 index 条既有规则的应用范围
+ *
+ * 走 FormatCondition.ModifyAppliesToRange（WPS 文档方法）。
+ * 写不进去就明说（宿主版本不支持 / 范围字符串非法），由页面还原输入。
+ */
+export function setForeignAppliesTo(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+  range: string,
+): { ok: true } | { ok: false; error: string } {
+  const fc = getForeignCondition(worksheet, index)
+  if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
+  if (typeof fc.ModifyAppliesToRange !== 'function') {
+    return { ok: false, error: '当前 WPS 版本不支持修改应用范围' }
+  }
+  try {
+    fc.ModifyAppliesToRange(range)
+    return { ok: true }
+  } catch (error: unknown) {
+    return { ok: false, error: (error as Error).message }
+  }
+}
+
+/**
+ * 改第 index 条既有规则的公式（Formula1 赋值）
+ *
+ * 与 setForeignStopIfTrue 同款：VBA 口径 Formula1 可写，JS 侧属性赋值；
+ * 宿主只读时抛错，返回错误文案由页面提示并还原输入框。
+ */
+export function setForeignFormula(
+  worksheet: WpsWorksheet | null | undefined,
+  index: number,
+  formula: string,
+): { ok: true } | { ok: false; error: string } {
+  const fc = getForeignCondition(worksheet, index)
+  if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
+  try {
+    fc.Formula1 = formula
+    return { ok: true }
+  } catch (error: unknown) {
+    return { ok: false, error: (error as Error).message }
+  }
+}
+
+/**
  * 调整既有规则优先级（-1 上移 / +1 下移）
  *
  * 用 SetFirstPriority / SetLastPriority 而不是删了重建——重建会丢格式。

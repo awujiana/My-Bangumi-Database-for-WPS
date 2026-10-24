@@ -62,6 +62,8 @@ import {
   isFormatConditionsSupported,
   moveForeignRule,
   readForeignRules,
+  setForeignAppliesTo,
+  setForeignFormula,
   setForeignStopIfTrue,
 } from './conditional-format-apply.js'
 import { initializeShellNav } from './shell-nav.js'
@@ -138,6 +140,10 @@ interface PageState {
    * 并在表格上方提示（不静默显示全部，否则用户以为「选择里没规则」）。
    */
   existingScope: 'all' | 'selection'
+  /** 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing） */
+  importForeignRules: ForeignRuleSnapshot[]
+  /** 导入弹框里的勾选集（1 基序号，口径同 existingSelection） */
+  importSelection: Set<number>
 }
 
 const state: PageState = {
@@ -156,6 +162,8 @@ const state: PageState = {
   existingPage: 1,
   existingSelection: new Set<number>(),
   existingScope: 'all',
+  importForeignRules: [],
+  importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
 }
 
@@ -507,6 +515,19 @@ function handleExistingTableClick(event: MouseEvent): void {
     return
   }
 
+  // 行内编辑：点「应用于 / 公式」单元格原地变输入框（momo：要能直接改）。
+  // 放在 button 分支之前：这两个单元格不是 button，走 button 分支会直接 return。
+  const editable = target.closest<HTMLElement>('.conditional-format-cell-editable')
+  if (editable) {
+    const editRow = editable.closest<HTMLElement>('[data-row-index]')
+    const editIndex = Number(editRow?.dataset.rowIndex ?? '0')
+    if (!Number.isSafeInteger(editIndex) || editIndex < 1) return
+    const { action } = editable.dataset
+    if (action === 'edit-range') startCellEdit(editable, editIndex, 'range')
+    else if (action === 'edit-formula') startCellEdit(editable, editIndex, 'formula')
+    return
+  }
+
   const button = target.closest<HTMLButtonElement>('button[data-action]')
   if (!button) return
   const row = button.closest<HTMLElement>('[data-row-index]')
@@ -559,38 +580,18 @@ function handleBatchAction(action: string): void {
 }
 
 /**
- * 批量导入所选既有规则到规则库
+ * 批量导入所选既有规则到规则库（表格勾选入口）
  *
- * 不可导入的（数据条 / 色阶等）逐条跳过并在结果里报数——不静默丢，
- * 否则用户以为 10 条全导进来了，实际只进了 3 条。
+ * 与导入弹框共用 {@link importSnapshots}：两条入口一套导入逻辑，
+ * 不各写一份（否则跳过计数 / 持久化 / 提示必然漂移）。
  */
 function batchImportForeignRules(): void {
-  const indices = [...state.existingSelection].sort((a, b) => a - b)
-  const imported: ConditionalFormatRule[] = []
-  let skipped = 0
-  for (const index of indices) {
-    const snapshot = state.existing[index - 1]
-    // 用条件包裹而非 continue（项目禁 continue）：snapshot 缺失说明序号越界，
-    // 跳过这条继续处理其余选中项
-    if (snapshot) {
-      const rule = foreignSnapshotToRule(snapshot, nextId)
-      if (rule) imported.push(rule)
-      else skipped += 1
-    }
-  }
-  if (imported.length === 0) {
-    showToast('所选规则里没有可导入的公式类规则', 'warn')
-    return
-  }
-  state.rules = [...state.rules, ...imported]
-  persistRules()
-  renderRuleList()
+  importSnapshots(
+    state.existing,
+    [...state.existingSelection].sort((a, b) => a - b),
+  )
   state.existingSelection = new Set<number>()
   renderExistingRules()
-  showToast(
-    `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条类型不支持，已跳过）` : ''}`,
-    skipped > 0 ? 'info' : 'success',
-  )
 }
 
 /**
@@ -721,6 +722,124 @@ function handleExistingTableChange(event: Event): void {
     target.checked = !target.checked
     showToast(`设置失败：${result.error}`, 'error')
   }
+}
+
+/**
+ * 行内编辑「应用于 / 公式」：单元格原地变成输入框
+ *
+ * Enter / blur 保存，Esc 取消（重渲染即还原）。保存走 COM 写工作表
+ * （ModifyAppliesToRange / Formula1），成功后按公式匹配联动规则库里
+ * 已导入的副本。
+ */
+function startCellEdit(cell: HTMLElement, index: number, kind: 'range' | 'formula'): void {
+  // 同一单元格已在编辑中（里面已有 input）不重复开
+  if (cell.querySelector('input')) return
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) return
+  const original = kind === 'range' ? snapshot.range : snapshot.formula
+
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.className = 'conditional-format-cell-input'
+  input.value = original
+  input.spellcheck = false
+  input.setAttribute('aria-label', kind === 'range' ? '修改应用范围' : '修改公式')
+  // replaceChildren 一次完成「清空 + 插入」：拆成 textContent='' + append 会踩
+  // no-param-reassign（禁给参数属性赋值，方法调用不管）
+  cell.replaceChildren(input)
+  input.focus()
+  input.select()
+
+  let isFinished = false
+  const finish = (shouldCommit: boolean): void => {
+    if (isFinished) return
+    isFinished = true
+    const next = input.value.trim()
+    // 取消 / 空值 / 没改动：重渲染还原，不写 COM
+    if (!shouldCommit || next === '' || next === original) {
+      renderExistingRules()
+      return
+    }
+    commitCellEdit(index, kind, original, next)
+  }
+
+  input.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      finish(true)
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      // 拦住传播：document 上还有关弹窗的 Esc 监听，不该被行内编辑触发
+      event.stopPropagation()
+      finish(false)
+    }
+  })
+  input.addEventListener('blur', () => {
+    finish(true)
+  })
+}
+
+/** 提交行内编辑：写工作表 → 联动规则库副本 → 刷新表格与规则库 */
+function commitCellEdit(
+  index: number,
+  kind: 'range' | 'formula',
+  oldFormula: string,
+  next: string,
+): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const result =
+    kind === 'range'
+      ? setForeignAppliesTo(entry.worksheet, index, next)
+      : setForeignFormula(entry.worksheet, index, next)
+  if (!result.ok) {
+    // 写不进去要还原输入并明说：否则用户以为改了，实际没有（与 stopIfTrue 同口径）
+    showToast(`修改失败：${result.error}`, 'error')
+    renderExistingRules()
+    return
+  }
+  const synced = syncImportedRulesInStore(
+    oldFormula,
+    kind === 'range' ? { appliesTo: next } : { formula: next },
+  )
+  showToast(
+    kind === 'range'
+      ? `第 ${String(index)} 条范围已改为 ${next}`
+      : `第 ${String(index)} 条公式已更新`,
+    'success',
+  )
+  if (synced > 0) {
+    showToast(`已同步规则库里 ${String(synced)} 条导入的规则`, 'info')
+  }
+  loadExistingRules()
+  renderRuleList()
+}
+
+/**
+ * 表格改了范围/公式后，同步规则库里已导入的副本（按公式匹配）
+ *
+ * 只动「导入的规则」分组：手工写的插件规则与工作表规则是两套东西，
+ * 不该被表格操作波及。多条同公式时全部同步（同一公式的范围通常一致）。
+ *
+ * @returns 同步了几条（0 = 库里没有对应副本，toast 不提示联动）
+ */
+function syncImportedRulesInStore(
+  oldFormula: string,
+  patch: { appliesTo?: string; formula?: string },
+): number {
+  if (oldFormula === '') return 0
+  let synced = 0
+  state.rules = state.rules.map((rule) => {
+    if (rule.group !== IMPORTED_RULE_GROUP || rule.formula !== oldFormula) return rule
+    synced += 1
+    return {
+      ...rule,
+      ...(patch.appliesTo !== undefined && { appliesTo: patch.appliesTo }),
+      ...(patch.formula !== undefined && { formula: patch.formula }),
+    }
+  })
+  if (synced > 0) persistRules()
+  return synced
 }
 
 /** 单条既有规则导入规则库 */
@@ -1325,27 +1444,138 @@ function importForeign(): void {
     return
   }
   const foreign = readForeignRules(entry.worksheet)
-  const expressible = foreign
-    .map((rule) => foreignSnapshotToRule(rule, nextId))
-    .filter((rule): rule is ConditionalFormatRule => rule !== null)
-  if (expressible.length === 0) {
-    showToast(
-      foreign.length === 0
-        ? '这张表没有条件格式规则（可在「既有规则」卡片确认）'
-        : `读取到 ${String(foreign.length)} 条规则，但没有可导入的公式类规则`,
-      'info',
-    )
+  if (foreign.length === 0) {
+    showToast('这张表没有条件格式规则（可在「既有规则」卡片确认）', 'info')
     loadExistingRules()
     return
   }
-  state.rules = [...state.rules, ...expressible]
+  // 不再一键全导：弹选择框让用户挑（momo：#conditionalFormatImportBtn 直接导了全部）
+  openImportModal(foreign, entry.sheet)
+}
+
+/** 快照是否可导入（与 foreignSnapshotToRule 的判据一致：公式类且有公式） */
+function isSnapshotImportable(snapshot: ForeignRuleSnapshot): boolean {
+  return snapshot.kind === 'expression' && snapshot.formula !== ''
+}
+
+/** 弹框里可导入项的 1 基序号（全选用） */
+function selectableImportIndices(): number[] {
+  return state.importForeignRules
+    .map((snapshot, position) => (isSnapshotImportable(snapshot) ? position + 1 : 0))
+    .filter((index) => index > 0)
+}
+
+/**
+ * 打开「选择要导入的规则」弹框
+ *
+ * 可导入的（公式类）默认全选——一表里通常大多数规则就是要导的；
+ * 不可导入的禁用勾选并标注类型，不静默丢。
+ */
+function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: string): void {
+  state.importForeignRules = [...snapshots]
+  state.importSelection = new Set(selectableImportIndices())
+  setText('conditionalFormatImportSheet', sheetName)
+  renderImportList()
+  const mask = byId('conditionalFormatImportMask')
+  if (mask) mask.style.display = 'flex'
+}
+
+function closeImportModal(): void {
+  const mask = byId('conditionalFormatImportMask')
+  if (mask) mask.style.display = 'none'
+  state.importSelection = new Set<number>()
+}
+
+function renderImportList(): void {
+  const container = byId('conditionalFormatImportList')
+  if (!container) return
+  const { importForeignRules: snapshots, importSelection: selection } = state
+  container.innerHTML = snapshots
+    .map((snapshot, position) => {
+      const index = position + 1
+      const canImport = isSnapshotImportable(snapshot)
+      const formulaPreview =
+        snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
+      return `
+      <label class="conditional-format-import-row${canImport ? '' : ' is-disabled'}" data-import-index="${String(index)}">
+        <input type="checkbox" data-import-check="${String(index)}" ${selection.has(index) ? 'checked' : ''} ${canImport ? '' : 'disabled'} aria-label="选择第 ${String(index)} 条规则" />
+        <span class="conditional-format-import-index">${String(index)}</span>
+        <span class="conditional-format-import-range" title="${escapeHtml(snapshot.range)}">${escapeHtml(snapshot.range || '（未读到范围）')}</span>
+        <code class="conditional-format-import-formula" title="${escapeHtml(snapshot.formula)}">${escapeHtml(formulaPreview)}</code>
+        ${canImport ? '' : '<em class="conditional-format-tag-warn">类型不支持</em>'}
+      </label>`
+    })
+    .join('')
+  setText('conditionalFormatImportConfirm', `导入所选（${String(selection.size)}）`)
+}
+
+/**
+ * 把指定快照导入规则库（导入弹框与表格勾选批量导入共用）
+ *
+ * 不可导入的逐条跳过并在结果里报数——不静默丢，否则用户以为 10 条全导进来了，
+ * 实际只进了 3 条。
+ */
+function importSnapshots(
+  snapshots: readonly ForeignRuleSnapshot[],
+  indices: readonly number[],
+): void {
+  const imported: ConditionalFormatRule[] = []
+  let skipped = 0
+  for (const index of indices) {
+    const snapshot = snapshots[index - 1]
+    // 用条件包裹而非 continue（项目禁 continue）：snapshot 缺失说明序号越界，
+    // 跳过这条继续处理其余选中项
+    if (snapshot) {
+      const rule = foreignSnapshotToRule(snapshot, nextId)
+      if (rule) imported.push(rule)
+      else skipped += 1
+    }
+  }
+  if (imported.length === 0) {
+    showToast('所选规则里没有可导入的公式类规则', 'warn')
+    return
+  }
+  state.rules = [...state.rules, ...imported]
   persistRules()
   renderRuleList()
-  const skipped = foreign.length - expressible.length
   showToast(
-    `已导入 ${String(expressible.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条非公式类无法导入）` : ''}`,
-    'success',
+    `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条类型不支持，已跳过）` : ''}`,
+    skipped > 0 ? 'info' : 'success',
   )
+}
+
+// ===== 导出规则 =====
+
+/**
+ * 导出规则库为 JSON 文件（备份 / 迁移 / 分享）
+ *
+ * Blob + a[download] 现导现下：不落服务端、不经剪贴板，用户拿到的就是文件。
+ * 文件名带日期，重复导出不互相覆盖。revoke 延迟一拍：立即收会让个别
+ * 浏览器取消刚起步的下载。
+ */
+function exportRules(): void {
+  if (state.rules.length === 0) {
+    showToast('规则库是空的，先新建或导入几条', 'warn')
+    return
+  }
+  const payload = {
+    format: 'bgm-conditional-format-rules',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    rules: state.rules,
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `bgm-条件格式规则-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 1000)
+  showToast(`已导出 ${String(state.rules.length)} 条规则`, 'success')
 }
 
 // ===== 初始化 =====
@@ -1449,6 +1679,9 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatImportBtn')?.addEventListener('click', () => {
     importForeign()
   })
+  byId('conditionalFormatExportBtn')?.addEventListener('click', () => {
+    exportRules()
+  })
   byId('conditionalFormatDefaultsBtn')?.addEventListener('click', () => {
     generateDefaults()
   })
@@ -1474,6 +1707,41 @@ export function initializeConditionalFormatPage(): void {
     bindColorField(field)
   }
 
+  // 导入手工规则：选择弹框（全选 / 全不选 / 确认 / 取消 / 遮罩）
+  byId('conditionalFormatImportConfirm')?.addEventListener('click', () => {
+    const indices = [...state.importSelection].sort((a, b) => a - b)
+    closeImportModal()
+    importSnapshots(state.importForeignRules, indices)
+  })
+  byId('conditionalFormatImportCancel')?.addEventListener('click', () => {
+    closeImportModal()
+  })
+  byId('conditionalFormatImportMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatImportMask')) closeImportModal()
+  })
+  byId('conditionalFormatImportAll')?.addEventListener('click', () => {
+    state.importSelection = new Set(selectableImportIndices())
+    renderImportList()
+  })
+  byId('conditionalFormatImportNone')?.addEventListener('click', () => {
+    state.importSelection = new Set<number>()
+    renderImportList()
+  })
+  // 列表勾选走 change 委托；勾选只更新确认按钮计数，不重建列表（保住焦点，
+  // 用户连勾十几条时不用每次重新点）
+  byId('conditionalFormatImportList')?.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement | null
+    const rawIndex = target?.dataset.importCheck
+    if (rawIndex === undefined) return
+    const index = Number(rawIndex)
+    if (!Number.isSafeInteger(index) || index < 1) return
+    const next = new Set(state.importSelection)
+    if (target?.checked === true) next.add(index)
+    else next.delete(index)
+    state.importSelection = next
+    setText('conditionalFormatImportConfirm', `导入所选（${String(next.size)}）`)
+  })
+
   // 确认模态框（双策略）
   byId('conditionalFormatConfirmClear')?.addEventListener('click', () => {
     closeConfirmModal()
@@ -1494,6 +1762,7 @@ export function initializeConditionalFormatPage(): void {
     closeConfirmModal()
     // 编辑器也关：两个 close 都幂等，另一个弹窗没开时是 no-op
     closeEditor()
+    closeImportModal()
   })
 
   renderRuleList()

@@ -323,8 +323,8 @@ export function buildForeignRuleRowHtml(row: ForeignRuleRow): string {
         <span class="conditional-format-col-index" title="优先级（靠前先生效）">${String(row.index)}</span>
         <span class="conditional-format-col-type" title="${row.rebuildable ? '公式类：插件可原样重建' : '该类型插件无法重建，应用时会被丢弃或触发降级'}">${escapeHtml(row.typeLabel)}${row.rebuildable ? '' : '<em class="conditional-format-tag-warn">不可重建</em>'}</span>
         ${formatSwatchHtml(row)}
-        <span class="conditional-format-col-range" title="${escapeHtml(row.range)}">${escapeHtml(row.range)}</span>
-        <code class="conditional-format-col-formula" title="${escapeHtml(row.formula)}">${escapeHtml(formulaPreview)}</code>
+        <span class="conditional-format-col-range conditional-format-cell-editable" data-action="edit-range" title="${escapeHtml(row.range)}">${escapeHtml(row.range)}</span>
+        <code class="conditional-format-col-formula conditional-format-cell-editable" data-action="edit-formula" title="${escapeHtml(row.formula)}">${escapeHtml(formulaPreview)}</code>
         <label class="conditional-format-col-stop" title="${isHiddenStop ? '当前 WPS 未暴露该属性，无法修改' : '勾选后：本条命中就不再评估后续规则'}">
           <input type="checkbox" data-action="stop" ${row.stopIfTrue === true ? 'checked' : ''} ${isHiddenStop ? 'disabled' : ''} />
         </label>

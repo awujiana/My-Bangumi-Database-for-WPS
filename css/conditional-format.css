@@ -120,6 +120,27 @@
   font-weight: 400;
 }
 
+/* 行内可编辑单元格（应用于 / 公式）：hover 给底色提示可点，点击原地变输入框 */
+.conditional-format-cell-editable {
+  cursor: pointer;
+}
+
+.conditional-format-cell-editable:hover {
+  background: var(--bg-surface-2);
+}
+
+.conditional-format-cell-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent, #4f8cff);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* 分组折叠：只藏规则行，标题与计数仍在——用户看得见「这组有多少条、收起着」 */
 .conditional-format-group.is-collapsed .conditional-format-rule {
   display: none;
@@ -242,6 +263,77 @@
 /* 编辑器比确认框宽：公式文本框 + 颜色行需要横向空间 */
 .conditional-format-modal--editor {
   width: min(520px, calc(100vw - 32px));
+}
+
+/* 导入弹框比确认框再宽：范围 + 公式两列要并排看全 */
+.conditional-format-modal--import {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.conditional-format-import-hint {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+
+/* 规则列表：38 条滚动展示，不撑爆屏幕 */
+.conditional-format-import-list {
+  max-height: 320px;
+  margin: var(--sp-3) 0;
+  overflow: auto;
+  border: 1px solid var(--border-faint);
+  border-radius: var(--r-md);
+}
+
+.conditional-format-import-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.conditional-format-import-row:last-child {
+  border-bottom: none;
+}
+
+.conditional-format-import-row:hover {
+  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+}
+
+.conditional-format-import-row.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.conditional-format-import-index {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.conditional-format-import-range {
+  flex: 0 0 auto;
+  max-width: 30%;
+  overflow: hidden;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.conditional-format-import-formula {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .conditional-format-editor h4 {
