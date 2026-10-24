@@ -182,6 +182,7 @@
             </button>
             <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
             <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
+            <button class="bgm-btn small" id="conditionalFormatExportBtn">📤 导出规则</button>
           </div>
           <div id="conditionalFormatRuleList" class="conditional-format-rule-list"></div>
         </section>
@@ -308,6 +309,45 @@
                 </button>
                 <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 导入手工规则：选择弹框（列出工作表全部既有规则，可导入的默认全选） -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatImportMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--import"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatImportTitle"
+          >
+            <h4 id="conditionalFormatImportTitle">选择要导入的规则</h4>
+            <p class="conditional-format-import-hint">
+              工作表「<span id="conditionalFormatImportSheet"></span
+              >」的既有规则。公式类可导入（插件可原样重建）；数据条 / 色阶等类型暂不支持。
+            </p>
+            <div id="conditionalFormatImportList" class="conditional-format-import-list"></div>
+            <div class="conditional-format-modal-actions">
+              <button type="button" class="bgm-btn small" id="conditionalFormatImportAll">
+                全选
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatImportNone">
+                全不选
+              </button>
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatImportConfirm"
+              >
+                导入所选
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatImportCancel">
+                取消
+              </button>
             </div>
           </div>
         </div>
