@@ -13,9 +13,9 @@
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/detachable-panel.css" />
-<link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/context-menu.css" />
     <link rel="stylesheet" href="../css/conditional-format.css" />
-<link rel="stylesheet" href="../css/sortable-list.css" />
+    <link rel="stylesheet" href="../css/sortable-list.css" />
   </head>
   <body data-page="conditional-format">
     <script type="text/javascript" src="../libs/purify.js"></script>
@@ -201,7 +201,16 @@
             <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
             <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
             <button class="bgm-btn small" id="conditionalFormatExportBtn">📤 导出规则</button>
+            <button
+              class="bgm-btn small"
+              id="conditionalFormatPickAllBtn"
+              title="全选 / 取消全部规则（配合删除所选 / 导出所选使用）"
+            >
+              ☑ 全选
+            </button>
           </div>
+          <!-- 批量操作条：勾选 N 条时才出现（删除所选 / 导出所选 / 取消选择） -->
+          <div id="conditionalFormatRuleBatchBar" class="conditional-format-batch-bar" hidden></div>
           <div id="conditionalFormatRuleList" class="conditional-format-rule-list"></div>
         </section>
 
@@ -218,7 +227,9 @@
             aria-labelledby="conditionalFormatEditorTitle"
           >
             <div id="conditionalFormatEditor" class="conditional-format-editor">
-              <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">编辑规则</h4>
+              <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">
+                编辑规则
+              </h4>
               <label class="conditional-format-field-label" for="conditionalFormatEditName"
                 >名称</label
               >
@@ -268,16 +279,6 @@
                       autocomplete="off"
                       aria-label="填充色十六进制码，如 #00B050"
                     />
-                    <button
-                      type="button"
-                      class="conditional-format-eyedropper"
-                      id="conditionalFormatEditFillPick"
-                      title="吸管：从屏幕上取色"
-                      aria-label="用吸管取填充色"
-                      hidden
-                    >
-                      💧
-                    </button>
                   </div>
                 </div>
                 <div class="conditional-format-color-field">
@@ -302,16 +303,6 @@
                       autocomplete="off"
                       aria-label="字体色十六进制码，如 #000000"
                     />
-                    <button
-                      type="button"
-                      class="conditional-format-eyedropper"
-                      id="conditionalFormatEditFontPick"
-                      title="吸管：从屏幕上取色"
-                      aria-label="用吸管取字体色"
-                      hidden
-                    >
-                      💧
-                    </button>
                   </div>
                 </div>
                 <div class="conditional-format-bold-box">
@@ -343,7 +334,9 @@
             aria-modal="true"
             aria-labelledby="conditionalFormatImportTitle"
           >
-            <h4 id="conditionalFormatImportTitle" class="conditional-format-modal-grip">选择要导入的规则</h4>
+            <h4 id="conditionalFormatImportTitle" class="conditional-format-modal-grip">
+              选择要导入的规则
+            </h4>
             <p class="conditional-format-import-hint">
               工作表「<span id="conditionalFormatImportSheet"></span
               >」的既有规则。公式类可导入（插件可原样重建）；数据条 / 色阶等类型暂不支持。
@@ -511,7 +504,9 @@
         aria-modal="true"
         aria-labelledby="conditionalFormatConfirmTitle"
       >
-        <h4 id="conditionalFormatConfirmTitle" class="conditional-format-modal-grip">应用条件格式</h4>
+        <h4 id="conditionalFormatConfirmTitle" class="conditional-format-modal-grip">
+          应用条件格式
+        </h4>
         <div class="conditional-format-modal-body" id="conditionalFormatConfirmBody"></div>
         <div class="conditional-format-modal-actions">
           <button type="button" class="bgm-btn small primary" id="conditionalFormatConfirmClear">
