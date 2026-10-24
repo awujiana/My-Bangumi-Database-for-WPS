@@ -6,8 +6,9 @@
  *              配置读写复用 tools/config.ts 的 getTheme / setTheme。
  */
 
-import { getTheme, setTheme } from './config.js'
+import { CONFIG_KEYS, getTheme, setTheme } from './config.js'
 import type { ThemeMode } from './config.js'
+import { subscribeConfigPoll } from './config-poll.js'
 
 const systemMedia =
   typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -56,36 +57,42 @@ export function saveTheme(mode: string): boolean {
 }
 
 /**
- * 跨页主题同步：轮询 PluginStorage 中的主题配置，变化时重新应用。
+ * 跨页主题同步：订阅共享配置轮询，主题变化时重新应用。
  *
  * WPS 中每个任务窗格是独立 WebView，postMessage 无法跨上下文广播，
  * 因此在 settings 页切换主题后，panel / enrich 页需定期从 PluginStorage
  * 读取最新主题并 `applyTheme`，实现「所有页面同时变色」。
  * 各页面入口（panel / settings / enrich）在启动时调用一次。
+ *
+ * 轮询本体在 `tools/config-poll.ts`（单定时器 + 键去重 + 隐藏跳过 + 原生下拉
+ * 交互让路）——此前这里自带 2s `setInterval`，与另外三个同步模块叠加成
+ * 「5 次 COM 读 / 2s、每 400ms 一次微卡顿」，真机上让原生 `<select>` 下拉卡顿。
  */
-export function startThemeSync(): void {
-  if (typeof window === 'undefined' || typeof setInterval !== 'function') return
+/** 非 DOM 环境（SSR / 测试）下的空退订函数 */
+function noopUnsubscribe(): void {
+  // 没有订阅，无需退订
+}
+
+export function startThemeSync(): () => void {
+  if (typeof window === 'undefined') return noopUnsubscribe
   let lastApplied = resolveTheme(getTheme(true))
-  const timer = setInterval(() => {
-    try {
-      // system 模式下 resolveTheme 会随系统外观变化，因此比较解析值即可同时捕获
-      // 配置变更与系统外观切换，变化时才重应用样式。
-      const resolved = resolveTheme(getTheme(true))
-      if (resolved !== lastApplied) {
-        lastApplied = resolved
-        applyTheme(getTheme(true))
+  return subscribeConfigPoll({
+    keys: [CONFIG_KEYS.THEME],
+    apply: () => {
+      try {
+        // system 模式下 resolveTheme 会随系统外观变化，因此比较解析值即可同时捕获
+        // 配置变更与系统外观切换，变化时才重应用样式。
+        const mode = getTheme(true)
+        const resolved = resolveTheme(mode)
+        if (resolved !== lastApplied) {
+          lastApplied = resolved
+          applyTheme(mode)
+        }
+      } catch {
+        // 静默处理偶发读取异常，轮询继续
       }
-    } catch {
-      // 静默处理偶发读取异常，轮询继续
-    }
-  }, 2000)
-  window.addEventListener(
-    'beforeunload',
-    () => {
-      clearInterval(timer)
     },
-    { once: true },
-  )
+  })
 }
 
 export { type ThemeMode } from './config.js'

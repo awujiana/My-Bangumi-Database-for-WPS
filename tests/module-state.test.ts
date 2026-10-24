@@ -515,21 +515,21 @@ describe('startModuleStateSync', () => {
     const stop = startModuleStateSync('panel')
     // 模拟「设置页在另一个任务窗格隐藏了模块」
     setHiddenModules('panel', ['sec-account'])
-    vi.advanceTimersByTime(2000)
+    vi.advanceTimersByTime(3000)
     expect(moduleElement('sec-account').hidden).toBe(true)
     stop()
   })
 
-  it('命中变化后切换到加密轮询（300ms 内再次检查），连续调整才跟手', () => {
+  it('命中变化后切换到快拍轮询（600ms 内再次检查），连续调整才跟手', () => {
     buildPanelDom()
     vi.useFakeTimers()
     const stop = startModuleStateSync('panel')
     setCollapsedModules('panel', ['sec-account'])
-    vi.advanceTimersByTime(2000)
+    vi.advanceTimersByTime(3000)
     expect(collapseButton('sec-account').getAttribute('aria-expanded')).toBe('false')
 
     setCollapsedModules('panel', ['sec-scope'])
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(600)
     expect(collapseButton('sec-scope').getAttribute('aria-expanded')).toBe('false')
     stop()
   })
@@ -540,10 +540,10 @@ describe('startModuleStateSync', () => {
     const stop = startModuleStateSync('panel')
     throwState.next = true
     expect(() => {
-      vi.advanceTimersByTime(2000)
+      vi.advanceTimersByTime(3000)
     }).not.toThrow()
     setHiddenModules('panel', ['sec-scope'])
-    vi.advanceTimersByTime(2000)
+    vi.advanceTimersByTime(3000)
     expect(moduleElement('sec-scope').hidden).toBe(true)
     stop()
   })

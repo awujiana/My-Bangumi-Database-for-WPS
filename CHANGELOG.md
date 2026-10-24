@@ -8,6 +8,34 @@
 
 ## [未发布]
 
+### 原生下拉卡顿：四个配置轮询合并为一个（2026-10-24）
+
+momo 真机：「下拉选项还是卡」（目标工作表下拉展开/悬停卡顿）。
+
+**根因**：主题 / 导航模式 / 导航顺序 / 模块折叠状态各自有 2s 定时器（活跃期 300ms），
+每个 tick 各读 1~2 个 PluginStorage 键——合计 **5 次 COM 读 / 2s**，且分散在不同时刻，
+平均每 400ms 一次跨进程同步调用。开 JsApiDevTool 调速器限速后每次读几百毫秒，
+页面基本一直在顿；原生 `<select>` 的展开/悬停正是被这些停顿打断。
+
+**修复**：新增 `ts/tools/config-poll.ts`，把四处轮询合并成**一个定时器**：
+
+- **键去重 + 单任务读完**：一次 tick 里读完所有订阅键（同一键被多个订阅者监听只读一次），
+  把「多次散落的微卡顿」压成「每拍一次集中停顿」；
+- **空闲 3s / 命中变化后 600ms 快拍 4s**（原 2s/300ms），空闲 COM 读次数降到原来的 ~40%；
+- **页面隐藏跳过**：`visibilityState === 'hidden'` 时不读存储；
+- **原生下拉交互让路**：`select` 上最近有 pointerdown/focusin、或焦点就在 `select` 上时，
+  这一拍直接跳过——下拉展开期间不再撞上 COM 停顿（焦点留在 select 上时最多让路 10s，
+  防键盘用户把同步卡死）；
+- `startThemeSync` / `startNavModeSync` / `startNavOrderSync` 改为返回退订函数
+  （`startModuleStateSync` 原本就返回），不再各挂 `beforeunload`。
+
+**测试**：新增 `tests/config-poll.test.ts` 7 例（键去重只读一次 / 未变化不 apply /
+隐藏跳过 / 下拉聚焦让路 / 快拍 600ms / 退订清定时器 / 读错不抛）；
+theme-sync / nav-mode / nav-order / module-state 四个既有测试按新节奏与退订语义更新（109 例）。
+
+gate 全绿。
+
+
 ### 目标工作表下拉失灵 + 浮窗位置还原：两个 COM 韧性缺陷（2026-10-24）
 
 momo 真机：「条件格式管理的目标工作表组件不能点击不能选中工作簿1 Sheet1」+「JsApiDevTool 调速器拖动就会还原位置」。

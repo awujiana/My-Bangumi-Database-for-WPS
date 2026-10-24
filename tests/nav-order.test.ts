@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { resetConfigPollForTest } from '../ts/tools/config-poll.js'
 import {
   getNavOrder,
   setNavOrder,
@@ -69,6 +70,7 @@ function mainChildIds(): string[] {
 }
 
 beforeEach(() => {
+  resetConfigPollForTest()
   configStore.clear()
   document.body.replaceChildren()
   document.body.dataset.page = 'panel'
@@ -297,7 +299,7 @@ describe('startNavOrderSync 跨页同步', () => {
     expect(mainChildIds()).toEqual(['sec-target', 'sec-file'])
     // 模拟另一窗格把顺序改成「文件在前」
     writeRaw(JSON.stringify({ enrich: ['sec-file', 'sec-target'] }))
-    vi.advanceTimersByTime(2000)
+    vi.advanceTimersByTime(3000)
     expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
   })
 
@@ -322,12 +324,12 @@ describe('startNavOrderSync 跨页同步', () => {
       throw new Error('read fail')
     })
     expect(() => {
-      vi.advanceTimersByTime(2000)
+      vi.advanceTimersByTime(3000)
     }).not.toThrow()
     spy.mockImplementation(original)
   })
 
-  it('自适应：命中变化后切换为加密轮询（300ms 即再次检查）', () => {
+  it('自适应：命中变化后切换为快拍轮询（600ms 即再次检查）', () => {
     vi.useFakeTimers()
     document.body.innerHTML = `
       <main class="main">
@@ -335,25 +337,25 @@ describe('startNavOrderSync 跨页同步', () => {
         <section id="sec-target">t</section>
       </main>`
     startNavOrderSync('enrich')
-    // 空闲态：2s 才检查一次
+    // 空闲态：3s 才检查一次
     writeRaw(JSON.stringify({ enrich: ['sec-target', 'sec-file'] }))
-    vi.advanceTimersByTime(1999)
+    vi.advanceTimersByTime(2999)
     expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
     vi.advanceTimersByTime(1)
     expect(mainChildIds()).toEqual(['sec-target', 'sec-file'])
-    // 命中变化后进入活跃窗口：再改一次只需 300ms 就被跟进
+    // 命中变化后进入活跃窗口：再改一次只需 600ms 就被跟进
     writeRaw(JSON.stringify({ enrich: ['sec-file', 'sec-target'] }))
-    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(600)
     expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
   })
 
-  it('页面卸载（beforeunload）时清除轮询定时器', () => {
+  it('退订后清除轮询定时器（页面销毁时调用）', () => {
     vi.useFakeTimers()
-    startNavOrderSync('enrich')
+    const unsubscribe = startNavOrderSync('enrich')
     expect(vi.getTimerCount()).toBeGreaterThan(0)
-    window.dispatchEvent(new Event('beforeunload'))
+    unsubscribe()
     expect(vi.getTimerCount()).toBe(0)
-    // 清理后不再有新的轮询被排入
+    // 退订后不再有新的轮询被排入
     vi.advanceTimersByTime(60_000)
     expect(vi.getTimerCount()).toBe(0)
   })

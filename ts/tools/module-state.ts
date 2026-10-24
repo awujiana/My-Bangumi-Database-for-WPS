@@ -33,19 +33,11 @@ import { getNotifyApi } from '../core/ui-bridge.js'
 import { LOG_LEVELS } from '../core/constants.js'
 import { runBeforeEnterSolo } from '../core/solo-hooks.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
+import { subscribeConfigPoll } from './config-poll.js'
 import { PAGE_MODULES } from './nav-order.js'
 import { bgmLog, showSettingsPanel } from './util/index.js'
 
 import type { NavModule } from './nav-order.js'
-
-/** 空闲态轮询间隔（ms） */
-const SYNC_IDLE_INTERVAL_MS = 2000
-
-/** 检测到变化后使用的加密轮询间隔（ms） */
-const SYNC_ACTIVE_INTERVAL_MS = 300
-
-/** 命中一次变化后保持加密轮询的时长（ms） */
-const SYNC_ACTIVE_WINDOW_MS = 5000
 
 /** 折叠按钮的类名（同时是样式与查询用的唯一标识） */
 const COLLAPSE_BUTTON_CLASS = 'mod-collapse-btn'
@@ -606,12 +598,6 @@ const noopCleanup = (): void => {
 }
 
 /** 两个状态键的合并快照，用于判断「配置是否变了」 */
-function rawSnapshot(): string {
-  const collapsed = getConfig(CONFIG_KEYS.MODULE_COLLAPSED, '', true)
-  const hidden = getConfig(CONFIG_KEYS.MODULE_HIDDEN, '', true)
-  return `${collapsed}|${hidden}`
-}
-
 /**
  * 启动本页的模块状态同步：挂折叠委托 → 套用一次状态 → 轮询其它页的改动。
  *
@@ -629,29 +615,16 @@ export function startModuleStateSync(page: string): () => void {
   bindSoloToggles()
   applyModuleState(page)
 
-  let lastRaw = rawSnapshot()
-  // tick() 在返回前已同步执行过一次，定时器必然已赋值，故这里不需要 undefined 分支
-  let timer: ReturnType<typeof setTimeout>
-  /** 最近一次检测到变化的时间戳；用于决定下一轮用加密还是空闲间隔 */
-  let lastChangeAt = 0
-
-  const tick = (): void => {
-    try {
-      const raw = rawSnapshot()
-      if (raw !== lastRaw) {
-        lastRaw = raw
-        lastChangeAt = Date.now()
+  // 轮询本体在 tools/config-poll.ts：与主题 / 导航模式 / 导航顺序共用一个定时器
+  // （此前四个模块各一个 2s 定时器 = 5 次 COM 读 / 2s，真机让原生下拉卡顿）
+  return subscribeConfigPoll({
+    keys: [CONFIG_KEYS.MODULE_COLLAPSED, CONFIG_KEYS.MODULE_HIDDEN],
+    apply: () => {
+      try {
         applyModuleState(page)
+      } catch {
+        // 静默处理偶发读取异常，轮询继续
       }
-    } catch {
-      // 静默处理偶发读取异常，轮询继续
-    }
-    const isActive = Date.now() - lastChangeAt < SYNC_ACTIVE_WINDOW_MS
-    timer = setTimeout(tick, isActive ? SYNC_ACTIVE_INTERVAL_MS : SYNC_IDLE_INTERVAL_MS)
-  }
-
-  tick()
-  return () => {
-    clearTimeout(timer)
-  }
+    },
+  })
 }

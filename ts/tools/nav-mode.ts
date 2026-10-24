@@ -8,7 +8,8 @@
  *              在启动时调用一次。
  */
 
-import { areNavIconsOnly } from './config.js'
+import { CONFIG_KEYS, areNavIconsOnly } from './config.js'
+import { subscribeConfigPoll } from './config-poll.js'
 
 /** 应用或移除「图标仅显示」模式；布局变化后触发 resize 让 shell-nav 重测胶囊位置 */
 function applyNavMode(isEnabled: boolean): void {
@@ -23,29 +24,28 @@ function applyNavMode(isEnabled: boolean): void {
 }
 
 /**
- * 跨页导航模式同步：轮询 PluginStorage 中的「导航仅显示图标」配置，
- * 变化时切换 body.nav-icons-only 类并重测导航布局。
+ * 跨页导航模式同步：订阅共享配置轮询，「导航仅显示图标」变化时切换
+ * body.nav-icons-only 类并重测导航布局。
+ *
+ * 轮询本体在 `tools/config-poll.ts`（单定时器 + 键去重 + 隐藏跳过 + 原生下拉
+ * 交互让路）；此前这里自带 2s `setInterval`。
  */
-export function startNavModeSync(): void {
-  if (typeof window === 'undefined' || typeof setInterval !== 'function') return
+/** 非 DOM 环境（SSR / 测试）下的空退订函数 */
+function noopUnsubscribe(): void {
+  // 没有订阅，无需退订
+}
+
+export function startNavModeSync(): () => void {
+  if (typeof window === 'undefined') return noopUnsubscribe
   let wasEnabled = areNavIconsOnly(true)
   applyNavMode(wasEnabled)
-  const timer = setInterval(() => {
-    try {
-      const isCurrentlyEnabled = areNavIconsOnly(true)
-      if (isCurrentlyEnabled !== wasEnabled) {
-        wasEnabled = isCurrentlyEnabled
-        applyNavMode(isCurrentlyEnabled)
-      }
-    } catch {
-      // 静默处理偶发读取异常，轮询继续
-    }
-  }, 2000)
-  window.addEventListener(
-    'beforeunload',
-    () => {
-      clearInterval(timer)
+  return subscribeConfigPoll({
+    keys: [CONFIG_KEYS.NAV_ICONS_ONLY],
+    apply: (values) => {
+      const isCurrentlyEnabled = values[CONFIG_KEYS.NAV_ICONS_ONLY] === 'true'
+      if (isCurrentlyEnabled === wasEnabled) return
+      wasEnabled = isCurrentlyEnabled
+      applyNavMode(isCurrentlyEnabled)
     },
-    { once: true },
-  )
+  })
 }

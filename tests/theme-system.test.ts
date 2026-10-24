@@ -16,7 +16,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 
 vi.mock('../ts/tools/config.js', () => ({
+  CONFIG_KEYS: { THEME: 'bgm_theme' },
   getTheme: vi.fn(),
+  getConfig: vi.fn(() => 'dark'),
   setTheme: vi.fn(),
 }))
 
@@ -101,17 +103,18 @@ describe('tools/theme · 跟随系统（systemMedia 非空）', () => {
     expect(document.documentElement.dataset.theme).toBe('sentinel')
   })
 
-  it('startThemeSync 在页面卸载时清除轮询定时器', () => {
+  it('startThemeSync 返回退订函数：退订后清除轮询定时器', () => {
     vi.useFakeTimers()
     vi.mocked(getTheme).mockReturnValue('dark')
 
-    theme.startThemeSync()
+    const unsubscribe = theme.startThemeSync()
     expect(vi.getTimerCount()).toBe(1)
 
-    window.dispatchEvent(new Event('beforeunload'))
+    // 轮询本体已迁到 tools/config-poll.ts（单定时器共享），销毁走退订而非 beforeunload
+    unsubscribe()
     expect(vi.getTimerCount()).toBe(0)
 
-    // 清理后不再有新的轮询被排入
+    // 退订后不再有新的轮询被排入
     vi.advanceTimersByTime(60_000)
     expect(vi.getTimerCount()).toBe(0)
   })

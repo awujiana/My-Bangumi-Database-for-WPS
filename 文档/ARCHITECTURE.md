@@ -1,6 +1,6 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.23 | 更新日期: 2026-10-24
+> 版本: 3.24 | 更新日期: 2026-10-24
 
 ---
 
@@ -35,6 +35,7 @@
 | v3.21 | 2026-10-24 | **性能基线入档 + 分片预览生成链守护**：① 新增 `文档/PERFORMANCE_AUDIT_2026_10_24.md`——方法论（logger 仅内存 RingBuffer 不落盘，故用「真实数据实测 + 热路径审计」替代读日志）、实测基线（6 片 gunzip+parse 865ms / join 130ms；默认 3 片 parse 193ms / join 139ms；computeDiff mirror 31k 最坏 453ms / 常规 160ms）、已优化清单（Value2 二维批量写、矩形读缓存、写穿透缓存、diff 全 Map、ScreenUpdating+手动重算包裹 apply、富化行缓存）、**唯一确认问题**：删除阶段逐行 `Range().Delete()`（remote-sync-apply.ts:1379，n 次 COM 每次整表重排），连续段合并方案已定（run 级一次 Delete + 失败回退逐行 + undo 逐行记），待真机验证后实施；② 核验分片预览链：`scripts/build-shard-samples.mjs` 重新生成零 drift（样本 sid=243430，2026-10-20 期次 2026 年字段最全），`tests/shard-samples.test.ts` 8 例守护 localColumn 防漂移 |
 | v3.22 | 2026-10-24 | **性能审计 P1/P3 实施**：① P1 删除阶段连续行合并——`remote-sync-apply.ts` 新纯函数 `groupContiguousDeleteRuns(items, rowOf)`（降序删除项按行号连续分组；散乱行各自成组与旧行为逐字一致），每组一次 `Range("max:min").Delete()`；失败回退组内逐行；undo/记录/明细逐行记（顺序不变）；取消检查在 run 边界；`buildRemovalSnapshot` 删前矩形读不变。`tests/remote-sync-apply.test.ts` 8 例回归（4 纯函数 + 4 假工作表集成，钉「连续 3 行只一次 Range("30:28").Delete()」「批量失败回退」「undo 降序」「取消零删除」）。⚠️ COM 写入行为变更，真机验证后再上线。② P3：`shard-manifest.ts` `mergeRowAt` 的 `.at()`→下标（62 万次调用）；`parseShardText` 的 slice 经评估保持原样（亚毫秒级，不值得对抗 no-continue/no-for-loop）。《性能审计报告》§4/§7 同步为已实施 |
 | v3.23 | 2026-10-24 | **COM 韧性两条**（真机缺陷）：① `sheet-list.ts` `collectSheets` 整段 try/catch（抛错返回已枚举部分 + WARN）——此前 `Workbooks.Count/Item` 零防护，桥未就绪时异常顺着 `reloadSheets → initializeConditionalFormatPage` 把**事件绑定段**一起炸掉（下拉不能点击不能选中的本因）；② 条件格式页 init 重排：**绑定先装、宿主读取后置**（`populateFromHost()` 兜底 + toast + 空态渲染），`isSheetLocked` 存储读取加兜底。③ 浮动窗几何持久化：`detachable-panel.ts` 几何落 `localStorage`（`bgm:panelGeo:<id>`，同步零 COM、跨 pane 重载存活；不用 PluginStorage 因它是 COM 且宿主隔离），恢复时 `clampPosition` 钳当前视口；「首次打开」判定改动态看「内存 + 落盘」（只看内存会让 pane 重载后误判首次 → 居中覆盖恢复的位置，即「还原位置」本因）；坏数据回默认位、存储不可用静默降级、测试复位一并清持久化键。测试：sheet-list 5 例 + 页面韧性 1 例 + 几何持久化 1 例 |
+| v3.24 | 2026-10-24 | **配置轮询合并**（真机：原生下拉卡顿）：新增 `ts/tools/config-poll.ts`——主题 / 导航模式 / 导航顺序 / 模块折叠四处各自 2s 定时器（合计 5 次 PluginStorage 读 / 2s、每 400ms 一次跨进程停顿）合并为**单定时器 + 键去重 + 单任务读完**；空闲 3s、命中变化后 600ms 快拍 4s；`visibilityState === hidden` 跳过；**select 交互让路**（最近 pointerdown/focusin 或焦点在 select 上时跳过该拍，焦点态最多 10s）；`startThemeSync`/`startNavModeSync`/`startNavOrderSync` 改返回退订函数（不再各挂 beforeunload）。测试：config-poll 7 例 + 四个既有同步测试按新节奏更新（109 例） |
 
 ## 一、架构概览
 

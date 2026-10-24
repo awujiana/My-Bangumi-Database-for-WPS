@@ -23,6 +23,7 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
+import { subscribeConfigPoll } from './config-poll.js'
 import { bgmLog } from './util/index.js'
 
 /** 单个可排序模块的定义 */
@@ -108,15 +109,6 @@ export const ORDERABLE_PAGES: readonly string[] = [
   'conditional-format',
   'settings',
 ]
-
-/** 排序持久化的轮询间隔（ms）：空闲态（无变化）时的读取频率 */
-const SYNC_IDLE_INTERVAL_MS = 2000
-
-/** 检测到变化后使用的加密轮询间隔（ms），让连续调整跟手 */
-const SYNC_ACTIVE_INTERVAL_MS = 300
-
-/** 命中一次变化后，保持加密轮询的时长（ms）；超过后回落到空闲间隔 */
-const SYNC_ACTIVE_WINDOW_MS = 5000
 
 /** 读取页面默认顺序 */
 function getDefaultOrder(page: string): string[] {
@@ -336,48 +328,32 @@ export function notifyNavOrderChanged(page: string): void {
  * 因此没有可用的跨窗格广播通道 —— 唯一共享媒介是 PluginStorage（只能读，不通知）。
  * 各页只能各自轮询。
  *
- * **自适应间隔**：改动往往成串发生（用户连点 ↑↓ 或连续拖拽），固定 2s 间隔会让
- * 中间几次改动被合并、看起来"没反应"。这里改成「检测到变化后一段时间内加密轮询」：
- * 默认 {@link SYNC_IDLE_INTERVAL_MS}，每次命中变化后切换到
- * {@link SYNC_ACTIVE_INTERVAL_MS} 并保持 {@link SYNC_ACTIVE_WINDOW_MS}，
- * 之后回落到空闲间隔。既让连续调整跟手，又不让空闲页面无谓地频繁读存储。
+ * **自适应间隔**：改动往往成串发生（用户连点 ↑↓ 或连续拖拽），固定间隔会让
+ * 中间几次改动被合并、看起来"没反应"。轮询本体在 `tools/config-poll.ts`：空闲 3s、
+ * 命中变化后 600ms 快拍 4s，且与主题 / 导航模式 / 模块状态**共用一个定时器**
+ * （此前四个模块各一个 2s 定时器 = 5 次 COM 读 / 2s，真机让原生下拉卡顿）。
  *
  * 编辑页自身的响应由 {@link notifyNavOrderChanged} 负责，不走轮询（零延迟）。
  *
  * @param page - 当前页面键
  */
-export function startNavOrderSync(page: string): void {
-  if (typeof window === 'undefined' || typeof setTimeout !== 'function') return
+/** 非 DOM 环境（SSR / 测试）下的空退订函数 */
+function noopUnsubscribe(): void {
+  // 没有订阅，无需退订
+}
+
+export function startNavOrderSync(page: string): () => void {
+  if (typeof window === 'undefined') return noopUnsubscribe
   // 启动时先应用一次，避免首屏闪回默认顺序
   applyNavOrder(page)
-  let lastRaw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
-  let timer: ReturnType<typeof setTimeout> | undefined
-  /** 最近一次检测到变化的时间戳；用于决定下一轮用加密还是空闲间隔 */
-  let lastChangeAt = 0
-
-  /** 单次轮询：读配置，变化则重排，然后按当前活跃度安排下一次 */
-  const tick = (): void => {
-    try {
-      const raw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
-      if (raw !== lastRaw) {
-        lastRaw = raw
-        lastChangeAt = Date.now()
+  return subscribeConfigPoll({
+    keys: [CONFIG_KEYS.NAV_ORDER],
+    apply: () => {
+      try {
         applyNavOrder(page)
+      } catch {
+        // 静默处理偶发读取异常，轮询继续
       }
-    } catch {
-      // 静默处理偶发读取异常，轮询继续
-    }
-    const isActive = Date.now() - lastChangeAt < SYNC_ACTIVE_WINDOW_MS
-    const delay = isActive ? SYNC_ACTIVE_INTERVAL_MS : SYNC_IDLE_INTERVAL_MS
-    timer = setTimeout(tick, delay)
-  }
-
-  tick()
-  window.addEventListener(
-    'beforeunload',
-    () => {
-      if (timer !== undefined) clearTimeout(timer)
     },
-    { once: true },
-  )
+  })
 }

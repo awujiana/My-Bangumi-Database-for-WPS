@@ -72,9 +72,12 @@ function readPageModules(source) {
   // 页面键可能是带连字符的字符串字面量（'conditional-format':）——页面键即
   // ui/<page>.html 的文件名，只能 kebab-case，故 key 同时接受 'xxx' 与裸标识符。
   // 必须整段用 String.raw：拼进模板字面量时 `\s` 会被当转笔画掉，正则直接失效
+  // 只认**恰好 2 空格缩进**的页面条目：PAGE_MODULES 的页面块都是 `  panel: [`。
+  // 不限定缩进时，文件后段任何 `xxx: [`（如 subscribeConfigPoll 的 `keys: [...]`）
+  // 都会被误当成页面键——2026-10-24 实测：配置轮询重构后本门禁误报「keys 页不存在」。
   const pageBlocks = new RegExp(
-    String.raw`(?:'([^']+)'|(\w+))\s*:\s*\[([\s\S]*?)\]`,
-    'gu',
+    String.raw`^ {2}(?:'([^']+)'|(\w+))\s*:\s*\[([\s\S]*?)\]`,
+    'gmu',
   )
   for (const pageMatch of declaration[1].matchAll(pageBlocks)) {
     const page = pageMatch[1] ?? pageMatch[2]
