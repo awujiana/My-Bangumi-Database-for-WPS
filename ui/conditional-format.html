@@ -130,6 +130,22 @@
               placeholder="搜索类型 / 范围 / 公式 / 颜色"
             />
             <span class="conditional-format-rule-count" id="conditionalFormatExistingCount">—</span>
+            <button
+              type="button"
+              class="bgm-btn small"
+              id="conditionalFormatClusterBtn"
+              title="按公式模式自动聚类成组（会覆盖现有分组）"
+            >
+              ✨ 自动聚类
+            </button>
+            <button
+              type="button"
+              class="bgm-btn small"
+              id="conditionalFormatClearGroupsBtn"
+              title="清除所有分组，回到平铺列表"
+            >
+              🧹 清除分组
+            </button>
             <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
@@ -346,6 +362,45 @@
                 导入所选
               </button>
               <button type="button" class="bgm-btn small" id="conditionalFormatImportCancel">
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 既有规则归组：组名输入小弹窗（本地视图分组，不写工作表） -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatGroupMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatGroupTitle"
+          >
+            <h4 id="conditionalFormatGroupTitle">归入分组</h4>
+            <p class="conditional-format-import-hint">
+              把所选的
+              <span id="conditionalFormatGroupCount">0</span>
+              条规则归入同一分组。分组只影响本页展示（可收起展开），并会在导入规则库时作为组名带过去。
+            </p>
+            <input
+              type="text"
+              id="conditionalFormatGroupName"
+              class="conditional-format-input"
+              placeholder="分组名，如：饮品相关"
+            />
+            <div class="conditional-format-modal-actions">
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatGroupConfirm"
+              >
+                确定
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatGroupCancel">
                 取消
               </button>
             </div>
