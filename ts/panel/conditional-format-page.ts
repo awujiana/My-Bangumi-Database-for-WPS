@@ -1156,20 +1156,29 @@ function readColorField(field: ColorFieldIds, fallback: string): string {
 }
 
 /**
- * 吸管取色（宿主不支持时按钮保持隐藏，见 bindColorField）
+ * 吸管取色
  *
- * 用户按 Esc 取消吸管时 `open()` 会 reject —— 静默返回即可，
- * 不该弹错误（取消是正常操作，不是失败）。
+ * WPS 内嵌 CEF 对 EyeDropper 的支持不确定（momo 实测：点了「就退出」——
+ * 大概率 open() 直接抛错、被旧的静默 catch 吞掉）。故：全程打诊断日志，
+ * 失败时**明说 + 藏按钮**（不留个点了没反应的图标），引导回十六进制输入。
+ * 用户按 Esc 取消吸管时 open() 也 reject，走同一分支，提示语保持中性。
  */
 async function pickColorWithEyeDropper(field: ColorFieldIds): Promise<void> {
+  const EyeDropperCtor = (window as Window & { EyeDropper?: new () => EyeDropperLike }).EyeDropper
+  if (!EyeDropperCtor) return
+  bgmLog(LOG_LEVELS.INFO, '[conditionalFormat] 吸管：调用 EyeDropper.open()')
   try {
-    const EyeDropperCtor = (window as Window & { EyeDropper?: new () => EyeDropperLike }).EyeDropper
-    if (!EyeDropperCtor) return
     const result = await new EyeDropperCtor().open()
+    bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 吸管：取到 ${result.sRGBHex}`)
     const normalized = normalizeHexColor(result.sRGBHex)
     if (normalized !== null) setColorField(field, normalized)
-  } catch {
-    // 取消或宿主拒绝：不动当前颜色
+  } catch (error: unknown) {
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 吸管不可用: ${message}`)
+    showToast('当前环境不支持吸管取色（或已取消），请直接用十六进制输入', 'info')
+    // 藏按钮：失败一次就够，别再让用户点第二次
+    const pick = byId(field.pick)
+    if (pick) pick.hidden = true
   }
 }
 
@@ -1211,6 +1220,43 @@ function bindColorField(field: ColorFieldIds): void {
   }
 }
 
+/** 弹窗遮罩计数锁：多个弹窗同时开时，不能有一个关闭就解锁背景滚动 */
+let modalScrollLockCount = 0
+
+/**
+ * 把弹窗遮罩锚定到「当前可见区顶部」
+ *
+ * WPS 任务窗格里 iframe 视口常常等于**内容全高**（长页面不产生窗格内滚动条，
+ * 而是 iframe 被内容撑高）：fixed + flex-center 会把弹窗放到文档中部、落在
+ * 任务窗格可见区外（momo 实测：弹窗出现在页面上方、窗口外）。
+ * absolute 遮罩 + top=scrollY 补偿滚动，在「iframe=可见区」与「iframe=内容高」
+ * 两种宿主模型下都落在可见区内。顺带打一条诊断日志确认宿主模型。
+ */
+function anchorModalMask(mask: HTMLElement): void {
+  // setProperty 而非 mask.style.top = ...：后者踩 no-param-reassign（禁给参数属性赋值）
+  mask.style.setProperty('top', `${String(window.scrollY)}px`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[conditionalFormat] 弹窗定位: innerHeight=${String(window.innerHeight)} scrollY=${String(
+      window.scrollY,
+    )} clientHeight=${String(document.documentElement.clientHeight)} scrollHeight=${String(
+      document.documentElement.scrollHeight,
+    )}`,
+  )
+}
+
+/** 锁背景滚动（弹窗打开期间；计数式，多弹窗叠加不会早解） */
+function lockModalScroll(): void {
+  modalScrollLockCount += 1
+  document.body.style.overflow = 'hidden'
+}
+
+/** 解背景滚动（计数归零才真解） */
+function unlockModalScroll(): void {
+  modalScrollLockCount = Math.max(0, modalScrollLockCount - 1)
+  if (modalScrollLockCount === 0) document.body.style.overflow = ''
+}
+
 // ===== 规则编辑器（浮动弹窗）=====
 
 function blankRule(): ConditionalFormatRule {
@@ -1243,7 +1289,11 @@ function openEditor(id: string | null, isNew: boolean): void {
   setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
   if (boldInput) boldInput.checked = rule.fontBold === true
   const mask = byId('conditionalFormatEditorMask')
-  if (mask) mask.style.display = 'flex'
+  if (mask) {
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+  }
+  lockModalScroll()
   setText('conditionalFormatEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
 }
 
@@ -1252,6 +1302,7 @@ function closeEditor(): void {
   state.editingIsNew = false
   const mask = byId('conditionalFormatEditorMask')
   if (mask) mask.style.display = 'none'
+  unlockModalScroll()
 }
 
 function saveEditor(): void {
@@ -1398,13 +1449,17 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
   if (keepButton) {
     keepButton.textContent = last === 'append-after' ? '保留手工规则（上次选择）' : '保留手工规则'
   }
+  // mask 在函数入口已判非 null（!mask || !body 早退），直接用
+  anchorModalMask(mask)
   mask.style.display = 'flex'
+  lockModalScroll()
   clearButton?.focus()
 }
 
 function closeConfirmModal(): void {
   const mask = byId('conditionalFormatConfirmMask')
   if (mask) mask.style.display = 'none'
+  unlockModalScroll()
 }
 
 function applyFlow(): void {
@@ -1477,13 +1532,18 @@ function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: s
   setText('conditionalFormatImportSheet', sheetName)
   renderImportList()
   const mask = byId('conditionalFormatImportMask')
-  if (mask) mask.style.display = 'flex'
+  if (mask) {
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+  }
+  lockModalScroll()
 }
 
 function closeImportModal(): void {
   const mask = byId('conditionalFormatImportMask')
   if (mask) mask.style.display = 'none'
   state.importSelection = new Set<number>()
+  unlockModalScroll()
 }
 
 function renderImportList(): void {
