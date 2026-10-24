@@ -360,14 +360,30 @@ export function createSortable(options: SortableOptions): SortableHandle {
     window.setTimeout(done, 240)
   }
 
-  /** 吞掉拖拽结束后那一次 click（否则会误触发行内按钮——dnd-kit 同款处理） */
+  /**
+   * 吞掉拖拽结束后那一次 click（否则会误触发行内按钮——dnd-kit 同款处理）
+   *
+   * 必须带**超时兜底自摘**：pointerup 之后不一定紧跟 click 事件（触摸 / 触控笔 /
+   *   合成事件场景就没有），拦截器挂着不摘会把用户之后真正的点击也吞掉——
+   *   表现是「拖完一次，接下来点什么都没反应」。
+   */
   function suppressPostDragClick(): void {
-    const handler = (event: Event): void => {
+    let isRemoved = false
+    // handler 先持变量、后赋值：remove 与 handler 互相引用，
+    // 任一定义在前都会踩 no-use-before-define
+    let handler: ((event: Event) => void) | null = null
+    const remove = (): void => {
+      if (isRemoved) return
+      isRemoved = true
+      if (handler) window.removeEventListener('click', handler, { capture: true })
+    }
+    handler = (event: Event): void => {
       event.stopPropagation()
       event.preventDefault()
-      window.removeEventListener('click', handler, { capture: true })
+      remove()
     }
     window.addEventListener('click', handler, { capture: true })
+    window.setTimeout(remove, 300)
   }
 
   /** 提交重排（同步 / 异步都支持） */
@@ -412,7 +428,13 @@ export function createSortable(options: SortableOptions): SortableHandle {
           ? { fromId: drag.fromId, overId: null, placeAfter: true, toIndex: index, ids }
           : { fromId: drag.fromId, overId: getItemId(next), placeAfter: false, toIndex: index, ids }
     } else {
-      event = { fromId: drag.fromId, overId: getItemId(previous), placeAfter: true, toIndex: index, ids }
+      event = {
+        fromId: drag.fromId,
+        overId: getItemId(previous),
+        placeAfter: true,
+        toIndex: index,
+        ids,
+      }
     }
     drag.indicator.remove()
     drag.item.classList.remove('is-keyboard-dragging')
@@ -528,7 +550,8 @@ export function createSortable(options: SortableOptions): SortableHandle {
       return
     }
     const drag = pointerDrag
-    const hasMoved = drag.overId !== drag.fromId && (drag.overId !== null || currentItems().length > 1)
+    const hasMoved =
+      drag.overId !== drag.fromId && (drag.overId !== null || currentItems().length > 1)
     teardownDragVisuals()
     suppressPostDragClick()
     if (!hasMoved) {

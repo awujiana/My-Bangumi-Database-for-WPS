@@ -255,57 +255,97 @@ describe('显示 / 隐藏 开关', () => {
   })
 })
 
-/** 触发一个可冒泡 / 可取消的原生事件（拖拽相关） */
-function fire(type: string, target: Element): void {
-  target.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }))
+/** 派发 pointer 事件序列（sortable 的 Pointer Events 驱动） */
+function pointer(
+  target: EventTarget,
+  type: 'pointerdown' | 'pointermove' | 'pointerup',
+  x: number,
+  y: number,
+): void {
+  target.dispatchEvent(
+    new PointerEvent(type, {
+      button: 0,
+      buttons: type === 'pointerup' ? 0 : 1,
+      clientX: x,
+      clientY: y,
+      pointerId: 1,
+      bubbles: true,
+      cancelable: true,
+    }),
+  )
 }
 
-describe('拖拽', () => {
-  it('拖到同页另一个模块上会重排', () => {
+/**
+ * 推进合帧：本文件全局 fake timers（rAF 也被接管），真实
+ * requestAnimationFrame 永远不会触发，必须用 advanceTimersByTime 驱动
+ */
+function nextFrames(): void {
+  vi.advanceTimersByTime(50)
+}
+
+/** 布局桩：项垂直排列、每项 40px（sortable 的中点碰撞检测要真实高度） */
+function stubItemRects(items: HTMLElement[]): void {
+  for (const [index, item] of items.entries()) {
+    item.getBoundingClientRect = () =>
+      ({
+        top: index * 40,
+        bottom: index * 40 + 40,
+        left: 0,
+        right: 300,
+        width: 300,
+        height: 40,
+      }) as DOMRect
+  }
+}
+
+describe('拖拽排序（sortable 接入）', () => {
+  it('DOM 契约：行不带 draggable（Pointer Events 驱动），把手在位', () => {
     renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    const to = itemsOf('clean')[2]!
-    fire('dragstart', from)
-    fire('dragover', to)
-    fire('drop', to)
-    fire('dragend', to)
-    expect(getNavOrder('clean')[2]).toBe(from.dataset.module)
+    for (const item of itemsOf('clean')) {
+      // 旧实现是 HTML5 DnD（draggable=true）——iframe 里不稳，已换 sortable
+      expect(item.draggable).toBe(false)
+      expect(item.querySelector('.module-order-handle')).not.toBeNull()
+    }
   })
 
-  it('拖到自己身上不变', () => {
-    renderModuleOrderEditor()
-    const item = itemsOf('clean')[0]!
-    fire('dragstart', item)
-    fire('drop', item)
-    expect(getNavOrder('clean')[0]).toBe(item.dataset.module)
+  it('从把手按下、拖到第 3 项中点之下松手 → 顺序落盘', () => {
+    // beforeEach 已 initializeModuleOrderEditor（含 sortable 装配），这里只补布局桩
+    const items = itemsOf('clean')
+    stubItemRects(items)
+    const from = items[0]!
+    const handle = from.querySelector<HTMLElement>('.module-order-handle')
+    if (!handle) throw new Error('缺少拖拽把手')
+
+    pointer(handle, 'pointerdown', 10, 10)
+    // 指针落到第 3 项（top 80..120）中点之下 → 插它后面 = index 3
+    pointer(window, 'pointermove', 10, 110)
+    pointer(window, 'pointermove', 10, 110)
+    nextFrames()
+    pointer(window, 'pointerup', 10, 110)
+    nextFrames()
+
+    expect(getNavOrder('clean')[3]).toBe(from.dataset.module)
+    // 摘掉「吞拖拽后 click」的窗口拦截器：fake timers 下不会自动到点，
+    // 不推进它会挂着吞掉后续用例的 click
+    vi.advanceTimersByTime(400)
   })
 
-  it('跨页拖放被忽略（不同页面的顺序互不影响）', () => {
-    renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    const to = itemsOf('panel')[2]!
-    fire('dragstart', from)
-    fire('dragover', to)
-    fire('drop', to)
-    expect(getNavOrder('clean')[0]).toBe(from.dataset.module)
-  })
+  it('不过激活阈值的位移 = 单击：顺序不变', () => {
+    initializeModuleOrderEditor()
+    const items = itemsOf('clean')
+    stubItemRects(items)
+    const before = getNavOrder('clean').join(',')
+    const handle = items[0]!.querySelector<HTMLElement>('.module-order-handle')
+    if (!handle) throw new Error('缺少拖拽把手')
 
-  it('拖拽结束后清掉视觉标记', () => {
-    renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    const to = itemsOf('clean')[1]!
-    fire('dragstart', from)
-    fire('dragover', to)
-    expect(document.querySelectorAll('.is-drop-target')).toHaveLength(1)
-    fire('dragend', to)
-    expect(document.querySelectorAll('.is-drop-target, .is-dragging')).toHaveLength(0)
-  })
+    pointer(handle, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 12, 12)
+    nextFrames()
+    pointer(window, 'pointerup', 12, 12)
+    nextFrames()
 
-  it('从非条目元素开始拖拽时不记录来源', () => {
-    renderModuleOrderEditor()
-    fire('dragstart', hostElement())
-    fire('drop', itemsOf('clean')[1]!)
-    expect(getNavOrder('clean')[0]).toBe('sec-targets')
+    expect(getNavOrder('clean').join(',')).toBe(before)
+    vi.advanceTimersByTime(400)
   })
 })
 
@@ -351,23 +391,6 @@ describe('跨页同步与初始化', () => {
 // ========== 兜底分支：写盘失败 / 拖拽数据 / 卸载清理 ==========
 
 /** 带 dataTransfer 的拖拽事件（jsdom 没有 DragEvent，用 Event 附加属性模拟） */
-function fireDragWithData(
-  type: string,
-  target: Element,
-): { recordedSetData: string[][]; transfer: { effectAllowed: string; dropEffect: string } } {
-  const recordedSetData: string[][] = []
-  const transfer = {
-    effectAllowed: '',
-    dropEffect: '',
-    setData: (format: string, data: string): void => {
-      recordedSetData.push([format, data])
-    },
-  }
-  const event = new Event(type, { bubbles: true, cancelable: true })
-  Object.assign(event, { dataTransfer: transfer })
-  target.dispatchEvent(event)
-  return { recordedSetData, transfer }
-}
 
 describe('兜底分支', () => {
   it('恢复默认顺序写盘失败时提示错误（配置保持原样）', () => {
@@ -383,43 +406,6 @@ describe('兜底分支', () => {
     expect(toastMessages()).toContain('恢复默认顺序失败')
     // 写盘失败 → 存储里仍是之前写入的顺序
     expect(getNavOrder('panel')[0]).toBe('sec-help')
-  })
-
-  it('拖拽开始时写入拖拽数据（兼容 Firefox / WebView 的 drop 触发要求）', () => {
-    renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    const { recordedSetData, transfer } = fireDragWithData('dragstart', from)
-
-    expect(recordedSetData).toEqual([['text/plain', from.dataset.module]])
-    expect(transfer.effectAllowed).toBe('move')
-  })
-
-  it('拖拽经过新目标时清掉上一个目标的高亮', () => {
-    renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    const firstTarget = itemsOf('clean')[1]!
-    const secondTarget = itemsOf('clean')[2]!
-
-    fire('dragstart', from)
-    fire('dragover', firstTarget)
-    expect(firstTarget.classList.contains('is-drop-target')).toBe(true)
-
-    fire('dragover', secondTarget)
-    expect(firstTarget.classList.contains('is-drop-target')).toBe(false)
-    expect(secondTarget.classList.contains('is-drop-target')).toBe(true)
-  })
-
-  it('拖拽来源模块不在顺序表中时提示调整失败', () => {
-    renderModuleOrderEditor()
-    const from = itemsOf('clean')[0]!
-    // onDragStart 记录的是条目上的 data-module —— 改成注册表里不存在的 id
-    from.dataset.module = 'sec-nope'
-    fire('dragstart', from)
-    const target = itemsOf('clean')[2]!
-    fire('dragover', target)
-    fire('drop', target)
-
-    expect(toastMessages()).toContain('调整顺序失败')
   })
 
   it('beforeunload 时清掉轮询定时器（不再跟随其它窗格的改动）', () => {

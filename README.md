@@ -1,6 +1,8 @@
-﻿# BGM Excel 加载项（WPS 追番标记助手）
+﻿# Bangumi Watchlist Bridge（WPS Excel 追番标记助手）
 
 > 一个运行在 **WPS Office / Excel** 中的加载项，用于在本地 Excel 表格与 Bangumi 番组计划（[bgm.tv](https://bgm.tv/)）之间同步动画收藏数据：把 Excel 中的观看状态 / 评分 / 标签上传到 Bangumi，或从远程仓库拉取 Bangumi 资料数据填充 Excel。
+>
+> **关于名字**：Watchlist = 追番片单（Bangumi 收藏），Bridge = 在 Bangumi 与 Excel 表格之间搭桥。刻意避开「BGM」缩写——在开源语境里它首先会被读成 Background Music（背景音乐），词不达意。
 
 ---
 
@@ -281,4 +283,8 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ## 📜 许可证
 
-本项目采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)（署名 – 非商业性使用 – 相同方式共享）。数据来源于 [Bangumi Archive](https://github.com/bangumi/Archive)。
+本项目采用 [GNU AGPL v3.0](https://www.gnu.org/licenses/agpl-3.0.html)（GNU Affero General Public License v3.0），完整条款见 [LICENSE](./LICENSE)。
+
+选 AGPL 而不是更宽松的 MIT/Apache 的关键原因：**第 13 条「网络交互即分发」**——任何人把这个插件改成在线服务（例如搭个网站让用户连 Bangumi 同步）时，也必须向使用者提供完整源码。对「连 Bangumi API 的工具」来说这是必要的约束，否则很容易出现「魔改成 SaaS 却不回馈」的分支。
+
+数据来源于 [Bangumi Archive](https://github.com/bangumi/Archive)（其数据遵循 Bangumi 站点条款）。

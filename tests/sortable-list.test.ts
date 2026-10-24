@@ -302,16 +302,22 @@ describe('键盘排序（dnd-kit 招牌无障碍）', () => {
     handles.push(createSortable(options))
     const items = [...container.querySelectorAll<HTMLElement>('.row')]
     items[0]?.focus()
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }),
+    )
     expect(items[0]?.classList.contains('is-keyboard-dragging')).toBe(true)
     expect(announced.at(-1)).toContain('已拾起第 1 项')
 
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+    )
     // DOM 实时换位：第 0 项跑到第 1 位
     expect(container.querySelectorAll('.row')[1]).toBe(items[0])
     expect(announced.at(-1)).toContain('第 2 项')
 
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }),
+    )
     expect(reorderEvents).toHaveLength(1)
     expect(reorderEvents[0]?.fromId).toBe('id-0')
     expect(reorderEvents[0]?.overId).toBe('id-1')
@@ -325,10 +331,16 @@ describe('键盘排序（dnd-kit 招牌无障碍）', () => {
     handles.push(createSortable(options))
     const items = [...container.querySelectorAll<HTMLElement>('.row')]
     items[0]?.focus()
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }),
+    )
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+    )
     expect(container.querySelectorAll('.row')[1]).toBe(items[0])
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
     expect(container.querySelector('.row')).toBe(items[0])
     expect(reorderEvents).toHaveLength(0)
     expect(items[0]?.classList.contains('is-keyboard-dragging')).toBe(false)
@@ -342,12 +354,16 @@ describe('键盘排序（dnd-kit 招牌无障碍）', () => {
     expect(items[0]?.tabIndex).toBe(0)
     expect(items[1]?.tabIndex).toBe(-1)
     items[0]?.focus()
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }),
+    )
     expect(document.activeElement).toBe(items[1])
     // 停靠点搬迁：旧项收起、新项升起
     expect(items[0]?.tabIndex).toBe(-1)
     expect(items[1]?.tabIndex).toBe(0)
-    items[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+    items[1]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }),
+    )
     expect(document.activeElement).toBe(items[0])
     expect(items[1]?.tabIndex).toBe(-1)
   })
@@ -375,8 +391,12 @@ describe('键盘排序（dnd-kit 招牌无障碍）', () => {
     handles.push(createSortable(options))
     const items = [...container.querySelectorAll<HTMLElement>('.row')]
     items[0]?.focus()
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }))
-    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }),
+    )
+    items[0]?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }),
+    )
     expect(announced.at(-1)).toBe('已经到顶了')
     expect(reorderEvents).toHaveLength(0)
   })
@@ -406,5 +426,46 @@ describe('refresh / destroy', () => {
     await nextFrames()
     expect(document.querySelector('.sortable-overlay')).toBeNull()
     expect(document.querySelector('.sortable-live-region')).toBeNull()
+  })
+})
+
+describe('拖拽后的 click 拦截器', () => {
+  it('pointerup 后没有 click 时，拦截器超时自摘（不吞用户后续点击）', async () => {
+    vi.useFakeTimers()
+    buildItems(3)
+    handles.push(createSortable(options))
+    const items = [...container.querySelectorAll<HTMLElement>('.row')]
+    for (const [index, item] of items.entries()) {
+      item.getBoundingClientRect = () =>
+        ({
+          top: index * 40,
+          bottom: index * 40 + 40,
+          left: 0,
+          right: 300,
+          width: 300,
+          height: 40,
+        }) as DOMRect
+    }
+
+    // 完整拖一次（过阈值 + 松手）——松手后**不派发 click**（触摸/笔场景就没有）
+    pointer(items[0]!, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 10, 90)
+    pointer(window, 'pointermove', 10, 90)
+    vi.advanceTimersByTime(50)
+    pointer(window, 'pointerup', 10, 90)
+    vi.advanceTimersByTime(50)
+
+    // 推进超过 300ms 兜底后，拦截器应自摘：新的 click 不再被拦
+    vi.advanceTimersByTime(400)
+    let isClickReached = false
+    const probe = document.createElement('button')
+    probe.addEventListener('click', () => {
+      isClickReached = true
+    })
+    document.body.append(probe)
+    probe.click()
+    expect(isClickReached).toBe(true)
+    probe.remove()
+    vi.useRealTimers()
   })
 })

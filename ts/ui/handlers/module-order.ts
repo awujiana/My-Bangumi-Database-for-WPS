@@ -19,9 +19,9 @@ import {
   PAGE_MODULES,
   getNavOrder,
   moveModuleBy,
-  moveModuleTo,
   notifyNavOrderChanged,
   resetNavOrder,
+  setNavOrder,
 } from '../../tools/nav-order.js'
 import {
   applyModuleState,
@@ -30,10 +30,8 @@ import {
   toggleModuleHidden,
 } from '../../tools/module-state.js'
 import { escapeHtml } from '../../tools/string-utilities.js'
-
-/** 拖拽会话状态（仅记录当前被拖起的模块） */
-let dragPage = ''
-let dragModuleId = ''
+import { createSortable, moveInArray } from '../components/sortable-list.js'
+import type { SortableHandle } from '../components/sortable-list.js'
 
 /** 构建单个页面的排序分组 */
 function buildGroupHtml(page: string): string {
@@ -61,8 +59,8 @@ function buildGroupHtml(page: string): string {
         hideTitle = '恢复显示'
       }
       return `
-        <li class="module-order-item${isHidden ? ' is-module-hidden' : ''}" draggable="true" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}">
-          <span class="module-order-handle" title="拖拽调整顺序" aria-hidden="true">⋮⋮</span>
+        <li class="module-order-item${isHidden ? ' is-module-hidden' : ''}" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}">
+          <span class="module-order-handle" title="拖拽调整顺序（也可用键盘：Space 拾起、↑↓ 移动、Space 放置）" aria-hidden="true">⋮⋮</span>
           <span class="module-order-ico" aria-hidden="true">${escapeHtml(module.icon)}</span>
           <span class="module-order-label">${name}</span>
           <span class="module-order-btns">
@@ -90,6 +88,8 @@ export function renderModuleOrderEditor(): void {
   if (!host) return
   const html = ORDERABLE_PAGES.map((page) => buildGroupHtml(page)).join('')
   host.innerHTML = html
+  // 容器整树替换过：让 sortable 重新扫描新 DOM（无句柄时是 no-op）
+  refreshSortables()
 }
 
 /** 排序变化后的统一收尾：本页即时重排 + 重渲染编辑器 + 提示 */
@@ -158,71 +158,29 @@ function onEditorClick(event: Event): void {
   }
 }
 
-/** 拖拽开始：记录来源并给出拖拽影像 */
-function onDragStart(event: DragEvent): void {
-  const { target } = event
-  if (!(target instanceof Element)) return
-  const item = target.closest<HTMLElement>('.module-order-item')
-  if (!item) return
-  dragPage = item.dataset.page ?? ''
-  dragModuleId = item.dataset.module ?? ''
-  if (!dragPage || !dragModuleId) return
-  item.classList.add('is-dragging')
-  // Firefox / 部分 WebView 要求必须设置数据，否则不触发 drop
-  const dt = event.dataTransfer
-  if (dt) {
-    dt.setData('text/plain', dragModuleId)
-    dt.effectAllowed = 'move'
-  }
-}
-
-/** 拖拽经过：仅同页面内允许放置 */
-function onDragOver(event: DragEvent): void {
-  const { target } = event
-  if (!(target instanceof Element)) return
-  const item = target.closest<HTMLElement>('.module-order-item')
-  if (item?.dataset.page !== dragPage) return
-  event.preventDefault()
-  const dt = event.dataTransfer
-  if (dt) dt.dropEffect = 'move'
-  for (const other of document.querySelectorAll('.module-order-item.is-drop-target')) {
-    other.classList.remove('is-drop-target')
-  }
-  if (item.dataset.module !== dragModuleId) item.classList.add('is-drop-target')
-}
-
-/** 放置：按目标项在当前顺序中的下标重排 */
-function onDrop(event: DragEvent): void {
-  const { target } = event
-  if (!(target instanceof Element)) return
-  const item = target.closest<HTMLElement>('.module-order-item')
-  if (!dragModuleId || item?.dataset.page !== dragPage) return
-  event.preventDefault()
-  const targetModuleId = item.dataset.module ?? ''
-  if (!targetModuleId || targetModuleId === dragModuleId) return
-  const order = getNavOrder(dragPage)
-  const targetIndex = order.indexOf(targetModuleId)
-  if (targetIndex === -1) return
-  if (moveModuleTo(dragPage, dragModuleId, targetIndex)) {
-    afterOrderChanged(dragPage, '顺序已更新')
-  } else {
-    showToast('调整顺序失败', 'error')
-  }
-}
-
-/** 拖拽结束：清理视觉状态 */
-function onDragEnd(): void {
-  dragPage = ''
-  dragModuleId = ''
-  for (const item of document.querySelectorAll(
-    '.module-order-item.is-dragging, .module-order-item.is-drop-target',
-  )) {
-    item.classList.remove('is-dragging', 'is-drop-target')
-  }
-}
-
 /** 轮询间隔（ms），与 nav-order / nav-mode 的跨页同步保持一致 */
 const ORDER_SYNC_INTERVAL_MS = 2000
+
+/**
+ * 各页排序列表的 sortable 句柄
+ *
+ * 用 sortable-list（dnd-kit 轻量实现）而非 HTML5 DnD：WPS 任务窗格的 iframe 里
+ * dragstart/drop 事件链不稳（旧实现踩过），而 sortable 走 Pointer Events +
+ * capture，与 detachable-panel 的 bindDrag 同源，稳；且自带键盘排序 / 拖拽浮层 /
+ * 放置指示线 / 自动滚动——HTML5 DnD 那套（is-drop-target 高亮 + dataTransfer）
+ * 全部删掉，行为统一到条件格式规则列表那一套。
+ */
+let sortableHandles: SortableHandle[] = []
+
+/** 渲染（或重渲染）后重新扫描可拖项（容器 innerHTML 重建过，旧扫描失效） */
+function refreshSortables(): void {
+  for (const handle of sortableHandles) handle.refresh()
+}
+
+/** 当前是否正在拖拽（跨页同步轮询用它避免重渲染拆掉拖拽中的 DOM） */
+function isSortableDragging(): boolean {
+  return sortableHandles.some((handle) => handle.isDragging())
+}
 
 /** 无定时器可清时的空清理函数（非浏览器上下文 / 编辑器不存在） */
 const noopCleanup = (): void => {
@@ -240,12 +198,18 @@ export function startModuleOrderSync(): () => void {
   if (!host) return noopCleanup
   let lastRaw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
   const timer = setInterval(() => {
+    // 宿主被移除（设置页模块销毁 / 测试重建 DOM）→ 自清定时器：
+    // 不检查的话 interval 会一直空转，还会在别的上下文里重建本页 DOM
+    if (!host.isConnected) {
+      clearInterval(timer)
+      return
+    }
     try {
       const raw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
       if (raw !== lastRaw) {
         lastRaw = raw
         // 拖拽过程中不重渲染：会拆掉正在拖拽的 DOM 节点
-        if (!dragModuleId) renderModuleOrderEditor()
+        if (!isSortableDragging()) renderModuleOrderEditor()
       }
     } catch {
       // 静默处理偶发读取异常，轮询继续
@@ -264,6 +228,50 @@ export function startModuleOrderSync(): () => void {
 }
 
 /**
+ * 给每个分页列表装配 sortable（拖拽重排 + 键盘排序）
+ *
+ * 每次渲染后句柄集合重建：renderModuleOrderEditor 用 innerHTML 整树替换，
+ * 旧容器上的监听随节点一起没了，必须对**新容器**建 sortable（建前先销毁旧的，
+ * 避免 live region 泄漏）。
+ */
+function bindSortables(): void {
+  for (const handle of sortableHandles) handle.destroy()
+  sortableHandles = []
+  const host = document.getElementById('moduleOrderGroups')
+  if (!host) return
+  host.querySelectorAll<HTMLElement>('.module-order-list').forEach((list) => {
+    const page = list.dataset.listPage ?? ''
+    if (page === '') return
+    sortableHandles.push(
+      createSortable({
+        container: list,
+        itemSelector: '.module-order-item',
+        getItemId: (item) => item.dataset.module ?? '',
+        // 把手启动：行内有隐藏 / 上移 / 下移三个按钮，整行拖会和它们抢手势
+        handleSelector: '.module-order-handle',
+        // 提交后整树重渲染（顺序存回存储 + afterOrderChanged），动画找不到
+        // 「移动后的项」，直接撤浮层（与既有规则表格同口径）
+        animateDrop: false,
+        onReorder: (event) => {
+          const order = getNavOrder(page)
+          const fromIndex = order.indexOf(event.fromId)
+          // overId 为 null = 拖到列表末尾；placeAfter = 落目标项之后
+          const overIndex = event.overId === null ? order.length - 1 : order.indexOf(event.overId)
+          if (fromIndex === -1 || overIndex === -1) return
+          const toIndex = event.placeAfter ? overIndex + 1 : overIndex
+          const next = moveInArray(order, fromIndex, toIndex)
+          if (!setNavOrder(page, next)) {
+            showToast('调整顺序失败', 'error')
+            return
+          }
+          afterOrderChanged(page, '顺序已更新')
+        },
+      }),
+    )
+  })
+}
+
+/**
  * 初始化模块排序编辑器：渲染清单并绑定容器级事件委托。
  * 仅在存在 `#moduleOrderGroups` 的设置页生效，其余页面静默跳过。
  */
@@ -271,14 +279,11 @@ export function initializeModuleOrderEditor(): void {
   const host = document.getElementById('moduleOrderGroups')
   if (!host) return
   renderModuleOrderEditor()
+  bindSortables()
   // 容器元素本身不会被替换，用标记位避免重复初始化时叠加监听器
   if (host.dataset.bound === '1') return
   host.dataset.bound = '1'
   host.addEventListener('click', onEditorClick)
-  host.addEventListener('dragstart', onDragStart)
-  host.addEventListener('dragover', onDragOver)
-  host.addEventListener('drop', onDrop)
-  host.addEventListener('dragend', onDragEnd)
   startModuleOrderSync()
   bgmLog(LOG_LEVELS.INFO, '[moduleOrder] 模块排序编辑器已初始化')
 }

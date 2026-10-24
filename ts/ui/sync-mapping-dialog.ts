@@ -31,6 +31,8 @@ import {
   resolveSyncMappingConfig,
 } from '../sync/sync-mapping.js'
 import type { SyncMappingConfig, SyncMappingRow } from '../sync/sync-mapping.js'
+import { createSortable, moveInArray } from './components/sortable-list.js'
+import type { SortableHandle } from './components/sortable-list.js'
 
 /** 弹窗根节点 id（重复调用时先移除旧框） */
 const MODAL_ID = 'bgmSyncMappingModal'
@@ -113,9 +115,13 @@ function renderDialog(
 
   /** 关闭弹窗（只 resolve 一次） */
   let isSettled = false
+  // 前置声明：close 要先于 createSortable 定义（它在下面所有 render/bind 之后），
+  // 但关闭路径要摘它的监听 / live region
+  let sortable: SortableHandle | null = null
   const close = (config: SyncMappingConfig | null): void => {
     if (isSettled) return
     isSettled = true
+    sortable?.destroy()
     modal.remove()
     resolve(config)
   }
@@ -147,7 +153,7 @@ function renderDialog(
       })
     })
 
-    // 上移 / 下移（拖拽在 iframe 里不稳，按钮是主通道）
+    // 上移 / 下移（键盘可达的等价物；拖拽见下方 sortable）
     list.querySelectorAll<HTMLButtonElement>('button[data-move]').forEach((button) => {
       button.addEventListener('click', () => {
         const { rowId } = button.dataset
@@ -164,37 +170,42 @@ function renderDialog(
     })
   }
 
-  /** 拖拽排序（HTML5 DnD；仅影响展示顺序） */
-  let draggingId: string | null = null
-  const bindDragEvents = (): void => {
-    if (!list) return
-    list.querySelectorAll<HTMLElement>('.bgm-mapping-row').forEach((rowElement) => {
-      rowElement.addEventListener('dragstart', () => {
-        draggingId = rowElement.dataset.rowId ?? null
-        rowElement.classList.add('bgm-mapping-row--dragging')
-      })
-      rowElement.addEventListener('dragend', () => {
-        rowElement.classList.remove('bgm-mapping-row--dragging')
-        draggingId = null
-      })
-      rowElement.addEventListener('dragover', (event) => {
-        event.preventDefault()
-      })
-      rowElement.addEventListener('drop', (event) => {
-        event.preventDefault()
-        const targetId = rowElement.dataset.rowId
-        if (draggingId === null || targetId === undefined || draggingId === targetId) return
-        const fromIndex = rows.findIndex((row) => row.id === draggingId)
-        const toIndex = rows.findIndex((row) => row.id === targetId)
-        if (fromIndex === -1 || toIndex === -1) return
-        const [moved] = rows.splice(fromIndex, 1)
-        if (moved) rows.splice(toIndex, 0, moved)
-        renderList()
-        bindListEvents()
-        bindDragEvents()
-      })
-    })
-  }
+  /**
+   * 拖拽排序：走 sortable-list（dnd-kit 轻量实现），与条件格式规则列表、
+   * 模块排序编辑器同一套——Pointer Events + capture（iframe 里稳），自带
+   * 键盘排序 / 拖拽浮层 / 放置指示线。旧实现是 HTML5 DnD（dragstart/drop），
+   * 在 WPS 任务窗格 iframe 里不稳（事件链时有时无），已删。
+   *
+   * 行 id 是字段名（重渲染不变），所以开落位动画；提交 = 数组重排 + 重渲染
+   * + refresh 重新扫描。
+   */
+  sortable =
+    list === null
+      ? null
+      : createSortable({
+          container: list,
+          itemSelector: '.bgm-mapping-row',
+          getItemId: (item) => item.dataset.rowId ?? '',
+          // 把手启动：行内有勾选框 / 目标列下拉 / ▲▼ 三个交互元素
+          handleSelector: '.bgm-mapping-handle',
+          onReorder: (event) => {
+            const fromIndex = rows.findIndex((row) => row.id === event.fromId)
+            // overId 为 null = 拖到列表末尾；placeAfter = 落目标项之后
+            const overIndex =
+              event.overId === null
+                ? rows.length - 1
+                : rows.findIndex((row) => row.id === event.overId)
+            if (fromIndex === -1 || overIndex === -1) return
+            const toIndex = event.placeAfter ? overIndex + 1 : overIndex
+            const next = moveInArray(rows, fromIndex, toIndex)
+            // rows 是入参数组：splice 整体替换内容（方法调用，不踩
+            // no-param-reassign 的属性赋值禁令），后续 confirm / 勾选回调
+            // 闭包读到的都是新顺序
+            rows.splice(0, rows.length, ...next)
+            renderList()
+            bindListEvents()
+          },
+        })
 
   /** 一键补列：写表头 → 读回校验 → 只有校验通过的才标记为已有列 */
   const handleAddMissing = (): void => {
@@ -224,7 +235,8 @@ function renderDialog(
     }
     renderList()
     bindListEvents()
-    bindDragEvents()
+    // 补列后 DOM 重建：让 sortable 重新扫描（它的事件委托在容器上，但项缓存要更新）
+    sortable?.refresh()
     if (status) {
       status.textContent =
         failed.length === 0
@@ -261,7 +273,6 @@ function renderDialog(
 
   renderList()
   bindListEvents()
-  bindDragEvents()
   confirmButton?.focus()
 }
 
@@ -279,7 +290,7 @@ function renderRowHtml(
   const groupLabel = SYNC_MAPPING_GROUP_LABELS[row.group]
 
   return `
-    <div class="bgm-mapping-row${row.hasLocalColumn ? '' : ' bgm-mapping-row--missing'}" data-row-id="${escapeAttribute(row.id)}" draggable="true">
+    <div class="bgm-mapping-row${row.hasLocalColumn ? '' : ' bgm-mapping-row--missing'}" data-row-id="${escapeAttribute(row.id)}">
       <span class="bgm-mapping-handle" title="拖拽排序">⋮⋮</span>
       <input type="checkbox" data-row-id="${escapeAttribute(row.id)}"${row.selected ? ' checked' : ''} />
       <span class="bgm-mapping-field" title="${escapeAttribute(row.remoteField)}（${escapeAttribute(groupLabel)}）">${escapeHtml(row.id)}</span>
