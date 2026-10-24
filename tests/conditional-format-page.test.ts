@@ -388,3 +388,39 @@ describe('既有规则表格', () => {
     expect(m.readForeignRules.mock.calls.length).toBeGreaterThan(readCallsBefore)
   })
 })
+
+describe('宿主读取失败时的韧性（2026-10-24 真机缺陷）', () => {
+  it('collectSheets 抛错：init 不炸、下拉绑定仍生效、给出重试提示', async () => {
+    // 真机场景：JSAPI 桥未就绪 / 被调速器限速，同步 COM 抛错。
+    // 修复前：异常在绑定段之前抛出 → 后面所有 addEventListener 都没跑到 →
+    // 下拉「不能点击不能选中」。修复后：绑定先装、宿主读取在末尾兜底。
+    m.collectSheets.mockImplementation(() => {
+      throw new Error('JSAPI 桥未就绪')
+    })
+
+    const page = await loadPage()
+    expect(() => {
+      page.initializeConditionalFormatPage()
+    }).not.toThrow()
+
+    // 明确报错 + 可恢复（刷新列表按钮是绑好的）
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('刷新列表'), 'error')
+
+    // 下拉渲染成明确空态，而不是空白
+    const workbookSelect = document.querySelector<HTMLSelectElement>('#conditionalFormatWorkbook')
+    expect(workbookSelect?.options[0]?.textContent).toContain('无已打开的工作簿')
+
+    // 关键断言：change 绑定仍生效（修复前这一段根本没执行）
+    const sheetSelect = document.querySelector<HTMLSelectElement>('#conditionalFormatSheet')
+    sheetSelect?.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(
+      m.setConfig.mock.calls.some(([key]) => key === 'conditionalFormat.sheet.v1'),
+    ).toBe(true)
+
+    // 刷新按钮也已绑定：点它不会抛（会再次尝试枚举并再次兜底）
+    const reloadButton = document.querySelector<HTMLButtonElement>('#conditionalFormatReloadSheetsBtn')
+    expect(() => {
+      reloadButton?.click()
+    }).not.toThrow()
+  })
+})

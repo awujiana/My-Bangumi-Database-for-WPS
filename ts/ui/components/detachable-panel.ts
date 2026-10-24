@@ -93,6 +93,43 @@ const PANEL_Z_INDEX = 900
 /** 几何记忆：key = 面板 id，关闭再打开时恢复上次的位置与尺寸 */
 const geometryMemory = new Map<string, PanelRect>()
 
+/**
+ * 几何的持久化 key 前缀（localStorage）
+ *
+ * 为什么不用 PluginStorage（getConfig/setConfig）：① 那是宿主隔离存储，pane
+ * 重载后不一定还在；② 它是 COM 调用——拖拽收尾时写它要等 COM，桥未就绪时还会
+ * 抛错把 onEnd 搞崩。面板几何是纯 UI 状态，localStorage 同步、零 COM、跨 pane
+ * 重载存活，正合适（2026-10-24 真机缺陷：JsApiDevTool 调速器拖动导致 pane
+ * 重载，内存几何全丢，浮窗「还原位置」回默认位）。
+ */
+const GEO_STORAGE_PREFIX = 'bgm:panelGeo:'
+
+/** 从 localStorage 读记住的几何；坏数据 / 存储不可用一律回 null（回退默认位） */
+function loadRememberedRect(panelId: string): PanelRect | null {
+  try {
+    const raw = window.localStorage.getItem(GEO_STORAGE_PREFIX + panelId)
+    if (raw === null) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed === null || typeof parsed !== 'object') return null
+    const candidate = parsed as Record<string, unknown>
+    const numbers = ['left', 'top', 'width', 'height'].map((key) => candidate[key])
+    if (numbers.some((value) => typeof value !== 'number' || !Number.isFinite(value))) return null
+    return { left: numbers[0] as number, top: numbers[1] as number, width: numbers[2] as number, height: numbers[3] as number }
+  } catch {
+    // 隐私模式 / 存储被禁：静默回退，不影响当前会话
+    return null
+  }
+}
+
+/** 记住几何到 localStorage；写失败只影响下次重载的恢复，不抛 */
+function persistRect(panelId: string, rect: PanelRect): void {
+  try {
+    window.localStorage.setItem(GEO_STORAGE_PREFIX + panelId, JSON.stringify(rect))
+  } catch {
+    // 存不上不影响当前会话（内存记忆还在）
+  }
+}
+
 /** 收回函数（拖出中的面板各一个；存函数而非句柄可避免前向引用） */
 type DetachCloser = () => void
 
@@ -640,9 +677,24 @@ export function createDetachablePanel(
   root.hidden = true
 
   // ---- 几何（必须早于按钮创建：折叠按钮的回调要读 rect 当前高度）----
-  const rect: PanelRect = geometryMemory.get(panelId) ?? {
-    ...defaultPanelRect(detachedClosers.length, readViewport(), resolved.width, resolved.height),
-  }
+  // 取值优先级：本次会话内存 > localStorage（上会话 / pane 重载前）> 级联默认位。
+  // 持久化的几何还要按当前视口钳一次——记住的位置可能落在缩小后的视口外，
+  // 不钳就会出现「浮窗拖出去了找不回来」（比不记忆更糟）。
+  const remembered = geometryMemory.get(panelId) ?? loadRememberedRect(panelId)
+  const rect: PanelRect = remembered
+    ? (() => {
+        const viewport = readViewport()
+        const clamped = clampPosition(
+          { left: remembered.left, top: remembered.top },
+          { width: remembered.width, height: remembered.height },
+          viewport,
+        )
+        return { ...remembered, left: clamped.left, top: clamped.top }
+      })()
+    : {
+        ...defaultPanelRect(detachedClosers.length, readViewport(), resolved.width, resolved.height),
+      }
+
 
   function applyPosition(): void {
     root.style.left = `${String(rect.left)}px`
@@ -671,6 +723,8 @@ export function createDetachablePanel(
   /** 记住几何，供下次打开恢复（只在收回时写一次，避免拖动过程频繁写 Map） */
   function rememberRect(): void {
     geometryMemory.set(panelId, { ...rect })
+    // 同时落盘：pane 重载（如 JsApiDevTool 调速器场景）后内存没了，靠它恢复
+    persistRect(panelId, { ...rect })
   }
 
   const header = document.createElement('header')
@@ -835,8 +889,13 @@ export function createDetachablePanel(
     // 首次打开（无记忆几何、无显式尺寸配置）时按内容量尺寸：
     // 固定默认值对内容少的区块会留大片空白（momo 反馈：体积太大、空区域太多）。
     // 用户拖过/缩放过后几何进 memory，之后都听 memory。
+    // 「首次打开」= 内存与落盘都没有几何。必须在 **detach 时**动态判定：
+    // 同一实例第二次打开时，内存已由上一次 rememberRect 写入，不该再重新量尺寸；
+    // 而 pane 重载后的首次打开要靠落盘几何认出「不是首次」，否则会把恢复的
+    // 位置覆盖成居中默认位（真机「还原位置」的本因）。
     if (
       !geometryMemory.has(panelId) &&
+      loadRememberedRect(panelId) === null &&
       resolved.width === undefined &&
       resolved.height === undefined
     ) {
@@ -996,6 +1055,17 @@ function bindEscapeToCloseTopmost(): void {
 export function resetDetachablePanelsForTest(): void {
   geometryMemory.clear()
   detachedClosers.length = 0
+  // 持久化几何也要清：否则跨用例残留的位置会污染后续断言
+  try {
+    const doomed: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (key?.startsWith(GEO_STORAGE_PREFIX) === true) doomed.push(key)
+    }
+    for (const key of doomed) window.localStorage.removeItem(key)
+  } catch {
+    // 存储不可用时无事可做
+  }
   hideWindowMenu()
 }
 

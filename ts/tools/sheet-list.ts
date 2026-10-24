@@ -9,7 +9,8 @@
  * （读整表数据 / Range 大读）不在此处，由各页面显式触发。
  */
 
-import { getApp } from './util/index.js'
+import { bgmLog, getApp } from './util/index.js'
+import { LOG_LEVELS } from '../core/constants.js'
 import type { WpsWorksheet } from './wps.js'
 
 /** 工作表枚举项：稳定键 = 工作簿名::工作表名 */
@@ -34,29 +35,42 @@ function readSheetName(worksheet: unknown): string {
   }
 }
 
-/** 枚举已打开工作簿的全部工作表（Count 提循环外，守 com-in-loop） */
+/**
+ * 枚举已打开工作簿的全部工作表（Count 提循环外，守 com-in-loop）
+ *
+ * **COM 防护**（2026-10-24 真机缺陷修复）：宿主初始化窗口内（或 JSAPI 桥未就绪 /
+ * 被调速器限速时）同步跨进程 COM 会抛错。此前的实现对 `Workbooks.Count/Item` 零防护，
+ * 一抛就顺着调用链把页面初始化炸掉——条件格式页的下拉因此永远绑不上事件
+ * （「不能点击不能选中」）。现在整段兜底：抛错时返回**已枚举到的部分**并记 WARN，
+ * 调用方渲染部分列表 + 刷新按钮，用户点一下就能恢复。
+ */
 export function collectSheets(): SheetEntry[] {
-  const app = getApp() as {
-    Workbooks?: { Count: number; Item(index: number): unknown }
-  } | null
-  const workbooks = app?.Workbooks
-  if (!workbooks) return []
-
   const entries: SheetEntry[] = []
-  const wbCount = workbooks.Count
-  for (let wbIndex = 1; wbIndex <= wbCount; wbIndex += 1) {
-    const wb = workbooks.Item(wbIndex) as WorkbookLike
-    const sheets = wb.Worksheets
-    if (sheets) {
-      const sheetCount = sheets.Count
-      for (let sheetIndex = 1; sheetIndex <= sheetCount; sheetIndex += 1) {
-        const worksheet = sheets.Item(sheetIndex) as WpsWorksheet
-        const sheet = readSheetName(worksheet)
-        if (sheet) {
-          entries.push({ key: `${wb.Name}::${sheet}`, workbook: wb.Name, sheet, worksheet })
+  try {
+    const app = getApp() as {
+      Workbooks?: { Count: number; Item(index: number): unknown }
+    } | null
+    const workbooks = app?.Workbooks
+    if (!workbooks) return entries
+
+    const wbCount = workbooks.Count
+    for (let wbIndex = 1; wbIndex <= wbCount; wbIndex += 1) {
+      const wb = workbooks.Item(wbIndex) as WorkbookLike
+      const sheets = wb.Worksheets
+      if (sheets) {
+        const sheetCount = sheets.Count
+        for (let sheetIndex = 1; sheetIndex <= sheetCount; sheetIndex += 1) {
+          const worksheet = sheets.Item(sheetIndex) as WpsWorksheet
+          const sheet = readSheetName(worksheet)
+          if (sheet) {
+            entries.push({ key: `${wb.Name}::${sheet}`, workbook: wb.Name, sheet, worksheet })
+          }
         }
       }
     }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.WARN, `[sheetList] 工作簿枚举中断（已拿到 ${String(entries.length)} 张表）：${message}`)
   }
   return entries
 }

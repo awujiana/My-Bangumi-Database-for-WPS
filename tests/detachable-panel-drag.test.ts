@@ -18,7 +18,7 @@
 
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createDetachablePanel,
   resetDetachablePanelsForTest,
@@ -194,5 +194,52 @@ describe('浮动窗口拖动：transform 定位', () => {
     expect(reopened.style.left).toBe(movedLeft)
     expect(reopened.style.top).toBe(movedTop)
     expect(reopened.style.transform).toBe('')
+  })
+})
+
+describe('浮动窗口几何持久化（2026-10-24 真机缺陷）', () => {
+  it('pane 重载后恢复上次位置（内存丢失靠 localStorage 兜住）', async () => {
+    // 真机场景：JsApiDevTool 调速器拖动 → pane 重载 → 模块级 geometryMemory 清空。
+    // 修复前：重载后浮窗回默认位（用户说的「还原位置」）。修复后：几何落盘 localStorage。
+    const handle = createDetachablePanel(section, { title: '预览', trigger })
+    if (!handle) throw new Error('面板创建失败')
+    trigger.click()
+    const root = document.querySelector<HTMLElement>('.detachable-panel')
+    const header = root?.querySelector<HTMLElement>('.detachable-panel-header')
+    if (!root || !header) throw new Error('面板骨架缺失')
+    stubPointerCapture(header)
+
+    const baseLeft = readPx(root.style.left)
+    const baseTop = readPx(root.style.top)
+
+    // 拖到新位置
+    pointer(header, 'pointerdown', 100, 100)
+    pointer(header, 'pointermove', 160, 140)
+    await nextFrames()
+    pointer(header, 'pointerup', 160, 140)
+    expect(readPx(root.style.left)).toBe(baseLeft + 60)
+    expect(readPx(root.style.top)).toBe(baseTop + 40)
+
+    // 收回面板：rememberRect → 落盘
+    handle.attach()
+
+    // 模拟 pane 重载：模块重新加载（内存几何清空，localStorage 留存）
+    vi.resetModules()
+    const fresh = await import('../ts/ui/components/detachable-panel.js')
+    document.body.replaceChildren()
+    const host = document.createElement('div')
+    const nextSection = document.createElement('section')
+    // 同 panelId → 同一条持久化记录
+    nextSection.id = 'sec-preview'
+    const nextTrigger = document.createElement('button')
+    host.append(nextSection, nextTrigger)
+    document.body.append(host)
+
+    const nextHandle = fresh.createDetachablePanel(nextSection, { title: '预览', trigger: nextTrigger })
+    if (!nextHandle) throw new Error('重载后创建失败')
+    nextTrigger.click()
+    const nextRoot = document.querySelector<HTMLElement>('.detachable-panel')
+    expect(readPx(nextRoot?.style.left ?? '0px')).toBe(baseLeft + 60)
+    expect(readPx(nextRoot?.style.top ?? '0px')).toBe(baseTop + 40)
   })
 })

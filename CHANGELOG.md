@@ -8,6 +8,32 @@
 
 ## [未发布]
 
+### 目标工作表下拉失灵 + 浮窗位置还原：两个 COM 韧性缺陷（2026-10-24）
+
+momo 真机：「条件格式管理的目标工作表组件不能点击不能选中工作簿1 Sheet1」+「JsApiDevTool 调速器拖动就会还原位置」。
+
+**① 目标工作表下拉「不能点击不能选中」——初始化被 COM 异常连坐**：
+
+- 根因：`collectSheets()` 对 `Workbooks.Count/Item` 零防护。JSAPI 桥未就绪（宿主初始化窗口 / 调速器限速）时同步 COM 抛错 → `reloadSheets()` 抛错 → `initializeConditionalFormatPage()` 在**事件绑定段之前**中断 → 下拉的 change 监听、刷新按钮、锁定开关全没装上，列表也永远是空的。
+- 修复两层：
+  · `ts/tools/sheet-list.ts`：`collectSheets` 整段 try/catch——抛错返回**已枚举到的部分**并记 WARN（中途挂掉也能拿到前几个工作簿），不再向上抛；
+  · `ts/panel/conditional-format-page.ts`：init 重排——**先装全部 DOM 绑定**（纯 DOM 不会抛），宿主读取（loadRules/reloadSheets 等 COM）挪到末尾的 `populateFromHost()` 并兜底：失败时 toast「读取工作簿列表失败，请点「🔄 刷新列表」重试」+ 下拉渲染明确空态；`isSheetLocked` 读存储也加了兜底。
+- 回归：`tests/sheet-list.test.ts` 5 例（正常枚举 / Count 抛错 / 中途抛错返回部分 / 无 Application / activeWorksheet 抛错）+ 页面测试新增「collectSheets 抛错时 init 不炸、下拉绑定仍生效、给出重试提示」。
+
+**② 浮窗「还原位置」——几何只存内存，pane 重载即丢**：
+
+- 根因：面板几何只在模块级 `geometryMemory`（内存 Map）。pane 一重载（JsApiDevTool 调速器场景）就全丢；更糟的是 `detach()` 的「首次打开」判定只看 `geometryMemory`，重载后误判成首次 → 按内容重新量尺寸 + **居中覆盖**恢复的位置。
+- 修复：
+  · 几何落盘 `localStorage`（key `bgm:panelGeo:<panelId>`）——同步、零 COM、跨 pane 重载存活；不选 PluginStorage 是因为它是 COM（拖拽收尾不能等它，桥未就绪还会抛）且宿主隔离；
+  · 恢复时按当前视口 `clampPosition` 钳一次（记住的位置可能落在缩小后的视口外，拖出去找不回来更糟）；
+  · 「首次打开」判定改为**动态**看「内存 + 落盘」：`!geometryMemory.has(id) && loadRememberedRect(id) === null`；
+  · 读到的坏数据（缺字段/非数字）一律回 null 走默认位；存储不可用（隐私模式）静默降级；
+  · `resetDetachablePanelsForTest` 一并清持久化键（测试隔离）。
+- 回归：`tests/detachable-panel-drag.test.ts` 新增「pane 重载后恢复上次位置」（`vi.resetModules()` 模拟重载 + 动态 import 新实例）。
+
+gate 全绿（新增 6 例）。
+
+
 ### 性能审计 P1/P3 实施：删除阶段连续行合并 + join 微优化（2026-10-24）
 
 momo：「执行 P1 和 P3」（承接《性能审计报告 2026-10-24》）。

@@ -337,7 +337,13 @@ function reloadSheets(): void {
  * 默认不锁，保持既有「失效即兜底到活动表」的行为。
  */
 function isSheetLocked(): boolean {
-  return getConfig(KEY_SHEET_LOCK, '0') === '1'
+  try {
+    return getConfig(KEY_SHEET_LOCK, '0') === '1'
+  } catch {
+    // PluginStorage 读取抛错（桥未就绪）时按「未锁定」兜底：
+    // 锁定是兜底策略，读不到时用默认行为比让绑定段崩掉好
+    return false
+  }
 }
 
 /** 设置目标表锁定开关；解锁时若正处于缺失态，立刻补一次兜底定位 */
@@ -1977,12 +1983,10 @@ export function initializeConditionalFormatPage(): void {
   initializeTheme()
   startThemeSync()
 
-  loadRules()
-  loadExistingGroups()
-  state.selectedKey = getConfig(KEY_SHEET, '', true)
-  // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
-  mountDataContextNotice('conditional-format')
-  reloadSheets()
+  // ⚠️ 宿主读取（loadRules / reloadSheets 等 COM）**不在这里做**，挪到本函数
+  // 末尾的 populateFromHost()——2026-10-24 真机缺陷：桥未就绪时 collectSheets
+  // 抛错会连坐整个初始化，后面全部事件绑定都装不上，下拉成了「不能点击不能
+  // 选中」的死件。先装绑定（纯 DOM 不可能抛），再读宿主，读失败页面仍可用。
 
   // 搜索
   inputById('conditionalFormatSearch')?.addEventListener('input', (event) => {
@@ -2193,10 +2197,39 @@ export function initializeConditionalFormatPage(): void {
     closeGroupNameModal()
   })
 
+  // ---- 宿主读取放在全部绑定之后：抛错也只损失首屏数据，不损失交互 ----
+  populateFromHost()
+
   renderRuleList()
 
   // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
   notifyModulesReady()
+}
+
+/**
+ * 首屏宿主读取（COM 集中在这里；抛错时绑定已装完，页面仍可用）
+ *
+ * 典型失败场景：宿主初始化窗口内同步跨进程 COM 抛错（JSAPI 桥未就绪，或被
+ * JsApiDevTool 调速器限速拖慢看门狗）。此时只报告「首屏数据没读到」并给恢复
+ * 路径——下拉显示「（无已打开的工作簿）」，「🔄 刷新列表」按钮是绑好的，点一
+ * 下重新枚举即可。绝不让异常把初始化连坐掉（那才是真机「组件不能点击」的本因）。
+ */
+function populateFromHost(): void {
+  try {
+    loadRules()
+    loadExistingGroups()
+    state.selectedKey = getConfig(KEY_SHEET, '', true)
+    // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
+    mountDataContextNotice('conditional-format')
+    reloadSheets()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 首屏宿主读取失败：${message}`)
+    showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error')
+    // 下拉渲染成明确的空态（有刷新按钮可点），不是静默的空下拉
+    renderWorkbookSelect()
+    renderSheetSelect()
+  }
 }
 
 // ===== 「既有规则」拖出为浮动「规则管理器」窗口 =====
