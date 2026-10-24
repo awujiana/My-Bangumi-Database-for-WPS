@@ -9,6 +9,8 @@
  *    **降级清空并在 warnings 说明**（不静默丢数据）
  * 4. Store 存取：坏行跳过不致命；隐藏规则不进应用计划
  * 5. 公式行号平移不误伤字符串字面量（"26年10月" / TEXT "00"）
+ * 6. 既有规则分组的维护：重命名按**组名**整组换、解散只清映射不动规则，
+ *    非法入参一律返回 null（调用方 toast，不静默成功）
  */
 
 import { describe, expect, it } from 'vitest'
@@ -22,12 +24,14 @@ import {
   buildDefaultRules,
   buildErrorFormula,
   buildSeasonFormula,
+  dissolveGroupMapping,
   filterRules,
   firstRowOfRange,
   groupRules,
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
+  renameGroupMapping,
   serializeExistingGroups,
   snapshotGroupKey,
   autoClusterGroups,
@@ -439,5 +443,46 @@ describe('autoClusterGroups', () => {
 
   it('空公式不聚类', () => {
     expect(autoClusterGroups([{ range: 'A1', formula: '', kind: 'expression' }])).toEqual({})
+  })
+})
+
+// ========== 既有规则分组的维护（renameGroupMapping / dissolveGroupMapping）==========
+
+describe('renameGroupMapping', () => {
+  it('按组名把组内全部规则换成新组名，其它组不动', () => {
+    const groups = { k1: '饮品', k2: '饮品', k3: '大区' }
+    expect(renameGroupMapping(groups, '饮品', '食品')).toEqual({
+      k1: '食品',
+      k2: '食品',
+      k3: '大区',
+    })
+  })
+
+  it('不改入参：页面层整体替换 state 再持久化，旧对象必须原样', () => {
+    const groups = { k1: '饮品' }
+    renameGroupMapping(groups, '饮品', '食品')
+    expect(groups).toEqual({ k1: '饮品' })
+  })
+
+  it('旧组名不存在 / 新名为空 / 新旧同名都返回 null（不静默成功）', () => {
+    const groups = { k1: '饮品' }
+    expect(renameGroupMapping(groups, '不存在', 'whatever')).toBeNull()
+    expect(renameGroupMapping(groups, '饮品', '')).toBeNull()
+    expect(renameGroupMapping(groups, '饮品', '饮品')).toBeNull()
+  })
+})
+
+describe('dissolveGroupMapping', () => {
+  it('删掉该组全部条目、其它组原样', () => {
+    const groups = { k1: '饮品', k2: '饮品', k3: '大区' }
+    expect(dissolveGroupMapping(groups, '饮品')).toEqual({ k3: '大区' })
+  })
+
+  it('组名不存在返回 null（调用方 toast，不假装解散了）', () => {
+    expect(dissolveGroupMapping({ k1: '饮品' }, '不存在')).toBeNull()
+  })
+
+  it('解散最后一个组得到空映射（回到平铺视图）', () => {
+    expect(dissolveGroupMapping({ k1: '饮品' }, '饮品')).toEqual({})
   })
 })

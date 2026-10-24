@@ -185,12 +185,18 @@ function readAppliesToAddress(fc: WpsFormatCondition, index: number): string {
  *
  * 统一入口：调用方拿不到对象时（Item 不存在 / 越界 / 宿主抛错）返回 null，
  * 由调用方给出「操作失败」提示，不静默当成功。
+ *
+ * ⚠️ **索引空间必须与 {@link readForeignRules} 一致**：读取走 Sheet 级
+ * FormatConditions（全表规则），这里若走 UsedRange 级，两条规则范围若不在
+ * UsedRange 内，两个集合的条目数与排序就会错位——表格第 N 行点「上移」，
+ * 动的将是另一条规则（观感：点一下整组规则莫名其妙换序）。故同样优先
+ * Sheet 级、个别 WPS 版本无该属性时回退 UsedRange（与 readForeignRules 同序）。
  */
 export function getForeignCondition(
   worksheet: WpsWorksheet | null | undefined,
   index: number,
 ): WpsFormatCondition | null {
-  const formatConditions = worksheet?.UsedRange?.FormatConditions
+  const formatConditions = worksheet?.FormatConditions ?? worksheet?.UsedRange?.FormatConditions
   if (typeof formatConditions?.Item !== 'function') return null
   try {
     // 宿主可能对越界下标返回 undefined 而非抛错，这里统一收敛成 null
@@ -293,10 +299,38 @@ export function setForeignFormula(
 }
 
 /**
- * 调整既有规则优先级（-1 上移 / +1 下移）
+ * 读规则的 Priority（非数字 / 抛错统一收敛成 null）
  *
- * 用 SetFirstPriority / SetLastPriority 而不是删了重建——重建会丢格式。
- * 只支持相邻移动：跨多条的拖拽排序需要多次调用，代价高且易错，先不做。
+ * Priority 是「优先级名次」：1 = 最高。读不到时调用方给明确错误，
+ * 不猜一个值继续写（写错优先级 = 规则静默换序，比失败更难发现）。
+ */
+function readPriority(fc: WpsFormatCondition): number | null {
+  try {
+    const value = fc.Priority
+    return typeof value === 'number' ? value : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 调整既有规则优先级：与相邻规则**交换一格**（-1 上移 / +1 下移）
+ *
+ * ## 为什么不再用 SetFirstPriority / SetLastPriority
+ * 那两个方法是**绝对**置顶 / 置底：点一次「上移」，第 20 条瞬移到第 1 条。
+ * 分组视图按「组名桶 + 首现顺序」渲染，整组跟着跳到表顶——用户实测观感是
+ * 「点上移结果变成了新的分组」。行内 tooltip 写的是「上移（提高优先级）」
+ * （一格），实现必须与之一致。
+ *
+ * ## 交换算法
+ * FormatConditions 没有「移动一格」的原语，但 FormatCondition.Priority 可读写：
+ * 把两条的 Priority 互换即完成相邻交换（宿主负责重排其余规则的名次）。
+ * 写后**回读校验**——宿主忽略写入时（只读代理 / 老版本）Priority 原样不动，
+ * 据此返回明确错误；不静默置顶，也不假装成功（项目铁律：写不进去就明说）。
+ *
+ * 已知局限：个别宿主若「接受写入但不保证唯一名次」，校验能抓到值未互换的
+ * 情况并报错，但规则可能已停在半交换态——此时重读整表即恢复真实视图，
+ * 用户可按提示重试或改用 WPS 原生规则管理器。
  */
 export function moveForeignRule(
   worksheet: WpsWorksheet | null | undefined,
@@ -305,16 +339,31 @@ export function moveForeignRule(
 ): { ok: true } | { ok: false; error: string } {
   const fc = getForeignCondition(worksheet, index)
   if (!fc) return { ok: false, error: '定位不到该规则（可能已被删除）' }
-  const setter = direction === -1 ? fc.SetFirstPriority : fc.SetLastPriority
-  if (typeof setter !== 'function') {
-    return { ok: false, error: '当前 WPS 版本不支持调整规则优先级' }
+  const neighbor = getForeignCondition(worksheet, index + direction)
+  if (!neighbor) {
+    return {
+      ok: false,
+      error: direction === -1 ? '已经是优先级最高的规则' : '已经是优先级最低的规则',
+    }
+  }
+  const ownPriority = readPriority(fc)
+  const neighborPriority = readPriority(neighbor)
+  if (ownPriority === null || neighborPriority === null) {
+    return { ok: false, error: '当前 WPS 版本读不到规则优先级，无法调整顺序' }
   }
   try {
-    setter.call(fc)
-    return { ok: true }
+    // 两条都写：不依赖宿主是否在首次写入后自动重排（自动重排的宿主第二次
+    // 写的是同值，无害；不重排的宿主靠这两行完成互换）
+    fc.Priority = neighborPriority
+    neighbor.Priority = ownPriority
   } catch (error: unknown) {
-    return { ok: false, error: (error as Error).message }
+    return { ok: false, error: `调整失败：${(error as Error).message}` }
   }
+  // 回读校验：写入被静默忽略时值不会变
+  if (readPriority(fc) !== neighborPriority || readPriority(neighbor) !== ownPriority) {
+    return { ok: false, error: '当前 WPS 版本不支持逐格调整优先级（写入未生效）' }
+  }
+  return { ok: true }
 }
 
 /**

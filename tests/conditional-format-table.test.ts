@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   FOREIGN_RULE_PAGE_SIZE,
+  buildForeignRuleGroupsHtml,
   buildForeignRuleHeadHtml,
   buildForeignRuleRowHtml,
   columnNumberOf,
@@ -31,6 +32,7 @@ import {
 } from '../ts/panel/conditional-format-table.js'
 import type { ForeignRuleRow } from '../ts/panel/conditional-format-table.js'
 import type { ForeignRuleSnapshot } from '../ts/panel/conditional-format-rules.js'
+import { snapshotGroupKey } from '../ts/panel/conditional-format-rules.js'
 
 /** 造一条快照的便捷工厂（只覆盖被测字段，其余用默认值） */
 function snapshot(overrides: Partial<ForeignRuleSnapshot> = {}): ForeignRuleSnapshot {
@@ -92,6 +94,7 @@ describe('toForeignRuleRows', () => {
 describe('buildForeignRuleRowHtml', () => {
   const baseRow: ForeignRuleRow = {
     index: 3,
+    groupKey: '=$R3="26年10月"\u0000$B$3:$B$26958',
     typeLabel: '公式',
     rebuildable: true,
     selected: false,
@@ -153,6 +156,7 @@ describe('formatSwatchHtml', () => {
   it('填充色与字体色都在（WPS 只显示填充）', () => {
     const html = formatSwatchHtml({
       index: 1,
+      groupKey: '\u0000A1',
       typeLabel: '公式',
       rebuildable: true,
       selected: false,
@@ -169,6 +173,7 @@ describe('formatSwatchHtml', () => {
   it('读不到颜色时用斜纹占位（不是空白，用户看得出「没读到」）', () => {
     const html = formatSwatchHtml({
       index: 1,
+      groupKey: '\u0000A1',
       typeLabel: '公式',
       rebuildable: true,
       selected: false,
@@ -381,5 +386,99 @@ describe('filterRowsByScope', () => {
 
   it('读不到选区时按整表返回（不能把表清空）', () => {
     expect(filterRowsByScope(rows, 'selection', '')).toHaveLength(2)
+  })
+})
+
+// ========== 既有规则本地分组（buildForeignRuleGroupsHtml）==========
+
+/** 两条同组 + 一条异组的快照（组名 = 自动聚类产出的公式模式） */
+function groupFixtures(): { rows: ForeignRuleRow[]; groups: Record<string, string> } {
+  const a = snapshot({ range: 'J2:J9', formula: '=$J2="饮品"' })
+  const b = snapshot({ range: 'J2:J9', formula: '=$J2="大区"' })
+  const c = snapshot({ range: 'K2:K9', formula: '=$K2<>""' })
+  const rows = toForeignRuleRows([a, b, c])
+  return {
+    rows,
+    groups: {
+      [snapshotGroupKey(a)]: '=$J2="*"',
+      [snapshotGroupKey(b)]: '=$J2="*"',
+      [snapshotGroupKey(c)]: '=$K2="*"',
+    },
+  }
+}
+
+describe('buildForeignRuleGroupsHtml', () => {
+  it('组序 = 组内首条规则出现序；组标题带收起钮 + 计数 + 组级操作', () => {
+    const { rows, groups } = groupFixtures()
+    const html = buildForeignRuleGroupsHtml(rows, groups, new Set())
+    // 组名走 escapeHtml（" → &quot;），按转义后的形态定位
+    const first = html.indexOf('data-group="=$J2=&quot;*&quot;"')
+    const second = html.indexOf('data-group="=$K2=&quot;*&quot;"')
+    expect(first).toBeGreaterThan(-1)
+    expect(second).toBeGreaterThan(-1)
+    expect(first).toBeLessThan(second)
+    expect(html).toContain('data-action="toggle-existing-group"')
+    expect(html).toContain('data-action="rename-existing-group"')
+    expect(html).toContain('data-action="dissolve-existing-group"')
+    expect(html).toContain('<span class="conditional-format-group-count">2</span>')
+    expect(html).toContain('<span class="conditional-format-group-count">1</span>')
+  })
+
+  it('收起契约：collapsed 里的组输出 is-collapsed + ▸ + aria-expanded=false', () => {
+    const { rows, groups } = groupFixtures()
+    const html = buildForeignRuleGroupsHtml(rows, groups, new Set(['=$J2="*"']))
+    // CSS 靠 .conditional-format-group.is-collapsed 藏行（.conditional-format-row），
+    // HTML 侧必须把类名与展开态如实输出——这个契约断过一次（收起完全没反应）
+    expect(html).toContain('conditional-format-existing-group is-collapsed')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('>▸</button>')
+    // 行仍然渲染（折叠只靠 CSS 藏）：计数仍说得通
+    expect(html.match(/conditional-format-row-head/g)).toBeNull()
+    expect(html).toContain('data-row-index="1"')
+  })
+
+  it('未收起的组输出 ▾ + aria-expanded=true', () => {
+    const { rows, groups } = groupFixtures()
+    const html = buildForeignRuleGroupsHtml(rows, groups, new Set())
+    expect(html).toContain('aria-expanded="true"')
+    expect(html).toContain('>▾</button>')
+    expect(html).not.toContain('is-collapsed')
+  })
+
+  it('未分组恒排最后（用户主动归的组先看到）', () => {
+    const rows = toForeignRuleRows([
+      snapshot({ range: 'A1', formula: '=1' }),
+      snapshot({ range: 'B1', formula: '=2' }),
+    ])
+    const html = buildForeignRuleGroupsHtml(rows, {}, new Set())
+    expect(html.indexOf('未分组')).toBeGreaterThan(-1)
+    // 两条都没归组 → 只有一个「未分组」组，且在文档中唯一
+    expect(html.match(/data-group="未分组"/g)).toHaveLength(1)
+  })
+
+  it('组名转义：公式模式串含引号也不破 attribute', () => {
+    const row = toForeignRuleRows([snapshot({ range: 'J2:J9', formula: '=$J2="x"' })])
+    const html = buildForeignRuleGroupsHtml(
+      row,
+      { [snapshotGroupKey(row[0]!)]: '=$J2="*"' },
+      new Set(),
+    )
+    expect(html).toContain('data-group="=$J2=&quot;*&quot;"')
+  })
+})
+
+describe('分组 key 口径（渲染层与存储层一致）', () => {
+  it('范围读不到的规则也能归组：groupKey 用原始范围，不用显示兜底串', () => {
+    // 读不到范围时行上 range 是「（未读到范围）」，映射却用原始 '' 存——
+    // 拿兜底串现算 key 永远命中不了，规则会死死掉进「未分组」
+    const noRange = snapshot({ range: '', formula: '=$A1>1' })
+    const rows = toForeignRuleRows([noRange])
+    const html = buildForeignRuleGroupsHtml(
+      rows,
+      { [snapshotGroupKey(noRange)]: '我的组' },
+      new Set(),
+    )
+    expect(html).toContain('data-group="我的组"')
+    expect(html).not.toContain('data-group="未分组"')
   })
 })

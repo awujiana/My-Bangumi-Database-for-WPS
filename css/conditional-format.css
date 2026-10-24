@@ -136,6 +136,39 @@
   font-size: 12px;
 }
 
+/* 组标题的组级操作：✎ 重命名 / ✕ 解散（见 buildForeignRuleGroupsHtml）。
+   常显但低调（--text-3）：只靠 hover 才出现的按钮用户找不到——
+   「不能手动命名分组」的反馈正说明入口必须可见。 */
+.conditional-format-group-edit,
+.conditional-format-group-remove {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.conditional-format-group-edit:hover,
+.conditional-format-group-remove:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
+.conditional-format-group-remove:hover {
+  color: var(--danger, #ef4444);
+}
+
+/* 组级操作推右：名称 + 计数靠左，✎/✕ 靠右（不挤占组名） */
+.conditional-format-existing-group .conditional-format-group-edit {
+  margin-left: auto;
+}
+
 /* 行内可编辑单元格（应用于 / 公式）：hover 给底色提示可点，点击原地变输入框 */
 .conditional-format-cell-editable {
   cursor: pointer;
@@ -157,8 +190,12 @@
   font-size: 12px;
 }
 
-/* 分组折叠：只藏规则行，标题与计数仍在——用户看得见「这组有多少条、收起着」 */
-.conditional-format-group.is-collapsed .conditional-format-rule {
+/* 分组折叠：只藏规则行，标题与计数仍在——用户看得见「这组有多少条、收起着」。
+   **两个行类都要藏**：规则库列表的行是 .conditional-format-rule，既有规则
+   表格的行是 .conditional-format-row。曾只写前者 → 表格分组的收起完全没反应
+   （2026-10-24 用户实测：既有规则分组点 ▾ 不收起）。 */
+.conditional-format-group.is-collapsed .conditional-format-rule,
+.conditional-format-group.is-collapsed .conditional-format-row {
   display: none;
 }
 
@@ -265,6 +302,13 @@
 .conditional-format-rule-actions button:hover {
   background: var(--bg-surface-2);
   color: var(--text-1);
+}
+
+/* ---- 模态框标题栏 = 拖动把手（见 ts/ui/components/modal-drag.ts）---- */
+.conditional-format-modal-grip {
+  cursor: move;
+  user-select: none;
+  touch-action: none;
 }
 
 /* ---- 规则编辑器（浮动弹窗）---- */
@@ -385,8 +429,12 @@
 
 .conditional-format-color-row {
   display: flex;
+  /* 必须可换行：两个颜色字段（选择器 48 + 文本 92）+ 加粗框并排约 400px，
+     窄任务窗格（<430px）下不换行就溢出模态框宽度 → 横向滚动条 +
+     「显示不全」（2026-10-24 用户实测）。换行后加粗框落到第二行，内容全可见。 */
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--sp-4);
+  gap: var(--sp-2) var(--sp-4);
 }
 
 /* 颜色字段三件套：原生选择器 + 十六进制文本 + 吸管（见 bindColorField） */
@@ -533,6 +581,16 @@
 .conditional-format-modal-actions .bgm-btn {
   flex: 1;
   min-width: 100px;
+}
+
+/* 弹窗里的次级按钮（取消 / 全不选 / 保留手工规则）补描边。
+   .bgm-btn 基类的描边是 transparent（panel-theme.css 第 6 节），只有
+   .primary / .warning / .success / .danger 变体设了可见 border-color——
+   深色主题下「取消」是一抹纯色块，与带描边的「保存」并排时轻重失衡
+   （2026-10-24 用户实测：「取消按钮描边没有」）。
+   只补本页弹窗内的次级按钮，不动全局按钮语言（工具条按钮维持原样）。 */
+.conditional-format-modal-mask .bgm-btn.small:not(.primary, .danger, .warning, .success) {
+  border-color: var(--border-strong);
 }
 
 /* =====================================================================

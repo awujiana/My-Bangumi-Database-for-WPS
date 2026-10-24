@@ -349,6 +349,52 @@ export function autoClusterGroups(
   return groups
 }
 
+// ===== 既有规则分组的维护（纯函数：页面层只负责持久化与重渲染）=====
+
+/**
+ * 重命名一个既有规则分组（映射里所有值为 oldName 的键改值为 newName）
+ *
+ * 按**组名**改而不是按 key 改：用户视角的分组单位是组名，一键改名要作用于
+ * 组内全部规则。规则本身不动（分组只是视图层映射，不写工作表）。
+ *
+ * @returns 新映射；oldName 不存在（或新旧同名）时返回 null —— 调用方 toast
+ *   说明，不静默返回原映射假装成功
+ */
+export function renameGroupMapping(
+  groups: Readonly<Record<string, string>>,
+  oldName: string,
+  nextName: string,
+): Record<string, string> | null {
+  if (nextName === '' || nextName === oldName) return null
+  if (!Object.values(groups).includes(oldName)) return null
+  const renamed: Record<string, string> = {}
+  for (const [key, value] of Object.entries(groups)) {
+    renamed[key] = value === oldName ? nextName : value
+  }
+  return renamed
+}
+
+/**
+ * 解散一个既有规则分组（删掉映射里所有值为 name 的条目）
+ *
+ * 不用 `delete groups[key]`：no-dynamic-delete 禁动态键删除，filter 重建一份
+ * 更直白（与 migrateExistingGroupKey 同口径）。解散后这些规则回「未分组」桶，
+ * **不会**从工作表删除任何规则。
+ *
+ * @returns 新映射；name 不存在时返回 null（调用方 toast，不静默成功）
+ */
+export function dissolveGroupMapping(
+  groups: Readonly<Record<string, string>>,
+  name: string,
+): Record<string, string> | null {
+  if (!Object.values(groups).includes(name)) return null
+  const next: Record<string, string> = {}
+  for (const [key, value] of Object.entries(groups)) {
+    if (value !== name) next[key] = value
+  }
+  return next
+}
+
 // ===== 搜索 / 分组 =====
 
 /** 搜索：名称 / 公式 / 范围 / 分组，大小写不敏感子串 */

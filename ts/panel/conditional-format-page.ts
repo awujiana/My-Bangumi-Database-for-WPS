@@ -29,6 +29,7 @@ import {
   IMPORTED_RULE_GROUP,
   autoClusterGroups,
   buildDefaultRules,
+  dissolveGroupMapping,
   filterRules,
   firstRowOfRange,
   foreignSnapshotToRule,
@@ -37,6 +38,7 @@ import {
   parseExistingGroups,
   parseRules,
   planApply,
+  renameGroupMapping,
   serializeExistingGroups,
   serializeRules,
   shiftFormulaRows,
@@ -61,6 +63,11 @@ import {
   toggleSelection,
 } from './conditional-format-table.js'
 import { enterSoloMode } from '../tools/module-state.js'
+import {
+  bindModalDrag,
+  bringModalIntoView,
+  resetModalPosition,
+} from '../ui/components/modal-drag.js'
 import {
   applyConditionalFormatPlan,
   checkFormatConditionsReadable,
@@ -156,6 +163,12 @@ interface PageState {
   existingGroups: Record<string, string>
   /** 既有规则表格里被收起的分组名（会话态，同规则库 collapsedGroups） */
   existingGroupCollapsed: Set<string>
+  /**
+   * 组名弹窗的「重命名模式」：非 null = 正在把该分组的全部规则换组名
+   * （从组标题 ✎ 进入）；null = 常规「勾选行归入分组」模式（批量条进入）。
+   * 两个模式共用同一个弹窗，靠这个字段在 confirmGroupName 里分流。
+   */
+  renamingGroup: string | null
   /** 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing） */
   importForeignRules: ForeignRuleSnapshot[]
   /** 导入弹框里的勾选集（1 基序号，口径同 existingSelection） */
@@ -180,6 +193,7 @@ const state: PageState = {
   existingScope: 'all',
   existingGroups: {},
   existingGroupCollapsed: new Set<string>(),
+  renamingGroup: null,
   importForeignRules: [],
   importSelection: new Set<number>(),
   collapsedGroups: new Set<string>(),
@@ -554,6 +568,22 @@ function handleExistingTableClick(event: MouseEvent): void {
     return
   }
 
+  // 组标题 ✎：重命名整组（弹窗预填旧组名，确认后组内全部规则换组名）
+  const renameGroupButton = target.closest<HTMLElement>('[data-action="rename-existing-group"]')
+  if (renameGroupButton) {
+    const group = renameGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') openRenameGroupModal(group)
+    return
+  }
+
+  // 组标题 ✕：解散整组（规则回「未分组」，不从工作表删除）
+  const dissolveGroupButton = target.closest<HTMLElement>('[data-action="dissolve-existing-group"]')
+  if (dissolveGroupButton) {
+    const group = dissolveGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') dissolveExistingGroupLocal(group)
+    return
+  }
+
   // 行内编辑：点「应用于 / 公式」单元格原地变输入框（momo：要能直接改）。
   // 放在 button 分支之前：这两个单元格不是 button，走 button 分支会直接 return。
   const editable = target.closest<HTMLElement>('.conditional-format-cell-editable')
@@ -623,7 +653,7 @@ function handleBatchAction(action: string): void {
 }
 
 /**
- * 打开「归入分组」组名输入弹窗
+ * 打开「归入分组」组名输入弹窗（批量条入口：作用于勾选的行）
  *
  * 预填：所选规则已全部属于同一组时，把该组名填进去（改名场景直接改）；
  * 跨组多选时留空（用户要输新名）。
@@ -639,34 +669,102 @@ function openGroupNameModal(): void {
       if (group !== undefined) names.add(group)
     }
   }
+  state.renamingGroup = null
   const input = inputById('conditionalFormatGroupName')
   if (input) {
     const onlyName = names.size === 1 ? names.values().next().value : undefined
     input.value = typeof onlyName === 'string' ? onlyName : ''
   }
-  setText('conditionalFormatGroupCount', String(indices.length))
+  setText('conditionalFormatGroupTitle', '归入分组')
+  setText(
+    'conditionalFormatGroupHint',
+    `把所选的 ${String(indices.length)} 条规则归入同一分组。分组只影响本页展示（可收起展开），并会在导入规则库时作为组名带过去。`,
+  )
+  showGroupNameMask()
+  input?.focus()
+}
+
+/**
+ * 打开「重命名分组」弹窗（组标题 ✎ 入口：作用于组内全部规则）
+ *
+ * 与「归入分组」共用弹窗 DOM，靠 state.renamingGroup 分流；预填旧组名，
+ * 计数给**整组**规则数（不是当前可见行数——搜索过滤不改变分组全集）。
+ */
+function openRenameGroupModal(group: string): void {
+  const count = Object.values(state.existingGroups).filter((value) => value === group).length
+  if (count === 0) {
+    showToast('分组不存在，可能已被解散', 'warn')
+    return
+  }
+  state.renamingGroup = group
+  const input = inputById('conditionalFormatGroupName')
+  if (input) input.value = group
+  setText('conditionalFormatGroupTitle', '重命名分组')
+  setText(
+    'conditionalFormatGroupHint',
+    `分组「${group}」下有 ${String(count)} 条规则，将全部改用新组名。分组只影响本页展示，不会改写工作表。`,
+  )
+  showGroupNameMask()
+  input?.focus()
+}
+
+/** 显示组名弹窗（锚定 + 锁定背景滚动 + 拉回可见区，三个模态框同口径） */
+function showGroupNameMask(): void {
   const mask = byId('conditionalFormatGroupMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
+    if (modal) resetModalPosition(modal)
     anchorModalMask(mask)
     mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
   }
   lockModalScroll()
-  input?.focus()
 }
 
 function closeGroupNameModal(): void {
   const mask = byId('conditionalFormatGroupMask')
   if (mask) mask.style.display = 'none'
+  state.renamingGroup = null
   unlockModalScroll()
 }
 
-/** 确定归组：写映射 → 持久化 → 重渲染（组名会随导入带进规则库） */
+/**
+ * 确定归组 / 重命名：写映射 → 持久化 → 重渲染（组名会随导入带进规则库）
+ *
+ * 两条路径由 state.renamingGroup 分流：
+ * - 重命名模式：renameGroupMapping 按**组名**换掉组内全部规则的组名；
+ * - 归组模式：把勾选的序号写进映射（原行为）。
+ */
 function confirmGroupName(): void {
   const name = inputById('conditionalFormatGroupName')?.value.trim() ?? ''
   if (name === '') {
     showToast('分组名不能为空', 'warn')
     return
   }
+
+  if (state.renamingGroup !== null) {
+    // 先取局部常量：state.renamingGroup 是可变属性，TS 的窄化不会传进下面的
+    // 闭包（filter 回调里又变成 string | null）；closeGroupNameModal 也会把它清空
+    const oldName = state.renamingGroup
+    const renamed = renameGroupMapping(state.existingGroups, oldName, name)
+    if (renamed === null) {
+      closeGroupNameModal()
+      showToast('分组不存在，可能已被解散', 'warn')
+      return
+    }
+    state.existingGroups = renamed
+    persistExistingGroups()
+    // 折叠集合里的旧名作废（新组默认展开）：不清的话下次渲染旧名永远
+    // 匹配不上，用户点展开也没反应
+    state.existingGroupCollapsed = new Set(
+      [...state.existingGroupCollapsed].filter((group) => group !== oldName),
+    )
+    closeGroupNameModal()
+    renderExistingRules()
+    showToast(`分组已重命名为「${name}」`, 'success')
+    return
+  }
+
   const indices = [...state.existingSelection].sort((a, b) => a - b)
   const groups = { ...state.existingGroups }
   let count = 0
@@ -682,6 +780,27 @@ function confirmGroupName(): void {
   closeGroupNameModal()
   renderExistingRules()
   showToast(`已把 ${String(count)} 条规则归入「${name}」`, 'success')
+}
+
+/**
+ * 解散一个分组（组标题 ✕ 入口）
+ *
+ * 只清视图层映射：组内规则回「未分组」桶，**不从工作表删除任何规则**
+ * （dissolveGroupMapping 的语义，弹窗标题/按钮文案都要说清）。
+ */
+function dissolveExistingGroupLocal(group: string): void {
+  const next = dissolveGroupMapping(state.existingGroups, group)
+  if (next === null) {
+    showToast('分组不存在，可能已被解散', 'warn')
+    return
+  }
+  state.existingGroups = next
+  persistExistingGroups()
+  state.existingGroupCollapsed = new Set(
+    [...state.existingGroupCollapsed].filter((collapsed) => collapsed !== group),
+  )
+  renderExistingRules()
+  showToast(`已解散分组「${group}」，规则回「未分组」`, 'success')
 }
 
 /**
@@ -806,8 +925,8 @@ function currentSelectionRange(): string {
  * 批量调整所选规则优先级
  *
  * ⚠️ **必须倒序**（与批量删除同理）：移动会改变其余规则的下标，正序走着就错位。
- * 每次只移动一格：`-1` = 把所选规则逐条顶到最高优先级，`+1` = 逐条压到最低。
- * 跨多条的精确排序需要反复重排，代价高且易错，先不做。
+ * moveForeignRule 现在是真正的「相邻交换一格」，倒序逐条调 = 每条各自上/下移
+ * 一格（多条同时穿越同一位置的精确排序需要反复重排，代价高且易错，先不做）。
  */
 function batchMoveForeignRules(direction: -1 | 1): void {
   const entry = selectedSheet()
@@ -1467,9 +1586,16 @@ function openEditor(id: string | null, isNew: boolean): void {
   setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
   if (boldInput) boldInput.checked = rule.fontBold === true
   const mask = byId('conditionalFormatEditorMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
+    // 每次打开都回到遮罩居中位：不记住上次拖动的位置——模态框是一次性交互，
+    // 记住旧位置只会让用户在老地方找一个刚打开的框
+    if (modal) resetModalPosition(modal)
     anchorModalMask(mask)
     mask.style.display = 'flex'
+    // 打开后拉回可见区：页面滚动后模态框会落在可见区外（实测标题栏被切半个），
+    // 量一次、越界就滚回来并重锚遮罩（见 modal-drag.ts 注释）
+    if (modal) bringModalIntoView(mask, modal)
   }
   lockModalScroll()
   setText('conditionalFormatEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
@@ -1628,8 +1754,11 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
     keepButton.textContent = last === 'append-after' ? '保留手工规则（上次选择）' : '保留手工规则'
   }
   // mask 在函数入口已判非 null（!mask || !body 早退），直接用
+  const modal = mask.querySelector<HTMLElement>('.conditional-format-modal')
+  if (modal) resetModalPosition(modal)
   anchorModalMask(mask)
   mask.style.display = 'flex'
+  if (modal) bringModalIntoView(mask, modal)
   lockModalScroll()
   clearButton?.focus()
 }
@@ -1710,9 +1839,12 @@ function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: s
   setText('conditionalFormatImportSheet', sheetName)
   renderImportList()
   const mask = byId('conditionalFormatImportMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
+    if (modal) resetModalPosition(modal)
     anchorModalMask(mask)
     mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
   }
   lockModalScroll()
 }
@@ -1941,6 +2073,22 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatEditorMask')?.addEventListener('click', (event) => {
     if (event.target === byId('conditionalFormatEditorMask')) closeEditor()
   })
+
+  // 四个模态框统一补「拖标题栏移动」：窄任务窗格 / 宿主滚动模型各异时，
+  // 遮罩居中的模态框可能落在可见区外，用户此前没有任何办法移动它
+  // （把手 = 各自 h4 标题，class conditional-format-modal-grip 给抓手光标）
+  const MODAL_DRAG_TARGETS: readonly (readonly [string, string])[] = [
+    ['conditionalFormatEditorMask', 'conditionalFormatEditorTitle'],
+    ['conditionalFormatImportMask', 'conditionalFormatImportTitle'],
+    ['conditionalFormatGroupMask', 'conditionalFormatGroupTitle'],
+    ['conditionalFormatConfirmMask', 'conditionalFormatConfirmTitle'],
+  ]
+  for (const [maskId, titleId] of MODAL_DRAG_TARGETS) {
+    const mask = byId(maskId)
+    const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
+    const grip = byId(titleId)
+    if (modal && grip) bindModalDrag({ modal, grip })
+  }
 
   // 颜色字段：选择器 / 十六进制手输 / 吸管三边联动（吸管按钮不支持时保持隐藏）
   for (const field of COLOR_FIELDS) {

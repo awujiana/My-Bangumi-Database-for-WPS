@@ -50,6 +50,15 @@ export function fcTypeLabel(type: number | undefined, kind: 'expression' | 'othe
 export interface ForeignRuleRow {
   /** 1 基序号，即优先级（靠前先生效）；同时是 COM 层 Item() 的下标 */
   index: number
+  /**
+   * 分组映射的查找键（= snapshotGroupKey(快照)，公式 \0 原始范围）
+   *
+   * ⚠️ 不能用行上的 `range` 字段现算：那个字段读不到范围时是**显示兜底**
+   * 「（未读到范围）」，而分组映射（existingGroups）是用**原始**范围存的——
+   * 拿兜底串算 key 永远命中不了，范围读不到的规则会死死掉进「未分组」，
+   * 归组 / 重命名对它全部静默失效（2026-10-24 修：渲染层与存储层的 key 口径统一）。
+   */
+  groupKey: string
   /** 类型中文标签 */
   typeLabel: string
   /** 插件能否按原样重建（false = 数据条 / 图标集等，导入时会说明） */
@@ -82,6 +91,7 @@ export function toForeignRuleRows(
     const index = position + 1
     return {
       index,
+      groupKey: snapshotGroupKey(snapshot),
       typeLabel: fcTypeLabel(snapshot.type, snapshot.kind),
       rebuildable: snapshot.kind === 'expression',
       ...(snapshot.interior !== undefined && { fillColor: snapshot.interior }),
@@ -367,6 +377,10 @@ export function buildForeignRuleHeadHtml(isAllSelected = false): string {
  * 标题复用规则库分组的 class（group-title / group-toggle / group-count），
  * 两处观感天然一致；折叠只藏行、计数仍在（看得出这组有多少条）。
  *
+ * 标题上除收起钮外还有两个组级操作：✎ 重命名（组内全部规则换组名）、
+ * ✕ 解散（映射清除，规则回「未分组」）——只靠「先勾行再找批量条」的归组
+ * 入口不符合「看到组标题就能改组名」的心智（2026-10-24 用户实测反馈）。
+ *
  * @param groups snapshotGroupKey → 组名（页面层从 PluginStorage 读出）
  * @param collapsed 被收起的分组名集合（会话态）
  */
@@ -377,7 +391,9 @@ export function buildForeignRuleGroupsHtml(
 ): string {
   const buckets = new Map<string, ForeignRuleRow[]>()
   for (const row of rows) {
-    const group = groups[snapshotGroupKey(row)] ?? UNGROUPED_LABEL
+    // 用行上预计算的 groupKey（原始公式@范围），不用 row.range 现算——
+    // 后者读不到范围时是显示兜底串，与映射的存储 key 对不上
+    const group = groups[row.groupKey] ?? UNGROUPED_LABEL
     const bucket = buckets.get(group)
     if (bucket) bucket.push(row)
     else buckets.set(group, [row])
@@ -397,6 +413,8 @@ export function buildForeignRuleGroupsHtml(
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-existing-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(groupRows.length)}</span>
+          <button type="button" class="conditional-format-group-edit" data-action="rename-existing-group" title="重命名分组（组内全部规则改用新组名）">✎</button>
+          <button type="button" class="conditional-format-group-remove" data-action="dissolve-existing-group" title="解散分组（规则回「未分组」，不从工作表删除）">✕</button>
         </div>
         ${groupRows.map((row) => buildForeignRuleRowHtml(row)).join('')}
       </div>`
