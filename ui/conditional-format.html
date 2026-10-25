@@ -478,10 +478,16 @@
         </div>
 
         <!--
-          粘贴规则确认框（可拖动 + 可收起）
+          粘贴规则确认框（可拖动 + ⛶ 最大化 + 缩放 + ▾ 收起）
           标题栏是拖动把手（conditional-format-modal-grip + bindModalDrag），
           ▾ 收起成只剩标题栏一行（bindModalCollapse，与浮动窗同范式）——
           momo：确定/取消贴输入框太近、框不能动不能收。
+
+          定位一律用 **absolute**（相对遮罩），不用 fixed：本宿主对 fixed 的
+          包含块解析不是视口（遮罩曾用 fixed 时「弹窗出现在页面上方、窗口外」），
+          一拖动/最大化就飞出可见区，而遮罩黑层还留在页面上。拖完与最大化后
+          各做一次出界自检（ensureModalVisible），真出界就复位；另外双击标题栏
+          可手动复位。
         -->
         <div
           class="conditional-format-modal-mask"
