@@ -341,11 +341,45 @@
   color: var(--text-1);
 }
 
-/* ---- 模态框标题栏 = 拖动把手（见 ts/ui/components/modal-drag.ts）---- */
+/* ---- 模态框标题栏 = 拖动把手（见 ts/ui/components/modal-drag.ts）----
+   flex 排布：标题文字占左，⛶ 最大化 / ▾ 收起（window-chrome）顶到最右 */
 .conditional-format-modal-grip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1, 4px);
   cursor: move;
   user-select: none;
   touch-action: none;
+}
+
+/* 标题栏里的第一个窗口按钮（⛶）顶到最右，▾ 跟在其后 */
+.conditional-format-modal-grip > button:first-of-type {
+  margin-left: auto;
+}
+
+/* 模态框缩放把手（window-chrome 的 bindModalResize）：右下角，拖动改宽高。
+   模态框默认是遮罩 flex 居中的子项，absolute 把手要有个定位祖先 → relative。 */
+.conditional-format-modal {
+  position: relative;
+}
+
+.conditional-format-modal-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* 视觉三角：两条边线 + 圆角随卡片 */
+  border-right: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  border-bottom-right-radius: var(--r-lg);
+  z-index: 1;
+}
+
+.conditional-format-modal-resize:hover {
+  border-color: var(--text-3);
 }
 
 /* 行可拖拽排序（sortable-list）：行主体给抓手光标，按钮/输入/可编辑单元格除外 */
@@ -948,9 +982,10 @@
   width: min(460px, calc(100vw - 32px));
 }
 
-/* 标题栏右侧的收起按钮（▾/▸）：与浮动窗 / 模块折叠按钮同范式 */
-.conditional-format-modal-collapse {
-  float: right;
+/* 标题栏右侧的窗口按钮（⛶ 最大化 / ▾ 收起）：与浮动窗 / 模块折叠按钮同范式 */
+.conditional-format-modal-collapse,
+.conditional-format-modal-max {
+  flex: 0 0 auto;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -963,18 +998,34 @@
   cursor: pointer;
 }
 
-.conditional-format-modal-collapse:hover {
+.conditional-format-modal-collapse:hover,
+.conditional-format-modal-max:hover {
   color: var(--text-1);
   background: var(--bg-surface-2);
 }
 
-/* 收起态：只留标题栏一行（hint / 输入框 / 按钮全藏）——与 detachable-panel
-   浮动窗的收起同语义（momo：范围看完先收起来，别一直挡着表格）。
+/* 收起态：只留标题栏一行——除标题栏（h4.grip）外的直接子元素全藏。
+   通用规则替代旧的逐类枚举（hint / input / actions）：编辑器表单、导入
+   列表、确认正文各自的类名不同，枚举漏一个就是「收起了还赖着半截」。
    拖过的 fixed 位置不受影响，展开后还在原处。 */
-.conditional-format-modal.is-collapsed .conditional-format-import-hint,
-.conditional-format-modal.is-collapsed .conditional-format-input,
-.conditional-format-modal.is-collapsed .conditional-format-modal-actions {
+.conditional-format-modal.is-collapsed > :not(.conditional-format-modal-grip) {
   display: none;
+}
+
+/* 缩放 / 最大化后（is-resized / is-maximized，window-chrome 挂）：导入列表
+   从「定高滚动」切成「吃满剩余高度」——放大才有意义；默认尺寸保持
+   max-height 定高（38 条以内在卡片内滚，按钮不滚出视野）。 */
+.conditional-format-modal--import.is-resized,
+.conditional-format-modal--import.is-maximized {
+  display: flex;
+  flex-direction: column;
+}
+
+.conditional-format-modal--import.is-resized .conditional-format-import-list,
+.conditional-format-modal--import.is-maximized .conditional-format-import-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: none;
 }
 
 /* 粘贴框按钮：小 + 右对齐不拉伸 + 与输入框保持距离。
