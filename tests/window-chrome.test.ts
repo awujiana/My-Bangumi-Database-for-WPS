@@ -53,6 +53,35 @@ let modal: HTMLElement
 let handle: HTMLElement
 let maximizeButton: HTMLElement
 
+/**
+ * jsdom 无布局引擎：装一个随内联样式变化的假矩形（语义见 modal-drag.test.ts
+ * 的同名 helper）。promoteToModalLayer 的「置零测差」需要它——固定矩形会让
+ * 抬升后的偏移算成 0，测不出「保持视觉位置」这件事。
+ */
+function installRectMock(
+  element: HTMLElement,
+  base: { left: number; top: number; width: number; height: number },
+): void {
+  element.getBoundingClientRect = (): DOMRect => {
+    const isLayered = element.style.position === 'absolute' || element.style.position === 'fixed'
+    const left = isLayered ? Number(element.style.left) || 0 : base.left
+    const top = isLayered ? Number(element.style.top) || 0 : base.top
+    const width = Number(element.style.width) || base.width
+    const height = Number(element.style.height) || base.height
+    return {
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+      toJSON: (): string => '',
+    }
+  }
+}
+
 beforeEach(() => {
   document.body.replaceChildren()
   modal = document.createElement('div')
@@ -61,8 +90,7 @@ beforeEach(() => {
   modal.append(handle, maximizeButton)
   document.body.append(modal)
   // 非零基准矩形（jsdom 默认全 0）
-  modal.getBoundingClientRect = () =>
-    ({ top: 50, bottom: 250, left: 100, right: 400, width: 300, height: 200 }) as DOMRect
+  installRectMock(modal, { left: 100, top: 50, width: 300, height: 200 })
   bindModalResize({ modal, handle })
   bindModalMaximize({ modal, button: maximizeButton })
 })
@@ -90,38 +118,40 @@ describe('bindModalResize：缩放把手', () => {
     expect(modal.style.getPropertyValue('height')).toBe('120px')
   })
 
-  it('放大到撞视口即停：上界 = 视口 - left/top - 8px 留隙', async () => {
+  it('放大到撞定位层边界即停：上界 = 层宽/高 - left/top', async () => {
     pointer(handle, 'pointerdown', 10, 10)
     pointer(window, 'pointermove', 5000, 5000)
     await nextFrames()
     pointer(window, 'pointerup', 5000, 5000)
 
-    // left=100, top=50：宽 = 1024-100-8 = 916，高 = 768-50-8 = 710
-    expect(modal.style.getPropertyValue('width')).toBe('916px')
-    expect(modal.style.getPropertyValue('height')).toBe('710px')
+    // 抬升后 left=100 / top=50：宽 = 1024-100 = 924，高 = 768-50 = 718
+    expect(modal.style.getPropertyValue('width')).toBe('924px')
+    expect(modal.style.getPropertyValue('height')).toBe('718px')
   })
 
-  it('缩放起点把静态模态框抬升为 fixed（基准几何 = 当前视口矩形）', async () => {
+  it('缩放起点把静态模态框抬升为 absolute 定位层（视觉位置不变）', async () => {
     expect(modal.style.getPropertyValue('position')).toBe('')
     pointer(handle, 'pointerdown', 10, 10)
     pointer(window, 'pointerup', 10, 10)
 
-    expect(modal.style.getPropertyValue('position')).toBe('fixed')
+    // 宿主下 fixed 会被摆到文档坐标 → 一律用 absolute（与遮罩锚定同基准）
+    expect(modal.style.getPropertyValue('position')).toBe('absolute')
     expect(modal.style.getPropertyValue('left')).toBe('100px')
     expect(modal.style.getPropertyValue('top')).toBe('50px')
   })
 })
 
 describe('bindModalMaximize：最大化 / 还原', () => {
-  it('⛶ 最大化：fixed + 铺满视口（留 8px 空隙）', () => {
+  it('⛶ 最大化：absolute + 铺满定位层（= 遮罩锚定的当前可见区）', () => {
     maximizeButton.click()
 
     expect(modal.classList.contains(MODAL_MAXIMIZED_CLASS)).toBe(true)
-    expect(modal.style.getPropertyValue('position')).toBe('fixed')
-    expect(modal.style.getPropertyValue('left')).toBe('8px')
-    expect(modal.style.getPropertyValue('top')).toBe('8px')
-    expect(modal.style.getPropertyValue('width')).toBe('1008px')
-    expect(modal.style.getPropertyValue('height')).toBe('752px')
+    expect(modal.style.getPropertyValue('position')).toBe('absolute')
+    // 铺满定位层：不读 window.inner*（宿主下会失真成整份文档高 → 弹窗撑没）
+    expect(modal.style.getPropertyValue('left')).toBe('0px')
+    expect(modal.style.getPropertyValue('top')).toBe('0px')
+    expect(modal.style.getPropertyValue('width')).toBe('1024px')
+    expect(modal.style.getPropertyValue('height')).toBe('768px')
   })
 
   it('再点还原：没拖过/缩放过 → 内联几何清干净，回 CSS 居中', () => {
@@ -141,12 +171,34 @@ describe('bindModalMaximize：最大化 / 还原', () => {
     pointer(window, 'pointerup', 130, 90)
 
     maximizeButton.click()
-    expect(modal.style.getPropertyValue('width')).toBe('1008px')
+    expect(modal.style.getPropertyValue('width')).toBe('1024px')
     maximizeButton.click()
 
     // 回到缩放留下的 420×280（不是清空回 CSS 默认）
     expect(modal.style.getPropertyValue('width')).toBe('420px')
     expect(modal.style.getPropertyValue('height')).toBe('280px')
+  })
+
+  it('最大化后一量完全出界 → 当场还原（不留孤零零的黑遮罩）', () => {
+    // 宿主把定位解析到可见区之外的极端情况
+    modal.getBoundingClientRect = (): DOMRect => ({
+      left: 9000,
+      top: 9000,
+      width: 1024,
+      height: 768,
+      right: 10_024,
+      bottom: 9768,
+      x: 9000,
+      y: 9000,
+      toJSON: (): string => '',
+    })
+
+    maximizeButton.click()
+
+    expect(modal.classList.contains(MODAL_MAXIMIZED_CLASS)).toBe(false)
+    expect(maximizeButton.textContent).toBe('⛶')
+    expect(maximizeButton.getAttribute('aria-pressed')).toBe('false')
+    expect(modal.style.getPropertyValue('position')).toBe('')
   })
 
   it('最大化态拖标题是 no-op（先 ⛶ 还原再拖）', async () => {
@@ -160,9 +212,9 @@ describe('bindModalMaximize：最大化 / 还原', () => {
     await nextFrames()
     pointer(window, 'pointerup', 200, 200)
 
-    // left/top 还是最大化的 8px，没被拖走
-    expect(modal.style.getPropertyValue('left')).toBe('8px')
-    expect(modal.style.getPropertyValue('top')).toBe('8px')
+    // left/top 还是最大化的 0px，没被拖走
+    expect(modal.style.getPropertyValue('left')).toBe('0px')
+    expect(modal.style.getPropertyValue('top')).toBe('0px')
   })
 })
 

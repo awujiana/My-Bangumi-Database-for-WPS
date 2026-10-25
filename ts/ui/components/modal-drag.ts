@@ -32,7 +32,13 @@
  *   能力层）；本模块只保留拖动与拉回可见区这两个遮罩模态框特有能力。
  */
 
-import { MODAL_MAXIMIZED_CLASS, suppressPostDragClick } from './window-chrome.js'
+import {
+  MODAL_MAXIMIZED_CLASS,
+  ensureModalVisible,
+  modalLayerSize,
+  promoteToModalLayer,
+  suppressPostDragClick,
+} from './window-chrome.js'
 
 /** 横向露头时至少保留的可抓宽度（px）：小于它用户就再也抓不到标题栏了 */
 const MIN_GRAB_WIDTH = 96
@@ -46,17 +52,22 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return target.closest('button, a, input, select, textarea, [role="button"]') !== null
 }
 
-/** 把模态框几何限制在视口内（留出可抓宽度 / 标题可见高度） */
-function clampLeft(startLeft: number, deltaX: number, width: number): number {
-  const maxLeft = Math.max(0, window.innerWidth - MIN_GRAB_WIDTH)
+/**
+ * 把模态框几何限制在定位层内（留出可抓宽度 / 标题可见高度）
+ *
+ * 边界取**定位层尺寸**（遮罩 = 当前可见区），不是 window.inner*：宿主下
+ * window 尺寸会失真，按它钳制等于「允许拖到窗外」。
+ */
+function clampLeft(startLeft: number, deltaX: number, width: number, layerWidth: number): number {
+  const maxLeft = Math.max(0, layerWidth - MIN_GRAB_WIDTH)
   // 允许向左露头，但露出的部分不能超过「宽度 - 可抓宽度」
   const minLeft = Math.min(0, MIN_GRAB_WIDTH - width)
   return Math.min(Math.max(startLeft + deltaX, minLeft), maxLeft)
 }
 
-/** 纵向钳制：顶不能高于视口顶，底至少要留标题栏高度在视口内 */
-function clampTop(startTop: number, deltaY: number): number {
-  const maxTop = Math.max(0, window.innerHeight - MIN_TITLE_VISIBLE)
+/** 纵向钳制：顶不能高于定位层顶，底至少要留标题栏高度在层内 */
+function clampTop(startTop: number, deltaY: number, layerHeight: number): number {
+  const maxTop = Math.max(0, layerHeight - MIN_TITLE_VISIBLE)
   return Math.min(Math.max(startTop + deltaY, 0), maxTop)
 }
 
@@ -79,19 +90,14 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
 
     const startX = event.clientX
     const startY = event.clientY
+    // 抬升到定位层（absolute 相对遮罩）：宿主下 fixed 会被摆到文档坐标
+    // 「一拖就没」，故与遮罩锚定同用 absolute（详见 promoteToModalLayer）
+    const { left: startLeft, top: startTop } = promoteToModalLayer(modal)
     const rect = modal.getBoundingClientRect()
-    const startLeft = rect.left
-    const startTop = rect.top
+    const layer = modalLayerSize(modal)
     // 是否真的发生了位移：原地点头（单击标题栏）不吞 click，
     // 否则标题栏上的按钮点击会被误拦
     let hasMoved = false
-
-    // 抬升：flex 子项 → fixed。margin 必须清零，否则遮罩的 flex 居中 margin
-    // 会让 left/top 相对元素盒本身再偏移一次（基准几何就歪了）。
-    modal.style.setProperty('position', 'fixed')
-    modal.style.setProperty('margin', '0')
-    modal.style.setProperty('left', `${String(startLeft)}px`)
-    modal.style.setProperty('top', `${String(startTop)}px`)
     modal.classList.add('is-dragged')
 
     // rAF 合帧：pointermove 可能快于屏幕刷新率，每次都写 style 会让一帧内
@@ -101,8 +107,11 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
     let latestY = 0
     const flush = (): void => {
       frame = null
-      modal.style.setProperty('left', `${String(clampLeft(startLeft, latestX, rect.width))}px`)
-      modal.style.setProperty('top', `${String(clampTop(startTop, latestY))}px`)
+      modal.style.setProperty(
+        'left',
+        `${String(clampLeft(startLeft, latestX, rect.width, layer.width))}px`,
+      )
+      modal.style.setProperty('top', `${String(clampTop(startTop, latestY, layer.height))}px`)
     }
     const onMove = (moveEvent: PointerEvent): void => {
       latestX = moveEvent.clientX - startX
@@ -123,10 +132,22 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
       window.removeEventListener('pointercancel', onUp)
       // 真拖过才吞 click：松手时补发的 click 落在遮罩上会把弹窗点关
       if (hasMoved) suppressPostDragClick()
+      // 兜底：拖完量一次，真被摆到可见区外就复位回遮罩居中——「弹窗没了、
+      // 遮罩黑层还盖着页面」比拖不到位糟得多（momo 2026-10-25 实测）
+      ensureModalVisible(modal, () => {
+        resetModalPosition(modal)
+      })
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+  })
+
+  // 双击标题栏 = 复位（弹窗万一被拖到别处，不用关掉重开；最大化态不处理，
+  // 免得 ⛶ 按钮文字与 is-maximized 类不同步——那种情况点 ⛶ 还原即可）
+  grip.addEventListener('dblclick', () => {
+    if (modal.classList.contains(MODAL_MAXIMIZED_CLASS)) return
+    resetModalPosition(modal)
   })
 }
 

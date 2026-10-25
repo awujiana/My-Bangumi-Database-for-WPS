@@ -54,6 +54,40 @@ let modal: HTMLElement
 let grip: HTMLElement
 let mask: HTMLElement
 
+/**
+ * jsdom 没有布局引擎（getBoundingClientRect 恒全 0），这里装一个**随内联样式
+ * 变化**的假矩形，模拟真实浏览器的两条语义：
+ * - 未定位（static/relative，在遮罩 flex 流里）→ 停在基准位 {left, top}；
+ * - 已定位（absolute/fixed）→ left/top 就是相对包含块原点的偏移（本测试里
+ *   包含块原点视作视口 0,0），改 style.left 即改视口位置。
+ *
+ * promoteToModalLayer 的「置零测差」依赖这个区别：静态时量一次、置零后再量
+ * 一次才能算出相对包含块的偏移。固定矩形会让它算出 0（测不出宿主真实行为）。
+ */
+function installRectMock(
+  element: HTMLElement,
+  base: { left: number; top: number; width: number; height: number },
+): void {
+  element.getBoundingClientRect = (): DOMRect => {
+    const isLayered = element.style.position === 'absolute' || element.style.position === 'fixed'
+    const left = isLayered ? Number(element.style.left) || 0 : base.left
+    const top = isLayered ? Number(element.style.top) || 0 : base.top
+    const width = Number(element.style.width) || base.width
+    const height = Number(element.style.height) || base.height
+    return {
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+      toJSON: (): string => '',
+    }
+  }
+}
+
 beforeEach(() => {
   document.body.replaceChildren()
   mask = document.createElement('div')
@@ -63,9 +97,7 @@ beforeEach(() => {
   modal.append(grip)
   mask.append(modal)
   document.body.append(mask)
-  // 给模态框一个非零基准矩形（jsdom 默认全是 0）
-  modal.getBoundingClientRect = () =>
-    ({ top: 50, bottom: 350, left: 100, right: 500, width: 400, height: 300 }) as DOMRect
+  installRectMock(modal, { left: 100, top: 50, width: 400, height: 300 })
   bindModalDrag({ modal, grip })
 })
 
@@ -222,6 +254,74 @@ async function dragOnce(targetGrip: HTMLElement): Promise<void> {
   pointer(window, 'pointerup', 80, 60)
 }
 
+// ========== 出界兜底（momo：弹窗没了、遮罩黑层还盖着页面） ==========
+
+/** 造一个「无论怎么量都在可见区之外」的假矩形 */
+function offscreenRect(): DOMRect {
+  return {
+    left: 0,
+    top: 9000,
+    width: 400,
+    height: 300,
+    right: 400,
+    bottom: 9300,
+    x: 0,
+    y: 9000,
+    toJSON: (): string => '',
+  }
+}
+
+describe('拖到可见区外：自愈', () => {
+  it('拖完一量完全出界 → 复位回遮罩居中（弹窗与遮罩不分离）', () => {
+    const { modal: modalElement, grip: gripElement } = setupFresh()
+    // 宿主把定位解析到文档别处的极端情况：怎么量都在可见区外
+    modalElement.getBoundingClientRect = offscreenRect
+
+    pointer(gripElement, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 80, 60)
+    pointer(window, 'pointerup', 80, 60)
+
+    expect(modalElement.style.left).toBe('')
+    expect(modalElement.style.top).toBe('')
+    expect(modalElement.style.position).toBe('')
+    expect(modalElement.classList.contains('is-dragged')).toBe(false)
+  })
+
+  it('正常拖（在可见区内）不被误复位', () => {
+    const { modal: modalElement, grip: gripElement } = setupFresh()
+    modalElement.getBoundingClientRect = (): DOMRect => ({
+      left: 70,
+      top: 50,
+      width: 400,
+      height: 300,
+      right: 470,
+      bottom: 350,
+      x: 70,
+      y: 50,
+      toJSON: (): string => '',
+    })
+
+    pointer(gripElement, 'pointerdown', 10, 10)
+    pointer(window, 'pointermove', 80, 60)
+    pointer(window, 'pointerup', 80, 60)
+
+    expect(modalElement.style.position).toBe('absolute')
+  })
+
+  it('双击标题栏 = 复位（弹窗被拖到别处时的自救，不用关掉重开）', () => {
+    const { modal: modalElement, grip: gripElement } = setupFresh()
+    modalElement.style.setProperty('position', 'absolute')
+    modalElement.style.setProperty('left', '120px')
+    modalElement.style.setProperty('top', '90px')
+
+    gripElement.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+
+    expect(modalElement.style.left).toBe('')
+    expect(modalElement.style.top).toBe('')
+    expect(modalElement.style.position).toBe('')
+  })
+})
+
 describe('bindModalDrag：拖拽后吞 click', () => {
   it('真拖过 → 松手补发的 click 被吞（不再点关遮罩弹窗）', async () => {
     const { mask: maskElement, modal: modalElement, grip: gripElement } = setupFresh()
@@ -237,7 +337,8 @@ describe('bindModalDrag：拖拽后吞 click', () => {
     })
     maskElement.dispatchEvent(click)
     expect(click.defaultPrevented).toBe(true)
-    expect(modalElement.style.getPropertyValue('position')).toBe('fixed')
+    // 抬升为定位层用 absolute（宿主下 fixed 会被摆到文档坐标 → 「一拖就没」）
+    expect(modalElement.style.getPropertyValue('position')).toBe('absolute')
   })
 
   it('原地单击标题栏（没过阈值）→ 不吞 click', async () => {
