@@ -226,11 +226,13 @@
 }
 
 /* 分组折叠：只藏规则行，标题与计数仍在——用户看得见「这组有多少条、收起着」。
-   **两个行类都要藏**：规则库列表的行是 .conditional-format-rule，既有规则
-   表格的行是 .conditional-format-row。曾只写前者 → 表格分组的收起完全没反应
-   （2026-10-24 用户实测：既有规则分组点 ▾ 不收起）。 */
+   **三个行类都要藏**：规则库列表的行是 .conditional-format-rule，既有规则
+   表格的行是 .conditional-format-row，导入弹框的行是 .conditional-format-import-row。
+   曾只写前者 → 表格分组的收起完全没反应（2026-10-24 用户实测：既有规则分组点
+   ▾ 不收起）。 */
 .conditional-format-group.is-collapsed .conditional-format-rule,
-.conditional-format-group.is-collapsed .conditional-format-row {
+.conditional-format-group.is-collapsed .conditional-format-row,
+.conditional-format-group.is-collapsed .conditional-format-import-row {
   display: none;
 }
 
@@ -986,4 +988,32 @@
 .conditional-format-modal--paste .conditional-format-modal-actions .bgm-btn {
   flex: 0 0 auto;
   min-width: 72px;
+}
+
+/* 组标题批量三件套（规则管理器：组内全选 / 导出 / 删除）——与 edit/remove 同款尺寸 */
+.conditional-format-group-pick,
+.conditional-format-group-export,
+.conditional-format-group-delete {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.conditional-format-group-pick:hover,
+.conditional-format-group-export:hover,
+.conditional-format-group-delete:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
+.conditional-format-group-delete:hover {
+  color: var(--danger, #ef4444);
 }
