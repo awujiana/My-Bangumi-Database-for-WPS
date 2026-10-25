@@ -21,6 +21,10 @@
 // 实例化仅发生在文件尾部的 resolveZod()（此时全部类已完成定义），TDZ 不可能触发。
 // 移动类定义无法解环（双向引用），故按文件级豁免处理。
 /* eslint-disable @typescript-eslint/no-use-before-define, no-use-before-define */
+// fluent 兼容层的类型签名天然 any（链式 API 的返回联合、shape 的运行时形态），
+// 整个文件按黄区豁免 no-explicit-any（原 37 处行内 disable 收敛到此）；
+// 替代保障：safeParse 的运行时断言 + schemas/*.ts 的类型契约由 tsc 把守。
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // 必须导出：schemas/*.ts 导出的 Schema 变量类型签名经由 ParseResult 传递引用到本类型，
 // declaration emit（.d.ts）需要按名字引用它，未导出会报 TS4023 "cannot be named"。
@@ -45,7 +49,6 @@ function fail<T>(message: string, path?: (string | number)[]): ParseResult<T> {
 }
 
 /** schema 链式返回类型：足够松，避免 exactOptionalPropertyTypes 下自引用条件类型爆炸 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySchema = any
 
 // ============================================================
@@ -56,12 +59,10 @@ export interface ZodSchema<T> {
   safeParse(input: unknown): ParseResult<T>
   parse(input: unknown): T
   optional(): AnySchema
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema
   readonly _type?: T
   readonly _output?: T
   readonly __isZodLite?: true
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 }
 
@@ -136,16 +137,13 @@ function flu<T extends object>(target: T): T {
 // ============================================================
 
 class LiteOptional<T> implements ZodSchema<T | undefined> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
 
   /** @internal */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(inner: ZodSchema<any>) {
     this._inner = inner
   }
@@ -162,7 +160,6 @@ class LiteOptional<T> implements ZodSchema<T | undefined> {
     return flu(new LiteNullable<T>(this._inner, true, true))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T | undefined, unknown>(this, d))
   }
@@ -180,25 +177,18 @@ class LiteOptional<T> implements ZodSchema<T | undefined> {
 }
 
 class LiteNullable<T> implements ZodSchema<T | null | undefined> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
 
   /** @internal */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
 
   /** @internal */ readonly _allowNull: boolean
 
   /** @internal */ readonly _allowUndefined: boolean
 
-  constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    inner: ZodSchema<any>,
-    shouldAllowNull = true,
-    shouldAllowUndefined = true,
-  ) {
+  constructor(inner: ZodSchema<any>, shouldAllowNull = true, shouldAllowUndefined = true) {
     this._inner = inner
     this._allowNull = shouldAllowNull
     this._allowUndefined = shouldAllowUndefined
@@ -208,7 +198,6 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
     return flu(new LiteNullable<T>(this._inner, this._allowNull, true))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T | null | undefined, unknown>(this, d))
   }
@@ -228,22 +217,16 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
 }
 
 class LiteWithDefault<T, D> implements ZodSchema<T | D> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
 
   /** @internal */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
 
   /** @internal */ readonly _definition: D
 
-  constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    inner: ZodSchema<any>,
-    definition: D,
-  ) {
+  constructor(inner: ZodSchema<any>, definition: D) {
     this._inner = inner
     this._definition = definition
   }
@@ -252,7 +235,6 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
     return flu(new LiteOptional<T | D>(this as unknown as ZodSchema<T | D>))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(definition: any): AnySchema {
     return flu(new LiteWithDefault<T | D, unknown>(this as unknown as ZodSchema<T | D>, definition))
   }
@@ -271,7 +253,6 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   }
 }
 class LiteString implements ZodSchema<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
@@ -301,7 +282,6 @@ class LiteString implements ZodSchema<string> {
     return flu(new LiteOptional<string>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<string, unknown>(this, d))
   }
@@ -323,7 +303,6 @@ class LiteString implements ZodSchema<string> {
 type LiteNumberSign = 'positive' | 'nonnegative' | 'negative' | 'nonpositive'
 
 class LiteNumber implements ZodSchema<number> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
@@ -375,7 +354,6 @@ class LiteNumber implements ZodSchema<number> {
     return flu(new LiteOptional<number>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<number, unknown>(this, d))
   }
@@ -404,7 +382,6 @@ class LiteNumber implements ZodSchema<number> {
 }
 
 class LiteBoolean implements ZodSchema<boolean> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
@@ -413,7 +390,6 @@ class LiteBoolean implements ZodSchema<boolean> {
     return flu(new LiteOptional<boolean>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<boolean, unknown>(this, d))
   }
@@ -431,7 +407,6 @@ class LiteBoolean implements ZodSchema<boolean> {
 }
 
 class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
@@ -446,7 +421,6 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
     return flu(new LiteOptional<V>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<V, unknown>(this, d))
   }
@@ -464,7 +438,6 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
 }
 
 class LiteEnum<V extends string> implements ZodSchema<V> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
@@ -479,7 +452,6 @@ class LiteEnum<V extends string> implements ZodSchema<V> {
     return flu(new LiteOptional<V>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<V, unknown>(this, d))
   }
@@ -496,19 +468,14 @@ class LiteEnum<V extends string> implements ZodSchema<V> {
     return r.data
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 class LiteArray<T = any> implements ZodSchema<T[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
 
   /** @internal */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _item: ZodSchema<any>
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(item: ZodSchema<any>) {
     this._item = item
   }
@@ -517,7 +484,6 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
     return flu(new LiteOptional<T[]>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T[], unknown>(this, d))
   }
@@ -546,25 +512,17 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
     return r.data
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 class LiteObject<T = any> implements ZodSchema<T> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
 
   readonly __isZodLite = true as const
 
   /** @internal */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _shape: Record<string, ZodSchema<any>>
 
   /** @internal */ readonly _passthrough: boolean
 
-  constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    shape: Record<string, ZodSchema<any>>,
-    shouldPassthrough = false,
-  ) {
+  constructor(shape: Record<string, ZodSchema<any>>, shouldPassthrough = false) {
     this._shape = shape
     this._passthrough = shouldPassthrough
   }
@@ -581,7 +539,6 @@ class LiteObject<T = any> implements ZodSchema<T> {
     return flu(new LiteOptional<T>(this))
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T, unknown>(this, d))
   }
@@ -625,7 +582,6 @@ interface LiteZod {
   boolean(): LiteBoolean
   literal<V extends string | number | boolean>(v: V): LiteLiteral<V>
   enum<V extends readonly string[]>(vs: V): LiteEnum<V[number]>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   object<Shape extends Record<string, ZodSchema<any>>>(
     shape: Shape,
   ): LiteObject<{ [K in keyof Shape]: Shape[K] extends ZodSchema<infer U> ? U : never }>
@@ -640,10 +596,7 @@ const LiteZodImplementation: LiteZod = {
     flu(new LiteLiteral<V>(v)),
   enum: <V extends readonly string[]>(vs: V): LiteEnum<V[number]> =>
     flu(new LiteEnum<V[number]>(vs)),
-  object: <
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Shape extends Record<string, ZodSchema<any>>,
-  >(
+  object: <Shape extends Record<string, ZodSchema<any>>>(
     shape: Shape,
   ): LiteObject<{ [K in keyof Shape]: Shape[K] extends ZodSchema<infer U> ? U : never }> =>
     flu(

@@ -897,7 +897,7 @@ export function viewSyncRecordDetail(subjectId: string): void {
       context: 'ViewSyncRecordDetail',
     })
   }
-  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.subjectId ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.subjectId ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}`
   safeAlert(detail, '同步记录详情')
 }
 

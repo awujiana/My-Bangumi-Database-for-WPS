@@ -85,9 +85,7 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
   const currentSourceType: SyncSourceType =
     (sourceTypeSelect?.value as SyncSourceType | undefined) ?? getSyncSourceType()
   // 读取「仅同步选中行」开关
-  const chkSelectedOnly = document.getElementById(
-    'chkSyncSelectedOnly',
-  ) as HTMLInputElement | null
+  const chkSelectedOnly = document.getElementById('chkSyncSelectedOnly') as HTMLInputElement | null
   const isSelectedRowsOnly = chkSelectedOnly?.checked === true
 
   // 读取时间筛选配置
@@ -99,7 +97,7 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
     const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
     const quarterSelect = document.getElementById('timeFilterQuarter') as HTMLSelectElement | null
     const monthSelect = document.getElementById('timeFilterMonth') as HTMLSelectElement | null
-    const year = Number(yearSelect?.value || '2026') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+    const year = Number(yearSelect?.value || '2026')
     const range =
       (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) ?? 'year'
     timeFilter = {
@@ -107,9 +105,9 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
       year,
       range,
       ...(range === 'quarter' && {
-        quarter: Number(quarterSelect?.value || '1') as 1 | 4 | 7 | 10, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+        quarter: Number(quarterSelect?.value || '1') as 1 | 4 | 7 | 10,
       }),
-      ...(range === 'month' && { month: Number(monthSelect?.value || '1') }), // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+      ...(range === 'month' && { month: Number(monthSelect?.value || '1') }),
     }
   }
   // 本地文件源仅需 path 字段；远程源（GitHub/GitLab/Gitee）要求 owner/repo/path

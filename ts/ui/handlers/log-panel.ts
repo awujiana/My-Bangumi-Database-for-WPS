@@ -12,7 +12,7 @@ export function renderLogEntries(): void {
   const body = document.getElementById('logModalBody')
   if (!body) return
   const filterSelect = document.getElementById('logLevelFilter') as HTMLSelectElement | null
-  const level = filterSelect?.value || undefined // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+  const level = filterSelect?.value || undefined
   const logs = getRecentLogs(level as LogLevel | undefined, 100)
   body.replaceChildren()
   if (logs.length === 0) {

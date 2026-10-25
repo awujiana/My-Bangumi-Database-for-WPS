@@ -558,7 +558,7 @@ function collectActiveFilterColumns(worksheet: WpsWorksheet, filters: WpsFilters
         let columnName = ''
         try {
           const headerCell = worksheet.Range(`${columnNumberToLetter(index)}1`)
-          columnName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
+          columnName = String(headerCell.Value2 || '').substring(0, 12)
         } catch (error: unknown) {
           BGM.handleError(error, {
             showAlert: false,

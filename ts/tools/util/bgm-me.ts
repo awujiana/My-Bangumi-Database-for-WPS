@@ -75,10 +75,7 @@ export interface BgmMeRawOptions {
  * 会在同一 signal 被反复取消 / 重试时持续累积（修法同 `sync/scraping.ts` 的
  * `requestPromise`）。
  */
-export function requestBgmMeRaw(
-  token: string,
-  options: BgmMeRawOptions,
-): Promise<BgmMeRawResult> {
+export function requestBgmMeRaw(token: string, options: BgmMeRawOptions): Promise<BgmMeRawResult> {
   const { timeout, signal } = options
   return new Promise<BgmMeRawResult>((resolve) => {
     if (signal?.aborted === true) {
@@ -155,12 +152,10 @@ function parseBgmMePayload(responseText: string): BGMUserInfo {
   }
   const userId = String(data.id ?? data.user_id ?? '')
   // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
-  const username =
-    (data.nickname || data.username || data.user_name || data.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const username = (data.nickname || data.username || data.user_name || data.name) ?? ''
 
   // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
-  const rawAvatarUrl =
-    (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
   const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : ''
 
   // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL

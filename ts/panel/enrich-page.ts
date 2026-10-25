@@ -596,7 +596,7 @@ function renderBatchFileList(): void {
 
       listElement.querySelectorAll('[data-batch-remove]').forEach((button) => {
         button.addEventListener('click', () => {
-          const index = Number((button as HTMLElement).dataset.batchRemove || '-1') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- dataset 属性为空时须回退到哨兵值
+          const index = Number((button as HTMLElement).dataset.batchRemove || '-1')
           if (index >= 0) batchRemoveFile(index)
         })
       })
@@ -938,7 +938,7 @@ function refreshWorkbookList(): void {
 
 function refreshSheetList(): void {
   const wbSelect = safeGetSelect('workbookSelect')
-  const wbName = wbSelect?.value || undefined // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+  const wbName = wbSelect?.value || undefined
 
   refreshEnrichSheets(wbName, 'sheetSelect', 'workbookSelect')
 
@@ -1618,7 +1618,7 @@ function renderBatchSummary(): void {
       const statusIcon = r.success ? '✅' : '❌'
       const detail = r.success
         ? `表头行 ${String(r.headerRow)} · 匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
-        : `失败：${escapeHtml(r.error || '未知错误')}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        : `失败：${escapeHtml(r.error || '未知错误')}`
       return `
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
           <span style="color:#ddd;">${statusIcon} #${String(index + 1)} ${escapeHtml(r.fileName)}</span>

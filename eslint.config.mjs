@@ -474,6 +474,14 @@ export default tseslint.config(
       // @typescript-eslint/no-unsafe-* 保证收窄前必须做类型判定。
       'unicorn/prefer-error-is-error': 'off',
 
+      // ④ 惯用语义模式：prefer-nullish-coalescing 开 ignorePrimitives。
+      // 本项目「空串 / 0 / NaN 也要回退」是**刻意语义**（占位文案、哨兵值、
+      // API 备用字段、单元格值域），`??` 会保留空串直接变 bug；而这类回退
+      // 两侧全是 primitive（string / number）。实测存量 38 处全部该模式
+      // （抽样 10/10 证实，每处原带理由注释）。primitive 上放行 ||，
+      // **对象 / 数组引用上的 || 仍照常查**（那才是 nullish bug 高发区）。
+      '@typescript-eslint/prefer-nullish-coalescing': ['error', { ignorePrimitives: true }],
+
       // ① 规则前提在本项目不成立（纯误报）：unicorn/no-unsafe-dom-html 一刀切
       // 禁止 innerHTML/outerHTML/insertAdjacentHTML 赋值，schema 无任何选项可豁免
       // 「先经消毒层」的调用形态。本项目在**所有** HTML 边界强制经 sanitizeHtml()

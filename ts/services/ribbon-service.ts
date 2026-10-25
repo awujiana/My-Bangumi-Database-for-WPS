@@ -761,7 +761,7 @@ export function openCollectionForRibbon(): void {
   }
 
   const userId = _getBgmUserId()
-  bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`)
 
   if (!userId) {
     bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置')

@@ -71,7 +71,7 @@ export function setConfig(key: string, value: string): boolean {
     bgmLog(LOG_LEVELS.INFO, `[config] 配置值未变化: ${key} = ${value}`)
   } else {
     bgmLog(LOG_LEVELS.INFO, `[config] 配置已更新: ${key}`)
-    bgmLog(LOG_LEVELS.INFO, `[config]   旧值: ${oldValue || '(空)'}`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+    bgmLog(LOG_LEVELS.INFO, `[config]   旧值: ${oldValue || '(空)'}`)
     bgmLog(LOG_LEVELS.INFO, `[config]   新值: ${value}`)
   }
 
@@ -146,7 +146,7 @@ export function removeConfig(key: string): boolean {
 
   const oldValue = storage.getItem(key)
   storage.removeItem(key)
-  bgmLog(LOG_LEVELS.INFO, `[config] 配置已删除: ${key} (原值: ${oldValue || '(空)'})`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  bgmLog(LOG_LEVELS.INFO, `[config] 配置已删除: ${key} (原值: ${oldValue || '(空)'})`)
 
   // 触发内部事件
   bgmLog(LOG_LEVELS.INFO, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`)

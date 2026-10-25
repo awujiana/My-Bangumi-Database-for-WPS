@@ -185,7 +185,7 @@ async function _fillSheetWithCollections(
     if (item?.subject_id) {
       const row = headerRow + 1 + index
       const { subject } = item
-      const name = (subject?.name_cn || subject?.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+      const name = (subject?.name_cn || subject?.name) ?? ''
       const alias = subject?.name_cn && subject.name ? subject.name : ''
       const url = `https://bgm.tv/subject/${String(item.subject_id)}`
 
@@ -503,7 +503,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   // 8. 冲突检测与策略
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤8: 冲突检测')
   const conflictSelect = document.getElementById('conflictStrategy') as HTMLSelectElement | null
-  const conflictStrategy = conflictSelect?.value || 'skip' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+  const conflictStrategy = conflictSelect?.value || 'skip'
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突策略: ${conflictStrategy}`)
 
   let conflictSubjectIds: Set<string> | undefined
@@ -926,7 +926,7 @@ async function _doAPISync(
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
 
-      const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+      const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
       pendingSyncRecords.push({
         name: itemName,
         url: `https://bgm.tv/subject/${String(item.subject_id)}`,

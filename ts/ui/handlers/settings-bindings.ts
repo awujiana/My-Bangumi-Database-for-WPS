@@ -66,7 +66,7 @@ export function updateThemePreview(mode: string): void {
 
 export const handleThemeChange = (): void => {
   const select = document.getElementById('themeSelect') as HTMLSelectElement | null
-  const mode = select?.value || 'dark' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+  const mode = select?.value || 'dark'
   // 乐观更新预览卡片，即使持久化失败也保持视觉一致
   updateThemePreview(mode)
   const isOk = saveTheme(mode)
@@ -76,7 +76,7 @@ export const handleThemeChange = (): void => {
       light: '浅色模式',
       system: '跟随系统',
     }
-    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success')
   } else {
     showToast('主题保存失败', 'error')
   }
@@ -102,7 +102,7 @@ export const handleListTypeChange = (): void => {
       wish: '想看',
       do: '在看',
     }
-    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success')
   } else {
     showToast('收藏列表类型保存失败', 'error')
   }
@@ -120,7 +120,7 @@ export const handleTimeFilterChange = (): void => {
       month: '月份',
       future: '预告 / 未来',
     }
-    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success')
   } else {
     showToast('时间筛选范围保存失败', 'error')
   }

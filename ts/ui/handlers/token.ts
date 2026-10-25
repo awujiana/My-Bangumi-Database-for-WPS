@@ -31,7 +31,7 @@ import { _T } from './_constants.js'
 // ========== 业务对话框 ==========
 
 export function showTokenDialog(currentToken?: string): void {
-  const defaultValue = (currentToken || loadBgToken()) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串等价于未设置，须回退到已存令牌
+  const defaultValue = (currentToken || loadBgToken()) ?? ''
   showInput(_T.setBgmToken, _T.inputToken, defaultValue, (value?: string) => {
     if (value) {
       storeBgToken(value)
@@ -184,7 +184,7 @@ export function openUserCollection(): void {
   bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========')
 
   const userId = _getBgmUserId()
-  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`)
 
   if (!userId) {
     bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面')
@@ -219,7 +219,7 @@ interface TokenVerifyData {
  * （从 testTokenValidity 的 try 块抽出，降低 try-complexity）
  */
 function applyVerifiedUserInfo(data: TokenVerifyData): { nickname: string; userId: string } {
-  const nickname = data.nickname || data.username || _T.unknownUser // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const nickname = data.nickname || data.username || _T.unknownUser
   const userId = String(data.id ?? '')
 
   _setBgmUserId(userId)
@@ -228,7 +228,7 @@ function applyVerifiedUserInfo(data: TokenVerifyData): { nickname: string; userI
   updateUserIdStatus()
 
   // 处理头像 URL：移除可能存在的反引号包裹
-  const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
   const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
   if (cleanAvatarUrl) {
     BGM.cache.avatarUrl = cleanAvatarUrl
@@ -694,7 +694,7 @@ export function showUserProfile(): void {
     if (avatarImage) {
       if (avatarUrl) {
         avatarImage.src = avatarUrl
-        avatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        avatarImage.alt = username || _T.avatarDefault
         bindAvatarError(avatarImage, handleAvatarError)
         avatarImage.style.display = ''
       } else {
@@ -709,11 +709,11 @@ export function showUserProfile(): void {
       // 让 CSS 媒体查询控制显示/隐藏；没有头像 URL 时直接不显示——
       // 否则窄页面会露出一个只显示 alt 文案的空 img（与 token 区同口径）
       topbarAvatarElement.style.display = avatarUrl ? '' : 'none'
-      topbarAvatarElement.title = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+      topbarAvatarElement.title = username || _T.avatarDefault
+      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault)
       if (topbarAvatarImage && avatarUrl) {
         topbarAvatarImage.src = avatarUrl
-        topbarAvatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        topbarAvatarImage.alt = username || _T.avatarDefault
         bindAvatarError(topbarAvatarImage, handleTopbarAvatarError)
       }
     }
@@ -735,7 +735,7 @@ export function showUserProfile(): void {
         if (tokenAvatarImage) {
           if (avatarUrl) {
             tokenAvatarImage.src = avatarUrl
-            tokenAvatarImage.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+            tokenAvatarImage.alt = username || _T.avatarDefault
             bindAvatarError(tokenAvatarImage, handleAvatarError)
             tokenAvatarImage.style.display = ''
           } else {

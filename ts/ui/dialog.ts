@@ -271,7 +271,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
     } else if (type === 'input') {
       // eslint-disable-next-line no-alert -- 对话框 DOM 未初始化时的原生 prompt 兜底；改用 BGM.Dialog 会在此无限递归
       const result = window.prompt(
-        (options.prompt || options.message) ?? '', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        (options.prompt || options.message) ?? '',
         options.defaultValue ?? '',
       )
       if (result === null) options.onCancel?.()
@@ -287,7 +287,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
   const titleElement = dom[config.titleId]
   const messageElement = dom[config.messageId]
   if (titleElement) titleElement.textContent = options.title ?? ''
-  if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+  if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? ''
 
   if (type === 'input' && dom.bgmInputField) {
     ;(dom.bgmInputField as HTMLInputElement).value = options.defaultValue ?? ''

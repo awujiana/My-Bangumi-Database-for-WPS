@@ -175,7 +175,7 @@ export function startUserInfoPolling(): void {
     if (isUserInfoChanged) {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串） // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+        `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`,
       )
       lastUserId = currentUserId
       lastUsername = currentUsername
