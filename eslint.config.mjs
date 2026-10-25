@@ -228,6 +228,13 @@ const patchedBaseRecommendedConfig = baseRecommendedConfig.map((config) => {
 // 说明：这不是"降低严格度"——被排除的规则要么有等价的现行规则在生效，要么在本项目
 // 语言范围内不可能命中；UNSAFE_FIX_RULES 仍保持 error 门禁（靠手工清零，不使用 --fix）。
 const EXCLUDED_RULE_PATTERN = /^jsx-/
+// 与项目 target/lib ES2022 不兼容的规则：fixer 建议的 API 在 lib 里没有类型，
+// --fix 会把可编译代码改坏（unicorn/prefer-set-methods → Set#difference 等
+// ES2024 方法，改完 tsc 直接报 Property does not exist）。ESLint 的 fixer
+// 不查 TS lib；行内 disable 也不可行——该规则在 --fix 模式缺席（UNSAFE 组），
+// disable 压住的是空气，反被 --fix 当 unused 删掉，然后 gate 模式再报 error
+// （实测循环三次）。唯一解：从展开源头排除，两个模式都不启用。
+const ES2022_INCOMPATIBLE_RULES = new Set(['unicorn/prefer-set-methods'])
 // 注意 `languages: ['*']`（unicorn 的 filename-case / comment-content / prefer-https 等用此写法）
 // 表示「所有语言」，必须视为支持 js/js；只认字面量 js/js 会把这类规则误伤（实测会把
 // filename-case 这类现行门禁规则一起关掉，等于悄悄降低严格度）。
@@ -247,6 +254,7 @@ const allRulesAsError = (plugin, prefix) =>
         ([rule, impl]) =>
           !impl?.meta?.deprecated &&
           !EXCLUDED_RULE_PATTERN.test(rule) &&
+          !ES2022_INCOMPATIBLE_RULES.has(`${prefix}/${rule}`) &&
           !isLanguageUnsupported(impl) &&
           !(isFix && UNSAFE_FIX_RULES.has(rule)),
       )

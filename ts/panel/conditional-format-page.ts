@@ -794,7 +794,12 @@ function showGroupNameMask(): void {
 
 function closeGroupNameModal(): void {
   const mask = byId('conditionalFormatGroupMask')
-  if (mask) mask.style.display = 'none'
+  // 没开 = no-op：Esc 块连调五个 close，没开的弹窗不能动共享的滚动锁计数
+  // （modalScrollLockCount 是计数式；空关一次就把别的弹窗的锁解掉了）
+  if (mask?.style.display === 'none') return
+  if (mask) {
+    mask.style.display = 'none'
+  }
   state.renamingGroup = null
   unlockModalScroll()
 }
@@ -1621,8 +1626,7 @@ function deleteSelectedRules(ids: readonly string[]): void {
   }
   const removed = new Set(ids)
   state.rules = state.rules.filter((rule) => !removed.has(rule.id))
-  // ES2022 目标没有 Set#difference（ES2024）的类型与运行时保证
-
+  // filter + has 而非 Set#difference：ES2022 无其类型（规则已在 eslint.config 排除）
   state.ruleSelection = new Set([...state.ruleSelection].filter((id) => !removed.has(id)))
   persistRules()
   renderRuleList()
@@ -1787,7 +1791,12 @@ function closeEditor(): void {
   state.editingId = null
   state.editingIsNew = false
   const mask = byId('conditionalFormatEditorMask')
-  if (mask) mask.style.display = 'none'
+  // 没开 = no-op：Esc 块连调五个 close，没开的弹窗不能动共享的滚动锁计数
+  // （modalScrollLockCount 是计数式；空关一次就把别的弹窗的锁解掉了）
+  if (mask?.style.display === 'none') return
+  if (mask) {
+    mask.style.display = 'none'
+  }
   unlockModalScroll()
 }
 
@@ -1947,7 +1956,12 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
 
 function closeConfirmModal(): void {
   const mask = byId('conditionalFormatConfirmMask')
-  if (mask) mask.style.display = 'none'
+  // 没开 = no-op：Esc 块连调五个 close，没开的弹窗不能动共享的滚动锁计数
+  // （modalScrollLockCount 是计数式；空关一次就把别的弹窗的锁解掉了）
+  if (mask?.style.display === 'none') return
+  if (mask) {
+    mask.style.display = 'none'
+  }
   unlockModalScroll()
 }
 
@@ -2051,7 +2065,12 @@ function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: s
 
 function closeImportModal(): void {
   const mask = byId('conditionalFormatImportMask')
-  if (mask) mask.style.display = 'none'
+  // 没开 = no-op：Esc 块连调五个 close，没开的弹窗不能动共享的滚动锁计数
+  // （modalScrollLockCount 是计数式；空关一次就把别的弹窗的锁解掉了）
+  if (mask?.style.display === 'none') return
+  if (mask) {
+    mask.style.display = 'none'
+  }
   // 不清 existingSelection：弹框与表格共享它，清了就是「联动只做一半」
   unlockModalScroll()
 }
