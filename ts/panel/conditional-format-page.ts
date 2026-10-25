@@ -13,6 +13,7 @@ import { LOG_LEVELS } from '../core/constants.js'
 import { showToast } from '../ui/dialog.js'
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js'
 import {
+  BGM,
   bgmLog,
   findHeaderRow,
   getApp,
@@ -46,6 +47,7 @@ import {
   serializeRules,
   shiftFormulaRows,
   snapshotGroupKey,
+  UNGROUPED_LABEL,
 } from './conditional-format-rules.js'
 import type {
   ApplyStrategy,
@@ -65,7 +67,6 @@ import {
   toForeignRuleRows,
   toggleSelection,
 } from './conditional-format-table.js'
-import { enterSoloMode } from '../tools/module-state.js'
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js'
 import {
   bindModalCollapse,
@@ -186,6 +187,13 @@ interface PageState {
    */
   importForeignRules: ForeignRuleSnapshot[]
   /**
+   * 导入弹框里被收起的分组名（会话态）
+   *
+   * 弹框与既有规则表格展示同一批规则的同一套分组（existingGroups），
+   * 但折叠状态独立——弹框开着时用户往往想全部看全，表格收了不该连坐。
+   */
+  importGroupCollapsed: Set<string>
+  /**
    * 规则库列表的勾选集（rule id）
    *
    * 与行的「👁 可见性复选框」是两回事：那个控制「隐藏/应用」，这个控制
@@ -222,6 +230,7 @@ const state: PageState = {
   existingGroupCollapsed: new Set<string>(),
   renamingGroup: null,
   importForeignRules: [],
+  importGroupCollapsed: new Set<string>(),
   collapsedGroups: new Set<string>(),
   ruleSortable: null,
   groupSortable: null,
@@ -622,6 +631,30 @@ function handleExistingTableClick(event: MouseEvent): void {
     return
   }
 
+  // 组标题 ☑：全选 / 取消本组（momo：组内也要能全选）
+  const pickGroupButton = target.closest<HTMLElement>('[data-action="pick-existing-group"]')
+  if (pickGroupButton) {
+    const group = pickGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') toggleExistingGroupSelection(group)
+    return
+  }
+
+  // 组标题 📤：导出本组规则（选保存位置）
+  const exportGroupButton = target.closest<HTMLElement>('[data-action="export-existing-group"]')
+  if (exportGroupButton) {
+    const group = exportGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') exportExistingGroup(group)
+    return
+  }
+
+  // 组标题 🗑：从工作表删除本组全部规则
+  const groupDeleteButton = target.closest<HTMLElement>('[data-action="delete-existing-group"]')
+  if (groupDeleteButton) {
+    const group = groupDeleteButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
+    if (group !== '') deleteExistingGroup(group)
+    return
+  }
+
   // 行内编辑：点「应用于 / 公式」单元格原地变输入框（momo：要能直接改）。
   // 放在 button 分支之前：这两个单元格不是 button，走 button 分支会直接 return。
   const editable = target.closest<HTMLElement>('.conditional-format-cell-editable')
@@ -721,6 +754,108 @@ function batchExportForeignRules(): void {
   if (skipped > 0) {
     showToast(`${String(skipped)} 条类型不支持，未包含在导出文件里`, 'info')
   }
+}
+
+/**
+ * 取一个分组下所有行的 1 基序号（从 DOM 读：分组是视图层概念，
+ * state 里只有 existingGroups 的 key→组名映射，行属于哪组看渲染结果）
+ */
+function existingGroupIndices(group: string): number[] {
+  const container = document.querySelector<HTMLElement>(`[data-group="${CSS.escape(group)}"]`)
+  if (!container) return []
+  const indices: number[] = []
+  for (const row of container.querySelectorAll<HTMLElement>('[data-row-index]')) {
+    const index = Number(row.dataset.rowIndex ?? '0')
+    if (Number.isSafeInteger(index) && index >= 1) indices.push(index)
+  }
+  return indices.sort((a, b) => a - b)
+}
+
+/** 组标题 ☑：组内已全勾 → 取消本组；否则补全本组 */
+function toggleExistingGroupSelection(group: string): void {
+  const indices = existingGroupIndices(group)
+  if (indices.length === 0) {
+    showToast('本组没有可勾选的规则', 'warn')
+    return
+  }
+  const next = new Set(state.existingSelection)
+  const isAllPicked = indices.every((index) => next.has(index))
+  for (const index of indices) {
+    if (isAllPicked) next.delete(index)
+    else next.add(index)
+  }
+  state.existingSelection = next
+  renderExistingRules()
+}
+
+/** 组标题 📤：导出本组快照转规则（与批量条导出所选同一通道） */
+function exportExistingGroup(group: string): void {
+  const indices = existingGroupIndices(group)
+  const rules: ConditionalFormatRule[] = []
+  let skipped = 0
+  for (const index of indices) {
+    const snapshot = state.existing[index - 1]
+    if (snapshot) {
+      const rule = foreignSnapshotToRule(snapshot, nextId, groupOfSnapshot(snapshot))
+      if (rule) rules.push(rule)
+      else skipped += 1
+    }
+  }
+  if (rules.length === 0) {
+    showToast('本组没有可导出的公式类规则', 'warn')
+    return
+  }
+  saveRulesJson(rules, `「${group}」分组`)
+  if (skipped > 0) {
+    showToast(`${String(skipped)} 条类型不支持，未包含在导出文件里`, 'info')
+  }
+}
+
+/**
+ * 组标题 🗑：从工作表删除本组全部规则
+ *
+ * 与 batchDeleteForeignRules 同口径：**逆序删**（删前面的行会让后面的
+ * FormatConditions.Item 下标漂移）。删除的是工作表规则，组的本地映射
+ * （existingGroups）保留——组里没规则了自然不再显示。
+ */
+function deleteExistingGroup(group: string): void {
+  const entry = selectedSheet()
+  if (!entry) return
+  const indices = existingGroupIndices(group)
+  if (indices.length === 0) {
+    showToast('本组没有可删除的规则', 'warn')
+    return
+  }
+  // BGM.Dialog.confirm（项目范式，非 window.confirm）：不可撤销操作必须确认
+  BGM.Dialog.confirm(
+    `将从工作表删除「${group}」分组的全部 ${String(indices.length)} 条规则，且不可撤销。确定？`,
+    (isConfirmed: boolean) => {
+      if (!isConfirmed) return
+      // 逆序删：删前面的行会让后面的 FormatConditions.Item 下标漂移
+      const descending = [...indices].sort((a, b) => b - a)
+      let succeeded = 0
+      const failures: string[] = []
+      for (const index of descending) {
+        const result = deleteForeignRule(entry.worksheet, index)
+        if (result.ok) succeeded += 1
+        else failures.push(`第 ${String(index)} 条：${result.error}`)
+      }
+      const removed = new Set(indices)
+      state.existingSelection = new Set(
+        [...state.existingSelection].filter((index) => !removed.has(index)),
+      )
+      if (failures.length > 0) {
+        showToast(
+          `已删除 ${String(succeeded)} 条，${String(failures.length)} 条失败（${failures[0] ?? '未知原因'}）`,
+          'error',
+        )
+      } else {
+        showToast(`已删除「${group}」分组 ${String(succeeded)} 条规则`, 'success')
+      }
+      loadExistingRules()
+    },
+    '删除整组规则？',
+  )
 }
 
 /**
@@ -2075,18 +2210,47 @@ function closeImportModal(): void {
   unlockModalScroll()
 }
 
+/**
+ * 导入弹框列表的分组聚合（momo：要按照分组导入）
+ *
+ * 与既有规则表格同一套映射（existingGroups，key = snapshotGroupKey），
+ * 组序 = 组内首条出现顺序，「未分组」恒排最后——两个视图口径一致，
+ * 用户在表格里归好的组在弹框里原样呈现。返回 [组名, [序号, 快照]] 有序对。
+ */
+function groupImportSnapshots(): [string, [number, ForeignRuleSnapshot][]][] {
+  const buckets = new Map<string, [number, ForeignRuleSnapshot][]>()
+  for (const [position, snapshot] of state.importForeignRules.entries()) {
+    const group = state.existingGroups[snapshotGroupKey(snapshot)] ?? UNGROUPED_LABEL
+    const bucket = buckets.get(group)
+    if (bucket) bucket.push([position + 1, snapshot])
+    else buckets.set(group, [[position + 1, snapshot]])
+  }
+  const ungrouped = buckets.get(UNGROUPED_LABEL)
+  if (ungrouped !== undefined) {
+    buckets.delete(UNGROUPED_LABEL)
+    buckets.set(UNGROUPED_LABEL, ungrouped)
+  }
+  return [...buckets]
+}
+
+/** 弹框分组内可导入项的序号（组内全选用：不可导入的禁用项不混进来） */
+function importableIndicesOfGroup(entries: readonly [number, ForeignRuleSnapshot][]): number[] {
+  return entries.filter(([, snapshot]) => isSnapshotImportable(snapshot)).map(([index]) => index)
+}
+
 function renderImportList(): void {
   const container = byId('conditionalFormatImportList')
   if (!container) return
-  const { importForeignRules: snapshots } = state
   const selection = state.existingSelection
-  container.innerHTML = snapshots
-    .map((snapshot, position) => {
-      const index = position + 1
-      const canImport = isSnapshotImportable(snapshot)
-      const formulaPreview =
-        snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
-      return `
+  container.innerHTML = groupImportSnapshots()
+    .map(([group, entries]) => {
+      const isCollapsed = state.importGroupCollapsed.has(group)
+      const rows = entries
+        .map(([index, snapshot]) => {
+          const canImport = isSnapshotImportable(snapshot)
+          const formulaPreview =
+            snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
+          return `
       <label class="conditional-format-import-row${canImport ? '' : ' is-disabled'}" data-import-index="${String(index)}">
         <input type="checkbox" data-import-check="${String(index)}" ${selection.has(index) ? 'checked' : ''} ${canImport ? '' : 'disabled'} aria-label="选择第 ${String(index)} 条规则" />
         <span class="conditional-format-import-index">${String(index)}</span>
@@ -2094,9 +2258,56 @@ function renderImportList(): void {
         <code class="conditional-format-import-formula" title="${escapeHtml(snapshot.formula)}">${escapeHtml(formulaPreview)}</code>
         ${canImport ? '' : '<em class="conditional-format-tag-warn">类型不支持</em>'}
       </label>`
+        })
+        .join('')
+      return `
+      <div class="conditional-format-group conditional-format-existing-group${isCollapsed ? ' is-collapsed' : ''}" data-import-group="${escapeHtml(group)}">
+        <div class="conditional-format-group-title">
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-import-group" data-import-group="${escapeHtml(group)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+          <span class="conditional-format-group-name">${escapeHtml(group)}</span>
+          <span class="conditional-format-group-count">${String(entries.length)}</span>
+          <button type="button" class="conditional-format-group-pick" data-action="pick-import-group" data-import-group="${escapeHtml(group)}" title="全选 / 取消本组可导入的规则">☑</button>
+        </div>
+        ${rows}
+      </div>`
     })
     .join('')
   setText('conditionalFormatImportConfirm', `导入所选（${String(selection.size)}）`)
+}
+
+/**
+ * 导入弹框的组标题按钮（点击委托）：收起 / 展开分组、组内全选 / 取消
+ *
+ * 组内全选是「切换」语义：组内可导入项已全勾 → 全部取消；否则补全。
+ * 只勾可导入项——类型不支持的本来就禁着，混进选中集只会虚增计数。
+ */
+function handleImportListClick(event: Event): void {
+  const target = event.target as HTMLElement | null
+  const group = target?.closest<HTMLElement>('[data-import-group]')?.dataset.importGroup
+  if (group === undefined || group === '') return
+  if (target?.closest('[data-action="toggle-import-group"]') !== null) {
+    const next = new Set(state.importGroupCollapsed)
+    if (next.has(group)) next.delete(group)
+    else next.add(group)
+    state.importGroupCollapsed = next
+    renderImportList()
+    return
+  }
+  // （能走到这里说明上面 closest 命中了 data-import-group，target 必非空）
+  if (target.closest('[data-action="pick-import-group"]') !== null) {
+    const found = groupImportSnapshots().find(([name]) => name === group)
+    const entries = found === undefined ? [] : found[1]
+    const groupIndices = importableIndicesOfGroup(entries)
+    const isGroupFullySelected =
+      groupIndices.length > 0 && groupIndices.every((index) => state.existingSelection.has(index))
+    const next = new Set(state.existingSelection)
+    for (const index of groupIndices) {
+      if (isGroupFullySelected) next.delete(index)
+      else next.add(index)
+    }
+    state.existingSelection = next
+    syncImportSelectionViews()
+  }
 }
 
 /**
@@ -2295,7 +2506,6 @@ export function initializeConditionalFormatPage(): void {
 
   // 浮动「规则管理器」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
   bindExistingToolbar()
-  setupRuleManagerEntry()
   // 两个列表的拖拽排序 + 行右键菜单（通用组件接入，只建一次）
   setupSortablesAndMenus()
 
@@ -2450,6 +2660,10 @@ export function initializeConditionalFormatPage(): void {
     state.existingSelection = new Set<number>()
     syncImportSelectionViews()
   })
+  // 组标题按钮（收起 / 展开分组、组内全选）走 click 委托
+  byId('conditionalFormatImportList')?.addEventListener('click', (event) => {
+    handleImportListClick(event)
+  })
   // 列表勾选走 change 委托；勾选只更新确认按钮计数，不重建列表（保住焦点，
   // 用户连勾十几条时不用每次重新点）
   byId('conditionalFormatImportList')?.addEventListener('change', (event) => {
@@ -2533,8 +2747,11 @@ function populateFromHost(): void {
 /**
  * 绑定「规则管理器」工具条（显示其格式规则 + ↑↓ 调序 + 删除）
  *
- * 工具条常显在「既有规则」区内（任务窗格与专注模式共用同一份 DOM），
- * 与入口装配（setupRuleManagerEntry）分开：入口只管「怎么进入只看此模块」。
+ * 工具条常显在「既有规则」区内（任务窗格与专注模式共用同一份 DOM）。
+ * 进入专注模式的入口在模块标题的「⛶ 只显示此模块」按钮（module-state
+ * 运行时注入）——工具栏原先那个「🔍 规则管理器」按钮与之完全同一件事
+ * （同调 enterSoloMode('conditional-format', 'sec-existing')），momo：
+ * 按钮功能重复，已删。
  */
 function bindExistingToolbar(): void {
   const scopeSelect = selectById('conditionalFormatFloatScope')
@@ -2561,22 +2778,21 @@ function bindExistingToolbar(): void {
 }
 
 /**
- * 「规则管理器」入口：点按钮进入**专注模式**，本页只显示「既有规则」模块。
+ * 「规则管理器」的专注模式入口：模块标题的「⛶ 只显示此模块」按钮
+ * （module-state 运行时注入，本文件不再装配任何入口）。
+ *
+ * 历史备注：这里曾有 setupRuleManagerEntry 给工具栏按钮
+ * （conditionalFormatFloatBtn）绑 enterSoloMode，与 ⛶ 按钮完全同一件事，
+ * 2026-10-25 momo 指出功能重复，已删——专注入口只留 ⛶ 一处。
  *
  * 为什么不再是原生独立窗口：原生 WebDialog（Application.CreateWebDialog /
  * ShowDialog）即使 `IsModal=false` 也会置顶、抢焦点，挡住用户在表格上框选区 ——
  * 这是 WPS 宿主级限制，插件侧绕不过（代码已尽力传非模态）。边看表格边管规则
  * 恰恰是它的核心场景，被挡反而本末倒置，故弃用原生。
  *
- * 改用页面内专注模式：点「🔍 规则管理器」→ 本页只剩「既有规则」（配合专注模式
- * 隐藏顶栏占满任务窗格），底部控制条可 ↑↓ 切换 / 退出。任务窗格在侧边不挡
- * 表格主区，用户可同时看到规则与表格。
+ * 页面内专注模式：本页只剩「既有规则」（配合专注模式隐藏顶栏占满任务窗格），
+ * 底部控制条可 ↑↓ 切换 / 退出。任务窗格在侧边不挡表格主区。
  */
-function setupRuleManagerEntry(): void {
-  byId('conditionalFormatFloatBtn')?.addEventListener('click', () => {
-    enterSoloMode('conditional-format', 'sec-existing')
-  })
-}
 
 // ===== 拖拽排序 + 行右键菜单（sortable-list / context-menu 两个通用组件接入）=====
 

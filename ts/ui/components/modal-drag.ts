@@ -10,12 +10,14 @@
  *      `calc(100vh - 64px)`；宿主「iframe 视口 = 内容全高」或页面滚动后，
  *      模态框会整体落在可见区外（截图：标题栏被切掉半个）。
  *
- *   本模块补两能力：
+ *   本模块补三能力：
  *   - {@link bindModalDrag}：按住标题栏把手拖动模态框。指针按下时把模态框抬升为
  *     `position: fixed`（基准几何 = 当前视口矩形），位移 rAF 合帧（一帧至多写一次
  *     样式，指针事件快于屏幕刷新时不掉帧），并做视口钳制——横向允许露头但保证
  *     ≥96px 可抓宽度，纵向钳在 `[0, 视口高-40]`：「拖出去找不回来」是最糟的
- *     失败模式（与 detachable-panel 的 bindDrag 同口径）。
+ *     失败模式（与 detachable-panel 的 bindDrag 同口径）。**拖过之后吞掉松手
+ *     补发的那一次 click**（否则 modal 拖离遮罩中心后，click 落在遮罩空白处，
+ *     「点遮罩关闭」逻辑会把弹窗点关——momo 实测「一拖动就关闭」）。
  *   - {@link bringModalIntoView}：打开后量一次，越界就 scrollBy 修正并重锚遮罩
  *     top——修「iframe 内部滚动」宿主模型下的显示不全；「iframe=内容全高」模型
  *     下 window 不可滚（scrollBy 是 no-op），此时靠拖动兜底。
@@ -37,6 +39,37 @@ const MIN_TITLE_VISIBLE = 40
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false
   return target.closest('button, a, input, select, textarea, [role="button"]') !== null
+}
+
+/**
+ * 吞掉拖拽结束后那一次 click
+ *
+ * 模态框拖离遮罩中心后，松手时浏览器补发的 click 落在**遮罩空白处**
+ * （modal 已经不在原位置），而「点遮罩关闭」的判定是 `event.target === mask`
+ * ——于是「一拖动就关闭」（momo 实测：导入弹窗拖一下就没了）。
+ *
+ * 与 sortable-list 的 suppressPostDragClick 同源同修：window 上加一次
+ * capture 阶段拦截，拦掉那一次 click 后自摘。**必须带超时兜底**——
+ * pointerup 后不一定紧跟 click（触摸 / 触控笔场景就没有），拦截器挂着
+ * 不摘会把用户之后真正的点击也吞掉。
+ */
+function suppressPostDragClick(): void {
+  let isRemoved = false
+  // handler 先持变量、后赋值：remove 与 handler 互相引用，
+  // 任一定义在前都踩 no-use-before-define
+  let handler: ((event: Event) => void) | null = null
+  const remove = (): void => {
+    if (isRemoved) return
+    isRemoved = true
+    if (handler) window.removeEventListener('click', handler, { capture: true })
+  }
+  handler = (event: Event): void => {
+    event.stopPropagation()
+    event.preventDefault()
+    remove()
+  }
+  window.addEventListener('click', handler, { capture: true })
+  window.setTimeout(remove, 300)
 }
 
 /** 把模态框几何限制在视口内（留出可抓宽度 / 标题可见高度） */
@@ -73,6 +106,9 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
     const rect = modal.getBoundingClientRect()
     const startLeft = rect.left
     const startTop = rect.top
+    // 是否真的发生了位移：原地点头（单击标题栏）不吞 click，
+    // 否则标题栏上的按钮点击会被误拦
+    let hasMoved = false
 
     // 抬升：flex 子项 → fixed。margin 必须清零，否则遮罩的 flex 居中 margin
     // 会让 left/top 相对元素盒本身再偏移一次（基准几何就歪了）。
@@ -95,6 +131,8 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
     const onMove = (moveEvent: PointerEvent): void => {
       latestX = moveEvent.clientX - startX
       latestY = moveEvent.clientY - startY
+      // 超过 3px 才算拖动（与 sortable 的激活阈值同口径，防手抖误判）
+      if (Math.abs(latestX) > 3 || Math.abs(latestY) > 3) hasMoved = true
       frame ??= window.requestAnimationFrame(flush)
     }
     const onUp = (): void => {
@@ -107,6 +145,8 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      // 真拖过才吞 click：松手时补发的 click 落在遮罩上会把弹窗点关
+      if (hasMoved) suppressPostDragClick()
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)

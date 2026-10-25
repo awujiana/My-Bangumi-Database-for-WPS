@@ -415,6 +415,9 @@ export function buildForeignRuleGroupsHtml(
           <span class="conditional-format-group-count">${String(groupRows.length)}</span>
           <button type="button" class="conditional-format-group-edit" data-action="rename-existing-group" title="重命名分组（组内全部规则改用新组名）">✎</button>
           <button type="button" class="conditional-format-group-remove" data-action="dissolve-existing-group" title="解散分组（规则回「未分组」，不从工作表删除）">✕</button>
+          <button type="button" class="conditional-format-group-pick" data-action="pick-existing-group" title="全选 / 取消本组">☑</button>
+          <button type="button" class="conditional-format-group-export" data-action="export-existing-group" title="导出本组规则为 JSON（选保存位置）">📤</button>
+          <button type="button" class="conditional-format-group-delete" data-action="delete-existing-group" title="从工作表删除本组全部规则">🗑</button>
         </div>
         ${groupRows.map((row) => buildForeignRuleRowHtml(row)).join('')}
       </div>`

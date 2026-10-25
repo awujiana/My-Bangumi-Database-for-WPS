@@ -198,3 +198,80 @@ describe('bringModalIntoView', () => {
     expect(mask.style.top).toBe('')
   })
 })
+
+// ========== 拖拽后 click 吞除（momo：一拖动就关闭） ==========
+
+/** 建遮罩 + 模态框 + 标题栏把手，绑拖动，开一屏 */
+function setupFresh(): { mask: HTMLElement; modal: HTMLElement; grip: HTMLElement } {
+  document.body.replaceChildren()
+  const freshMask = document.createElement('div')
+  const freshModal = document.createElement('div')
+  const freshGrip = document.createElement('h4')
+  freshModal.append(freshGrip)
+  freshMask.append(freshModal)
+  document.body.append(freshMask)
+  bindModalDrag({ modal: freshModal, grip: freshGrip })
+  return { mask: freshMask, modal: freshModal, grip: freshGrip }
+}
+
+/** 拖一把（过阈值 + 松手），装上 click 拦截器 */
+async function dragOnce(targetGrip: HTMLElement): Promise<void> {
+  pointer(targetGrip, 'pointerdown', 10, 10)
+  pointer(window, 'pointermove', 80, 60)
+  await nextFrames()
+  pointer(window, 'pointerup', 80, 60)
+}
+
+describe('bindModalDrag：拖拽后吞 click', () => {
+  it('真拖过 → 松手补发的 click 被吞（不再点关遮罩弹窗）', async () => {
+    const { mask: maskElement, modal: modalElement, grip: gripElement } = setupFresh()
+    await dragOnce(gripElement)
+
+    // modal 已拖到 (70,50) 附近；此时点「modal 外、mask 上」的旧位置，
+    // click 必须被拦截器吃掉（defaultPrevented），不会冒泡到 mask 的关闭逻辑
+    const click = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 10,
+      clientY: 10,
+    })
+    maskElement.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(true)
+    expect(modalElement.style.getPropertyValue('position')).toBe('fixed')
+  })
+
+  it('原地单击标题栏（没过阈值）→ 不吞 click', async () => {
+    const { mask: maskElement, grip: gripElement } = setupFresh()
+
+    pointer(gripElement, 'pointerdown', 10, 10)
+    // 位移 2px < 3px 阈值
+    pointer(window, 'pointermove', 12, 12)
+    await nextFrames()
+    pointer(window, 'pointerup', 12, 12)
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    maskElement.dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(false)
+  })
+
+  it('拦截器超时自摘：拖完 300ms 后点击恢复正常', () => {
+    vi.useFakeTimers()
+    try {
+      const { mask: maskElement, grip: gripElement } = setupFresh()
+      // 不用 dragOnce：它内含 nextFrames（真实 rAF），而本用例的 fake timers
+      // 会把 rAF 也接管导致永不 resolve。pointerup 的 flush 是同步的，
+      // 不等帧几何也已落位，拦截器也已装上。
+      pointer(gripElement, 'pointerdown', 10, 10)
+      pointer(window, 'pointermove', 80, 60)
+      pointer(window, 'pointerup', 80, 60)
+
+      // 推进超过 300ms 兜底：拦截器应自摘
+      vi.advanceTimersByTime(400)
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+      maskElement.dispatchEvent(click)
+      expect(click.defaultPrevented).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

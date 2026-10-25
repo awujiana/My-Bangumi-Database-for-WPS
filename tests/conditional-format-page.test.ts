@@ -442,6 +442,157 @@ describe('既有规则表格', () => {
     expect(m.showToast).toHaveBeenCalledWith('已移动 2 格', 'success')
     // 提交后重读整表（loadExistingRules）
     expect(m.readForeignRules.mock.calls.length).toBeGreaterThan(readCallsBefore)
+
+    // 消费掉拖拽后装的一次性 click 拦截器（suppressPostDragClick：吞一次 +
+    // 300ms 真实超时自摘）。不主动消费的话它会泄漏进下一个用例，把那边的
+    // 首次点击（开弹框之类）吞掉——排查过一轮「按钮全无反应」就是它。
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  })
+})
+
+// ========== 导入弹窗分组（momo：要按照分组导入 / 组内全选） ==========
+
+/** 组 key = 公式 \0 范围（与 snapshotGroupKey 同式），测试里手拼 */
+const importGroupKey = (formula: string, range: string): string => `${formula}\u{0}${range}`
+
+/** 开页 + 点导入按钮打开弹框（openImportModal 默认全选可导入项） */
+async function openImportModalForTest(): Promise<HTMLElement> {
+  await openPage()
+  document.querySelector<HTMLButtonElement>('#conditionalFormatImportBtn')?.click()
+  const list = document.querySelector<HTMLElement>('#conditionalFormatImportList')
+  expect(list).not.toBeNull()
+  return list!
+}
+
+describe('导入弹窗分组', () => {
+  /** 三条规则：甲组两条（含一条不可导入）、乙组一条 */
+  const SNAPSHOTS = [
+    {
+      range: 'B2:B9',
+      formula: '=$B2="x"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#00B050',
+    },
+    {
+      range: 'D2:D9',
+      formula: '',
+      kind: 'other' as const,
+      type: 3,
+    },
+    {
+      range: 'C2:C9',
+      formula: '=$C2="y"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#FF0000',
+    },
+  ]
+
+  /** 甲组的映射（第一条 + 第二条），乙组（第三条）不映射 → 未分组 */
+  function mockGroups(): void {
+    mockConfigWithRules([], SHEET_ENTRY.key)
+    m.getConfig.mockImplementation((key: string) => {
+      if (key === 'conditionalFormat.sheet.v1') return SHEET_ENTRY.key
+      if (key === 'conditionalFormat.existingGroups.v1') {
+        return JSON.stringify({
+          [importGroupKey('=$B2="x"', 'B2:B9')]: '甲组',
+          [importGroupKey('', 'D2:D9')]: '甲组',
+        })
+      }
+      return ''
+    })
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue(SNAPSHOTS)
+  }
+
+  it('弹框按组渲染：组标题 + 计数 + 组内行，「未分组」排最后', async () => {
+    mockGroups()
+    const list = await openImportModalForTest()
+
+    // 只取组容器（组标题里的按钮也带 data-import-group，得排除）
+    const groups = [
+      ...list.querySelectorAll<HTMLElement>('.conditional-format-group[data-import-group]'),
+    ]
+    expect(groups.map((group) => group.dataset.importGroup)).toEqual(['甲组', '未分组'])
+    // 甲组 2 条（含不可导入的也显示，标注类型不支持）
+    expect(groups[0]?.querySelectorAll('.conditional-format-import-row')).toHaveLength(2)
+    expect(groups[0]?.querySelector('.conditional-format-group-count')?.textContent).toBe('2')
+    expect(groups[0]?.querySelector('.conditional-format-tag-warn')).not.toBeNull()
+    expect(groups[1]?.querySelectorAll('.conditional-format-import-row')).toHaveLength(1)
+  })
+
+  it('组内全选 ☑ 是切换语义：已全选 → 取消本组；再点 → 补全本组', async () => {
+    mockGroups()
+    const list = await openImportModalForTest()
+    const confirm = document.querySelector<HTMLButtonElement>('#conditionalFormatImportConfirm')!
+
+    // 打开时默认全选可导入项（2 条公式类）
+    expect(confirm.textContent).toContain('2')
+
+    // 点甲组的 ☑：本组可导入项只有第 1 条 → 取消后只剩未分组的第 3 条
+    // （每次重新查询：组内全选会 syncImportSelectionViews 重渲染列表，
+    // 旧按钮引用已脱离 DOM，再点不会冒泡到委托监听器）
+    const pickInGroup = (): HTMLButtonElement =>
+      list.querySelector<HTMLButtonElement>(
+        ':scope [data-import-group="甲组"] [data-action="pick-import-group"]',
+      )!
+    pickInGroup().click()
+    expect(confirm.textContent).toContain('1')
+
+    // 再点一次：补回，回到 2 条
+    pickInGroup().click()
+    expect(confirm.textContent).toContain('2')
+  })
+
+  it('组内全选只勾可导入项：类型不支持的禁用行不混进选中集', async () => {
+    mockGroups()
+    const list = await openImportModalForTest()
+
+    // 先全不选，再点甲组 ☑：甲组里只有第 1 条可导入 → 只勾它
+    document.querySelector<HTMLButtonElement>('#conditionalFormatImportNone')?.click()
+    list
+      .querySelector<HTMLButtonElement>(
+        ':scope [data-import-group="甲组"] [data-action="pick-import-group"]',
+      )
+      ?.click()
+
+    const checked = [...list.querySelectorAll<HTMLInputElement>('[data-import-check]:checked')].map(
+      (input) => input.dataset.importCheck,
+    )
+    expect(checked).toEqual(['1'])
+  })
+
+  it('▾ 收起分组：行隐藏（is-collapsed）、标题与计数仍在', async () => {
+    mockGroups()
+    const list = await openImportModalForTest()
+
+    const group = list.querySelector<HTMLElement>('[data-import-group="甲组"]')!
+    group.querySelector<HTMLButtonElement>('[data-action="toggle-import-group"]')!.click()
+    const collapsedAgain = list.querySelector<HTMLElement>('[data-import-group="甲组"]') ?? group
+    expect(collapsedAgain.classList.contains('is-collapsed')).toBe(true)
+    // 计数仍在（收起只藏行）
+    expect(collapsedAgain.querySelector('.conditional-format-group-count')?.textContent).toBe('2')
+  })
+
+  it('组内全选与既有规则表格联动：弹框里点 ☑，表格勾选同步亮起', async () => {
+    mockGroups()
+    const list = await openImportModalForTest()
+    document.querySelector<HTMLButtonElement>('#conditionalFormatImportNone')?.click()
+
+    list
+      .querySelector<HTMLButtonElement>(
+        ':scope [data-import-group="甲组"] [data-action="pick-import-group"]',
+      )
+      ?.click()
+
+    // 表格共用 existingSelection：第 1 条应亮起
+    const tableChecks = [
+      ...document.querySelectorAll<HTMLInputElement>(
+        '#conditionalFormatExistingList [data-action="select"]',
+      ),
+    ].map((input) => input.checked)
+    expect(tableChecks).toEqual([true, false, false])
   })
 })
 

@@ -99,7 +99,8 @@
         <!--
           既有规则（可管理）：目标工作表当前的条件格式。
 
-          「🔍 规则管理器」按钮进入**专注模式**（module-state 的 enterSoloMode）：
+          「⛶ 只显示此模块」按钮（模块标题右侧）进入**专注模式**（module-state 的
+          enterSoloMode）：
           本页只剩这一个模块（并隐藏顶栏占满任务窗格），底部控制条可 ↑↓ 切换 / 退出。
           原先走宿主原生独立窗口（CreateWebDialog），但它即使非模态也会置顶挡住
           表格框选区，故改用页面内专注模式替代（见 conditional-format-page.ts
@@ -121,7 +122,7 @@
             目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
             可以直接管理：勾选后批量导入 / 删除，或单条上移下移 / 「如果为真则停止」。 数据条 / 色阶
             / 图标集等类型插件无法重建，双策略会按你的选择处理。
-            <br />点「🔍 规则管理器」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
+            <br />点「⛶ 只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
             底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。
           </p>
           <div class="conditional-format-toolbar">
@@ -151,9 +152,9 @@
             <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
-            <button type="button" class="bgm-btn small primary" id="conditionalFormatFloatBtn">
-              🔍 规则管理器
-            </button>
+            <!-- 进入专注模式的入口 = 模块标题的「⛶ 只显示此模块」按钮（module-state
+                 运行时注入）；原先这里的「🔍 规则管理器」按钮与之功能重复，已删
+                 （2026-10-25 momo 反馈）。 -->
           </div>
           <!-- 工具栏 + 表格 + 分页 + 批量条：常驻在本 section 内，任务窗格与专注模式共用同一份 DOM。 -->
           <div id="conditionalFormatExistingPanel">
