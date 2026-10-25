@@ -229,7 +229,26 @@
           >
             <div id="conditionalFormatEditor" class="conditional-format-editor">
               <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">
-                编辑规则
+                编辑规则<button
+                  type="button"
+                  class="conditional-format-modal-max"
+                  id="conditionalFormatEditorMax"
+                  aria-pressed="false"
+                  aria-label="最大化 / 还原「编辑规则」"
+                  title="最大化 / 还原"
+                >
+                  ⛶
+                </button>
+                <button
+                  type="button"
+                  class="conditional-format-modal-collapse"
+                  id="conditionalFormatEditorCollapse"
+                  aria-expanded="true"
+                  aria-label="收起 / 展开「编辑规则」"
+                  title="收起 / 展开"
+                >
+                  ▾
+                </button>
               </h4>
               <label class="conditional-format-field-label" for="conditionalFormatEditName"
                 >名称</label
@@ -320,10 +339,16 @@
                 <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
               </div>
             </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
           </div>
         </div>
 
-        <!-- 导入手工规则：选择弹框（列出工作表全部既有规则，可导入的默认全选） -->
+        <!-- 导入手工规则：选择弹框（列出工作表既有规则，可导入的默认全选） -->
         <div
           class="conditional-format-modal-mask"
           id="conditionalFormatImportMask"
@@ -336,7 +361,26 @@
             aria-labelledby="conditionalFormatImportTitle"
           >
             <h4 id="conditionalFormatImportTitle" class="conditional-format-modal-grip">
-              选择要导入的规则
+              选择要导入的规则<button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatImportMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「选择要导入的规则」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatImportCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「选择要导入的规则」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
             </h4>
             <p class="conditional-format-import-hint">
               工作表「<span id="conditionalFormatImportSheet"></span
@@ -361,6 +405,12 @@
                 取消
               </button>
             </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
           </div>
         </div>
 
@@ -376,7 +426,28 @@
             aria-modal="true"
             aria-labelledby="conditionalFormatGroupTitle"
           >
-            <h4 id="conditionalFormatGroupTitle" class="conditional-format-modal-grip">归入分组</h4>
+            <h4 id="conditionalFormatGroupTitle" class="conditional-format-modal-grip">
+              归入分组<button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatGroupMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「归入分组」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatGroupCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「归入分组」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
             <!-- 文案由 JS 按模式切换（归入分组 / 重命名分组），见 openGroupNameModal / openRenameGroupModal -->
             <p id="conditionalFormatGroupHint" class="conditional-format-import-hint"></p>
             <input
@@ -397,6 +468,12 @@
                 取消
               </button>
             </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
           </div>
         </div>
 
@@ -419,6 +496,16 @@
           >
             <h4 id="conditionalFormatPasteTitle" class="conditional-format-modal-grip">
               📋 粘贴规则<button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatPasteMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「粘贴规则」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
                 type="button"
                 class="conditional-format-modal-collapse"
                 id="conditionalFormatPasteCollapse"
@@ -444,6 +531,12 @@
                 取消
               </button>
             </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
           </div>
         </div>
 
@@ -553,7 +646,26 @@
         aria-labelledby="conditionalFormatConfirmTitle"
       >
         <h4 id="conditionalFormatConfirmTitle" class="conditional-format-modal-grip">
-          应用条件格式
+          应用条件格式<button
+            type="button"
+            class="conditional-format-modal-max"
+            id="conditionalFormatConfirmMax"
+            aria-pressed="false"
+            aria-label="最大化 / 还原「应用条件格式」"
+            title="最大化 / 还原"
+          >
+            ⛶
+          </button>
+          <button
+            type="button"
+            class="conditional-format-modal-collapse"
+            id="conditionalFormatConfirmCollapse"
+            aria-expanded="true"
+            aria-label="收起 / 展开「应用条件格式」"
+            title="收起 / 展开"
+          >
+            ▾
+          </button>
         </h4>
         <div class="conditional-format-modal-body" id="conditionalFormatConfirmBody"></div>
         <div class="conditional-format-modal-actions">
@@ -567,6 +679,12 @@
             取消
           </button>
         </div>
+        <div
+          class="conditional-format-modal-resize"
+          role="separator"
+          aria-label="拖动缩放窗口"
+          title="拖动缩放"
+        ></div>
       </div>
     </div>
   </body>

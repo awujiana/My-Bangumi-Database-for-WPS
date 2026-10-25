@@ -27,7 +27,12 @@
  *   （直接写 left/top，没有可复用的基准几何）。事件监听挂 **window** 而不是
  *   把手 + setPointerCapture：老宿主 / jsdom 没有指针捕获 API，window 监听
  *   在两者下都能完整收到 move/up（拖到遮罩外也不丢事件）。
+ *
+ *   收起 / 最大化 / 缩放三件套在 window-chrome（模态框与浮动窗共用的窗口
+ *   能力层）；本模块只保留拖动与拉回可见区这两个遮罩模态框特有能力。
  */
+
+import { MODAL_MAXIMIZED_CLASS, suppressPostDragClick } from './window-chrome.js'
 
 /** 横向露头时至少保留的可抓宽度（px）：小于它用户就再也抓不到标题栏了 */
 const MIN_GRAB_WIDTH = 96
@@ -39,37 +44,6 @@ const MIN_TITLE_VISIBLE = 40
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false
   return target.closest('button, a, input, select, textarea, [role="button"]') !== null
-}
-
-/**
- * 吞掉拖拽结束后那一次 click
- *
- * 模态框拖离遮罩中心后，松手时浏览器补发的 click 落在**遮罩空白处**
- * （modal 已经不在原位置），而「点遮罩关闭」的判定是 `event.target === mask`
- * ——于是「一拖动就关闭」（momo 实测：导入弹窗拖一下就没了）。
- *
- * 与 sortable-list 的 suppressPostDragClick 同源同修：window 上加一次
- * capture 阶段拦截，拦掉那一次 click 后自摘。**必须带超时兜底**——
- * pointerup 后不一定紧跟 click（触摸 / 触控笔场景就没有），拦截器挂着
- * 不摘会把用户之后真正的点击也吞掉。
- */
-function suppressPostDragClick(): void {
-  let isRemoved = false
-  // handler 先持变量、后赋值：remove 与 handler 互相引用，
-  // 任一定义在前都踩 no-use-before-define
-  let handler: ((event: Event) => void) | null = null
-  const remove = (): void => {
-    if (isRemoved) return
-    isRemoved = true
-    if (handler) window.removeEventListener('click', handler, { capture: true })
-  }
-  handler = (event: Event): void => {
-    event.stopPropagation()
-    event.preventDefault()
-    remove()
-  }
-  window.addEventListener('click', handler, { capture: true })
-  window.setTimeout(remove, 300)
 }
 
 /** 把模态框几何限制在视口内（留出可抓宽度 / 标题可见高度） */
@@ -99,6 +73,8 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
     // 只响应主键：右键 / 中键拖动会和系统菜单冲突
     if (event.button !== 0) return
     if (isInteractiveTarget(event.target)) return
+    // 最大化态不拖：铺满视口再拖位没意义，先 ⛶ 还原再拖
+    if (modal.classList.contains(MODAL_MAXIMIZED_CLASS)) return
     event.preventDefault()
 
     const startX = event.clientX
@@ -155,16 +131,19 @@ export function bindModalDrag(options: { modal: HTMLElement; grip: HTMLElement }
 }
 
 /**
- * 清掉拖动留下的内联几何，让模态框回到遮罩的 CSS 居中位
+ * 清掉拖动 / 缩放 / 最大化 / 收起留下的状态，让模态框回到遮罩的 CSS 居中位
  *
- * 打开模态框前调用（每次打开都重新居中，不记住上次拖到的位置）。
+ * 打开模态框前调用（每次打开都重新居中 + 展开，不记住上次的几何与会话态）。
  */
 export function resetModalPosition(modal: HTMLElement): void {
   modal.style.removeProperty('position')
   modal.style.removeProperty('margin')
   modal.style.removeProperty('left')
   modal.style.removeProperty('top')
-  modal.classList.remove('is-dragged')
+  // 缩放留下的尺寸一并清：width/height 内联不清的话 CSS 的 min() 宽度被压住
+  modal.style.removeProperty('width')
+  modal.style.removeProperty('height')
+  modal.classList.remove('is-dragged', 'is-resized', 'is-collapsed', MODAL_MAXIMIZED_CLASS)
 }
 
 /**

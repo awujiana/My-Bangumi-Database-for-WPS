@@ -74,6 +74,7 @@ import {
   bringModalIntoView,
   resetModalPosition,
 } from '../ui/components/modal-drag.js'
+import { bindModalMaximize, bindModalResize } from '../ui/components/window-chrome.js'
 import { attachDelegatedContextMenu } from '../ui/components/context-menu.js'
 import { createSortable } from '../ui/components/sortable-list.js'
 import type { SortableHandle } from '../ui/components/sortable-list.js'
@@ -2586,28 +2587,63 @@ export function initializeConditionalFormatPage(): void {
     if (event.target === byId('conditionalFormatEditorMask')) closeEditor()
   })
 
-  // 四个模态框统一补「拖标题栏移动」：窄任务窗格 / 宿主滚动模型各异时，
-  // 遮罩居中的模态框可能落在可见区外，用户此前没有任何办法移动它
-  // （把手 = 各自 h4 标题，class conditional-format-modal-grip 给抓手光标）
-  const MODAL_DRAG_TARGETS: readonly (readonly [string, string])[] = [
-    ['conditionalFormatEditorMask', 'conditionalFormatEditorTitle'],
-    ['conditionalFormatImportMask', 'conditionalFormatImportTitle'],
-    ['conditionalFormatGroupMask', 'conditionalFormatGroupTitle'],
-    ['conditionalFormatConfirmMask', 'conditionalFormatConfirmTitle'],
-    ['conditionalFormatPasteMask', 'conditionalFormatPasteTitle'],
+  // 五个模态框统一补「窗口三件套」：拖标题栏移动 + ⛶ 最大化/还原 + ▾ 收起 +
+  // 右下角缩放把手——能力原语在 window-chrome（与浮动窗共用的窗口能力层）。
+  // 窄任务窗格里遮罩居中的模态框又小又挡内容，此前只能看不能调（momo：加上
+  // 浮动窗口模块的收起和放大等功能）。
+  // [遮罩 id, 标题栏 id, 收起按钮 id, 最大化按钮 id, 缩放把手 id]
+  const MODAL_SPECS: readonly (readonly [string, string, string, string, string])[] = [
+    [
+      'conditionalFormatEditorMask',
+      'conditionalFormatEditorTitle',
+      'conditionalFormatEditorCollapse',
+      'conditionalFormatEditorMax',
+      'conditionalFormatEditorResize',
+    ],
+    [
+      'conditionalFormatImportMask',
+      'conditionalFormatImportTitle',
+      'conditionalFormatImportCollapse',
+      'conditionalFormatImportMax',
+      'conditionalFormatImportResize',
+    ],
+    [
+      'conditionalFormatGroupMask',
+      'conditionalFormatGroupTitle',
+      'conditionalFormatGroupCollapse',
+      'conditionalFormatGroupMax',
+      'conditionalFormatGroupResize',
+    ],
+    [
+      'conditionalFormatConfirmMask',
+      'conditionalFormatConfirmTitle',
+      'conditionalFormatConfirmCollapse',
+      'conditionalFormatConfirmMax',
+      'conditionalFormatConfirmResize',
+    ],
+    [
+      'conditionalFormatPasteMask',
+      'conditionalFormatPasteTitle',
+      'conditionalFormatPasteCollapse',
+      'conditionalFormatPasteMax',
+      'conditionalFormatPasteResize',
+    ],
   ]
-  for (const [maskId, titleId] of MODAL_DRAG_TARGETS) {
+  for (const [maskId, titleId, collapseId, maximizeId, resizeId] of MODAL_SPECS) {
     const mask = byId(maskId)
     const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
     const grip = byId(titleId)
     if (modal && grip) bindModalDrag({ modal, grip })
+    const collapseButton = byId(collapseId)
+    if (modal && collapseButton) bindModalCollapse({ modal, button: collapseButton })
+    const maximizeButton = byId(maximizeId)
+    if (modal && maximizeButton) bindModalMaximize({ modal, button: maximizeButton })
+    const resizeHandle = byId(resizeId)
+    if (modal && resizeHandle) bindModalResize({ modal, handle: resizeHandle })
   }
 
-  // 粘贴规则弹窗：收起 / 展开 + 确定 / 取消 / 遮罩关闭
+  // 粘贴规则弹窗：确定 / 取消 / 遮罩关闭（三件套已在上面统一绑）
   const pasteMask = byId('conditionalFormatPasteMask')
-  const pasteModal = pasteMask?.querySelector<HTMLElement>('.conditional-format-modal')
-  const pasteCollapse = byId('conditionalFormatPasteCollapse')
-  if (pasteModal && pasteCollapse) bindModalCollapse({ modal: pasteModal, button: pasteCollapse })
   byId('conditionalFormatPasteOk')?.addEventListener('click', () => {
     confirmPaste()
   })

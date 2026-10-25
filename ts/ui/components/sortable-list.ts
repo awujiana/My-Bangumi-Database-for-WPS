@@ -25,6 +25,8 @@
  *   （克隆 overlay + 中点碰撞 + 键盘传感器）。
  */
 
+import { suppressPostDragClick } from './window-chrome.js'
+
 /** 重排事件：fromId 移到了 overId 的前面（placeAfter=false）或后面 */
 export interface SortableReorderEvent {
   /** 被拖项的 id（getItemId 的返回值） */
@@ -360,31 +362,7 @@ export function createSortable(options: SortableOptions): SortableHandle {
     window.setTimeout(done, 240)
   }
 
-  /**
-   * 吞掉拖拽结束后那一次 click（否则会误触发行内按钮——dnd-kit 同款处理）
-   *
-   * 必须带**超时兜底自摘**：pointerup 之后不一定紧跟 click 事件（触摸 / 触控笔 /
-   *   合成事件场景就没有），拦截器挂着不摘会把用户之后真正的点击也吞掉——
-   *   表现是「拖完一次，接下来点什么都没反应」。
-   */
-  function suppressPostDragClick(): void {
-    let isRemoved = false
-    // handler 先持变量、后赋值：remove 与 handler 互相引用，
-    // 任一定义在前都会踩 no-use-before-define
-    let handler: ((event: Event) => void) | null = null
-    const remove = (): void => {
-      if (isRemoved) return
-      isRemoved = true
-      if (handler) window.removeEventListener('click', handler, { capture: true })
-    }
-    handler = (event: Event): void => {
-      event.stopPropagation()
-      event.preventDefault()
-      remove()
-    }
-    window.addEventListener('click', handler, { capture: true })
-    window.setTimeout(remove, 300)
-  }
+  // 吞掉拖拽结束后那一次 click（否则会误触发行内按钮）。实现已收敛到 window-chrome（modal-drag 同源共用，带超时兜底自摘）。
 
   /** 提交重排（同步 / 异步都支持） */
   function commitReorder(event: SortableReorderEvent, overlay: HTMLElement | null): void {
