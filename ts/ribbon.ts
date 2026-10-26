@@ -359,6 +359,28 @@ const SYNC_ACTIONS: Record<string, () => unknown> = {
   btnSetToken: setTokenForRibbon,
   btnSetUserId: setUserIdForRibbon,
   btnOpenCollection: openCollectionForRibbon,
+  btnDonate: showDonateForRibbon,
+}
+
+/**
+ * 「赞赏」按钮：说明插件的开源性质与支持方式
+ *
+ * 用 alert 而非新开面板：这是「一次阅读即可关闭」的信息，不值得占一个任务窗格；
+ * 也不用 toast（一行放不下，且容易被后面的事件冲掉）。
+ */
+function showDonateForRibbon(): void {
+  getNotifyApi().alert(
+    [
+      'Bangumi Watchlist Bridge 是免费开源插件，使用不收费、功能无限制。',
+      '',
+      '如果它帮你省下了整理追番表的功夫，欢迎请作者喝杯咖啡 —— ',
+      '这会让插件继续更新下去（新站点适配 / 新字段 / bug 修复）。',
+      '',
+      '· 在 GitHub 上点个 Star，或提 Issue / PR，同样是非常实在的支持；',
+      '· 也可在「设置 · 关于」里找到作者与仓库地址。',
+    ].join('\n'),
+    '💙 感谢支持',
+  )
 }
 
 /**
@@ -459,6 +481,7 @@ const ICON_PATHS: Record<string, string> = {
   btnOpenCleanPanel: 'images/cleanPage.svg',
   btnOpenHighlightPanel: 'images/highlightPage.svg',
   btnOpenConditionalFormatPanel: 'images/conditionalFormatPage.svg',
+  btnDonate: 'images/donate.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

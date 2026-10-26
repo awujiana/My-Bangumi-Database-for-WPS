@@ -438,6 +438,14 @@ export {
   setTheme,
   getTheme,
   type ThemeMode,
+  // 主题定时切换（schedule 模式的开始时刻）
+  setThemeSchedule,
+  getThemeSchedule,
+  type ThemeSchedule,
+  // 模态框按钮位置（模态框内底部 / 标题栏右上角）
+  setModalButtonsPosition,
+  getModalButtonsPosition,
+  type ModalButtonsPosition,
   // 默认收藏列表类型
   setListType,
   getListType,
@@ -469,6 +477,8 @@ export {
   saveTheme,
   resolveTheme,
   startThemeSync,
+  startThemeScheduleWatch,
+  switchThemeAnimated,
 } from './tools/theme.js'
 
 // ============================================================================

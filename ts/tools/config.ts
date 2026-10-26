@@ -20,6 +20,8 @@ export const CONFIG_KEYS = {
   ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
   NAV_ICONS_ONLY: 'bgm_nav_icons_only',
   THEME: 'bgm_theme',
+  THEME_SCHEDULE: 'bgm_theme_schedule',
+  MODAL_BUTTONS_POSITION: 'bgm_modal_buttons_position',
   LIST_TYPE: 'bgm_list_type',
   TIME_FILTER: 'bgm_time_filter',
   REFRESH_INTERVAL: 'bgm_refresh_interval',
@@ -223,7 +225,13 @@ export function areNavIconsOnly(isSilent = false): boolean {
 
 // ========== 外观主题 ==========
 
-const THEME_MODES = ['dark', 'light', 'system'] as const
+/**
+ * 主题模式四种：
+ * - `dark` / `light`：固定
+ * - `system`：跟随操作系统（prefers-color-scheme）
+ * - `schedule`：按「深色开始 / 浅色开始」两个时刻定时切换（momo 2026-10-26）
+ */
+const THEME_MODES = ['dark', 'light', 'system', 'schedule'] as const
 export type ThemeMode = (typeof THEME_MODES)[number]
 
 export function setTheme(mode: string): boolean {
@@ -239,6 +247,118 @@ export function getTheme(isSilent = false): ThemeMode {
   const v = getConfig(CONFIG_KEYS.THEME, 'dark', isSilent)
   const result = THEME_MODES.includes(v as ThemeMode) ? (v as ThemeMode) : 'dark'
   if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取主题模式: ${result}`)
+  return result
+}
+
+// ========== 主题定时切换（schedule 模式的开始时刻） ==========
+
+/** `HH:MM`（24 小时制）；解析失败返回 null */
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** 主题定时配置 */
+export interface ThemeSchedule {
+  /** 是否启用定时切换（关闭则 schedule 模式按深色处理） */
+  enabled: boolean
+  /** 深色开始时刻 `HH:MM` */
+  darkStart: string
+  /** 浅色开始时刻 `HH:MM` */
+  lightStart: string
+}
+
+const DEFAULT_THEME_SCHEDULE: ThemeSchedule = {
+  enabled: true,
+  darkStart: '19:00',
+  lightStart: '07:00',
+}
+
+export function setThemeSchedule(schedule: ThemeSchedule): boolean {
+  if (!TIME_PATTERN.test(schedule.darkStart) || !TIME_PATTERN.test(schedule.lightStart)) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[config] 无效主题定时时刻: ${schedule.darkStart} / ${schedule.lightStart}`,
+    )
+    return false
+  }
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[config] 设置主题定时: ${schedule.enabled ? '开' : '关'} ${schedule.lightStart}→${schedule.darkStart}`,
+  )
+  return setConfig(CONFIG_KEYS.THEME_SCHEDULE, JSON.stringify(schedule))
+}
+
+export function getThemeSchedule(isSilent = false): ThemeSchedule {
+  const raw = getConfig(CONFIG_KEYS.THEME_SCHEDULE, '', isSilent)
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed !== null && typeof parsed === 'object') {
+        const { darkStart, lightStart, enabled } = parsed as Record<string, unknown>
+        if (
+          typeof darkStart === 'string' &&
+          typeof lightStart === 'string' &&
+          TIME_PATTERN.test(darkStart) &&
+          TIME_PATTERN.test(lightStart)
+        ) {
+          return { enabled: enabled === true, darkStart, lightStart }
+        }
+      }
+    } catch {
+      bgmLog(LOG_LEVELS.WARN, '[config] 主题定时配置解析失败，用默认值')
+    }
+  }
+  return DEFAULT_THEME_SCHEDULE
+}
+
+/** `HH:MM` → 当天分钟数（解析失败按 0 处理，调用方已用 TIME_PATTERN 校验过） */
+function toMinutesOfDay(value: string): number {
+  const [hours, mins] = value.split(':', 2)
+  return Number(hours) * 60 + Number(mins)
+}
+
+/**
+ * 按定时配置解析当前应处的主题
+ *
+ * 语义：`[lightStart, darkStart)` 为浅色区间，其余为深色。
+ * 跨零点（darkStart 02:00、lightStart 08:00）也能正确判定。
+ */
+export function resolveScheduledTheme(schedule: ThemeSchedule, now: Date): 'dark' | 'light' {
+  if (!schedule.enabled) return 'dark'
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  const darkStart = toMinutesOfDay(schedule.darkStart)
+  const lightStart = toMinutesOfDay(schedule.lightStart)
+  // 浅色区间：lightStart ≤ t < darkStart（不跨零点）或 t ≥ lightStart / t < darkStart（跨零点）
+  const isLight =
+    lightStart <= darkStart
+      ? minutes >= lightStart && minutes < darkStart
+      : minutes >= lightStart || minutes < darkStart
+  return isLight ? 'light' : 'dark'
+}
+
+// ========== 模态框按钮位置（momo：可放到模态框之外） ==========
+
+const MODAL_BUTTON_POSITIONS = ['inside', 'outside'] as const
+/**
+ * 模态框按钮位置：
+ * - `inside`：底部按钮组（模态框之内，默认）
+ * - `outside`：标题栏右上角（模态框之外，与 ⛶/▾ 同排——momo 截图里的样式）
+ */
+export type ModalButtonsPosition = (typeof MODAL_BUTTON_POSITIONS)[number]
+
+export function setModalButtonsPosition(position: string): boolean {
+  if (!MODAL_BUTTON_POSITIONS.includes(position as ModalButtonsPosition)) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效模态框按钮位置: ${position}，已忽略`)
+    return false
+  }
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置模态框按钮位置: ${position}`)
+  return setConfig(CONFIG_KEYS.MODAL_BUTTONS_POSITION, position)
+}
+
+export function getModalButtonsPosition(isSilent = false): ModalButtonsPosition {
+  const v = getConfig(CONFIG_KEYS.MODAL_BUTTONS_POSITION, 'inside', isSilent)
+  const result = MODAL_BUTTON_POSITIONS.includes(v as ModalButtonsPosition)
+    ? (v as ModalButtonsPosition)
+    : 'inside'
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取模态框按钮位置: ${result}`)
   return result
 }
 

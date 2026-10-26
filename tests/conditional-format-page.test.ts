@@ -39,6 +39,8 @@ const m = vi.hoisted(() => ({
   // 默认导出位置（save-file 流程用；测试不关心位置，返回空 = 用对话框默认目录）
   getExportPath: vi.fn<() => string>(),
   setExportPath: vi.fn<(path: string) => boolean>(),
+  // 模态框按钮位置（inside = 模态框内；outside = 右上角外置），默认 inside
+  getModalButtonsPosition: vi.fn<() => string>(() => 'inside'),
   // tools/save-file.js（选位置 + 写文件；测试环境无 WPS COM，统一 mock）
   saveTextFileWithDialog:
     vi.fn<(options: unknown) => { path: string; via: 'fso' | 'download' } | null>(),
@@ -88,6 +90,7 @@ vi.mock('../ts/tools/config.js', () => ({
   setConfig: m.setConfig,
   getExportPath: m.getExportPath,
   setExportPath: m.setExportPath,
+  getModalButtonsPosition: m.getModalButtonsPosition,
 }))
 
 vi.mock('../ts/tools/save-file.js', () => ({

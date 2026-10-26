@@ -3256,13 +3256,103 @@ body {
     padding: 0;
 }
 
+/* ========== 主题模式按钮组（momo：替代下拉栏的按钮形式） ========== */
+/* 胶囊分段控件：四个模式一排放，active 用主色描边 + 淡底，比下拉更直白 */
+.theme-mode-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+}
+
+.theme-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-surface);
+    color: var(--text-2);
+    font-size: var(--fs-body);
+    cursor: pointer;
+    transition: border-color var(--dur), background var(--dur), color var(--dur);
+}
+
+.theme-mode-btn:hover {
+    border-color: var(--border-strong);
+    color: var(--text-1);
+}
+
+.theme-mode-btn.active {
+    border-color: var(--primary);
+    background: var(--primary-soft, rgba(18, 150, 219, 0.14));
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.theme-mode-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* 定时切换的开始时刻（选「定时」模式才显示） */
+.theme-schedule-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-top: var(--sp-3);
+    padding: var(--sp-3);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-md);
+}
+
+.theme-schedule-box[hidden] {
+    display: none;
+}
+
+.theme-schedule-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+}
+
+.theme-schedule-row label {
+    min-width: 72px;
+    color: var(--text-2);
+    font-size: var(--fs-sm);
+}
+
+.theme-schedule-input {
+    width: 120px;
+}
+
+/* ========== 主题切换扩散动画（ts/tools/theme.ts 的覆盖层降级路径） ========== */
+/* 老 WebView 没有 View Transition 时用：盖一层「切换前的 --bg-app」实色，
+   从满屏收缩到点击点，露出下面的新主题 —— 视觉上就是「新主题从中心扩散」。
+   pointer-events: none 保证动画期间不抢用户的点击。 */
+.theme-ripple-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    pointer-events: none;
+    animation: theme-ripple-spread 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes theme-ripple-spread {
+    from {
+        clip-path: circle(var(--ripple-radius) at var(--ripple-x) var(--ripple-y));
+    }
+    to {
+        clip-path: circle(0px at var(--ripple-x) var(--ripple-y));
+    }
+}
+
 /* 主题预览 */
 .theme-preview {
     display: flex;
     gap: 12px;
     margin-top: 4px;
 }
-
 .theme-preview-card {
     flex: 1;
     display: flex;

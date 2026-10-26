@@ -19,6 +19,8 @@ import {
   getTimeFilter,
   getRefreshInterval,
   getLogLevel,
+  getModalButtonsPosition,
+  getThemeSchedule,
 } from '../../index.js'
 import { loadGithubConfigIntoForm } from './github-settings.js'
 import { initializeModuleOrderEditor } from './module-order.js'
@@ -39,9 +41,14 @@ import {
   handleLogLevelFilterChange,
   handleRefreshIntervalChange,
   handleThemeChange,
+  handleModalButtonsPositionClick,
+  handleThemeModeClick,
   handleThemePreviewClick,
+  handleThemeScheduleChange,
   handleTimeFilterChange,
   setupTimeFilterControls,
+  updateModalButtonsPositionButtons,
+  updateThemeModeButtons,
   updateThemePreview,
 } from './settings-bindings.js'
 import { syncFromPanel } from './sync.js'
@@ -171,13 +178,34 @@ export function setupButtonListeners(): void {
     bgmLog(LOG_LEVELS.INFO, '[handlers] 日志级别筛选 change 监听器已注册')
   }
 
-  // 设置页：外观主题选择 / 预览卡片
+  // 设置页：外观主题（按钮组：深色 / 浅色 / 跟随系统 / 定时 + 定时时刻输入）
+  // 旧 themeSelect 下拉已改为按钮组（momo：用按钮形式），此处仅兼容残留的旧 DOM
   const themeSelect = document.getElementById('themeSelect') as HTMLSelectElement | null
   if (themeSelect) {
     themeSelect.value = getTheme(true)
     trackedAddEventListener(themeSelect, 'change', handleThemeChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 主题选择 change 监听器已注册')
   }
+  for (const button of document.querySelectorAll<HTMLElement>('[data-theme-mode]')) {
+    trackedAddEventListener(button, 'click', handleThemeModeClick)
+  }
+  const themeDarkStart = document.getElementById('themeDarkStart') as HTMLInputElement | null
+  const themeLightStart = document.getElementById('themeLightStart') as HTMLInputElement | null
+  const savedSchedule = getThemeSchedule(true)
+  if (themeDarkStart) {
+    themeDarkStart.value = savedSchedule.darkStart
+    trackedAddEventListener(themeDarkStart, 'change', handleThemeScheduleChange)
+  }
+  if (themeLightStart) {
+    themeLightStart.value = savedSchedule.lightStart
+    trackedAddEventListener(themeLightStart, 'change', handleThemeScheduleChange)
+  }
+  updateThemeModeButtons(getTheme(true))
+  // 模态框按钮位置分段按钮（回填 + 点击切换）
+  for (const button of document.querySelectorAll<HTMLElement>('[data-modal-buttons-position]')) {
+    trackedAddEventListener(button, 'click', handleModalButtonsPositionClick)
+  }
+  updateModalButtonsPositionButtons(getModalButtonsPosition(true))
 
   // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
   loadEnrichPreviewSettingsIntoForm()

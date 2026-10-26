@@ -16,10 +16,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 
 vi.mock('../ts/tools/config.js', () => ({
-  CONFIG_KEYS: { THEME: 'bgm_theme' },
+  CONFIG_KEYS: { THEME: 'bgm_theme', THEME_SCHEDULE: 'bgm_theme_schedule' },
   getTheme: vi.fn(),
   getConfig: vi.fn(() => 'dark'),
   setTheme: vi.fn(),
+  getThemeSchedule: vi.fn(() => ({ enabled: true, darkStart: '19:00', lightStart: '07:00' })),
+  resolveScheduledTheme: vi.fn(() => 'dark'),
 }))
 
 /**

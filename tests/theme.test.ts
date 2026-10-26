@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Mock 依赖：完全隔离 tools/config.ts，ts 运行时仅用到 getTheme / setTheme。
+// Mock 依赖：完全隔离 tools/config.ts，ts 运行时仅用到 getTheme / setTheme / 定时相关。
 vi.mock('../ts/tools/config.js', () => ({
+  CONFIG_KEYS: { THEME: 'bgm_theme', THEME_SCHEDULE: 'bgm_theme_schedule' },
   getTheme: vi.fn(),
   setTheme: vi.fn(),
+  getThemeSchedule: vi.fn(() => ({ enabled: true, darkStart: '19:00', lightStart: '07:00' })),
+  resolveScheduledTheme: vi.fn(() => 'dark'),
 }))
 
 import { getTheme, setTheme } from '../ts/tools/config.js'
@@ -13,6 +16,8 @@ import {
   applyTheme,
   initializeTheme,
   startThemeSync,
+  startThemeScheduleWatch,
+  switchThemeAnimated,
 } from '../ts/tools/theme.js'
 
 /**
@@ -124,6 +129,32 @@ describe('tools/theme', () => {
   describe('startThemeSync', () => {
     it('node 下 window 未定义时早退不抛错', () => {
       expect(() => startThemeSync()).not.toThrow()
+    })
+  })
+
+  describe('startThemeScheduleWatch', () => {
+    it('node 下 window 未定义时返回空退订函数，不抛错', () => {
+      const stop = startThemeScheduleWatch()
+      expect(typeof stop).toBe('function')
+      expect(() => stop()).not.toThrow()
+    })
+  })
+
+  describe('switchThemeAnimated', () => {
+    it('node 下无 document 时静默返回（不抛错）', () => {
+      expect(() => switchThemeAnimated('dark', { x: 0, y: 0 })).not.toThrow()
+    })
+  })
+
+  describe('saveTheme', () => {
+    it('schedule 模式写入成功时返回 true', () => {
+      vi.mocked(setTheme).mockReturnValue(true)
+      expect(saveTheme('schedule')).toBe(true)
+      expect(setTheme).toHaveBeenCalledWith('schedule')
+    })
+
+    it('未知模式拒绝写入', () => {
+      expect(saveTheme('rainbow')).toBe(false)
     })
   })
 })

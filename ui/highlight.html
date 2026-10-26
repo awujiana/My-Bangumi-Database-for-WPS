@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/detachable-panel.css" />
-<link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/context-menu.css" />
     <link rel="stylesheet" href="../css/highlight.css" />
   </head>
   <body data-page="highlight">
@@ -107,6 +107,42 @@
             自动模式按今天定位当前季：1/2 月→1 月季，3/4/5 月→4 月季，6/7/8 月→7 月季，9/10/11 月→10
             月季，12 月→次年 1 月季（12 月播的番剧归冬季档）。
           </p>
+
+          <!-- 筛选范围：与 GitHub 同步的时间筛选同口径（momo：和同步的筛选一样） -->
+          <label class="highlight-field-label">筛选范围（只看哪些行）</label>
+          <div class="highlight-mode-row highlight-filter-row" role="group" aria-label="筛选范围">
+            <button type="button" class="highlight-mode-btn" data-filter-range="all">全部</button>
+            <button type="button" class="highlight-mode-btn" data-filter-range="year">年度</button>
+            <button type="button" class="highlight-mode-btn" data-filter-range="quarter">
+              季度
+            </button>
+            <button type="button" class="highlight-mode-btn" data-filter-range="month">月份</button>
+            <button type="button" class="highlight-mode-btn" data-filter-range="future">
+              未来番
+            </button>
+          </div>
+          <div class="highlight-manual-box" id="highlightFilterBox" style="display: none">
+            <select id="highlightFilterYear" class="highlight-select"></select>
+            <select id="highlightFilterQuarter" class="highlight-select"></select>
+            <select id="highlightFilterMonth" class="highlight-select"></select>
+          </div>
+          <p class="hint" id="highlightFilterHint">
+            季度 = yy 年 mm 月新番（1 月季含上年 12 月，10 月季含 9/10/11 月）；年度 = 该年所有季
+            （12 月播算次年 1 月季）。与「数据同步」页的时间筛选同一套口径。
+          </p>
+          <label class="highlight-watch-row">
+            <input type="checkbox" id="highlightIncludeNonAnime" />
+            <span>包含非动漫条目（书籍 / 音乐 / 游戏 / 三次元）</span>
+          </label>
+          <p class="hint">
+            默认只认动漫：「开播季度」公式列只对日漫归一，非动漫行的公式值是原始年月，永远匹配不上季目标。
+            勾选后额外读该行的「开播日期」来匹配——Bangumi 收藏里的书 / 游戏 / 三次元也能筛。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="highlightFilterApplyBtn">🔍 筛选显示</button>
+            <button class="bgm-btn small" id="highlightFilterClearBtn">取消筛选</button>
+          </div>
+          <p class="hint">「筛选显示」把不命中的行隐藏（只隐藏不改数据），「取消筛选」全部显示。</p>
 
           <label class="highlight-watch-row">
             <input type="checkbox" id="highlightAutoWatch" />

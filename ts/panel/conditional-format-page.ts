@@ -20,7 +20,13 @@ import {
   getColumnMap,
   markConditionalFormatPaneLoaded,
 } from '../tools/util/index.js'
-import { getConfig, getExportPath, setConfig, setExportPath } from '../tools/config.js'
+import {
+  getConfig,
+  getExportPath,
+  getModalButtonsPosition,
+  setConfig,
+  setExportPath,
+} from '../tools/config.js'
 import {
   CONDITIONAL_FORMAT_GROUP_HIGHLIGHT,
   CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
@@ -327,31 +333,44 @@ function selectedSheet(): SheetEntry | null {
  * 记录 `selectionMissing`，由 renderSheetSelect 提示重新选择。
  */
 function reloadSheets(): void {
-  state.sheets = collectSheets()
-  const isSelectionValid = state.sheets.some((entry) => entry.key === state.selectedKey)
-  if (!isSelectionValid && state.sheets.length > 0) {
-    if (isSheetLocked()) {
-      // 锁定：记住失效前选的是哪张表，供下拉里提示「原目标表 X 已不存在」
-      state.selectionMissing = state.selectedKey || getConfig(KEY_SHEET, '', true) || '（未知）'
-      state.selectedKey = ''
-    } else {
-      // 默认选中活动表：用户是在活动表上点开面板的，第一张往往是别的表，
-      // 于是「既有规则」区显示空、而用户明明看到活动表上有规则（真机反馈）。
-      // 活动表匹配不到（未打开 / 取不到）才退回首张。
-      const active = activeWorksheet()
-      const matched = active ? state.sheets.find((entry) => entry.worksheet === active) : undefined
-      const fallback = state.sheets[0]
-      state.selectedKey = (matched ?? fallback)?.key ?? ''
+  try {
+    state.sheets = collectSheets()
+    const isSelectionValid = state.sheets.some((entry) => entry.key === state.selectedKey)
+    if (!isSelectionValid && state.sheets.length > 0) {
+      if (isSheetLocked()) {
+        // 锁定：记住失效前选的是哪张表，供下拉里提示「原目标表 X 已不存在」
+        state.selectionMissing = state.selectedKey || getConfig(KEY_SHEET, '', true) || '（未知）'
+        state.selectedKey = ''
+      } else {
+        // 默认选中活动表：用户是在活动表上点开面板的，第一张往往是别的表，
+        // 于是「既有规则」区显示空、而用户明明看到活动表上有规则（真机反馈）。
+        // 活动表匹配不到（未打开 / 取不到）才退回首张。
+        const active = activeWorksheet()
+        const matched = active
+          ? state.sheets.find((entry) => entry.worksheet === active)
+          : undefined
+        const fallback = state.sheets[0]
+        state.selectedKey = (matched ?? fallback)?.key ?? ''
+        state.selectionMissing = ''
+      }
+    } else if (isSelectionValid) {
       state.selectionMissing = ''
     }
-  } else if (isSelectionValid) {
-    state.selectionMissing = ''
+    renderWorkbookSelect()
+    renderSheetSelect()
+    // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
+    // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
+    loadExistingRules()
+  } catch (error: unknown) {
+    // 宿主读取失败（JSAPI 桥未就绪 / 被调速器限速）：绝不让异常冒泡到事件
+    // 监听或初始化，否则整页「不能点击」。降级为「可重试」空态 + 提示。
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 枚举工作表失败：${message}`)
+    showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error')
+    state.sheets = []
+    renderWorkbookSelect()
+    renderSheetSelect()
   }
-  renderWorkbookSelect()
-  renderSheetSelect()
-  // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
-  // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
-  loadExistingRules()
 }
 
 /**
@@ -920,7 +939,10 @@ function showGroupNameMask(): void {
   const mask = byId('conditionalFormatGroupMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
-    if (modal) resetModalPosition(modal)
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
     anchorModalMask(mask)
     mask.style.display = 'flex'
     if (modal) bringModalIntoView(mask, modal)
@@ -1495,7 +1517,10 @@ function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
   const mask = byId('conditionalFormatPasteMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
-    if (modal) resetModalPosition(modal)
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
     anchorModalMask(mask)
     mask.style.display = 'flex'
     if (modal) bringModalIntoView(mask, modal)
@@ -1864,6 +1889,19 @@ function anchorModalMask(mask: HTMLElement): void {
   )
 }
 
+/**
+ * 按配置套「模态框按钮外置」类（momo：按钮可放到模态框之外）
+ *
+ * 每次打开弹窗时读一次配置（设置页改完，下次打开即生效）——跨窗格不做即时
+ * 同步，与「高亮模式 / 自动关注上移设置页」同策略：读的时候重算，不推。
+ * 类名只切显隐与定位，不动 DOM 结构（按钮组始终在 modal 里，CSS 决定它
+ * 坐在底部还是标题栏那一行）。
+ */
+function applyModalButtonsPosition(modal: HTMLElement): void {
+  const isOutside = getModalButtonsPosition(true) === 'outside'
+  modal.classList.toggle('conditional-format-modal--buttons-outside', isOutside)
+}
+
 /** 锁背景滚动（弹窗打开期间；计数式，多弹窗叠加不会早解） */
 function lockModalScroll(): void {
   modalScrollLockCount += 1
@@ -1912,7 +1950,10 @@ function openEditor(id: string | null, isNew: boolean): void {
   if (mask) {
     // 每次打开都回到遮罩居中位：不记住上次拖动的位置——模态框是一次性交互，
     // 记住旧位置只会让用户在老地方找一个刚打开的框
-    if (modal) resetModalPosition(modal)
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
     anchorModalMask(mask)
     mask.style.display = 'flex'
     // 打开后拉回可见区：页面滚动后模态框会落在可见区外（实测标题栏被切半个），
@@ -2082,7 +2123,10 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
   }
   // mask 在函数入口已判非 null（!mask || !body 早退），直接用
   const modal = mask.querySelector<HTMLElement>('.conditional-format-modal')
-  if (modal) resetModalPosition(modal)
+  if (modal) {
+    resetModalPosition(modal)
+    applyModalButtonsPosition(modal)
+  }
   anchorModalMask(mask)
   mask.style.display = 'flex'
   if (modal) bringModalIntoView(mask, modal)
@@ -2191,7 +2235,10 @@ function openImportModal(snapshots: readonly ForeignRuleSnapshot[], sheetName: s
   const mask = byId('conditionalFormatImportMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
-    if (modal) resetModalPosition(modal)
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
     anchorModalMask(mask)
     mask.style.display = 'flex'
     if (modal) bringModalIntoView(mask, modal)

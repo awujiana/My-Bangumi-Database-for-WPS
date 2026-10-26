@@ -140,6 +140,8 @@ export interface WpsRows {
   Count: number
   /** 获取指定行（1‑based） */
   Item(index: number): WpsRow
+  /** 整组行的显隐（高亮页「筛选显示」用：`Range(...).Rows.Hidden = true`） */
+  Hidden: boolean
   // 不再提供可调用签名 (index: number): WpsRow，运行时不支持
 }
 

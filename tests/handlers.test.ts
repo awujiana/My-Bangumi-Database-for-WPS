@@ -194,6 +194,11 @@ vi.mock('../ts/tools/config.js', () => ({
   setListType: vi.fn(() => true),
   getTimeFilter: mockState.getTimeFilter,
   setTimeFilter: vi.fn(() => true),
+  // 主题定时（system / schedule 模式）与模态框按钮位置：设置页初始化与切主题时会同步读取
+  getThemeSchedule: vi.fn(() => ({ enabled: false, darkStart: '19:00', lightStart: '07:00' })),
+  setThemeSchedule: vi.fn(() => true),
+  getModalButtonsPosition: vi.fn(() => 'inside'),
+  setModalButtonsPosition: vi.fn(() => true),
   getRefreshInterval: mockState.getRefreshInterval,
   setRefreshInterval: vi.fn(() => true),
   // 全局日志级别：setupButtonListeners 用它回填 #logLevelSelect

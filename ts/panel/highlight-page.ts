@@ -33,12 +33,19 @@ import {
   currentSeason,
   formatSeasonKey,
   formatSeasonLabel,
+  isSeasonFilterMatch,
   rowsToRangeAddresses,
   runRangeGroupsWithSplit,
   selectSeasonRows,
   splitRangeAddresses,
 } from './highlight-season.js'
-import type { SeasonSelectResult, YearMonth } from './highlight-season.js'
+import type {
+  SeasonFilter,
+  SeasonFilterRange,
+  SeasonMonth,
+  SeasonSelectResult,
+  YearMonth,
+} from './highlight-season.js'
 import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
@@ -62,6 +69,10 @@ const KEY_MANUAL = 'highlight.manual'
 const KEY_LAST_APPLIED = 'highlight.lastApplied'
 /** 上次选中的工作表（稳定键：工作簿名::工作表名）；下次打开直接定位 */
 const KEY_SHEET = 'highlight.sheet'
+/** 筛选范围配置（range|year|quarter|month，与 GitHub 同步筛选同口径） */
+const KEY_FILTER = 'highlight.filter'
+/** 是否包含非动漫条目（书籍 / 音乐 / 游戏 / 三次元） */
+const KEY_NON_ANIME = 'highlight.includeNonAnime'
 /**
  * 目标表锁定开关（`1` = 锁定）。
  *
@@ -118,6 +129,16 @@ interface PageState {
   columns: HighlightColumn[]
   mode: 'auto' | 'manual'
   manual: YearMonth
+  /**
+   * 筛选范围（第二维：匹配模式定「高亮哪一季」，筛选定「只看哪些行」）
+   *
+   * 与 GitHub 同步的 {@link SyncTimeFilter} 同口径（momo：和同步的筛选一样）。
+   */
+  filter: SeasonFilter
+  /** 包含非动漫条目：公式列模式下额外读原始日期列匹配（默认关） */
+  includeNonAnime: boolean
+  /** 上次应用「筛选显示」的数据行范围（取消筛选用） */
+  filterSpan: { firstRow: number; lastRow: number } | null
   lastSelect: SeasonSelectResult
   lastTarget: YearMonth | null
   /** 已打开工作簿/工作表枚举（来自 collectSheets，轻量 COM） */
@@ -140,6 +161,15 @@ const state: PageState = {
   columns: [],
   mode: 'auto',
   manual: { year: new Date().getFullYear(), month: 1 },
+  filter: {
+    enabled: false,
+    year: new Date().getFullYear(),
+    range: 'all',
+    quarter: 1,
+    month: 1,
+  },
+  includeNonAnime: false,
+  filterSpan: null,
   lastSelect: { matchedRows: [], emptyCount: 0, invalidCount: 0 },
   lastTarget: null,
   sheets: [],
@@ -456,10 +486,12 @@ function refreshPreview(): void {
     return
   }
 
-  // 一次矩形读：日期源列 + 名称列（名称仅用于预览展示）
+  // 一次矩形读：日期源列 + 名称列（名称仅用于预览展示）+ 非动漫兜底列
   const nameColumn = state.columnMap.get('名称')
+  const fallbackColumn = nonAnimeFallbackColumn(source.key)
   const readColumns = new Set<number>([source.column])
   if (nameColumn !== undefined) readColumns.add(nameColumn)
+  if (fallbackColumn !== null) readColumns.add(fallbackColumn)
   let minColumn = Infinity
   let maxColumn = 0
   for (const column of readColumns) {
@@ -476,18 +508,80 @@ function refreshPreview(): void {
 
   const names = new Map<number, string>()
   const rows: { row: number; value: string }[] = []
+  const fallbackValues = new Map<number, string>()
   for (const [index, line] of block.entries()) {
     const rowNo = firstRow + index
     const cells = line
     const value = cells[source.column - minColumn] ?? ''
     rows.push({ row: rowNo, value })
     if (nameColumn !== undefined) names.set(rowNo, cells[nameColumn - minColumn] ?? '')
+    if (fallbackColumn !== null) {
+      fallbackValues.set(rowNo, cells[fallbackColumn - minColumn] ?? '')
+    }
   }
 
   const target = currentTarget()
   state.lastTarget = target
-  state.lastSelect = selectSeasonRows(rows, target, { mapAirMonthToSeason: !isFormulaSource() })
+  state.filterSpan = { firstRow, lastRow }
+  state.lastSelect = selectVisibleRows(rows, fallbackValues, target)
   renderPreview(names)
+}
+
+/**
+ * 非动漫兜底列：勾了「包含非动漫」且当前源是公式列（开播季度）时，
+ * 读该行的原始日期列（开播日期 > 完播日）来匹配。
+ *
+ * 公式列只对日漫归一（数据页公式的设计意图），非动漫行的公式值是原始年月
+ * （如 `25年12月`），永远匹配不上季目标；给它们一条原始日期的活路。
+ */
+function nonAnimeFallbackColumn(sourceKey: string): number | null {
+  if (!state.includeNonAnime) return null
+  if (sourceKey !== FORMULA_SOURCE) return null
+  for (const candidate of ['开播日期', '完播日']) {
+    const column = state.columnMap.get(candidate)
+    if (column !== undefined) return column
+  }
+  return null
+}
+
+/**
+ * 按季目标 + 筛选范围选出可见行
+ *
+ * 顺序：先按季目标选（既有口径），再过筛选（与 GitHub 同步同口径），
+ * 勾了非动漫时对**季目标未命中**的行用原始日期列再捞一遍。
+ */
+function selectVisibleRows(
+  rows: readonly { row: number; value: string }[],
+  fallbackValues: Map<number, string>,
+  target: YearMonth,
+): SeasonSelectResult {
+  const base = selectSeasonRows(rows, target, { mapAirMonthToSeason: !isFormulaSource() })
+  let matched = base.matchedRows
+
+  // 非动漫补捞：公式列口径下未命中的行，改用原始日期列 + 归一口径再选一次
+  if (fallbackValues.size > 0) {
+    const already = new Set(matched)
+    const pending = rows
+      .filter((item) => !already.has(item.row))
+      .map((item) => ({ row: item.row, value: fallbackValues.get(item.row) ?? '' }))
+    const second = selectSeasonRows(pending, target, { mapAirMonthToSeason: true })
+    matched = [...matched, ...second.matchedRows].sort((a, b) => a - b)
+  }
+
+  if (!state.filter.enabled || state.filter.range === 'all') {
+    return { ...base, matchedRows: matched }
+  }
+
+  const valueByRow = new Map(rows.map((item) => [item.row, item.value]))
+  const filtered = matched.filter((row) => {
+    const value = valueByRow.get(row) ?? ''
+    // 非动漫行的季命中来自兜底列，筛的时候也要按兜底列的值判
+    const fallbackValue = fallbackValues.get(row)
+    const effective =
+      fallbackValue !== undefined && fallbackValue.trim() !== '' ? fallbackValue : value
+    return isSeasonFilterMatch(effective, state.filter)
+  })
+  return { ...base, matchedRows: filtered }
 }
 
 function renderPreview(names: Map<number, string>): void {
@@ -741,6 +835,180 @@ function persistManual(): void {
   )
 }
 
+// ===== 筛选范围（与 GitHub 同步的时间筛选同口径）=====
+
+/** 季度起点月选项（番剧四季：1 / 4 / 7 / 10 月） */
+const QUARTER_OPTIONS: readonly SeasonMonth[] = [1, 4, 7, 10]
+
+/** 建筛选控件（年 / 季 / 月下拉 + 五个范围按钮 + 非动漫开关 + 筛选动作） */
+function buildFilterControls(): void {
+  const yearSelect = selectById('highlightFilterYear')
+  if (yearSelect) {
+    const thisYear = new Date().getFullYear()
+    const years = Array.from({ length: 11 }, (_, index) => thisYear - 5 + index)
+    yearSelect.innerHTML = years
+      .map((y) => `<option value="${String(y)}">${String(y)} 年</option>`)
+      .join('')
+    yearSelect.value = String(state.filter.year)
+    yearSelect.addEventListener('change', () => {
+      state.filter = { ...state.filter, year: Number(yearSelect.value) }
+      persistFilter()
+      refreshPreview()
+    })
+  }
+  const quarterSelect = selectById('highlightFilterQuarter')
+  if (quarterSelect) {
+    quarterSelect.innerHTML = QUARTER_OPTIONS.map(
+      (m) => `<option value="${String(m)}">${String(m)} 月季</option>`,
+    ).join('')
+    quarterSelect.value = String(state.filter.quarter ?? 1)
+    quarterSelect.addEventListener('change', () => {
+      state.filter = { ...state.filter, quarter: Number(quarterSelect.value) as SeasonMonth }
+      persistFilter()
+      refreshPreview()
+    })
+  }
+  const monthSelect = selectById('highlightFilterMonth')
+  if (monthSelect) {
+    monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
+      .map((m) => `<option value="${String(m)}">${String(m)} 月</option>`)
+      .join('')
+    monthSelect.value = String(state.filter.month ?? 1)
+    monthSelect.addEventListener('change', () => {
+      state.filter = { ...state.filter, month: Number(monthSelect.value) }
+      persistFilter()
+      refreshPreview()
+    })
+  }
+  for (const button of document.querySelectorAll<HTMLElement>('[data-filter-range]')) {
+    button.addEventListener('click', () => {
+      const range = button.dataset.filterRange
+      if (!range) return
+      state.filter = { ...state.filter, range: range as SeasonFilterRange }
+      persistFilter()
+      renderFilterUi()
+      refreshPreview()
+    })
+  }
+  const nonAnimeBox = inputById('highlightIncludeNonAnime')
+  if (nonAnimeBox) {
+    nonAnimeBox.checked = state.includeNonAnime
+    nonAnimeBox.addEventListener('change', () => {
+      state.includeNonAnime = nonAnimeBox.checked
+      setConfig(KEY_NON_ANIME, nonAnimeBox.checked ? '1' : '0')
+      refreshPreview()
+    })
+  }
+  byId('highlightFilterApplyBtn')?.addEventListener('click', () => {
+    applyFilterRows()
+  })
+  byId('highlightFilterClearBtn')?.addEventListener('click', () => {
+    clearFilterRows()
+  })
+}
+
+/** 筛选控件显隐与按钮 active（按 state.filter.range） */
+function renderFilterUi(): void {
+  for (const button of document.querySelectorAll<HTMLElement>('[data-filter-range]')) {
+    button.classList.toggle('active', button.dataset.filterRange === state.filter.range)
+  }
+  // 需要选目标年的三种模式（年度 / 季度 / 月份）；全部与未来番只要一个按钮
+  const isYearScoped = ['year', 'quarter', 'month'].includes(state.filter.range)
+  const box = byId('highlightFilterBox')
+  if (box) box.style.display = isYearScoped ? 'flex' : 'none'
+  const quarterSelect = selectById('highlightFilterQuarter')
+  if (quarterSelect) quarterSelect.style.display = state.filter.range === 'quarter' ? '' : 'none'
+  const monthSelect = selectById('highlightFilterMonth')
+  if (monthSelect) monthSelect.style.display = state.filter.range === 'month' ? '' : 'none'
+}
+
+/** 落筛选配置：`range|year|quarter|month` */
+function persistFilter(): void {
+  setConfig(
+    KEY_FILTER,
+    [
+      state.filter.range,
+      String(state.filter.year),
+      String(state.filter.quarter ?? 1),
+      String(state.filter.month ?? 1),
+    ].join('|'),
+  )
+}
+
+/** 从配置恢复筛选（格式不对就回默认全部） */
+function restoreFilter(): void {
+  const raw = getConfig(KEY_FILTER, '', true)
+  if (raw) {
+    const [range, year, quarter, month] = raw.split('|', 4)
+    if (range && year) {
+      state.filter = {
+        enabled: range !== 'all',
+        year: Number(year),
+        range: range as SeasonFilterRange,
+        quarter: Number(quarter) as SeasonMonth,
+        month: Number(month),
+      }
+    }
+  }
+}
+
+/**
+ * 筛选显示：把不命中的行隐藏（只改 Hidden，不动数据与填充）
+ *
+ * 为什么不用 AutoFilter：日期列的单元格形态五花八门（Excel 序列值 / `25年4月`
+ * 文本 / 公式输出），criteria 拼不出来；Hidden 是精确的逐行控制，且「取消筛选」
+ * 能把范围整体还原，不会留下筛选项箭头误导用户。
+ */
+function applyFilterRows(isSilent = false): void {
+  const { worksheet } = state
+  const span = state.filterSpan
+  if (!worksheet || !span) {
+    if (!isSilent) showToast('请先点「加载并预览」', 'warn')
+    return
+  }
+  const matched = new Set(state.lastSelect.matchedRows)
+  const hiddenRows: number[] = []
+  for (let row = span.firstRow; row <= span.lastRow; row += 1) {
+    if (!matched.has(row)) hiddenRows.push(row)
+  }
+  if (hiddenRows.length === 0) {
+    if (!isSilent) showToast('所有行都命中，无需筛选', 'info')
+    return
+  }
+  const painted = runRangeGroupsWithSplit(
+    splitRangeAddresses(rowsToRangeAddresses(hiddenRows, 'A')),
+    (group) => {
+      worksheet.Range(group.join(',')).Rows.Hidden = true
+    },
+  )
+  if (painted === 0) {
+    if (!isSilent) showToast('筛选写入失败，请查看日志', 'error')
+    return
+  }
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[highlight] 已筛选显示 ${String(matched.size)} 行（隐藏 ${String(hiddenRows.length)} 行）`,
+  )
+  if (!isSilent) {
+    showToast(
+      `已筛选显示 ${String(matched.size)} 行（隐藏 ${String(hiddenRows.length)} 行）`,
+      'success',
+    )
+  }
+}
+
+/** 取消筛选：把数据区整体显示回来 */
+function clearFilterRows(isSilent = false): void {
+  const { worksheet } = state
+  const span = state.filterSpan
+  if (!worksheet || !span) {
+    if (!isSilent) showToast('请先点「加载并预览」', 'warn')
+    return
+  }
+  worksheet.Range(`A${String(span.firstRow)}:A${String(span.lastRow)}`).Rows.Hidden = false
+  if (!isSilent) showToast('已取消筛选', 'success')
+}
+
 /** 按 state.mode 渲染模式按钮 active 与手动框显隐（只读反映配置，不在本页切换） */
 function renderModeUi(): void {
   const autoButton = byId('highlightModeAuto')
@@ -800,6 +1068,10 @@ function highlightPhaseConfig(): void {
     state.manual = { year: Number(manualMatch[1]), month: Number(manualMatch[2]) }
   }
   buildManualSelectors()
+  // 筛选范围（年度 / 季度 / 月份 / 未来番，与 GitHub 同步同口径）+ 非动漫开关
+  restoreFilter()
+  buildFilterControls()
+  renderFilterUi()
   // 高亮模式 / 自动关注从配置应用（设置页统一管理；renderModeUi 同步按钮态与手动框显隐）
   applyFeatureTogglesFromConfig()
 

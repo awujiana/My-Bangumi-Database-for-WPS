@@ -41,6 +41,9 @@ import {
   areNavIconsOnly,
   setTheme,
   getTheme,
+  setThemeSchedule,
+  getThemeSchedule,
+  resolveScheduledTheme,
   setListType,
   getListType,
   setTimeFilter,
@@ -267,6 +270,66 @@ describe('tools/config', () => {
       expect(setTimeFilter('month')).toBe(true)
       expect(getTimeFilter(true)).toBe('month')
       expect(setTimeFilter('century')).toBe(false)
+    })
+  })
+
+  describe('主题定时切换（schedule 模式）', () => {
+    it('setThemeSchedule / getThemeSchedule 存取（含 enabled 与两个时刻）', () => {
+      expect(setThemeSchedule({ enabled: true, darkStart: '21:30', lightStart: '06:45' })).toBe(
+        true,
+      )
+      expect(getThemeSchedule(true)).toEqual({
+        enabled: true,
+        darkStart: '21:30',
+        lightStart: '06:45',
+      })
+    })
+
+    it('非法时刻拒绝写入（HH:MM 之外）', () => {
+      expect(setThemeSchedule({ enabled: true, darkStart: '99:99', lightStart: '07:00' })).toBe(
+        false,
+      )
+      expect(setThemeSchedule({ enabled: true, darkStart: '7:00', lightStart: '07:00' })).toBe(
+        false,
+      )
+    })
+
+    it('存储损坏 / 空值回落默认（19:00 深 → 07:00 浅）', () => {
+      storage.setItem(CONFIG_KEYS.THEME_SCHEDULE, '{坏 JSON')
+      expect(getThemeSchedule(true)).toEqual({
+        enabled: true,
+        darkStart: '19:00',
+        lightStart: '07:00',
+      })
+      storage.setItem(CONFIG_KEYS.THEME_SCHEDULE, '{"darkStart":"x","lightStart":"y"}')
+      expect(getThemeSchedule(true)).toEqual({
+        enabled: true,
+        darkStart: '19:00',
+        lightStart: '07:00',
+      })
+    })
+
+    it('resolveScheduledTheme：07:00~19:00 为浅色，其余深色', () => {
+      const schedule = { enabled: true, darkStart: '19:00', lightStart: '07:00' }
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 8, 0))).toBe('light')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 18, 59))).toBe('light')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 19, 0))).toBe('dark')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 3, 0))).toBe('dark')
+    })
+
+    it('resolveScheduledTheme：跨零点（深色 02:00、浅色 08:00）也能判对', () => {
+      const schedule = { enabled: true, darkStart: '02:00', lightStart: '08:00' }
+      // 浅色区间 = [08:00, 次日 02:00)：白天浅；深夜 02:00~08:00 才深
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 9, 0))).toBe('light')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 23, 0))).toBe('light')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 1, 0))).toBe('light')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 3, 0))).toBe('dark')
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 7, 59))).toBe('dark')
+    })
+
+    it('resolveScheduledTheme：enabled=false 时恒深色', () => {
+      const schedule = { enabled: false, darkStart: '19:00', lightStart: '07:00' }
+      expect(resolveScheduledTheme(schedule, new Date(2026, 9, 26, 12, 0))).toBe('dark')
     })
   })
 

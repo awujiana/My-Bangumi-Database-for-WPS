@@ -28,6 +28,11 @@ const mockReferences = vi.hoisted(() => ({
   mockSetSyncRecordEnabled: vi.fn(() => true),
   mockSetTimeFilter: vi.fn(() => true),
   mockRenderLogEntries: vi.fn(),
+  mockApplyTheme: vi.fn(),
+  mockSwitchThemeAnimated: vi.fn(),
+  mockSetThemeSchedule: vi.fn(() => true),
+  mockGetTheme: vi.fn(() => 'dark'),
+  mockSetModalButtonsPosition: vi.fn(() => true),
 }))
 
 vi.mock('../ts/index.js', () => ({
@@ -47,6 +52,18 @@ vi.mock('../ts/ui/handlers/log-panel.js', () => ({
   renderLogEntries: mockReferences.mockRenderLogEntries,
 }))
 
+// settings-bindings 现在直接 import tools/theme 与 tools/config（不再经 index 中转）
+vi.mock('../ts/tools/theme.js', () => ({
+  applyTheme: mockReferences.mockApplyTheme,
+  switchThemeAnimated: mockReferences.mockSwitchThemeAnimated,
+}))
+
+vi.mock('../ts/tools/config.js', () => ({
+  setThemeSchedule: mockReferences.mockSetThemeSchedule,
+  getTheme: mockReferences.mockGetTheme,
+  setModalButtonsPosition: mockReferences.mockSetModalButtonsPosition,
+}))
+
 import {
   handleEnableSyncRecordChange,
   handleLogLevelFilterChange,
@@ -54,9 +71,14 @@ import {
   handleListTypeChange,
   handleRefreshIntervalChange,
   handleThemeChange,
+  handleModalButtonsPositionClick,
+  handleThemeModeClick,
   handleThemePreviewClick,
+  handleThemeScheduleChange,
   handleTimeFilterChange,
   setupTimeFilterControls,
+  updateModalButtonsPositionButtons,
+  updateThemeModeButtons,
   updateThemePreview,
 } from '../ts/ui/handlers/settings-bindings.js'
 
@@ -75,6 +97,13 @@ function mountInput(id: string): HTMLInputElement {
   const element = document.createElement('input')
   element.id = id
   document.body.append(element)
+  return element
+}
+
+/** 建一个带值的 input 并挂到文档（主题定时时刻用） */
+function mountInputWithValue(id: string, value: string): HTMLInputElement {
+  const element = mountInput(id)
+  element.value = value
   return element
 }
 
@@ -116,6 +145,10 @@ beforeEach(() => {
   mockReferences.mockSetRefreshInterval.mockReturnValue(true)
   mockReferences.mockSetSyncRecordEnabled.mockReturnValue(true)
   mockReferences.mockSetTimeFilter.mockReturnValue(true)
+  mockReferences.mockSetThemeSchedule.mockReturnValue(true)
+  mockReferences.mockGetTheme.mockReturnValue('dark')
+  mockReferences.mockSetModalButtonsPosition.mockReturnValue(true)
+  delete document.documentElement.dataset.theme
   document.body.replaceChildren()
 })
 
@@ -179,10 +212,7 @@ describe('settings-bindings · handleLogLevelChange', () => {
     mountSelectWithValue('logLevelSelect', '9')
     handleLogLevelChange()
     expect(mockReferences.mockSetLogLevel).toHaveBeenCalledWith(9)
-    expect(mockReferences.mockShowToast).toHaveBeenCalledWith(
-      '日志记录级别已设为「9」',
-      'success',
-    )
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('日志记录级别已设为「9」', 'success')
   })
 
   it('保存失败 → 错误提示', () => {
@@ -234,17 +264,15 @@ describe('settings-bindings · handleThemeChange', () => {
     expect(mockReferences.mockShowToast).toHaveBeenCalledWith('主题已切换为「sepia」', 'success')
   })
 
-  it('保存失败 → 错误提示，但预览高亮仍乐观更新', () => {
+  it('保存失败 → 错误提示，但按钮组高亮仍乐观更新', () => {
     mockReferences.mockSaveTheme.mockReturnValue(false)
-    const card = document.createElement('div')
-    card.dataset.themeCard = 'light'
-    document.body.append(card)
+    const button = mountThemeModeButton('light')
     mountSelectWithValue('themeSelect', 'light')
 
     handleThemeChange()
 
     expect(mockReferences.mockShowToast).toHaveBeenCalledWith('主题保存失败', 'error')
-    expect(card.classList.contains('active')).toBe(true)
+    expect(button.classList.contains('active')).toBe(true)
   })
 })
 
@@ -259,15 +287,13 @@ function mountThemeCard(mode: string | undefined): HTMLSpanElement {
 }
 
 describe('settings-bindings · handleThemePreviewClick', () => {
-  it('点击卡片 → 写入下拉框并触发主题切换', () => {
+  it('点击卡片 → 保存该模式并从卡片中心扩散切换', () => {
     const inner = mountThemeCard('light')
-    const select = mountSelectWithValue('themeSelect', 'dark')
-    appendOption(select, 'light')
 
     handleThemePreviewClick({ currentTarget: inner } as unknown as Event)
 
-    expect(select.value).toBe('light')
     expect(mockReferences.mockSaveTheme).toHaveBeenCalledWith('light')
+    expect(mockReferences.mockSwitchThemeAnimated).toHaveBeenCalledTimes(1)
   })
 
   it('点击非主题卡片 → 不做任何事', () => {
@@ -275,11 +301,175 @@ describe('settings-bindings · handleThemePreviewClick', () => {
     handleThemePreviewClick({ currentTarget: inner } as unknown as Event)
     expect(mockReferences.mockSaveTheme).not.toHaveBeenCalled()
   })
+})
 
-  it('下拉框缺失时退回默认深色档（点击值经下拉框中转，无处可存）', () => {
-    const inner = mountThemeCard('system')
-    handleThemePreviewClick({ currentTarget: inner } as unknown as Event)
+// ========== 主题模式按钮组（momo：按钮形式 + 扩散动画） ==========
+
+/** 建一个主题模式按钮，返回按钮本身 */
+function mountThemeModeButton(mode: string | undefined): HTMLButtonElement {
+  const button = document.createElement('button')
+  if (mode !== undefined) button.dataset.themeMode = mode
+  document.body.append(button)
+  return button
+}
+
+describe('settings-bindings · handleThemeModeClick', () => {
+  it('点深色 → 保存 + 从按钮中心扩散切换', () => {
+    const button = mountThemeModeButton('light')
+    // jsdom 的 getBoundingClientRect 全 0 → 走视口中心兜底
+    handleThemeModeClick({ currentTarget: button } as unknown as Event)
+
+    expect(mockReferences.mockSaveTheme).toHaveBeenCalledWith('light')
+    expect(mockReferences.mockSwitchThemeAnimated).toHaveBeenCalledTimes(1)
+    const firstCall = mockReferences.mockSwitchThemeAnimated.mock.calls[0]
+    expect(firstCall?.[0]).toBe('light')
+    expect(firstCall?.[1]).toEqual({ x: 512, y: 384 })
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('主题已切换为「浅色模式」', 'success')
+  })
+
+  it('已是当前主题 → 不播放扩散动画（避免同色闪一下）', () => {
+    mockReferences.mockGetTheme.mockReturnValue('dark')
+    document.documentElement.dataset.theme = 'dark'
+    const button = mountThemeModeButton('dark')
+
+    handleThemeModeClick({ currentTarget: button } as unknown as Event)
+
     expect(mockReferences.mockSaveTheme).toHaveBeenCalledWith('dark')
+    expect(mockReferences.mockSwitchThemeAnimated).not.toHaveBeenCalled()
+    expect(mockReferences.mockApplyTheme).toHaveBeenCalledWith('dark')
+  })
+
+  it('非 dark/light 模式（system/schedule）不走动画，直接应用', () => {
+    const button = mountThemeModeButton('system')
+
+    handleThemeModeClick({ currentTarget: button } as unknown as Event)
+
+    expect(mockReferences.mockSaveTheme).toHaveBeenCalledWith('system')
+    expect(mockReferences.mockSwitchThemeAnimated).not.toHaveBeenCalled()
+    expect(mockReferences.mockApplyTheme).toHaveBeenCalledWith('system')
+  })
+
+  it('点无 data-theme-mode 的元素 → 早退', () => {
+    const button = mountThemeModeButton(undefined)
+    handleThemeModeClick({ currentTarget: button } as unknown as Event)
+    expect(mockReferences.mockSaveTheme).not.toHaveBeenCalled()
+  })
+
+  it('保存失败 → 错误提示', () => {
+    mockReferences.mockSaveTheme.mockReturnValue(false)
+    const button = mountThemeModeButton('light')
+    handleThemeModeClick({ currentTarget: button } as unknown as Event)
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('主题保存失败', 'error')
+  })
+})
+
+describe('settings-bindings · handleThemeScheduleChange', () => {
+  it('两个时刻合法 → 保存并（定时模式下）立即按新时刻重解析', () => {
+    mockReferences.mockGetTheme.mockReturnValue('schedule')
+    mountInputWithValue('themeDarkStart', '21:30')
+    mountInputWithValue('themeLightStart', '06:45')
+
+    handleThemeScheduleChange()
+
+    expect(mockReferences.mockSetThemeSchedule).toHaveBeenCalledWith({
+      enabled: true,
+      darkStart: '21:30',
+      lightStart: '06:45',
+    })
+    expect(mockReferences.mockApplyTheme).toHaveBeenCalledWith('schedule')
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith(
+      '定时已更新：06:45 浅 → 21:30 深',
+      'success',
+    )
+  })
+
+  it('非定时模式 → 只保存，不重解析', () => {
+    mockReferences.mockGetTheme.mockReturnValue('dark')
+    mountInputWithValue('themeDarkStart', '22:00')
+    mountInputWithValue('themeLightStart', '07:00')
+
+    handleThemeScheduleChange()
+
+    expect(mockReferences.mockSetThemeSchedule).toHaveBeenCalledTimes(1)
+    expect(mockReferences.mockApplyTheme).not.toHaveBeenCalled()
+  })
+
+  it('保存失败 → 错误提示', () => {
+    mockReferences.mockSetThemeSchedule.mockReturnValue(false)
+    mountInputWithValue('themeDarkStart', '99:99')
+    mountInputWithValue('themeLightStart', '07:00')
+
+    handleThemeScheduleChange()
+
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('时刻格式应为 HH:MM', 'error')
+  })
+})
+
+describe('settings-bindings · updateThemeModeButtons', () => {
+  it('active 与 aria-pressed 只落在匹配的按钮上，定时框随 schedule 显隐', () => {
+    const dark = mountThemeModeButton('dark')
+    const schedule = mountThemeModeButton('schedule')
+    const box = document.createElement('div')
+    box.id = 'themeScheduleBox'
+    document.body.append(box)
+
+    updateThemeModeButtons('schedule')
+
+    expect(dark.classList.contains('active')).toBe(false)
+    expect(schedule.classList.contains('active')).toBe(true)
+    expect(schedule.getAttribute('aria-pressed')).toBe('true')
+    expect(dark.getAttribute('aria-pressed')).toBe('false')
+    expect(box.hidden).toBe(false)
+
+    updateThemeModeButtons('dark')
+    expect(box.hidden).toBe(true)
+  })
+})
+
+/** 建一个模态框按钮位置分段按钮 */
+function mountModalButtonsPositionButton(position: string | undefined): HTMLButtonElement {
+  const button = document.createElement('button')
+  if (position !== undefined) button.dataset.modalButtonsPosition = position
+  document.body.append(button)
+  return button
+}
+
+describe('settings-bindings · 模态框按钮位置', () => {
+  it('点「模态框外」→ 保存配置 + 按钮态更新 + toast', () => {
+    const button = mountModalButtonsPositionButton('outside')
+
+    handleModalButtonsPositionClick({ currentTarget: button } as unknown as Event)
+
+    expect(mockReferences.mockSetModalButtonsPosition).toHaveBeenCalledWith('outside')
+    expect(button.classList.contains('active')).toBe(true)
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith(
+      '模态框按钮位置：模态框外（标题栏右上角）',
+      'success',
+    )
+  })
+
+  it('点无 data 属性的元素 → 早退', () => {
+    const button = mountModalButtonsPositionButton(undefined)
+    handleModalButtonsPositionClick({ currentTarget: button } as unknown as Event)
+    expect(mockReferences.mockSetModalButtonsPosition).not.toHaveBeenCalled()
+  })
+
+  it('保存失败 → 错误提示', () => {
+    mockReferences.mockSetModalButtonsPosition.mockReturnValue(false)
+    const button = mountModalButtonsPositionButton('inside')
+    handleModalButtonsPositionClick({ currentTarget: button } as unknown as Event)
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('保存失败', 'error')
+  })
+
+  it('updateModalButtonsPositionButtons：active 只落在匹配项', () => {
+    const inside = mountModalButtonsPositionButton('inside')
+    const outside = mountModalButtonsPositionButton('outside')
+
+    updateModalButtonsPositionButtons('outside')
+
+    expect(inside.classList.contains('active')).toBe(false)
+    expect(outside.classList.contains('active')).toBe(true)
+    expect(outside.getAttribute('aria-pressed')).toBe('true')
   })
 })
 
@@ -320,7 +510,10 @@ describe('settings-bindings · handleTimeFilterChange', () => {
     mountSelectWithValue('timeFilterSelect', 'quarter')
     handleTimeFilterChange()
     expect(mockReferences.mockSetTimeFilter).toHaveBeenCalledWith('quarter')
-    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('默认时间筛选范围：季度新番', 'success')
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith(
+      '默认时间筛选范围：季度新番',
+      'success',
+    )
   })
 
   it('未知取值 → 回退原始值；保存失败 → 错误提示', () => {
@@ -391,7 +584,10 @@ describe('settings-bindings · handleRefreshIntervalChange', () => {
     input.value = '15.4'
     handleRefreshIntervalChange()
     expect(mockReferences.mockSetRefreshInterval).toHaveBeenCalledWith(15.4)
-    expect(mockReferences.mockShowToast).toHaveBeenCalledWith('自动刷新间隔已设为 15 分钟', 'success')
+    expect(mockReferences.mockShowToast).toHaveBeenCalledWith(
+      '自动刷新间隔已设为 15 分钟',
+      'success',
+    )
   })
 
   it('保存失败 → 错误提示', () => {

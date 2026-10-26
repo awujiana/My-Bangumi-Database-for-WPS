@@ -175,6 +175,83 @@ export interface SeasonRow {
   value: string
 }
 
+// ========== 季度 / 年度筛选（与 GitHub 同步筛选同口径） ==========
+
+/**
+ * 筛选范围（与 {@link SyncTimeFilter.range} 同款五模式）
+ *
+ * - `all`：不过滤
+ * - `year`：年度（如 2026 年度新番）
+ * - `quarter`：季度（如 2026 年 10 月新番）
+ * - `month`：精确到月（如 2025 年 1 月）
+ * - `future`：预告 / 未来番（无开播日期）
+ */
+export type SeasonFilterRange = 'all' | 'year' | 'quarter' | 'month' | 'future'
+
+/**
+ * 高亮页的筛选条件
+ *
+ * **口径与 `ts/sync/github-sync-diff.ts` 的 {@link SyncTimeFilter} 保持一致**
+ * （momo：和从 GitHub 仓库同步的筛选一样）：四季月份划分同为
+ * 1 月季 = 12/1/2 月、4 月季 = 3/4/5、7 月季 = 6/7/8、10 月季 = 9/10/11，
+ * 12 月播出的归属次年 1 月季。两边各有一份实现（本页吃本地行、同步吃远程条目），
+ * 由 `tests/season-filter-parity.test.ts` 锁口径一致。
+ *
+ * 与同步筛选的唯一差异：`year` 模式按**季归属年**算（25 年 12 月播的算
+ * 26 年 1 月季 → 属于 2026 年度新番），同步侧按自然年算——本页整体是「季」
+ * 语义，年度 = 这一年有哪些季，更符合「年度新番」的说法。
+ */
+export interface SeasonFilter {
+  /** 是否启用筛选（关闭时 matchesSeasonFilter 恒 true） */
+  enabled: boolean
+  /** 目标年份 */
+  year: number
+  /** 筛选范围 */
+  range: SeasonFilterRange
+  /** 季度起点月（仅 range='quarter' 有效） */
+  quarter?: SeasonMonth
+  /** 月份（仅 range='month' 有效） */
+  month?: number
+}
+
+/**
+ * 判断一行的日期源是否命中筛选条件
+ *
+ * 纯函数：`value` 为 null 表示该行没有日期源（公式列 + 未提供原始日期时），
+ * 仅 `future` 模式会命中它。
+ */
+export function isSeasonFilterMatch(value: string | null, filter: SeasonFilter): boolean {
+  if (!filter.enabled || filter.range === 'all') return true
+
+  // 预告 / 未来番：没有日期的行
+  if (filter.range === 'future') {
+    return value === null || value.trim() === ''
+  }
+  if (value === null) return false
+
+  const ym = parseYearMonth(value)
+  if (ym === null) return false
+
+  switch (filter.range) {
+    case 'year': {
+      // 按季归属年：12 月播的算次年 1 月季（见 SeasonFilter 注释）
+      return (toSeason(ym)?.year ?? ym.year) === filter.year
+    }
+    case 'quarter': {
+      const season = toSeason(ym)
+      return (
+        season !== null && season.year === filter.year && season.month === (filter.quarter ?? 1)
+      )
+    }
+    case 'month': {
+      return ym.year === filter.year && ym.month === (filter.month ?? 1)
+    }
+    default: {
+      return true
+    }
+  }
+}
+
 /** 匹配口径选项 */
 export interface SeasonSelectOptions {
   /**
