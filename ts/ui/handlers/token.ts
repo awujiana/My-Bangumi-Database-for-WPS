@@ -1,0 +1,815 @@
+/**
+ * UI 事件处理模块 - Token 相关函数
+ * @module ui/handlers/token
+ * @description Token 设置、用户 ID 设置、Token 有效性测试、用户信息展示等。
+ */
+
+import {
+  LOG_LEVELS,
+  bgmLog,
+  BGM,
+  loadBgToken,
+  storeBgToken,
+  storeTokenExpires,
+  loadTokenExpires,
+  clearTokenExpires,
+  getTokenRemainingTime,
+  _getBgmUserId,
+  _setBgmUserId,
+  _getBgmUsername,
+  _setBgmUsername,
+  getApp,
+  fetchBgmUserInfo,
+  showAlert,
+  showInput,
+  showError,
+  showToast,
+} from '../../index.js'
+
+import { _T } from './_constants.js'
+
+// ========== 业务对话框 ==========
+
+export function showTokenDialog(currentToken?: string): void {
+  const defaultValue = (currentToken || loadBgToken()) ?? ''
+  showInput(_T.setBgmToken, _T.inputToken, defaultValue, (value?: string) => {
+    if (value) {
+      storeBgToken(value)
+      // 新 Token 保存时清除旧的过期信息，等待下次查询刷新
+      clearTokenExpires()
+      updateTokenStatus()
+      showToast(_T.tokenSaved, 'success')
+    } else {
+      showToast('Token 不能为空', 'warn')
+    }
+  })
+}
+
+export function showUserIdDialog(): void {
+  const currentId = _getBgmUserId() ?? ''
+  showInput(_T.setBgmUserId, _T.inputUserId, currentId, (value?: string) => {
+    if (value && value.trim() !== '') {
+      _setBgmUserId(value.trim())
+      updateUserIdStatus()
+      showToast(_T.userIdSaved, 'success')
+    } else {
+      showToast('用户 ID 不能为空', 'warn')
+    }
+  })
+}
+
+export function updateTokenStatus(): void {
+  const tokenStatus = document.getElementById('tokenStatus')
+  if (!tokenStatus) return
+
+  const token = loadBgToken()
+  if (token && token.length > 10) {
+    tokenStatus.style.color = '#4CAF50'
+
+    // 如果已经有用户名缓存，直接显示
+    if (BGM.cache.username) {
+      tokenStatus.textContent = `${_T.set}: ${BGM.cache.username}`
+      showUserProfile()
+      // 后台静默查询 Token 状态
+      void (async () => {
+        try {
+          await queryTokenStatus(token)
+        } catch {
+          // 静默失败，不影响主流程
+        }
+      })()
+    } else {
+      tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...)`
+
+      // 尝试获取用户信息（但不阻塞 UI 更新）
+      // 注意：这里可能会因为 CORS 或网络问题失败
+      void (async () => {
+        try {
+          const { userInfo, errorType } = await fetchBgmUserInfo()
+          if (userInfo?.username) {
+            tokenStatus.style.color = '#4CAF50'
+            tokenStatus.textContent = `${_T.set}: ${userInfo.username}`
+            updateUserIdStatus()
+            showUserProfile()
+            // 后台静默查询 Token 状态
+            void (async () => {
+              try {
+                await queryTokenStatus(token)
+              } catch {
+                // 静默失败
+              }
+            })()
+          } else if (errorType === 'network') {
+            // 网络错误：Token 本身可能有效，但无法连接到 BGM API
+            // 常见原因：被 GFW 墙、断网、DNS 失败
+            // 橙色警告
+            tokenStatus.style.color = '#ff9800'
+            tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...) ⚠ 网络无法连接`
+            bgmLog(
+              LOG_LEVELS.WARN,
+              '[updateTokenStatus] 网络错误：无法连接到 BGM API（可能被 GFW 墙）',
+            )
+            showToast(
+              'Token 已设置，但无法连接到 Bangumi API\n可能原因：网络被墙（GFW）或断网\nToken 本身可能有效，请在网络恢复后重试',
+              'warn',
+            )
+            // 离线时仍显示本地缓存的过期信息
+            const cachedExpires = loadTokenExpires()
+            if (cachedExpires) {
+              showTokenExpiryInfo(cachedExpires)
+            }
+          } else if (errorType === 'http') {
+            // HTTP 错误（如 401）：Token 失效
+            tokenStatus.style.color = '#f44336'
+            tokenStatus.textContent = `${_T.set} (Token 可能失效)`
+            bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效')
+          }
+          // errorType === 'parse' 或 'none'：保持原显示
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errorMessage}`)
+          BGM.handleError(error)
+        }
+      })()
+    }
+  } else {
+    tokenStatus.textContent = _T.notSet
+    tokenStatus.style.color = '#f44336'
+    BGM.cache.userId = null
+    BGM.cache.username = null
+    clearTokenExpires()
+    hideUserProfile()
+  }
+}
+
+// 缓存上次更新的状态，避免重复日志和 DOM 操作
+let _lastUserIdSnapshot: string | null | undefined
+
+export function updateUserIdStatus(): void {
+  // panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新；
+  // 用属性选择器命中全部同名 id 元素（querySelector 只能命中第一个）
+  const userIdStatusEls = document.querySelectorAll<HTMLElement>('[id="userIdStatus"]')
+  if (userIdStatusEls.length === 0) return
+
+  const userId = _getBgmUserId()
+  const username = _getBgmUsername()
+  const snapshot = `${userId ?? 'null'}|${username ?? 'null'}`
+
+  // 去重：状态未变化时跳过
+  if (_lastUserIdSnapshot === snapshot) return
+  _lastUserIdSnapshot = snapshot
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[updateUserIdStatus] userId: ${userId ?? ''}, username: ${username ?? ''}`,
+  )
+
+  if (userId) {
+    const display = username ? `${username} (${userId})` : userId
+    const text = `${_T.set}: ${display}`
+    userIdStatusEls.forEach((element) => {
+      element.textContent = text
+      element.style.color = '#4CAF50'
+    })
+  } else {
+    userIdStatusEls.forEach((element) => {
+      element.textContent = _T.notSet
+      element.style.color = '#f44336'
+    })
+  }
+}
+
+export function openUserCollection(): void {
+  const startTime = Date.now()
+  bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========')
+
+  const userId = _getBgmUserId()
+  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`)
+
+  if (!userId) {
+    bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面')
+    showAlert(_T.pleaseSetUserIdFirst)
+    return
+  }
+
+  const collectionUrl = `https://bgm.tv/user/${userId}/collection`
+  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 生成收藏页面URL: ${collectionUrl}`)
+  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 正在打开收藏页面...`)
+  window.open(collectionUrl, '_blank')
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[openUserCollection] 收藏页面已在新标签页打开，耗时: ${String(Date.now() - startTime)}ms`,
+  )
+}
+
+/** 验证结果数据结构 */
+interface TokenVerifyData {
+  nickname?: string
+  username?: string
+  id?: string | number
+  avatar?: {
+    large?: string
+    medium?: string
+    small?: string
+  }
+}
+
+/**
+ * 应用 Token 验证成功结果：写入缓存、刷新用户 ID 状态、处理头像 URL
+ * （从 testTokenValidity 的 try 块抽出，降低 try-complexity）
+ */
+function applyVerifiedUserInfo(data: TokenVerifyData): { nickname: string; userId: string } {
+  const nickname = data.nickname || data.username || _T.unknownUser
+  const userId = String(data.id ?? '')
+
+  _setBgmUserId(userId)
+  _setBgmUsername(nickname)
+  // Token 验证成功后自动刷新「收藏页面访问」区的用户 ID
+  updateUserIdStatus()
+
+  // 处理头像 URL：移除可能存在的反引号包裹
+  const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
+  const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
+  if (cleanAvatarUrl) {
+    BGM.cache.avatarUrl = cleanAvatarUrl
+    // 持久化头像 URL
+    try {
+      const app = getApp()
+      if (app?.PluginStorage) {
+        app.PluginStorage.setItem('bgm_avatar_url', cleanAvatarUrl)
+      }
+    } catch {
+      // 静默处理
+    }
+    showUserProfile()
+  }
+
+  return { nickname, userId }
+}
+
+export function testTokenValidity(): void {
+  const token = loadBgToken()
+  if (!token) {
+    showAlert(_T.pleaseSetTokenFirst)
+    return
+  }
+
+  const apiUrl = 'https://api.bgm.tv/v0/me'
+  const requestStartTime = Date.now()
+
+  bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 开始测试 Token ==========`)
+  bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] API 路由: ${apiUrl}`)
+  bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求方法: GET`)
+  // 安全：只打印长度，不打印凭据片段（日志会进环形缓冲并被调试面板展示/导出）
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[testTokenValidity] 请求头: Authorization: Bearer <已脱敏，长度 ${String(token.length)}>`,
+  )
+  bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求头: Content-Type: application/json`)
+
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', apiUrl, true)
+  // 15 秒超时，防止网络挂起导致 Token 测试按钮无限期等待
+  xhr.timeout = 15_000
+  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  xhr.setRequestHeader('Content-Type', 'application/json')
+
+  xhr.addEventListener('load', () => {
+    const requestEndTime = Date.now()
+    const duration = requestEndTime - requestStartTime
+
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 请求完成 ==========`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[testTokenValidity] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`,
+    )
+    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求耗时: ${String(duration)}ms`)
+
+    if (xhr.getAllResponseHeaders()) {
+      bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`)
+    }
+
+    if (xhr.status === 200) {
+      try {
+        const data = JSON.parse(xhr.responseText) as {
+          nickname?: string
+          username?: string
+          id?: string | number
+          avatar?: {
+            large?: string
+            medium?: string
+            small?: string
+          }
+        }
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应数据: ${JSON.stringify(data)}`)
+
+        const { nickname, userId } = applyVerifiedUserInfo(data)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`,
+        )
+
+        // 查询 Token 有效期，完成后显示剩余天数
+        void (async () => {
+          try {
+            const { expires } = await queryTokenStatus(token)
+            const remaining = getTokenRemainingTime(expires)
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `[testTokenValidity] 📅 Token 剩余时间: ${remaining.label} | 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
+            )
+            showToast(`✅ Token 有效 | 用户: ${nickname} | ${remaining.label}`, 'success')
+          } catch {
+            bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
+            showToast(`✅ Token 有效 | 用户: ${nickname}`, 'success')
+          }
+        })()
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(error as Error).message}`)
+        showError(_T.parseFailed, _T.cannotParseResponse)
+        BGM.handleError(error, {
+          showAlert: false,
+          level: BGM.ErrorLevel.WARN,
+          context: 'testTokenValidity',
+        })
+      }
+    } else if (xhr.status === 401) {
+      bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 无效或已过期')
+      showError(_T.tokenInvalid, _T.tokenExpired)
+      hideUserProfile()
+    } else {
+      bgmLog(
+        LOG_LEVELS.ERROR,
+        `[testTokenValidity] Token 验证失败，HTTP 状态码: ${String(xhr.status)}`,
+      )
+      bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`)
+      showError('错误', `Token验证失败 (HTTP ${String(xhr.status)})`)
+    }
+  })
+
+  xhr.addEventListener('error', () => {
+    const requestEndTime = Date.now()
+    const duration = requestEndTime - requestStartTime
+
+    bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${String(duration)}ms`)
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] XHR 状态: ${String(xhr.readyState)}`)
+    showError(_T.networkError, _T.cannotConnectBgm)
+  })
+
+  xhr.ontimeout = () => {
+    const requestEndTime = Date.now()
+    const duration = requestEndTime - requestStartTime
+    bgmLog(LOG_LEVELS.WARN, `[testTokenValidity] 请求超时（15s），耗时: ${String(duration)}ms`)
+    showError('网络超时，请重试', '超时')
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 正在发送请求...`)
+  xhr.send()
+}
+
+export function testDebugConnection(): void {
+  // 通过统一的 getApp() 获取 WPS Application 对象，避免直接访问 window 全局
+  if (getApp() === null) {
+    showToast(_T.debugConnFail, 'error')
+  } else {
+    showToast(_T.debugConnOk, 'success')
+  }
+}
+
+// ========== Token 有效期查询 ==========
+
+/**
+ * 查询 Token 状态（有效期、过期时间）
+ *
+ * 通过 POST /oauth/token_status 接口获取 Access Token 的过期时间戳。
+ * Bangumi API 返回 expires 字段（Unix 时间戳，秒），据此可计算剩余天数。
+ *
+ * @param token - Bangumi Access Token
+ * @returns Promise  resolving to { expires: number, userId: string }
+ */
+export function queryTokenStatus(token: string): Promise<{ expires: number; userId: string }> {
+  return new Promise((resolve, reject) => {
+    const apiUrl = 'https://bgm.tv/oauth/token_status'
+    const startTime = Date.now()
+
+    bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] ========== 查询 Token 状态 ==========`)
+    bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] API 路由: ${apiUrl}`)
+    bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] 请求方法: POST`)
+    // 安全：只打印长度，不打印凭据片段（日志会进环形缓冲并被调试面板展示/导出）
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[queryTokenStatus] 请求体: access_token=<已脱敏，长度 ${String(token.length)}>`,
+    )
+
+    // 说明（刻意保留裸 XHR，不迁到 tools/http.ts 的 httpRequest）：
+    //   token_status 是 OAuth 接口，要求 access_token 以 x-www-form-urlencoded
+    //   形式放在请求体里；而 httpRequest 的 XHR 路径在带 body 时会硬编码
+    //   Content-Type: application/json，迁移会改变请求编码、可能直接破坏该接口。
+    //   本函数的凭据安全由「不把 token 写入任何日志」保证（见上）。
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', apiUrl, true)
+    xhr.timeout = 15_000
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
+
+    xhr.addEventListener('load', () => {
+      const duration = Date.now() - startTime
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[queryTokenStatus] HTTP 状态码: ${String(xhr.status)}，耗时: ${String(duration)}ms`,
+      )
+
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText) as {
+            access_token?: string
+            client_id?: string
+            expires?: number
+            scope?: string | null
+            user_id?: string | number
+          }
+
+          if (typeof data.expires === 'number' && data.expires > 0) {
+            const { expires } = data
+            const userId = String(data.user_id ?? '')
+            storeTokenExpires(expires)
+
+            const remaining = getTokenRemainingTime(expires)
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `[queryTokenStatus] Token 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')} | ${remaining.label} | 状态: ${remaining.status}`,
+            )
+
+            // 更新 UI 显示过期信息
+            showTokenExpiryInfo(expires)
+
+            // 过期提醒（P1）
+            checkTokenExpiryWarning(expires)
+
+            resolve({ expires, userId })
+          } else {
+            bgmLog(LOG_LEVELS.WARN, '[queryTokenStatus] 响应中缺少有效的 expires 字段')
+            reject(new Error('Invalid response: missing expires field'))
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 解析响应失败: ${errorMessage}`)
+          reject(new Error('Failed to parse token status response'))
+        }
+      } else if (xhr.status === 400 || xhr.status === 401) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[queryTokenStatus] Token 状态查询失败，HTTP ${String(xhr.status)}（Token 可能已失效）`,
+        )
+        reject(new Error(`Token invalid or expired (HTTP ${String(xhr.status)})`))
+      } else {
+        bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 请求失败，HTTP ${String(xhr.status)}`)
+        reject(new Error(`HTTP ${String(xhr.status)}`))
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      const duration = Date.now() - startTime
+      bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 网络错误，耗时: ${String(duration)}ms`)
+      reject(new Error('Network error'))
+    })
+
+    xhr.ontimeout = () => {
+      bgmLog(LOG_LEVELS.WARN, '[queryTokenStatus] 请求超时（15s）')
+      reject(new Error('Request timeout'))
+    }
+
+    bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] 正在发送请求...`)
+    xhr.send(`access_token=${encodeURIComponent(token)}`)
+  })
+}
+
+/**
+ * 在 UI 上显示 Token 过期信息
+ *
+ * 更新 tokenExpiresDisplay 元素，显示剩余天数和状态。
+ * 同时更新 tokenStatus 颜色以反映过期紧迫程度。
+ *
+ * @param expires - Unix 时间戳（秒）
+ */
+export function showTokenExpiryInfo(expires: number): void {
+  const remaining = getTokenRemainingTime(expires)
+  const expiresElement = document.getElementById('tokenExpiresDisplay')
+  const tokenStatusElement = document.getElementById('tokenStatus')
+
+  // 更新过期信息显示元素
+  if (expiresElement) {
+    expiresElement.textContent = `${_T.tokenExpiresLabel}: ${remaining.label}`
+    expiresElement.style.display = ''
+
+    // 根据状态设置颜色
+    // green
+    let color = '#4CAF50'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
+
+    expiresElement.style.color = color
+  }
+
+  // 更新 tokenStatus 状态颜色
+  if (tokenStatusElement) {
+    let color = '#4CAF50'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
+    tokenStatusElement.style.color = color
+  }
+
+  // 如果有用户头像区域，也在那里显示过期信息
+  const profileExpiresElement = document.getElementById('profileExpiresDisplay')
+  if (profileExpiresElement) {
+    let icon = '✅'
+    switch (remaining.status) {
+      case 'warning': {
+        icon = '⚠️'
+        break
+      }
+      case 'danger': {
+        icon = '🔴'
+        break
+      }
+      case 'expired': {
+        icon = '⛔'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认图标
+        break
+      }
+    }
+    profileExpiresElement.textContent = `${icon} ${remaining.label}`
+    profileExpiresElement.style.display = ''
+
+    let color = '#4CAF50'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
+    profileExpiresElement.style.color = color
+  }
+}
+
+/**
+ * 检查 Token 过期并发送提醒（P1）
+ *
+ * - expired: 红色 Toast，强烈建议重新获取
+ * - danger (<3天): 红色 Toast，提醒尽快获取
+ * - warning (<7天): 黄色 Toast，建议关注
+ *
+ * @param expires - Unix 时间戳（秒）
+ */
+export function checkTokenExpiryWarning(expires: number): void {
+  const remaining = getTokenRemainingTime(expires)
+
+  switch (remaining.status) {
+    case 'expired': {
+      showToast(_T.tokenExpiredWarning, 'error')
+      bgmLog(LOG_LEVELS.ERROR, `[checkTokenExpiryWarning] ${_T.tokenExpiredWarning}`)
+
+      break
+    }
+    case 'danger': {
+      const message = _T.tokenExpiringCritical.split('{}').join(remaining.label)
+      showToast(message, 'error')
+      bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
+
+      break
+    }
+    case 'warning': {
+      const message = _T.tokenExpiringSoon.split('{}').join(remaining.label)
+      showToast(message, 'warn')
+      bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
+
+      break
+    }
+    default: {
+      // 其余状态（normal/expired 已在上方分支处理）不发送提醒
+      break
+    }
+  }
+}
+
+// ========== 用户头像显示 ==========
+
+/**
+ * 头像加载失败 → 隐藏头像本身
+ *
+ * 必须是**模块级命名函数**，且调用方通过 {@link bindAvatarError} 先 remove 再 add：
+ * showUserProfile 会被 updateTokenStatus（tokenUpdated 事件 + 2 秒轮询）反复调用，
+ * 内联闭包每次都是新函数引用，addEventListener 无法去重 → 监听器无限累积。
+ */
+const handleAvatarError = (event: Event): void => {
+  const image = event.currentTarget as HTMLImageElement | null
+  if (image) image.style.display = 'none'
+  bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
+}
+
+/**
+ * 顶栏头像加载失败 → 隐藏顶栏容器
+ *
+ * 按 ID 定位容器而非 `currentTarget.parentElement`：不依赖 DOM 嵌套关系，
+ * 单测平铺挂载时同样生效。
+ */
+const handleTopbarAvatarError = (event: Event): void => {
+  const image = event.currentTarget as HTMLImageElement | null
+  if (image) image.style.display = 'none'
+  const container = document.getElementById('topbarAvatar')
+  if (container) container.style.display = 'none'
+  bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
+}
+
+/** 绑定头像 error 监听：先去重再绑定，保证每个元素至多一个监听器 */
+function bindAvatarError(image: HTMLImageElement, handler: (event: Event) => void): void {
+  image.removeEventListener('error', handler)
+  image.addEventListener('error', handler)
+}
+
+/**
+ * 显示用户头像和信息
+ * 根据 BGM.cache 中的数据更新头像显示区域
+ */
+export function showUserProfile(): void {
+  const profileElement = document.getElementById('userProfile')
+
+  const { avatarUrl } = BGM.cache
+  const { username } = BGM.cache
+  const { userId } = BGM.cache
+
+  if (avatarUrl || username) {
+    if (profileElement) {
+      profileElement.style.display = 'flex'
+    }
+
+    // 主头像
+    const avatarImage = document.getElementById('userAvatar') as HTMLImageElement | null
+    if (avatarImage) {
+      if (avatarUrl) {
+        avatarImage.src = avatarUrl
+        avatarImage.alt = username || _T.avatarDefault
+        bindAvatarError(avatarImage, handleAvatarError)
+        avatarImage.style.display = ''
+      } else {
+        avatarImage.style.display = 'none'
+      }
+    }
+
+    // 同步更新顶栏头像（窄页面时显示）
+    const topbarAvatarElement = document.getElementById('topbarAvatar')
+    const topbarAvatarImage = document.getElementById('topbarAvatarImg') as HTMLImageElement | null
+    if (topbarAvatarElement) {
+      // 让 CSS 媒体查询控制显示/隐藏；没有头像 URL 时直接不显示——
+      // 否则窄页面会露出一个只显示 alt 文案的空 img（与 token 区同口径）
+      topbarAvatarElement.style.display = avatarUrl ? '' : 'none'
+      topbarAvatarElement.title = username || _T.avatarDefault
+      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault)
+      if (topbarAvatarImage && avatarUrl) {
+        topbarAvatarImage.src = avatarUrl
+        topbarAvatarImage.alt = username || _T.avatarDefault
+        bindAvatarError(topbarAvatarImage, handleTopbarAvatarError)
+      }
+    }
+
+    // 同步更新 Token 区域右侧的用户信息和头像
+    const tokenStatusRight = document.getElementById('tokenStatusRight')
+    const tokenUsernameElement = document.getElementById('tokenUserName')
+    const tokenUserIdElement = document.getElementById('tokenUserId')
+    const tokenAvatarImage = document.getElementById('tokenAvatarImg') as HTMLImageElement | null
+    if (tokenStatusRight) {
+      if (username || userId || avatarUrl) {
+        tokenStatusRight.style.display = 'flex'
+        if (tokenUsernameElement && username) {
+          tokenUsernameElement.textContent = username
+        }
+        if (tokenUserIdElement && userId) {
+          tokenUserIdElement.textContent = `ID: ${userId}`
+        }
+        if (tokenAvatarImage) {
+          if (avatarUrl) {
+            tokenAvatarImage.src = avatarUrl
+            tokenAvatarImage.alt = username || _T.avatarDefault
+            bindAvatarError(tokenAvatarImage, handleAvatarError)
+            tokenAvatarImage.style.display = ''
+          } else {
+            tokenAvatarImage.style.display = 'none'
+          }
+        }
+      } else {
+        tokenStatusRight.style.display = 'none'
+      }
+    }
+
+    const nameElement = document.getElementById('userNameDisplay')
+    if (nameElement && username) {
+      nameElement.textContent = username
+    }
+
+    const idElement = document.getElementById('userIdDisplay')
+    if (idElement && userId) {
+      idElement.textContent = `ID: ${userId}`
+    }
+
+    // 如果有缓存的过期信息，显示它
+    const cachedExpires = loadTokenExpires()
+    if (cachedExpires) {
+      showTokenExpiryInfo(cachedExpires)
+    }
+  } else {
+    if (profileElement) {
+      profileElement.style.display = 'none'
+    }
+    // 同时隐藏顶栏头像
+    const topbarAvatarElement = document.getElementById('topbarAvatar')
+    if (topbarAvatarElement) {
+      topbarAvatarElement.style.display = 'none'
+    }
+    // 同时隐藏 Token 区右侧用户信息
+    const tokenStatusRight = document.getElementById('tokenStatusRight')
+    if (tokenStatusRight) {
+      tokenStatusRight.style.display = 'none'
+    }
+  }
+  // 兜底：同步「收藏页面访问」区的用户 ID（内部有去重）
+  updateUserIdStatus()
+}
+
+/**
+ * 隐藏用户头像区域
+ */
+export function hideUserProfile(): void {
+  const profileElement = document.getElementById('userProfile')
+  if (profileElement) {
+    profileElement.style.display = 'none'
+  }
+  // 隐藏顶栏头像
+  const topbarAvatarElement = document.getElementById('topbarAvatar')
+  if (topbarAvatarElement) {
+    topbarAvatarElement.style.display = 'none'
+  }
+  // 隐藏 Token 区右侧用户信息
+  const tokenStatusRight = document.getElementById('tokenStatusRight')
+  if (tokenStatusRight) {
+    tokenStatusRight.style.display = 'none'
+  }
+  // 兜底：同步「收藏页面访问」区的用户 ID（内部有去重）
+  updateUserIdStatus()
+  // 隐藏过期信息显示
+  const expiresElement = document.getElementById('tokenExpiresDisplay')
+  if (expiresElement) {
+    expiresElement.style.display = 'none'
+    expiresElement.textContent = ''
+  }
+  const profileExpiresElement = document.getElementById('profileExpiresDisplay')
+  if (profileExpiresElement) {
+    profileExpiresElement.style.display = 'none'
+    profileExpiresElement.textContent = ''
+  }
+}
