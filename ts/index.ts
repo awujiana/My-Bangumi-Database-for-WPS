@@ -375,6 +375,8 @@ export {
   showCleanPanel,
   showHighlightPanel,
   showConditionalFormatPanel,
+  // 显示赞赏页面（Ribbon「赞赏」按钮）
+  showDonatePanel,
   // 一键关闭所有任务窗格页面（Ribbon「关闭所有页面」）
   closeAllPanels,
   // 标记清理面板已成功加载（面板 ID 自愈）

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <JsPlugin>
   <ApiVersion>1.0.0</ApiVersion>
-  <Name>HelloEt</Name>
-  <Description>addon Description</Description>
+  <Name>My Bangumi Database for WPS</Name>
+  <Description>在 WPS 表格中管理 Bangumi 番组数据：上传同步、数据同步、收藏下载、新番表富化、数据清洗、番剧高亮与条件格式管理。</Description>
   <Functions>
     <Uri>/functions.json</Uri>
-    <Namespace>HelloEt</Namespace>
+    <Namespace>MyBangumiDatabase</Namespace>
   </Functions>
 </JsPlugin>

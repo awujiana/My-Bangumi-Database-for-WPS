@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#11111b" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892 https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892 https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://github.com https://objects.githubusercontent.com https://codeload.github.com https://gitlab.com https://gitee.com"
     />
     <link rel="stylesheet" href="../css/tokens.css" />
     <link rel="stylesheet" href="../css/styles.css" />
@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="../css/sortable-list.css" />
     <link rel="stylesheet" href="../css/context-menu.css" />
     <link rel="stylesheet" href="../css/diff.css" />
+    <link rel="stylesheet" href="../css/update-dialog.css" />
   </head>
   <body data-page="settings">
     <script type="text/javascript" src="../libs/purify.js"></script>
@@ -653,17 +654,59 @@
             </button>
           </h3>
           <p class="hint">
-            <strong>Bangumi 同步工具</strong> v2.0<br />
-            用于在 Excel 中管理 Bangumi 动漫数据，支持：<br />
-            • 上传同步（Excel → Bangumi）<br />
-            • 数据同步（远程仓库 → Excel）<br />
-            • 收藏下载（Bangumi → Excel）<br />
-            • 新番表富化 / 数据清洗<br />
+            <strong>My Bangumi Database for WPS</strong>
+            <span id="aboutVersion">v2.1.0</span><br />
+            用于在 WPS 表格中管理 Bangumi 番组数据，支持：<br />
+            • 上传同步（WPS 表格 → Bangumi）<br />
+            • 数据同步（远程仓库 → WPS 表格）<br />
+            • 收藏下载（Bangumi → WPS 表格）<br />
+            • 新番表富化 / 数据清洗 / 番剧高亮 / 条件格式管理<br />
             <br />
             本页只保留「跨会话生效的长期偏好」；Token、远程仓库、冲突策略等本次操作参数位于各操作页面。
           </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button type="button" class="bgm-btn small primary" id="checkUpdateBtn">
+              🔄 检查更新
+            </button>
+          </div>
+          <p class="hint">从 GitHub Release 检查新版本；下载更新包后按日志提示覆盖安装。</p>
         </section>
       </main>
+    </div>
+
+    <!-- ===================== 检查更新弹窗 ===================== -->
+    <div class="update-modal" id="updateModal" hidden>
+      <div class="update-modal__mask">
+        <div
+          class="update-modal__panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="updateModalTitle"
+        >
+          <div class="update-modal__head">
+            <h2 id="updateModalTitle" class="update-modal__title">发现新版本</h2>
+            <button type="button" class="update-modal__close" data-update-close aria-label="关闭">
+              ✕
+            </button>
+          </div>
+          <p class="update-modal__version" id="updateVersionLine"></p>
+          <div class="update-modal__notes" id="updateNotes"></div>
+          <div class="update-modal__progress" id="updateProgressWrap" hidden>
+            <progress id="updateProgress" max="100" value="0"></progress>
+            <span id="updateProgressText">0%</span>
+          </div>
+          <pre class="update-modal__log" id="updateLog" aria-live="polite"></pre>
+          <div class="update-modal__actions">
+            <button type="button" class="bgm-btn small primary" id="updateInstallBtn">
+              ⬇️ 下载并安装
+            </button>
+            <button type="button" class="bgm-btn small" id="updateCopyLogBtn" hidden>
+              📋 复制日志
+            </button>
+            <button type="button" class="bgm-btn small" data-update-close>稍后</button>
+          </div>
+        </div>
+      </div>
     </div>
   </body>
 </html>

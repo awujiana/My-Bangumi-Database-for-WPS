@@ -51,6 +51,7 @@ import {
   updateThemeModeButtons,
   updateThemePreview,
 } from './settings-bindings.js'
+import { setupUpdateChecker } from './update-checker.js'
 import { syncFromPanel } from './sync.js'
 import {
   showTokenDialog,
@@ -215,6 +216,9 @@ export function setupButtonListeners(): void {
     trackedAddEventListener(card, 'click', handleThemePreviewClick)
   })
   updateThemePreview(getTheme(true))
+
+  // 设置页「关于」：检查更新（元素不存在时内部静默跳过）
+  setupUpdateChecker()
 
   // 设置页：默认导出位置 / 默认导入文件夹（回填已记忆的路径）
   initializeConfigPathControls()

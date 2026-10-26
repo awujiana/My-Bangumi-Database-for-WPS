@@ -1,0 +1,173 @@
+/**
+ * @fileoverview 赞赏页样式（ui/donate.html）
+ *
+ * 设计要点：
+ * 1. 二维码必须带**纯白静区（quiet zone）**，否则在深色页面上扫码识别率会下降；
+ * 2. 卡片宽度收窄到 520px，窄任务窗格（320px）下自动堆叠；
+ * 3. 颜色全部走 tokens.css 变量，深浅主题自动适配。
+ */
+
+.donate-main {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(16px, 2vw, 28px);
+}
+
+.donate-card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: clamp(20px, 2.4vw, 32px);
+  text-align: center;
+}
+
+/* ---------- 头部 ---------- */
+.donate-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-4);
+}
+
+.donate-avatar {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  line-height: 1;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.donate-name {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-display);
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.02em;
+}
+
+.donate-tagline {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+/* ---------- 说明 ---------- */
+.donate-intro {
+  margin: 0 auto var(--sp-5);
+  max-width: 44ch;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+/* ---------- 二维码 ---------- */
+.donate-qr {
+  margin: 0 auto var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.donate-qr img {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  /* 静区：二维码四周留白，扫码器需要 */
+  padding: 12px;
+  box-sizing: content-box;
+  background: #ffffff;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.donate-qr figcaption {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+}
+
+/* ---------- 联系方式 ---------- */
+.donate-links {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+@media (min-width: 460px) {
+  .donate-links {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.donate-link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  text-decoration: none;
+  text-align: left;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.donate-link:hover,
+.donate-link:focus-visible {
+  background: var(--bg-surface-2);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.donate-link-ico {
+  font-size: 20px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.donate-link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.donate-link-text strong {
+  font-size: var(--fs-ctrl);
+  font-weight: 600;
+}
+
+.donate-link-text span {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 结尾 ---------- */
+.donate-thanks {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-3);
+}

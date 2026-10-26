@@ -1,26 +1,77 @@
-﻿# Bangumi Watchlist Bridge（WPS Excel 追番标记助手）
+﻿[![License](https://img.shields.io/badge/协议-AGPL--3.0-blue)](LICENSE)
+[![Language](https://img.shields.io/badge/语言-TypeScript-blue)](https://www.typescriptlang.org/)
+[![Platform](https://img.shields.io/badge/平台-WPS%20Office-blue)](#sec-5)
+[![Author](https://img.shields.io/badge/作者-awujian-blue)](https://github.com/awujiana)
 
-> 一个运行在 **WPS Office / Excel** 中的加载项，用于在本地 Excel 表格与 Bangumi 番组计划（[bgm.tv](https://bgm.tv/)）之间同步动画收藏数据：把 Excel 中的观看状态 / 评分 / 标签上传到 Bangumi，或从远程仓库拉取 Bangumi 资料数据填充 Excel。
->
-> **关于名字**：Watchlist = 追番片单（Bangumi 收藏），Bridge = 在 Bangumi 与 Excel 表格之间搭桥。刻意避开「BGM」缩写——在开源语境里它首先会被读成 Background Music（背景音乐），词不达意。
+[![Release](https://img.shields.io/github/v/release/awujiana/My-Bangumi-Database-for-WPS?label=Release&color=blue)](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases)
+[![Stars](https://img.shields.io/github/stars/awujiana/My-Bangumi-Database-for-WPS?label=Stars&color=blue)](https://github.com/awujiana/My-Bangumi-Database-for-WPS/stargazers)
+[![Issues](https://img.shields.io/github/issues/awujiana/My-Bangumi-Database-for-WPS?label=Issues&color=blue)](https://github.com/awujiana/My-Bangumi-Database-for-WPS/issues)
+
+<div align="center">
+
+<h1>My Bangumi Database for WPS</h1>
+
+<strong>在 WPS 表格里管理 Bangumi 番组数据：上传同步、数据同步、收藏下载、新番表富化与数据清洗</strong>
+
+</div>
+
+> [!WARNING]
+> 本项目的相当一部分代码由 AI 辅助生成，并经过持续的人工作业、联调和重构，但它仍然可能存在遗漏、边界情况处理不足或行为与预期不完全一致的问题。如果你在使用过程中发现 Bug、兼容性问题、异常行为或文档缺失，欢迎积极提交 Issue。最好附上复现步骤、日志、截图和系统版本信息，这会非常有帮助。
+
+## 📚 目录
+
+- [项目简介](#sec-1)
+- [核心特色](#sec-2)
+- [技术栈](#sec-3)
+- [目录结构](#sec-4)
+- [环境要求与安装](#sec-5)
+- [开发调试](#sec-6)
+- [构建与打包](#sec-7)
+- [使用示例](#sec-8)
+- [测试](#sec-9)
+- [代码规范与贡献](#sec-10)
+- [文档索引](#sec-11)
+- [数据来源](#sec-12)
+- [反馈建议](#sec-13)
+- [开源协议](#sec-14)
+
+<a id="sec-1"></a>
+
+## 🚀 项目简介
+
+**My Bangumi Database for WPS** 是一个运行在 **WPS Office** 中的表格加载项，用于在本地表格与 [Bangumi 番组计划](https://bgm.tv/) 之间双向搬运数据：
+
+- **上传同步**：把表格里的观看状态 / 评分 / 标签批量写回 Bangumi；
+- **数据同步**：从公开数据仓库拉取 Bangumi 资料，按 SID 增量写入表格；
+- **收藏下载**：把 Bangumi 收藏列表标记到表格；
+- **新番表富化 / 数据清洗 / 番剧高亮 / 条件格式管理**：把追番表整理成可长期维护的样子。
+
+数据源由姊妹仓库 [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 每周从 Bangumi 官方 Archive 处理后下发，插件免 Token 即可同步。
 
 ---
 
-## 📌 功能特性
+<a id="sec-2"></a>
 
-| 能力                | 说明                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 📤 **上传同步**     | 将 Excel 中的观看状态、评分、标签批量同步到 Bangumi API（指数退避重试 + 请求竞态防护）。                                             |
-| 📥 **数据同步**     | 从远程仓库（GitHub / GitLab / Gitee / Gist / 本地文件）下载 Bangumi 资料 JSONL 并增量写入 Excel，内置 24h 本地缓存与 DJB2 哈希比对。 |
-| ↩️ **收藏下载**     | 从 Bangumi 拉取收藏列表标记到 Excel；工作表为空时可自动填充为 Bangumi 账号收藏条目，再标记到 Excel。                                 |
-| 🔄 **5 种同步策略** | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                           |
-| ✅ **同步偏好**     | 增量同步、冲突跳过、同步记录开关、默认收藏列表类型、默认时间筛选范围、自动刷新间隔；基于同步记录的「撤销同步」。                     |
-| 🎨 **外观主题**     | 深色 / 浅色 / 跟随系统三种主题模式，`data-theme` 变量切换，跟随系统实时响应。                                                        |
-| 🪄 **新番表富化**   | 自动补全新番表的名称 / 别名差异，映射 infobox 字段，减少手工录入。                                                                   |
-| 🔑 **Token 管理**   | 设置、测试、复制、清除 Bangumi API Token。                                                                                           |
-| ⚙️ **双面板 UI**    | 主面板 + 设置面板动态停靠协调；设置面板侧边功能导航（支持仅图标 + 悬停提示）；基于 `data-action` 的统一事件分发（30+ action）。      |
+## ✨ 核心特色
+
+| 能力                 | 说明                                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 📤 **上传同步**      | 将表格中的观看状态、评分、标签批量同步到 Bangumi API（指数退避重试 + 请求竞态防护）。                                              |
+| 📥 **数据同步**      | 从远程仓库（GitHub / GitLab / Gitee / Gist / 本地文件）下载 Bangumi 资料 JSONL 并增量写入表格，内置 24h 本地缓存与 DJB2 哈希比对。 |
+| ↩️ **收藏下载**      | 从 Bangumi 拉取收藏列表标记到表格；工作表为空时可自动填充为 Bangumi 账号收藏条目，再标记到表格。                                   |
+| 🔄 **5 种同步策略**  | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                         |
+| ✅ **同步偏好**      | 增量同步、冲突跳过、同步记录开关、默认收藏列表类型、默认时间筛选范围、自动刷新间隔；基于同步记录的「撤销同步」。                   |
+| 🎨 **外观主题**      | 深色 / 浅色 / 跟随系统 / 定时四种模式；点击从按钮中心向外扩散切换，可设深浅起止时间。                                              |
+| 🗓️ **季度/年度筛选** | 高亮页支持「全部 / 年度 / 季度 / 月份 / 未来番」筛选，与 GitHub 同步筛选同口径；「筛选显示」直接隐藏表格中不命中的行。             |
+| 🪄 **新番表富化**    | 自动补全新番表的名称 / 别名差异，映射 infobox 字段，减少手工录入。                                                                 |
+| 🔑 **Token 管理**    | 设置、测试、复制、清除 Bangumi API Token。                                                                                         |
+| 🆕 **检查更新**      | 从 GitHub Release 检查新版本，弹窗显示版本与更新说明，带下载进度与可复制日志。                                                     |
+| 💙 **赞赏页**        | 功能区「赞赏」按钮打开赞赏页，含作者 GitHub、邮箱与微信赞赏码。                                                                    |
+| ⚙️ **双面板 UI**     | 主面板 + 设置面板动态停靠协调；设置面板侧边功能导航（支持仅图标 + 悬停提示）；基于 `data-action` 的统一事件分发（30+ action）。    |
 
 ---
+
+<a id="sec-3"></a>
 
 ## 🧰 技术栈
 
@@ -33,6 +84,8 @@
 - **构建期依赖**：`@napi-rs/canvas` / `@resvg/resvg-js`（图像导出）
 
 ---
+
+<a id="sec-4"></a>
 
 ## 📂 目录结构
 
@@ -71,6 +124,8 @@ BGM/
 
 ---
 
+<a id="sec-5"></a>
+
 ## 🔧 环境要求
 
 | 依赖       | 版本                    | 说明                                       |
@@ -86,8 +141,8 @@ BGM/
 
 ```bash
 # 1. 克隆仓库
-git clone <本仓库地址>
-cd BGM
+git clone https://github.com/awujiana/My-Bangumi-Database-for-WPS.git
+cd My-Bangumi-Database-for-WPS
 
 # 2. 安装依赖
 npm install
@@ -96,6 +151,8 @@ npm install
 > `wpsjs`、`vite` 等 CLI 已作为 devDependencies 随 `npm install` 安装，无需全局安装。
 
 ---
+
+<a id="sec-6"></a>
 
 ## 🐞 开发调试
 
@@ -118,6 +175,8 @@ npm run build:ts                 # tsc --project tsconfig.build.json → dist-ts
 
 ---
 
+<a id="sec-7"></a>
+
 ## 📦 构建与打包
 
 ```bash
@@ -134,6 +193,8 @@ npm run build:ts
 - `dist/`：`vite build` 输出，含 `manifest.xml`、`ribbon.xml`、`images/`、`ui/`、`main.js`、`dist-ts/**`、`css/` 与经哈希的 `assets/`。将此目录作为加载项发布包部署到 WPS。
 
 ---
+
+<a id="sec-8"></a>
 
 ## 📖 使用示例
 
@@ -174,6 +235,8 @@ npm run build:ts
 
 ---
 
+<a id="sec-9"></a>
+
 ## 🧪 测试
 
 ```bash
@@ -211,6 +274,8 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 > 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
 
 ---
+
+<a id="sec-10"></a>
 
 ## 🤝 代码规范与贡献指南
 
@@ -251,6 +316,8 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ---
 
+<a id="sec-11"></a>
+
 ## 📚 文档索引
 
 | 文档                                                                     | 说明                                                                                        |
@@ -275,13 +342,42 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ---
 
+<a id="sec-12"></a>
+
 ## 🗂️ 数据来源
 
-插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/bangumi.jsonlines.gz`（Bangumi 官方 Archive 每周 dump 处理后的动画条目数据）。本仓库 `data/` 下保留一份本地副本，用于「本地文件同步」与开发测试。
+插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/anime.manifest.json`（分片清单），再按表头选择需要的分片（`anime.base.jsonlines.gz` 等）下载。数据来自 Bangumi 官方 Archive 每周 dump，经处理后按字段分片、gzip 压缩下发，插件端免 Token 即可同步。
+
+> 分片格式、清单字段与选片规则见数据仓库 README 与 [`文档/github-data-distribution.md`](文档/github-data-distribution.md)。
 
 ---
 
-## 📜 许可证
+<a id="sec-13"></a>
+
+## 💬 反馈建议
+
+- **Bug / 功能建议**：请到 [Issues](https://github.com/awujiana/My-Bangumi-Database-for-WPS/issues) 提交，附上复现步骤、日志、截图与 WPS 版本。
+- **安全 / 数据问题**：请直接邮件联系作者，不要在公开 Issue 里贴 Token 或表格内容。
+- **Pull Request**：欢迎先开 Issue 讨论，再提交 PR；提交前请确保 `npm run gate` 全绿。
+
+---
+
+## 🔗 关联仓库
+
+| 仓库                                                                                   | 说明                                                  |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [My-Bangumi-Database-for-WPS](https://github.com/awujiana/My-Bangumi-Database-for-WPS) | 本仓库：WPS 加载项（代码）                            |
+| [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) | 数据源仓库：Bangumi 动画存档 JSONL 分片与每周差异摘要 |
+
+## 👤 作者联系方式
+
+- **GitHub**：[@awujiana](https://github.com/awujiana)
+- **邮箱**：bingshanlengtie@qq.com
+- **赞赏**：插件功能区「赞赏」按钮，或见 [`ui/donate.html`](ui/donate.html)
+
+<a id="sec-14"></a>
+
+## 📄 开源协议
 
 本项目采用 [GNU AGPL v3.0](https://www.gnu.org/licenses/agpl-3.0.html)（GNU Affero General Public License v3.0），完整条款见 [LICENSE](./LICENSE)。
 

@@ -1099,6 +1099,15 @@ export function markHighlightPaneLoaded(): void {
 }
 
 /**
+ * 标记「赞赏」页面已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
+ */
+export function markDonatePaneLoaded(): void {
+  if (typeof window === 'undefined') return
+  const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
+  app?.PluginStorage?.setItem('donate_pane_url', window.location.href)
+}
+
+/**
  * 标记「条件格式管理」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
  */
 export function markConditionalFormatPaneLoaded(): void {
@@ -1239,6 +1248,73 @@ export function showHighlightPanel(): void {
     bgmLog(LOG_LEVELS.INFO, `[showHighlightPanel] 高亮面板已创建(ID:${pane.ID})`)
   } else {
     bgmLog(LOG_LEVELS.ERROR, '[showHighlightPanel] 创建高亮面板失败')
+  }
+}
+
+/**
+ * 显示 / 切换「赞赏」页面（Ribbon「赞赏」按钮的落地页）
+ *
+ * 与其它工具页不同，赞赏页是纯展示页（作者 GitHub / 邮箱 / 微信赞赏码），
+ * 不参与功能导航与模块排序，因此不进 `PAGE_MODULES`；但它同样需要
+ * 「窗格对象活着 ≠ 页面活着」的自愈，故沿用 `donate_pane_id` 缓存 + 心跳。
+ */
+export function showDonatePanel(): void {
+  const app = getApp() as {
+    PluginStorage?: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+    }
+    CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    GetTaskPane?: (id: string) => { Visible: boolean }
+  } | null
+  if (!app) {
+    bgmLog(LOG_LEVELS.ERROR, '[showDonatePanel] 无法获取 WPS Application 对象')
+    return
+  }
+
+  let donateId = app.PluginStorage?.getItem('donate_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('donate_pane_url')
+
+  // 自愈：缓存 ID 存在但页面从未成功加载 → 隐藏并重建
+  if (donateId && !storedPaneUrl?.includes('donate.html')) {
+    const stalePane = app.GetTaskPane?.(donateId)
+    if (stalePane) stalePane.Visible = false
+    app.PluginStorage?.setItem('donate_pane_id', '')
+    app.PluginStorage?.setItem('donate_pane_url', '')
+    donateId = null
+    bgmLog(LOG_LEVELS.WARN, '[showDonatePanel] 检测到加载失败的旧赞赏面板，已重建')
+  }
+
+  if (donateId) {
+    const pane = app.GetTaskPane?.(donateId)
+    if (pane) {
+      // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
+      if (isPanePageAlive('donate')) {
+        pane.Visible = !pane.Visible
+        bgmLog(LOG_LEVELS.INFO, `[showDonatePanel] 赞赏面板可见性切换: ${String(pane.Visible)}`)
+        return
+      }
+      pane.Visible = false
+      app.PluginStorage?.setItem('donate_pane_id', '')
+      app.PluginStorage?.setItem('donate_pane_url', '')
+      bgmLog(
+        LOG_LEVELS.WARN,
+        '[showDonatePanel] 赞赏窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+      )
+    } else {
+      app.PluginStorage?.setItem('donate_pane_id', '')
+      app.PluginStorage?.setItem('donate_pane_url', '')
+      bgmLog(LOG_LEVELS.WARN, '[showDonatePanel] 赞赏面板ID失效，已清除存储')
+    }
+  }
+
+  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('donate.html'))
+  if (pane) {
+    pane.Visible = true
+    app.PluginStorage?.setItem('donate_pane_id', pane.ID)
+    bgmLog(LOG_LEVELS.INFO, `[showDonatePanel] 赞赏面板已创建(ID:${pane.ID})`)
+  } else {
+    bgmLog(LOG_LEVELS.ERROR, '[showDonatePanel] 创建赞赏面板失败')
   }
 }
 

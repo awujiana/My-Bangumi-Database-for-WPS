@@ -1,0 +1,158 @@
+/**
+ * @fileoverview 检查更新弹窗样式（settings.html 的 #updateModal）
+ *
+ * 遮罩用 absolute 而非 fixed：WPS 任务窗格对 fixed 包含块解析不是视口
+ * （详见 conditional-format.css 同款说明），JS 打开时写 top=scrollY 锚定可见区。
+ */
+
+.update-modal[hidden] {
+  display: none;
+}
+
+.update-modal__mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 20px 16px;
+  background: var(--bg-overlay);
+}
+
+.update-modal__panel {
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+
+.update-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.update-modal__title {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.update-modal__close {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.update-modal__close:hover,
+.update-modal__close:focus-visible {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+  outline: none;
+}
+
+.update-modal__version {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.update-modal__notes {
+  max-height: 180px;
+  overflow: auto;
+  padding: var(--sp-3);
+  border-radius: var(--r-sm);
+  background: var(--bg-mantle);
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update-modal__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.update-modal__progress[hidden] {
+  display: none;
+}
+
+.update-modal__progress progress {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 8px;
+  border: none;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  accent-color: var(--accent-blue);
+  background: var(--bg-mantle);
+}
+
+.update-modal__progress progress::-webkit-progress-bar {
+  background: var(--bg-mantle);
+  border-radius: var(--r-pill);
+}
+
+.update-modal__progress progress::-webkit-progress-value {
+  background: var(--accent-blue);
+  border-radius: var(--r-pill);
+  transition: width var(--dur) var(--ease);
+}
+
+.update-modal__progress span {
+  flex: 0 0 auto;
+  min-width: 40px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.update-modal__log {
+  max-height: 160px;
+  margin: 0;
+  overflow: auto;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-app);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.update-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

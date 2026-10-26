@@ -26,6 +26,7 @@ import {
   showCleanPanel,
   showHighlightPanel,
   showConditionalFormatPanel,
+  showDonatePanel,
   closeAllPanels,
   BGM,
   isIncrementalSyncEnabled,
@@ -363,24 +364,13 @@ const SYNC_ACTIONS: Record<string, () => unknown> = {
 }
 
 /**
- * 「赞赏」按钮：说明插件的开源性质与支持方式
+ * 「赞赏」按钮：打开赞赏页面（作者 GitHub / 邮箱 / 微信赞赏码）
  *
- * 用 alert 而非新开面板：这是「一次阅读即可关闭」的信息，不值得占一个任务窗格；
- * 也不用 toast（一行放不下，且容易被后面的事件冲掉）。
+ * 赞赏页是一个独立任务窗格（ui/donate.html），而非 alert：二维码要足够大才能
+ * 被手机稳定扫描，alert 放不下图片。
  */
 function showDonateForRibbon(): void {
-  getNotifyApi().alert(
-    [
-      'Bangumi Watchlist Bridge 是免费开源插件，使用不收费、功能无限制。',
-      '',
-      '如果它帮你省下了整理追番表的功夫，欢迎请作者喝杯咖啡 —— ',
-      '这会让插件继续更新下去（新站点适配 / 新字段 / bug 修复）。',
-      '',
-      '· 在 GitHub 上点个 Star，或提 Issue / PR，同样是非常实在的支持；',
-      '· 也可在「设置 · 关于」里找到作者与仓库地址。',
-    ].join('\n'),
-    '💙 感谢支持',
-  )
+  showDonatePanel()
 }
 
 /**
