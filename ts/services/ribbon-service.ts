@@ -30,8 +30,10 @@ import {
   isGithubConfigComplete,
   createBatchFieldGetter,
   calcSyncRowFingerprint,
+  showSettingsPanel,
 } from '../index.js'
 import type { WpsWorksheet, GithubSyncResult, GithubRemoteEntry, LocalRowEntry } from '../index.js'
+import { getNotifyApi } from '../core/ui-bridge.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undo-stack.js'
 import { createStatusBarWriter } from '../tools/util/status-bar.js'
 
@@ -656,10 +658,30 @@ export async function testTokenForRibbon(): Promise<void> {
   }
 }
 
+// ========== 未配置时的引导 ==========
+
+/**
+ * 未配置（无 Token / 无用户 ID）时的统一引导
+ *
+ * 真机反馈：Ribbon 里点「测试 Token / 复制 Token / 打开收藏页」，在没设置时
+ * 「完全没反应」—— 原实现只调原生 `MessageBox`，而 Ribbon 宿主是独立 WebView，
+ * 没有前台窗口时该弹窗会被静默吞掉，日志也只留在 Ribbon 的 console 里，
+ * 用户在面板的「记录与日志」中看不到，于是表现为静默无操作。
+ *
+ * 现在统一：**打开设置页**（用户能立刻看到该填哪一栏）+ 应用内轻提示 + WARN 日志，
+ * 原生弹窗保留（能用的时候仍然是最醒目的提示）。
+ */
+function guideWithToast(message: string): void {
+  bgmLog(LOG_LEVELS.WARN, `[ribbon] ${message} → 已打开设置页引导用户`)
+  showSettingsPanel()
+  getNotifyApi().toast(message, 'warn')
+}
+
 /** testTokenForRibbon 的实际流程（由对外函数包一层兜底 try/catch） */
 async function runTokenTest(): Promise<void> {
   const token = loadBgToken()
   if (!token) {
+    guideWithToast('尚未设置 Token：请到「设置 → 账户与凭证」填写，或点 Ribbon 的「设置Token」')
     await wpsMessageBox('请先设置 Token！', 0, 48)
     return
   }
@@ -720,6 +742,7 @@ async function runTokenTest(): Promise<void> {
 export async function copyTokenForRibbon(): Promise<void> {
   const token = loadBgToken()
   if (!token) {
+    guideWithToast('尚未设置 Token，没有可复制的内容')
     await wpsMessageBox('未设置 Token，请先设置！', 0, 48)
     return
   }
@@ -764,6 +787,7 @@ export function openCollectionForRibbon(): void {
   bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`)
 
   if (!userId) {
+    guideWithToast('尚未设置用户 ID：请在设置页填写，或先点「测试 Token」自动识别')
     bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置')
     app.MessageBox?.('请先设置用户ID！', 0, 48)
     return

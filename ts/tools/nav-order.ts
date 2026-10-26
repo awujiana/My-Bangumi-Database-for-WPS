@@ -80,6 +80,7 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
     { id: 'sec-appearance', label: '外观与导航', icon: '🎨' },
     { id: 'sec-modules', label: '模块排序', icon: '🧩' },
     { id: 'sec-shortcuts', label: '快捷键', icon: '⌨️' },
+    { id: 'sec-accounts', label: '账号', icon: '👤' },
     { id: 'sec-sync-pref', label: '同步偏好', icon: '🔄' },
     { id: 'sec-enrich-preview', label: '富化预览', icon: '⚡️' },
     { id: 'sec-feature-toggles', label: '功能开关', icon: '⚙️' },

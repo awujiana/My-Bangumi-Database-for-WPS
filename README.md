@@ -243,11 +243,16 @@ npm run debug
 
 2. **注册到 WPS**
 
-   WPS 在以下目录读取加载项清单（Windows）：
+   WPS 各系统读取加载项清单的目录：
 
-   ```
-   %appdata%\kingsoft\wps\jsaddons
-   ```
+   | 系统        | 加载项目录                                                                   |
+   | ----------- | ---------------------------------------------------------------------------- |
+   | **Windows** | `%APPDATA%\kingsoft\wps\jsaddons`                                            |
+   | **macOS**   | `~/Library/Containers/com.kingsoft.wpsoffice.mac/Data/.kingsoft/wps/jsaddons` |
+   | **Linux**   | `~/.local/share/Kingsoft/wps/jsaddons`                                       |
+
+   > Windows 上最快的到达方式：`Win + R` → 输入 `%appdata%` → 回车，再依次进入 `kingsoft\wps\jsaddons`。
+   > 例：`C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
 
    - **(推荐) 安装器 / publish.html**：用 WPS 官方 `wpsjs` 工具链生成的 `publish.html`（离线模式）或 `wpsjs build --exe` 生成的安装器，浏览器打开后点「安装」，会自动写入上面的 `publish.xml`。
    - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.1.0\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
@@ -262,6 +267,17 @@ npm run debug
      ```
 
      > `url` 指向**包含 `index.html` 的目录**，可用 `file:///` 本地路径或 `http(s)://` 服务器地址；多个加载项在同一 `publish.xml` 中各写一条 `<jsplugin>` 即可。
+
+3. **卸载**
+
+   **操作前请务必先完全关闭 WPS**（含托盘里的 WPS 云服务进程），否则文件被占用会删不掉：
+
+   1. 进入上表的加载项目录（Windows：`%APPDATA%\kingsoft\wps\jsaddons`）；
+   2. 找到本插件的文件夹 —— 名为 `My-Bangumi-Database-for-WPS_2.1.0`（或 `my-bangumi-database-for-wps_2.1.0`、以及带版本号后缀的类似名称），**整目录删除**；
+   3. 可选：编辑同目录的 `publish.xml`，删掉指向该目录的 `<jsplugin .../>` 那一行（只删这一行）。
+
+   > ⚠️ 不要删除整个 `jsaddons` 文件夹，也不要删掉 `publish.xml` 本身 —— 里面可能还有其它加载项的注册信息，删了会一起失效。
+   > 卸载只移除插件文件，**表格里的数据与 `%APPDATA%` 下其它 WPS 配置不受影响**；插件配置（Token、偏好）随 `PluginStorage` 保存在文档/宿主侧，重装后通常仍在。
 
 3. **启用**：关闭并重新打开 WPS 表格。首次出现「Bangumi同步」选项卡时会请求允许，允许后约半分钟加载完成（可在 WPS「应用中心 / 加载项」里管理启用 / 禁用）。
 
@@ -333,6 +349,26 @@ zip -r "My-Bangumi-Database-for-WPS-v${VERSION}.zip" dist
 > 若沿用 WPS 标准 `wpsjs` 工程布局，也可直接 `wpsjs build`（生成 `wps-addon-build/` + `wps-addon-publish/publish.html`）后将该产物压缩上传；两种产物在计算机上都是「含 `index.html` 的目录」，安装方式一致。
 
 **插件品牌图标**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字样），随 `dist/`（或 `wpsjs build` 产物）一并打包进加载项，同时作为 README 标题标识与 Releases 资源使用。
+
+### 维护者：两棵工作树 + 发布流程
+
+本机维护时存在**两棵内容一致、职责不同**的树（不要在两棵树里各改一半）：
+
+| 树                               | 位置（本机）                              | 职责                                                                     |
+| -------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| **开发树**                       | `Excel加载项/BGM/restore-src`             | 含 `tests/`、`scripts/`、`package.json` / `tsconfig*` / `vite.config`，跑 `npm run gate` 全量门禁 |
+| **发布树**（= 本 GitHub 仓库）   | `Excel加载项/BGM/My-Bangumi-Database-for-WPS` | 只放发布文件 + `ts/` 源码 + `dist-ts/`；远端 `origin` 指向 GitHub        |
+
+标准流程：
+
+1. 在**开发树**改代码 → `npm run gate` 全绿（lint / 类型 / 门禁脚本 / 全量单测）；
+2. 把改动的文件同步到**发布树**（`ts/`、`ui/`、`css/`、`images/` 等；`tests/` 不进发布树）；
+3. 在发布树 `npm run build:ts` 重新生成 `dist-ts/`；
+4. 提交后运行 `node ../publish.mjs`（或双击 `publish.cmd`）—— 脚本会重建只含发布文件的 `publish` 分支并强推 `origin/main`，本地 `main` 保留工具链。
+
+> ⚠️ 新增的 `dist-ts/**` 文件被 `.gitignore` 挡住，`publish.mjs` 的 `git add -A` 收不到，必须显式 `git add -f dist-ts/...`，否则发布包缺模块会直接白屏。
+> ⚠️ 开发树缺 `node_modules` 时，用目录联接复用发布树的依赖（`New-Item -ItemType Junction`），不必重新 `npm install`。
+
 
 ---
 

@@ -92,6 +92,9 @@
           <a href="#sec-shortcuts" title="快捷键"
             ><span class="nav-ico">⌨️</span><span class="nav-text">快捷键</span></a
           >
+          <a href="#sec-accounts" title="账号"
+            ><span class="nav-ico">👤</span><span class="nav-text">账号</span></a
+          >
           <a href="#sec-sync-pref" title="同步偏好"
             ><span class="nav-ico">🔄</span><span class="nav-text">同步偏好</span></a
           >
@@ -311,6 +314,37 @@
                 ↩️ 全部恢复默认
               </button>
             </div>
+          </div>
+        </section>
+
+        <!-- 账号（多账号切换：记录多个 Token，长按头像切换） -->
+        <section class="section" id="sec-accounts" data-detachable>
+          <h3>
+            👤 账号<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-accounts"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「账号」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            记录多个 Bangumi 账号的 Token，之后可**长按右上角头像**一键切换。切换只改写当前生效的
+            Token / 用户 ID，表格数据与已同步内容不受影响。
+          </p>
+          <div id="accountPanel">
+            <div class="account-list" id="accountList"></div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button class="bgm-btn small primary" type="button" data-account-add="1">
+                ➕ 记录当前账号
+              </button>
+            </div>
+            <p class="hint">
+              「记录当前账号」把现在生效的 Token 与识别到的用户 ID 存成一条档案（同一账号重复记录只更新，不重复）。最多保留
+              8 个。
+            </p>
           </div>
         </section>
 

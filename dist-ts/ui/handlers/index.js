@@ -6,6 +6,7 @@
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, showConfirm, refreshData, previewSyncContent, isSyncRecordEnabled, getTheme, getListType, getTimeFilter, getRefreshInterval, getLogLevel, getModalButtonsPosition, getThemeSchedule, getClusterMode, } from '../../index.js';
 import { loadGithubConfigIntoForm } from './github-settings.js';
+import { initializeAccountManager } from './accounts.js';
 import { initializeModuleOrderEditor } from './module-order.js';
 import { initializeShortcutSettings } from './shortcuts-settings.js';
 import { initializeConfigPathControls } from './path-controls.js';
@@ -184,6 +185,13 @@ export function setupButtonListeners() {
     }
     catch (error) {
         bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化模块排序编辑器失败: ${error.message}`);
+    }
+    // 账号：设置页列表 + 长按头像切换（面板与设置页都会调用，缺元素时各自跳过）
+    try {
+        initializeAccountManager();
+    }
+    catch (error) {
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化账号管理失败: ${error.message}`);
     }
     // 设置页：快捷键编辑器（绑定录制 / 冲突提示 / 鼠标手势）
     try {

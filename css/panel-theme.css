@@ -1573,3 +1573,83 @@ body.is-nav-hidden .global {
     'topbar'
     'main';
 }
+
+/* ============================ 16c. 账号列表 / 长按头像浮层 ================= */
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--sp-3);
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+.account-row.is-active {
+  border-color: var(--primary);
+}
+.account-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-meta {
+  flex: 0 0 auto;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+/* 长按头像后的浮层：贴着头像右下角，z-index 高于正文、低于模态框 */
+.account-menu {
+  position: fixed;
+  z-index: 900;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 6px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu-item:hover {
+  background: var(--bg-surface);
+}
+.account-menu-item.is-active {
+  color: var(--primary);
+}
+.account-menu-hint {
+  margin: 4px 6px 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.account-menu-manage {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 8px;
+  color: var(--text-2);
+}

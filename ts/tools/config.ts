@@ -26,6 +26,7 @@ export const CONFIG_KEYS = {
   SHORTCUTS_ENABLED: 'bgm_shortcuts_enabled',
   SHORTCUT_BINDINGS: 'bgm_shortcut_bindings',
   SHORTCUT_MOUSE: 'bgm_shortcut_mouse',
+  ACCOUNTS: 'bgm_accounts',
   LIST_TYPE: 'bgm_list_type',
   TIME_FILTER: 'bgm_time_filter',
   REFRESH_INTERVAL: 'bgm_refresh_interval',
