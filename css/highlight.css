@@ -30,6 +30,15 @@
   gap: var(--sp-2);
 }
 
+/* 筛选范围五个按钮比匹配模式两个更挤：允许换行，别压成竖条 */
+.highlight-filter-row {
+  flex-wrap: wrap;
+}
+
+.highlight-filter-row .highlight-mode-btn {
+  flex: 1 1 56px;
+}
+
 .highlight-mode-btn {
   flex: 1;
   padding: 7px 0;

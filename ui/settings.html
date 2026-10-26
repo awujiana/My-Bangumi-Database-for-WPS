@@ -131,13 +131,52 @@
             </button>
           </h3>
           <div class="form-group">
-            <label for="themeSelect">主题模式</label>
-            <select id="themeSelect" class="input">
-              <option value="dark">深色模式</option>
-              <option value="light">浅色模式</option>
-              <option value="system">跟随系统</option>
-            </select>
-            <p class="hint">浅色模式适合明亮环境；「跟随系统」将自动匹配操作系统外观设置。</p>
+            <label>主题模式</label>
+            <!-- 按钮式分段控件（替代原下拉栏，momo：用 CodePen 那种按钮形式）。
+                 点击深色 / 浅色时带「从按钮中心向外扩散」的过渡动画。 -->
+            <div class="theme-mode-group" role="group" aria-label="主题模式">
+              <button type="button" class="theme-mode-btn" data-theme-mode="dark">
+                <span class="theme-mode-icon" aria-hidden="true">🌙</span>深色
+              </button>
+              <button type="button" class="theme-mode-btn" data-theme-mode="light">
+                <span class="theme-mode-icon" aria-hidden="true">☀️</span>浅色
+              </button>
+              <button type="button" class="theme-mode-btn" data-theme-mode="system">
+                <span class="theme-mode-icon" aria-hidden="true">🖥️</span>跟随系统
+              </button>
+              <button type="button" class="theme-mode-btn" data-theme-mode="schedule">
+                <span class="theme-mode-icon" aria-hidden="true">⏰</span>定时
+              </button>
+            </div>
+            <p class="hint">
+              深色 / 浅色点一下就以按钮为中心扩散切换；「跟随系统」自动匹配操作系统外观；
+              「定时」按下面两个时刻每天自动切换。
+            </p>
+          </div>
+          <!-- 定时切换的开始时刻（仅「定时」模式显示） -->
+          <div class="theme-schedule-box" id="themeScheduleBox" hidden>
+            <div class="theme-schedule-row">
+              <label for="themeDarkStart">深色开始</label>
+              <input
+                type="time"
+                id="themeDarkStart"
+                class="input theme-schedule-input"
+                value="19:00"
+              />
+            </div>
+            <div class="theme-schedule-row">
+              <label for="themeLightStart">浅色开始</label>
+              <input
+                type="time"
+                id="themeLightStart"
+                class="input theme-schedule-input"
+                value="07:00"
+              />
+            </div>
+            <p class="hint">
+              两个时刻之间是浅色，其余时间深色（例：07:00 浅 → 19:00 深）。支持跨零点 （深色
+              02:00、浅色 08:00 表示夜间深色）。
+            </p>
           </div>
           <div class="theme-preview" id="themePreview" aria-hidden="true">
             <div class="theme-preview-card" data-theme-card="dark">
@@ -154,6 +193,24 @@
             <span>导航仅显示图标（鼠标悬停显示名称）</span>
           </label>
           <p class="hint">勾选后侧栏导航仅显示图标，鼠标悬停时显示名称；在三个页面中同时生效。</p>
+
+          <!-- 模态框按钮位置（momo：确定/取消可放到模态框之外） -->
+          <div class="form-group">
+            <label>模态框按钮位置</label>
+            <div class="theme-mode-group" role="group" aria-label="模态框按钮位置">
+              <button type="button" class="theme-mode-btn" data-modal-buttons-position="inside">
+                模态框内（底部）
+              </button>
+              <button type="button" class="theme-mode-btn" data-modal-buttons-position="outside">
+                模态框外（标题栏右上角）
+              </button>
+            </div>
+            <p class="hint">
+              「模态框外」把确定 / 取消挪到标题栏那一行（与 ⛶ 最大化 / ▾ 收起同排），
+              输入框下方不再被按钮占位——短弹窗（粘贴规则、归组命名）更紧凑。
+              改动对下次打开的弹框生效。
+            </p>
+          </div>
         </section>
 
         <!-- 模块排序（设置其他页面功能模块的显示顺序） -->

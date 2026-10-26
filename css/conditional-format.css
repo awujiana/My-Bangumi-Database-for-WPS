@@ -1012,6 +1012,30 @@
   display: none;
 }
 
+/* 按钮外置（设置页「模态框按钮位置 → 模态框外」，momo：截图里那种样式）：
+   确定/取消组绝对定位到**标题栏那一行**、⛶/▾ 左侧——输入框下方不再被按钮
+   占位，短弹窗（粘贴规则 / 归组命名）更紧凑。DOM 不动，只靠这个类改定位。 */
+.conditional-format-modal--buttons-outside .conditional-format-modal-actions {
+  position: absolute;
+  top: 8px;
+  /* 让出右上角两个 22px 窗口按钮（⛶ + ▾）与间距 */
+  right: 58px;
+  z-index: 2;
+  margin: 0;
+  max-width: calc(100% - 90px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* 标题文字给外置按钮让位，避免压字（导入框有三个按钮，让得更多） */
+.conditional-format-modal--buttons-outside > h4 {
+  padding-right: 130px;
+}
+
+.conditional-format-modal--buttons-outside.conditional-format-modal--import > h4 {
+  padding-right: 240px;
+}
+
 /* 缩放 / 最大化后（is-resized / is-maximized，window-chrome 挂）：导入列表
    从「定高滚动」切成「吃满剩余高度」——放大才有意义；默认尺寸保持
    max-height 定高（38 条以内在卡片内滚，按钮不滚出视野）。 */
