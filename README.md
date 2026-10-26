@@ -9,7 +9,7 @@
 
 <div align="center">
 
-[![我的 Bangumi 数据库 (WPS版)](images/mbd-logo.svg)](images/mbd-logo.svg)
+[![插件图标：我的 Bangumi 数据库 (WPS版)](images/mbd-logo.svg)](images/mbd-logo.svg)
 
 <h1>我的 Bangumi 数据库 (WPS版)</h1>
 <h2>My Bangumi Database for WPS</h2>
@@ -25,6 +25,7 @@
 
 - [项目简介](#sec-1)
 - [核心特色](#sec-2)
+- [界面预览](#sec-2b)
 - [技术栈](#sec-3)
 - [目录结构](#sec-4)
 - [环境要求](#sec-5)
@@ -52,6 +53,9 @@
 
 数据源由姊妹仓库 [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 每周从 Bangumi 官方 Archive 处理后下发，插件免 Token 即可同步。
 
+> [!IMPORTANT]
+> **网络说明：`https://bgm.tv/` 在中国大陆无法直连。** 上传同步、收藏下载、Token 校验等直接访问 Bangumi 的功能需要自备代理 / 加速工具，并让 WPS 的网络请求走该代理；请自行解决网络环境问题。若只想离线整理数据，可使用「数据同步」（从 GitHub / GitLab / Gitee / Gist / 本地文件拉取 Archive 数据），该路径不依赖 bgm.tv。
+
 ---
 
 <a id="sec-2"></a>
@@ -75,6 +79,23 @@
 
 ---
 
+<a id="sec-2b"></a>
+
+## 🖼️ 界面预览
+
+<p align="center">
+  <img src="images/screenshot-panel.png" alt="主面板：数据选择区、同步策略、上传同步与同步记录" width="320" />
+  <img src="images/screenshot-clean.png" alt="数据清洗工具：重复名称、URL 重复、空行、噪音、标签订正与执行预览" width="320" />
+</p>
+
+<p align="center">
+  <img src="images/screenshot-donate-contact.png" alt="赞赏页的联系方式：点击可复制 GitHub 链接与邮箱" width="320" />
+</p>
+
+> 截图取自实际插件界面（深色主题）；不同 WPS 版本与窗口宽度下，面板会自动切换为单列 / 双列布局。
+
+---
+
 <a id="sec-3"></a>
 
 ## 🧰 技术栈
@@ -93,38 +114,61 @@
 
 ## 📂 目录结构
 
+以下为发布包 **`My-Bangumi-Database-for-WPS-v2.1.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
+
 ```
-BGM/
+My-Bangumi-Database-for-WPS-v2.1.0/
 ├── index.html                  # 加载项入口（WPS 启动时加载）
 ├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
 ├── manifest.xml                # 加载项清单（ApiVersion / Name）
-├── ribbon.xml                  # 功能区按钮配置（"Bangumi同步" Tab）
-├── vite.config.mjs             # Vite 构建配置
-├── tsconfig.json               # TS 编译配置（strict）
-├── package.json                # 脚本与依赖
-├── ts/                         # TypeScript 源码
-│   ├── core/                   # 常量、容器、类型、加密、服务
+├── ribbon.xml                  # 功能区按钮配置（「Bangumi同步」Tab）
+├── wpsjsrpcsdk.js              # WPS JSAPI RPC SDK
+├── assets/                     # Vite 哈希资源
+│   ├── main.<hash>.js          # 主入口打包产物
+│   ├── logger.<hash>.js        # 日志模块
+│   └── data-export.<hash>.js   # 数据导出模块
+├── css/                        # 全局与各页面样式
+│   ├── tokens.css              # 设计变量（颜色 / 间距 / 字号）
+│   ├── styles.css              # 通用组件与 Toast
+│   ├── panel-theme.css         # 面板主题与顶栏
+│   ├── clean.css
+│   ├── conditional-format.css
+│   ├── context-menu.css
+│   ├── detachable-panel.css
+│   ├── diff.css
+│   ├── donate.css
+│   ├── enrich.css
+│   ├── highlight.css
+│   ├── sortable-list.css
+│   └── update-dialog.css
+├── dist-ts/                    # tsc 编译产物（运行时依赖）
+│   ├── index.js
+│   ├── ribbon.js
+│   ├── core/                   # 常量、错误处理、结果、进度、类型
 │   ├── entry/                  # ribbon / panel / settings 入口
-│   ├── sync/                   # 同步引擎（githubSync / gitlabSync / giteeSync / gistSync / localFileSync / exceltobangumi）
-│   ├── ui/                     # 面板 UI 与事件处理（handlers/）
-│   ├── panel/                  # 主面板 / 设置面板页面逻辑
-│   ├── services/               # 配置 / Ribbon 服务
+│   ├── panel/                  # 主面板、设置、清洗、富化、高亮、条件格式、赞赏页逻辑
 │   ├── schemas/                # zod 校验 schema
-│   └── tools/                  # 工具函数（http / wps / logger / sanitize ...）
-├── ui/                         # 面板 HTML（panel.html / settings.html）
-├── css/                        # 面板样式
-├── images/                     # 功能区与面板 SVG 图标
-├── data/
-│   └── bangumi.jsonlines.gz    # 数据源本地副本（gzip，用于本地文件同步 / 开发测试）
-├── differences/                # 数据差异摘要
-├── 文档/                        # 项目文档（架构知识、用户操作手册、历史审计/评审、UI/交互、数据下发、数据源仓库说明、覆盖率报告，见「文档索引」）
-├── tests/                      # Vitest 单元测试
-├── scripts/                    # 构建 / 工具脚本（convert-icons.mjs 等）
-├── wps-addon-build/            # 遗留发布构建产物（含打包用的 test.exe，旧 taskpane 命名，非日常开发所需）
-└── dist/ , dist-ts/            # 构建产物（dist 由 Vite 生成，dist-ts 由 tsc 生成；二者均不入库，源码在 ts/）
+│   ├── services/               # 配置 / Ribbon 服务
+│   ├── sync/                   # 同步引擎（github / gitlab / gitee / gist / 本地文件 / Archive）
+│   ├── tools/                  # 工具函数（http / wps / logger / sanitize / clipboard ...）
+│   └── ui/                     # 面板 UI 与 handlers/
+├── images/                     # 功能区与面板图标（SVG）、赞赏二维码
+├── libs/                       # 运行时第三方库
+│   ├── fit-viewport.js
+│   ├── purify.js               # DOMPurify UMD
+│   ├── purify.min.js.map
+│   └── wps-sdk-loader.js
+└── ui/                         # 面板 HTML
+    ├── panel.html              # 主面板
+    ├── settings.html           # 设置面板
+    ├── clean.html              # 数据清洗
+    ├── conditional-format.html # 条件格式管理
+    ├── donate.html             # 赞赏页
+    ├── enrich.html             # 新番表富化
+    └── highlight.html          # 番剧高亮
 ```
 
-> `dist/`、`dist-ts/`、`node_modules/`、`wps-addon-build/` 由构建或发布生成；`*.xlsx` 被 `.gitignore` 排除。`data/`、`differences/` 及其数据文件按 `.gitignore` 约定入库。
+> 发布包内不含 `ts/`、`tests/`、`scripts/`、`文档/`、`data/` 等开发资源；需要源码、调试与测试环境请直接克隆本仓库。
 
 ---
 
@@ -176,7 +220,7 @@ npm run debug
 
 1. **获取加载项包**
    - 开发者：见 [构建与打包](#sec-7)，`npm run build` 产出的 `dist/` 目录（含 `index.html` / `manifest.xml` / `ribbon.xml` / `images/` / `ui/` / `dist-ts/` / `css/` / `libs/` / `assets/`）就是完整加载项包。
-   - 使用者：直接从 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases) 下载发布的 `bgm-addon-vX.Y.Z.zip`，解压得到加载项目录。
+   - 使用者：直接从 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases) 下载发布的 `My-Bangumi-Database-for-WPS-vX.Y.Z.zip`，解压得到加载项目录。
 
 2. **注册到 WPS**
 
@@ -260,10 +304,10 @@ npm run build
 
 # 2. 压缩为发布包（版本号取自 package.json 的 version）
 VERSION=$(node -p "require('./package.json').version")
-zip -r "bgm-addon-v${VERSION}.zip" dist
+zip -r "My-Bangumi-Database-for-WPS-v${VERSION}.zip" dist
 ```
 
-将 `bgm-addon-vX.Y.Z.zip` 上传到 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases)，使用者按 [安装到 WPS 使用环境](#sec-5b) 的「方式二」下载解压、注册即可，无需 Node 与构建。
+将 `My-Bangumi-Database-for-WPS-vX.Y.Z.zip` 上传到 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases)，使用者按 [安装到 WPS 使用环境](#sec-5b) 的「方式二」下载解压、注册即可，无需 Node 与构建。
 
 > 若沿用 WPS 标准 `wpsjs` 工程布局，也可直接 `wpsjs build`（生成 `wps-addon-build/` + `wps-addon-publish/publish.html`）后将该产物压缩上传；两种产物在计算机上都是「含 `index.html` 的目录」，安装方式一致。
 
@@ -326,10 +370,11 @@ npm run check:shard-layout     # 布局回归门禁（改了 css/ 或分片区�
 npm run audit:layout           # 全页面布局审计（改了 css/ 或页面结构后手工跑，需本机 Chrome）
 ```
 
-`npm run gate` 依次执行八道关：`lint:check` → `check:dompurify-version` → `check:cycles`
-→ `check:ribbon-buttons` → `check:nav-order` → `check:com-in-loop` → `typecheck:tests` → `test`。
+`npm run gate` 依次执行：`lint:check` → `check:dompurify-version` → `check:module-manifest` →
+`check:cycles` → `check:ribbon-buttons` → `check:nav-order` → `check:com-in-loop` → `check:detachable`
+→ `check:csp` → `check:wpsjs-patch` → `check:boot-com` → `typecheck:tests` → `test`。
 
-`npm run check:guards-reverse` **不在 `gate` 内**：八道关里有 6 道是**源码级断言**，而一条永远为真的
+`npm run check:guards-reverse` **不在 `gate` 内**：门禁里有多道是**源码级断言**，而一条永远为真的
 断言与有效断言外观完全相同 —— 都是绿的。该脚本为这 6 条各注入一个「已知违规」，确认它们真的会红，
 **且失败输出里出现预期片段**（脚本崩了退出码同样非 0），最后逐字节还原。
 **新增源码级断言时必须同时在它的 `CASES` 里补一个变异用例**，否则那条断言只是「看起来在守门」。
@@ -345,7 +390,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 （详见 [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md) v3.12）。判据 2 是启发式，命中项需人工确认；
 命令支持 `--json` / `--widths 360,500` / 指定单个页面。
 
-当前基线：**4430 条测试 / 133 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
+当前基线：**5120 条测试 / 169 文件**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
 
 > **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
 > 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
@@ -355,6 +400,8 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 <a id="sec-10"></a>
 
 ## 🤝 代码规范与贡献指南
+
+完整的开发环境、分支模型、提交规范、质量门禁与 PR 清单请见 **[CONTRIBUTING.md](CONTRIBUTING.md)**。以下为速览。
 
 ### 分支与提交流程
 
