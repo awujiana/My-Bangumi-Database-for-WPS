@@ -168,7 +168,7 @@ My-Bangumi-Database-for-WPS-v2.1.0/
     └── highlight.html          # 番剧高亮
 ```
 
-> 发布包内不含 `ts/`、`tests/`、`scripts/`、`文档/`、`data/` 等开发资源；需要源码、调试与测试环境请直接克隆本仓库。
+> 本仓库是**发布产物分发仓库**：只包含上述可安装文件、`README.md`、`LICENSE` 与 `CONTRIBUTING.md`，**不包含** `ts/` 源码、`tests/`、`scripts/`、构建配置（`package.json` / `tsconfig` / `vite.config`）与测试环境。下文「开发者环境搭建 / 开发调试 / 质量门禁」描述的是维护者本地完整源码工作区的流程，无法直接在本仓库执行。
 
 ---
 
@@ -187,7 +187,7 @@ My-Bangumi-Database-for-WPS-v2.1.0/
 
 ## 📥 开发者环境搭建（仅开发需要）
 
-> 这是**开发插件本身**的步骤。普通使用者安装插件请看下一节 [安装到 WPS 使用环境](#sec-5b)，无需 Node / 构建。
+> 这是**开发插件本身**的步骤，需在维护者的完整源码工作区执行（本仓库不含 `package.json` 与 `ts/` 源码，直接克隆后 `npm install` 会失败）。普通使用者安装插件请看下一节 [安装到 WPS 使用环境](#sec-5b)，无需 Node / 构建。
 
 ```bash
 # 1. 克隆仓库
@@ -257,6 +257,8 @@ npm run debug
 <a id="sec-6"></a>
 
 ## 🐞 开发调试
+
+> 以下命令仅适用于维护者的完整源码工作区；本仓库不提供构建脚本。
 
 加载项通过 WPS 的 `wpsjs debug` 启动调试会话（会编译 TS 并拉起 WPS 加载项）：
 

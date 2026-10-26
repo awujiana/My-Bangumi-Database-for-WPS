@@ -3,6 +3,10 @@
 感谢你愿意参与 **My Bangumi Database for WPS**！  
 本项目是一个运行在 WPS 表格（ET）中的加载项，使用 TypeScript + Vite + Vitest 开发。无论是提 Issue、修 Bug、补测试、改文档，还是适配新的同步源，都欢迎。
 
+> [!IMPORTANT]
+> 本仓库是**发布产物分发仓库**，只包含可直接安装的加载项文件、`README.md`、`LICENSE` 与本文档，**不包含** `ts/` 源码、`tests/`、`scripts/` 与构建配置。  
+> 因此下列「快速开始 / 源码结构 / 开发流程 / 质量门禁 / 测试要求 / 发布流程」是维护者本地完整源码工作区的操作说明，**无法直接在本仓库克隆执行**。外部贡献者请通过 Issue 提交问题、复现步骤与改进建议；维护者会在源码工作区合入后再同步发布产物。
+
 ---
 
 ## 目录
@@ -45,10 +49,11 @@
 | WPS Office | 2019+（Windows），需支持 JSAPI / 加载项调试    |
 | Git        | 较新版本                                       |
 
-### 本地安装与运行
+### 本地安装与运行（维护者源码工作区）
 
 ```bash
-git clone https://github.com/awujiana/My-Bangumi-Database-for-WPS.git
+# 本仓库不含源码与 package.json：以下步骤请在维护者的完整源码工作区执行
+git clone <维护者的完整源码仓库>
 cd My-Bangumi-Database-for-WPS
 
 npm install          # 安装依赖，并执行 husky + patch-package
