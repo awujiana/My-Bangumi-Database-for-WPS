@@ -369,6 +369,16 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 | [My-Bangumi-Database-for-WPS](https://github.com/awujiana/My-Bangumi-Database-for-WPS) | 本仓库：WPS 加载项（代码）                            |
 | [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) | 数据源仓库：Bangumi 动画存档 JSONL 分片与每周差异摘要 |
 
+## 💙 赞赏支持
+
+如果这个插件帮你省下了整理追番表的功夫，欢迎扫码请作者喝杯咖啡 —— 你的支持会让它继续更新下去（新站点适配 / 新字段 / Bug 修复）。
+
+<p align="center">
+  <img src="images/donate-qrcode.jpg" alt="微信赞赏码：扫描后可向作者赞赏" width="240" />
+</p>
+
+<p align="center">微信扫一扫 · 赞赏作者</p>
+
 ## 👤 作者联系方式
 
 - **GitHub**：[@awujiana](https://github.com/awujiana)
