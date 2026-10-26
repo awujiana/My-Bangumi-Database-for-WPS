@@ -117,13 +117,17 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  width: 100%;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text-1);
+  /* 使用 <button> 承载「点击复制」，需清掉浏览器默认样式 */
+  font: inherit;
   text-decoration: none;
   text-align: left;
+  cursor: pointer;
   transition:
     background var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
