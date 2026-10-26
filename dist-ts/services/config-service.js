@@ -4,12 +4,15 @@
  * @description 聚合 PluginStorage 中的配置为 JSON 字符串以便备份迁移，
  *              导入时使用 zod 进行严格结构校验，校验失败返回 Result.fail。
  *
- *              导出内容分两部分：
- *              - 核心字段（token / userId / githubConfig）：结构化、经 zod 校验；
- *              - preferences：全部长期偏好键的扁平映射（主题、导航模式、模块排序、
- *                同步偏好、默认路径、日志级别、富化预览设置、番剧高亮、条件格式、
- *                数据清理的规则开关）。
- *                新增偏好键无需改动本文件或 schema，导出会自动带上。
+ *              导出内容分三部分：
+ *              - 核心字段（token / userId / githubConfig 含 sourceType 与 Gist ID）：
+ *                结构化、经 zod 校验；
+ *              - preferences：全部长期偏好键的扁平映射（主题与定时、导航模式、模块
+ *                排序与折叠、快捷键、同步偏好、默认路径、日志级别、富化预览设置、
+ *                番剧高亮含筛选、条件格式含规则库 / 分组映射 / 锚定与固定记录、
+ *                数据清理的规则开关、多账号列表与用户资料缓存）。
+ *                新增偏好键需登记进 {@link EXPORTABLE_PREFERENCE_KEYS}，导出才会带上。
+ *              - 会话态（锁定工作表、面板信号、探测缓存）**不导出**，理由见白名单注释。
  */
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 import { BgmError, Result } from '../core/result.js';
@@ -24,24 +27,40 @@ import { CLEAN_RULES } from '../panel/clean-rules.js';
 const CONFIG_VERSION = 1;
 /**
  * 参与导入导出的偏好键白名单。
- * token / userId 由核心字段单独承载；锁定状态（bgm_locked_*）属会话态，不入档。
+ * token / userId 由核心字段单独承载；会话态与缓存键不入档（见下方说明）。
  *
- * 分三组，按「谁拥有的」排：
- *   1. 全局偏好（主题 / 导航 / 同步 / 路径 / 日志）—— 设置页直接管；
- *   2. 高亮页（highlight.*）—— 8 个键，含 2026-10-22 新增的 sheetLock；
- *   3. 条件格式页（conditionalFormat.*）—— 4 个键，含 sheetLock；
- *   4. 清理页（bgm_clean_on_* / bgm_clean_sheets:*）—— 前缀键，见下方说明。
+ * 分五组，按「谁拥有的」排：
+ *   1. 全局偏好（主题 / 导航 / 快捷键 / 同步 / 路径 / 日志）—— 设置页直接管；
+ *   2. 账号（多账号列表 + 用户资料缓存）—— 切换账号用；
+ *   3. 高亮页（highlight.*）—— 含 2026-10 新增的筛选与非动漫开关；
+ *   4. 条件格式页（conditionalFormat.*）—— 规则库 / 策略 / 目标表 / 聚类与合并口径 /
+ *      既有规则分组映射 / 锚定与固定记录；
+ *   5. GitHub 同步的补充键（Gist ID、分片选择）—— owner/repo/branch/path/strategy/sourceType
+ *      由核心字段 `githubConfig` 承载，这三个不在 GithubSyncConfig 结构里，单列。
  *
  * 清理页的两个前缀为什么要单独处理：`bgm_clean_on_<规则id>` 一条规则一个键、
  * `bgm_clean_sheets:<工作簿全路径>` 一个工作簿一个键，**键的数量随用户的规则数 /
  * 工作簿数增长**，写不进静态白名单。故 `collectPreferences` / `applyPreferences`
  * 对这两个前缀做「枚举匹配」而非白名单命中（见两个函数里的 isCleanPrefixKey）。
+ *
+ * **故意不导出的三类**（2026-10-27 全量盘点确认）：
+ * - `bgm_locked_sheet_<page>`：会话态，换台机器锁的表根本不存在；
+ * - `bgm_clean_sheets:<路径>`：键里是本机文件绝对路径，导入过去对不上；
+ * - `bgm_panel_shown_at` / `bgm_com_stall_<page>` / `bgm_data_context` /
+ *   `bgm_target_detect_cache`：瞬时信号与缓存，导出只是噪音，重算即可。
  */
 const EXPORTABLE_PREFERENCE_KEYS = [
     // ---- 全局偏好（设置页）----
     CONFIG_KEYS.THEME,
+    CONFIG_KEYS.THEME_SCHEDULE,
+    CONFIG_KEYS.MODAL_BUTTONS_POSITION,
     CONFIG_KEYS.NAV_ICONS_ONLY,
     CONFIG_KEYS.NAV_ORDER,
+    CONFIG_KEYS.MODULE_COLLAPSED,
+    CONFIG_KEYS.MODULE_HIDDEN,
+    CONFIG_KEYS.SHORTCUTS_ENABLED,
+    CONFIG_KEYS.SHORTCUT_BINDINGS,
+    CONFIG_KEYS.SHORTCUT_MOUSE,
     CONFIG_KEYS.LIST_TYPE,
     CONFIG_KEYS.TIME_FILTER,
     CONFIG_KEYS.REFRESH_INTERVAL,
@@ -58,6 +77,14 @@ const EXPORTABLE_PREFERENCE_KEYS = [
     CONFIG_KEYS.ENRICH_PREMIERE_COLOR,
     CONFIG_KEYS.ENRICH_PLATFORM_COLOR,
     CONFIG_KEYS.ENRICH_AUTO_CLEAN,
+    // 富化的自动探测开关（键在 sync/workbook-auto-detect.ts 里，未进 CONFIG_KEYS）
+    'bgm_enrich_auto_detect',
+    'bgm_enrich_auto_detect_bangumi',
+    // ---- 账号 ----
+    CONFIG_KEYS.ACCOUNTS,
+    'bgm_username',
+    'bgm_avatar_url',
+    'bgm_token_expires',
     // ---- 番剧高亮页 ----
     'highlight.source',
     'highlight.columns',
@@ -67,13 +94,22 @@ const EXPORTABLE_PREFERENCE_KEYS = [
     'highlight.lastApplied',
     'highlight.sheet',
     'highlight.sheetLock',
+    'highlight.filter',
+    'highlight.includeNonAnime',
     // ---- 条件格式管理页 ----
     'conditionalFormat.rules.v1',
     'conditionalFormat.strategy.v1',
     'conditionalFormat.sheet.v1',
     'conditionalFormat.sheetLock',
-    // 锚定 / 固定（删除行列后按锚定恢复）—— 随配置导出导入，换机器也带着
+    CONFIG_KEYS.CF_CLUSTER_MODE,
+    CONFIG_KEYS.CF_MERGE_MODE,
+    // 既有规则的分组命名（用户手动归组 / 改名 / 解散的成果，丢了要重新分一遍）
+    'conditionalFormat.existingGroups.v1',
+    // 锚定 / 固定（删除行列后按锚定范围恢复）—— 随配置导出导入，换机器也带着
     'conditionalFormat.anchors.v1',
+    // ---- GitHub 同步的补充键 ----
+    'github_sync_gist_id',
+    'github_sync_shards',
 ];
 /**
  * 清理页配置键的两个前缀。
@@ -173,6 +209,9 @@ export function exportConfig() {
             branch: githubConfig.branch,
             path: githubConfig.path,
             strategy,
+            sourceType: githubConfig.sourceType,
+            // Gist 源才有值；非空才落档（空串会让 setGithubConfig 写入一个空 Gist ID）
+            ...(githubConfig.gistId ? { gistId: githubConfig.gistId } : {}),
         },
         preferences: collectPreferences(),
     };
@@ -233,7 +272,9 @@ export function importConfig(json) {
     if (config.userId) {
         _setBgmUserId(config.userId);
     }
-    // 恢复 GitHub 仓库配置与同步策略
+    // 恢复 GitHub 仓库配置与同步策略。
+    // sourceType / gistId 必须一起带过去：setGithubConfig 对缺省值会写回 'github'，
+    // 不传就会把 Gist / Gitee 等源静默改成 GitHub（2026-10-27 修）。
     if (config.githubConfig) {
         const gc = config.githubConfig;
         setGithubConfig({
@@ -241,6 +282,8 @@ export function importConfig(json) {
             repo: gc.repo,
             branch: gc.branch,
             path: gc.path,
+            sourceType: gc.sourceType,
+            ...(gc.gistId ? { gistId: gc.gistId } : {}),
         });
         if (gc.strategy) {
             // 配置里的 default 已经保证 value ∈ SyncStrategy；这里用一次 schema 缩窄

@@ -705,15 +705,29 @@
             </button>
           </div>
           <p class="hint">
-            导出会下载配置文件并复制到剪贴板；导入支持从粘贴的 JSON
-            恢复；重置会清空所有已保存配置，请谨慎操作。
+            一键导出：下载 <code>bgm-config-日期.json</code> 并复制到剪贴板；一键导入：粘贴该文件
+            JSON 即可恢复。重置会清空所有已保存配置，请谨慎操作。
           </p>
           <p class="hint">
-            导出范围：Token、用户 ID、GitHub 仓库配置，以及全部工具页面的偏好 ——
-            外观与导航、同步选项、默认路径、日志级别、富化预览、番剧高亮（含目标工作表与锁定）、条件格式（含规则库、策略与目标工作表）、数据清理的规则开关。
+            <strong>导出范围</strong>：Bangumi Token 与多账号列表（含用户资料与过期时间）、GitHub
+            仓库配置（含同步源类型、Gist ID、分片选择、同步策略）、外观（主题 / 定时切换 /
+            模态框按钮位置）、导航（图标模式 / 分块排序 / 折叠隐藏）、快捷键绑定、同步选项、默认导入导出路径、日志级别、富化（预览设置 /
+            自动探测）、番剧高亮（列映射 / 模式 / 筛选范围 / 非动漫）、<strong>条件格式</strong>（规则库 /
+            应用策略 / 目标工作表 / 聚类与合并口径 / 分组命名 / <strong>锚定与固定记录</strong>）、数据清理的规则开关。
           </p>
           <p class="hint">
-            不在导出范围：各页当前锁定的工作表实例（`bgm_locked_*`，属会话态）、数据清理里按工作簿记住的勾选（`bgm_clean_sheets:`，键里是文件路径，换机器对不上）。
+            <strong>不在导出范围</strong>（刻意的，非遗漏）：会话态与缓存 —— 各页锁定的工作表实例
+            <code>bgm_locked_sheet_*</code>、面板显示信号 <code>bgm_panel_shown_at</code>、COM 卡顿观测
+            <code>bgm_com_stall_*</code>、数据上下文 <code>bgm_data_context</code>、目标探测缓存
+            <code>bgm_target_detect_cache</code>；以及按工作簿记住的清理勾选
+            <code>bgm_clean_sheets:</code>（键里是本机文件绝对路径，换机器对不上，到新机器重新勾选即可）。
+          </p>
+          <p class="hint">
+            <strong>更新会不会丢配置</strong>：所有配置存在 WPS 的 PluginStorage（按加载项 ID
+            存放），<strong>更新插件（替换加载项目录 / 覆盖 dist）不会清除</strong>，规则库、锚定与固定记录、
+            账号与偏好都会原样保留；只有卸载加载项、清理 WPS 缓存或换机器才会丢 ——
+            这些场景用上面的导出 / 导入兜底。各工具的运行记录（同步 / 富化 / 清理日志）在「数据导出」里另行导出为
+            CSV / TXT。
           </p>
         </section>
 

@@ -18,6 +18,10 @@ export const GithubConfigSchema = z.object({
         .enum(['github', 'gitlab', 'gitee', 'local', 'gist'])
         .optional()
         .default('github'),
+    // Gist 源的 Gist ID：只有 sourceType === 'gist' 时有值，与 owner/repo 互斥。
+    // 2026-10-27 补进导入导出 —— 之前它不在 schema 里，导入时会被 setGithubConfig
+    // 按默认 'github' 覆盖掉，Gist 用户迁机器后同步源直接失效。
+    gistId: z.string().optional(),
 });
 /** 完整配置 Schema（用于导入导出） */
 export const FullConfigSchema = z.object({
