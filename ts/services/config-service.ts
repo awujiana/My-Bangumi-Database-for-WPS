@@ -81,6 +81,8 @@ const EXPORTABLE_PREFERENCE_KEYS: readonly string[] = [
   'conditionalFormat.strategy.v1',
   'conditionalFormat.sheet.v1',
   'conditionalFormat.sheetLock',
+  // 锚定 / 固定（删除行列后按锚定恢复）—— 随配置导出导入，换机器也带着
+  'conditionalFormat.anchors.v1',
 ]
 
 /**

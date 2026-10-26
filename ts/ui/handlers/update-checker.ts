@@ -19,6 +19,8 @@ import {
   fetchLatestRelease,
   isNewerVersion,
   saveZipViaBrowser,
+  UPDATE_OWNER,
+  UPDATE_REPO,
 } from '../../tools/update-check.js'
 import type { ReleaseInfo } from '../../tools/update-check.js'
 
@@ -145,6 +147,78 @@ function fillModal(release: ReleaseInfo): void {
   setLog([`当前版本 v${CURRENT_VERSION}`, `发现新版本 ${release.version}`])
 }
 
+/**
+ * 按错误文本给出可操作的原因推测（只覆盖真机上最常见的三种）
+ *
+ * 之所以要「猜」：浏览器只给一句 `HTTP 403` / `Failed to fetch`，
+ * 用户看到这句话完全不知道该改什么。这里把它翻译成「接下来做什么」。
+ */
+function diagnoseFailure(message: string): string[] {
+  const hints: string[] = []
+  if (message.includes('403')) {
+    hints.push(
+      '· HTTP 403 多为 GitHub API 限流：未登录时每小时只有 60 次，稍等几分钟再试，或换个网络（手机热点）验证。',
+    )
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
+    hints.push(
+      '· Failed to fetch 表示请求没到达服务器：检查网络 / 代理 / 防火墙；公司网络常拦截 api.github.com。',
+    )
+  }
+  if (message.includes('404')) {
+    hints.push('· HTTP 404 表示仓库或 Release 不存在：可能被改名、转为私有，或还没有任何 Release。')
+  }
+  hints.push(`· 也可以直接打开 https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases 手动查看。`)
+  return hints
+}
+
+/** 组装诊断日志（能贴进 Issue 的最小集合） */
+function buildDiagnostics(message: string, error: unknown): string[] {
+  const lines = [
+    `时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`,
+    `当前版本：v${CURRENT_VERSION}`,
+    `接口：https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
+    `错误：${message}`,
+  ]
+  if (error instanceof Error) {
+    lines.push(`错误名：${error.name}`)
+    const stack = (error.stack ?? '').split('\n').slice(0, 6).join('\n')
+    if (stack !== '') lines.push(`调用栈：\n${stack}`)
+  }
+  if (typeof navigator !== 'undefined') {
+    const isOffline = !navigator.onLine
+    lines.push(`UA：${navigator.userAgent}`, `在线状态：${isOffline ? '离线' : '在线'}`)
+  }
+  return lines
+}
+
+/**
+ * 检查更新失败 → 弹「可复制日志」的模态框（momo：失败要能按日志排查）
+ *
+ * 只弹 toast 的问题是：3 秒后消失、且只给一句「HTTP 403」，用户既看不到
+ * 请求地址也拿不到可粘贴给维护者的信息。这里复用下载进度那套模态框，
+ * 把「失败原因 + 常见成因 + 诊断日志」一次给全。
+ */
+function showFailureModal(message: string, error: unknown): void {
+  const versionLine = elementById('updateVersionLine')
+  if (versionLine) versionLine.textContent = `当前 v${CURRENT_VERSION} · 检查更新失败`
+
+  const notes = elementById('updateNotes')
+  if (notes) {
+    notes.textContent = [`失败原因：${message}`, ...diagnoseFailure(message)].join('\n')
+  }
+
+  const installButton = buttonById('updateInstallBtn')
+  if (installButton) installButton.hidden = true
+  const progressWrapper = elementById('updateProgressWrap')
+  if (progressWrapper) progressWrapper.hidden = true
+  const copyButton = buttonById('updateCopyLogBtn')
+  if (copyButton) copyButton.hidden = false
+
+  setLog(buildDiagnostics(message, error))
+  setModalVisible(true)
+}
+
 /** 检查更新主流程 */
 async function checkForUpdates(): Promise<void> {
   const button = buttonById('checkUpdateBtn')
@@ -166,7 +240,7 @@ async function checkForUpdates(): Promise<void> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[update] 检查更新失败：${message}`)
-    showToast(`检查更新失败：${message}`, 'error')
+    showFailureModal(message, error)
   } finally {
     if (button) button.disabled = false
   }

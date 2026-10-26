@@ -394,6 +394,119 @@ export function mergeDuplicateRules(snapshots, mode = 'adjacent') {
     const rules = [...kept, ...merged];
     return { rules, mergedGroups, removedCount: snapshots.length - rules.length };
 }
+// ===== 锚定（删除行列后按锚定范围恢复）=====
+/** 锚定表的 PluginStorage 键（`{ 规则身份: 锚定范围 }`） */
+export const EXISTING_ANCHORS_STORE_KEY = 'conditionalFormat.anchors.v1';
+/**
+ * 规则身份键：公式 + 类型
+ *
+ * 不含范围 —— 范围正是锚定要**保住**的东西；也不含 1 基序号，序号会随规则增删漂移。
+ * 同公式但作用在两列的情况公式本身不同（`=$J2=""` vs `=$K2=""`），不会串。
+ */
+export function anchorKeyOf(snapshot) {
+    return `${snapshot.formula}\u{0}${snapshot.kind}`;
+}
+/** 列字母 → 1 基列号（A=1） */
+function columnToIndex(column) {
+    let index = 0;
+    for (const char of column.toUpperCase()) {
+        index = index * 26 + ((char.codePointAt(0) ?? 64) - 64);
+    }
+    return index;
+}
+/** 1 基列号 → 列字母 */
+function indexToColumn(index) {
+    let rest = index;
+    let column = '';
+    while (rest > 0) {
+        const remainder = (rest - 1) % 26;
+        column = String.fromCodePoint(65 + remainder) + column;
+        rest = Math.floor((rest - 1) / 26);
+    }
+    return column;
+}
+/**
+ * 把任意范围转成**整列范围**：`J2:J9` → `$J:$J`，`A1:C99` → `$A:$C`
+ *
+ * 这是「锚定」的落点（momo：锚定 = 把应用范围改写成整列，公式不变）。
+ * 整列范围的好处是**行增删不再影响它** —— 宿主只会在列被删除时调整它，
+ * 而行号怎么变都还是「整列」。
+ *
+ * 解析不出列字母（空范围、多区域、非法地址）时返回 null，调用方保留原范围。
+ */
+export function toFullColumnRange(range) {
+    const [startText, endText] = range.trim().split(':', 2);
+    const start = parseCell(startText ?? '');
+    if (start === null)
+        return null;
+    const end = endText === undefined ? start : parseCell(endText);
+    if (end === null)
+        return null;
+    const fromIndex = columnToIndex(start.column);
+    const toIndex = columnToIndex(end.column);
+    if (fromIndex <= 0 || toIndex <= 0)
+        return null;
+    const left = indexToColumn(Math.min(fromIndex, toIndex));
+    const right = indexToColumn(Math.max(fromIndex, toIndex));
+    return `$${left}:$${right}`;
+}
+/** 把单元格地址规范成绝对引用：`J5` → `$J$5`（固定单元格用） */
+export function toAbsoluteCell(text) {
+    const cell = parseCell(text);
+    if (cell === null)
+        return null;
+    return `$${cell.column}$${String(cell.row)}`;
+}
+/** 反序列化锚定表（坏数据当空，不逐条救） */
+export function parseAnchors(text) {
+    if (!text)
+        return {};
+    try {
+        const parsed = JSON.parse(text);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+            return {};
+        const anchors = {};
+        for (const [key, value] of Object.entries(parsed)) {
+            if (typeof value === 'string' && value !== '')
+                anchors[key] = value;
+        }
+        return anchors;
+    }
+    catch {
+        return {};
+    }
+}
+/** 序列化锚定表 */
+export function serializeAnchors(anchors) {
+    return JSON.stringify(anchors);
+}
+/**
+ * 算出「按锚定需要改回哪些范围」
+ *
+ * 语义：锚定 = 这条规则的**应用范围**被钉死。用户删掉行 / 列后，工作表上的
+ * 条件格式范围会被宿主自动收缩或平移，锚定表里记的仍是原范围 —— 这里把两者
+ * 比出来，由页面层写回工作表。
+ *
+ * 只按「公式 + 类型」匹配：范围已变，不能拿范围当身份；序号会漂移也不能用。
+ *
+ * @returns `repairs` 待写回的 `{ 0 基下标, 锚定范围 }`；`unmatched` 找不到对应规则的锚定数
+ *   （规则被删了，锚定自然失效，由调用方决定是否清理）
+ */
+export function planAnchorRepair(snapshots, anchors) {
+    const repairs = [];
+    let unmatched = 0;
+    for (const [key, range] of Object.entries(anchors)) {
+        const index = snapshots.findIndex((snapshot) => anchorKeyOf(snapshot) === key);
+        const current = index === -1 ? undefined : snapshots[index];
+        if (current === undefined) {
+            unmatched += 1;
+        }
+        else if (current.range !== range) {
+            repairs.push({ index, range });
+        }
+    }
+    return { repairs, unmatched };
+}
 // ===== 既有规则分组的维护（纯函数：页面层只负责持久化与重渲染）=====
 /**
  * 重命名一个既有规则分组（映射里所有值为 oldName 的键改值为 newName）

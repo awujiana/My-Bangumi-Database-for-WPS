@@ -13,7 +13,7 @@ import { showToast } from '../ui/dialog.js';
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js';
 import { BGM, bgmLog, findHeaderRow, getApp, getColumnMap, markConditionalFormatPaneLoaded, } from '../tools/util/index.js';
 import { CLUSTER_MODE_LABELS, getClusterMode, getMergeMode, getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
-import { CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STRATEGY_FALLBACK, CONDITIONAL_FORMAT_STORE_KEY, CONDITIONAL_FORMAT_STRATEGY_KEY, EXISTING_GROUPS_STORE_KEY, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, mergeDuplicateRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
+import { CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STRATEGY_FALLBACK, CONDITIONAL_FORMAT_STORE_KEY, CONDITIONAL_FORMAT_STRATEGY_KEY, EXISTING_GROUPS_STORE_KEY, EXISTING_ANCHORS_STORE_KEY, anchorKeyOf, parseAnchors, planAnchorRepair, serializeAnchors, toAbsoluteCell, toFullColumnRange, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, mergeDuplicateRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
 import { FOREIGN_RULE_PAGE_SIZE, buildForeignRuleGroupsHtml, buildForeignRuleHeadHtml, buildForeignRuleRowHtml, filterForeignRuleRows, filterRowsByScope, fcTypeLabel, paginate, selectionSummary, toForeignRuleRows, toggleSelection, } from './conditional-format-table.js';
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js';
 import { bindModalCollapse, bindModalDrag, bringModalIntoView, resetModalPosition, } from '../ui/components/modal-drag.js';
@@ -229,6 +229,9 @@ function loadExistingRules() {
     try {
         state.existing = readForeignRules(entry.worksheet);
         state.existingError = null;
+        // 锚定自动修复：删过行 / 列后宿主会把范围收缩或平移，这里按锚定改回原范围
+        if (repairAnchors(true) > 0)
+            state.existing = readForeignRules(entry.worksheet);
         // 读了多少条必须留痕：真机出现过「界面显示没有规则、用户坚称表上有 38 条」
         // 的争议，没有这行日志时双方都无法判断是 COM 没读到还是渲染丢了。
         bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 工作表「${entry.sheet}」读到 ${String(state.existing.length)} 条既有规则`);
@@ -448,6 +451,14 @@ function handleExistingTableClick(event) {
         const group = exportGroupButton.closest('[data-group]')?.dataset.group ?? '';
         if (group !== '')
             exportExistingGroup(group);
+        return;
+    }
+    // 组标题 📌：把本组规则的应用范围钉住（删除行列后自动恢复）
+    const anchorGroupButton = target.closest('[data-action="anchor-existing-group"]');
+    if (anchorGroupButton) {
+        const group = anchorGroupButton.closest('[data-group]')?.dataset.group ?? '';
+        if (group !== '')
+            anchorExistingGroup(group);
         return;
     }
     // 组标题 🗑：从工作表删除本组全部规则
@@ -862,6 +873,127 @@ function mergeExistingDuplicates() {
     renderRuleList();
     showToast(`已把 ${String(state.existing.length)} 条合并为 ${String(result.rules.length)} 条并加入规则库（口径：${mode === 'union' ? '强行并成一块' : '仅连续行'}）；点「应用与修复」写回工作表`, 'success');
     bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 合并重复项: ${String(result.removedCount)} 条 → ${String(result.rules.length)} 条（${mode}）`);
+}
+/** 读锚定表（坏数据当空） */
+function readAnchors() {
+    return parseAnchors(getConfig(EXISTING_ANCHORS_STORE_KEY, '', true));
+}
+/**
+ * 锚定一个分组的全部规则
+ *
+ * 锚定的是「应用范围」：把这些规则当前的 range 记下来，之后删行 / 删列导致宿主
+ * 收缩或平移范围时，{@link repairAnchors} 会把范围改回锚定值 —— 这就是用户要的
+ * 「描定后删除行列不影响条件格式」。
+ */
+function anchorExistingGroup(group) {
+    const entry = selectedSheet();
+    const anchors = readAnchors();
+    let count = 0;
+    for (const [index, snapshot] of state.existing.entries()) {
+        const isInGroup = state.existingGroups[snapshotGroupKey(snapshot)] === group;
+        const columnRange = isInGroup && snapshot.formula !== '' && snapshot.range !== ''
+            ? toFullColumnRange(snapshot.range)
+            : null;
+        if (columnRange !== null) {
+            // 锚定 = 把应用范围改写为整列（$J:$J / $J:$L），公式不动
+            anchors[anchorKeyOf(snapshot)] = columnRange;
+            count += 1;
+            // 立刻写回工作表：用户要的是「现在就不受行列增删影响」，不是等下次
+            if (entry !== null)
+                setForeignAppliesTo(entry.worksheet, index + 1, columnRange);
+        }
+    }
+    if (count === 0) {
+        showToast('本组没有可锚定的规则（需要公式与范围都能读到）', 'info');
+        return;
+    }
+    if (!setConfig(EXISTING_ANCHORS_STORE_KEY, serializeAnchors(anchors))) {
+        showToast('锚定保存失败', 'error');
+        return;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 已锚定分组「${group}」共 ${String(count)} 条规则（整列）`);
+    loadExistingRules();
+    showToast(`已锚定 ${String(count)} 条规则：应用范围改为整列，行增删不再影响`, 'success');
+}
+/**
+ * 固定单元格：把选中的规则（没选就全部）的应用范围钉成**一个单元格**
+ *
+ * 与「锚定整列」的区别：整列范围怕删列，单元格范围怕删行 —— 固定就是把
+ * 「只认这个单元格号」写死，之后删行删列都由 {@link repairAnchors} 改回该地址。
+ * 地址由用户输入（`J5` / `$J$5` 都认），落盘统一成绝对引用。
+ */
+function fixRulesToCell() {
+    const entry = selectedSheet();
+    if (entry === null || state.existing.length === 0) {
+        showToast('当前表没有既有规则', 'info');
+        return;
+    }
+    // eslint-disable-next-line no-alert -- 只有一个单元格地址要填，用原生 prompt 比再搭一个模态框更轻
+    const input = window.prompt('要固定到哪个单元格？（例如 J5）', '');
+    if (input === null)
+        return;
+    const cell = toAbsoluteCell(input);
+    if (cell === null) {
+        showToast('单元格地址无法识别，请输入类似 J5 的形式', 'warn');
+        return;
+    }
+    const targets = state.existingSelection.size > 0
+        ? [...state.existingSelection].map((index) => index - 1)
+        : state.existing.map((_snapshot, index) => index);
+    const anchors = readAnchors();
+    let count = 0;
+    for (const index of targets) {
+        const snapshot = state.existing[index];
+        if (snapshot !== undefined && snapshot.formula !== '') {
+            anchors[anchorKeyOf(snapshot)] = cell;
+            if (setForeignAppliesTo(entry.worksheet, index + 1, cell).ok)
+                count += 1;
+        }
+    }
+    if (count === 0) {
+        showToast('固定失败：没有可写入的规则', 'error');
+        return;
+    }
+    setConfig(EXISTING_ANCHORS_STORE_KEY, serializeAnchors(anchors));
+    bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 已把 ${String(count)} 条规则固定到 ${cell}`);
+    loadExistingRules();
+    showToast(`已固定 ${String(count)} 条规则到 ${cell}：删行删列后仍只作用于该单元格`, 'success');
+}
+/**
+ * 按锚定表修复范围
+ * @param isAuto - 自动修复（读取后触发）时不弹成功 toast，避免每次换表都吵
+ * @returns 实际写回的条数
+ */
+function repairAnchors(isAuto) {
+    const entry = selectedSheet();
+    const anchors = readAnchors();
+    if (!entry || Object.keys(anchors).length === 0) {
+        if (!isAuto)
+            showToast('还没有锚定任何规则', 'info');
+        return 0;
+    }
+    const plan = planAnchorRepair(state.existing, anchors);
+    if (plan.repairs.length === 0) {
+        if (!isAuto)
+            showToast('所有锚定规则的范围都正确，无需修复', 'info');
+        return 0;
+    }
+    let repaired = 0;
+    for (const repair of plan.repairs) {
+        const result = setForeignAppliesTo(entry.worksheet, repair.index + 1, repair.range);
+        if (result.ok)
+            repaired += 1;
+        else
+            bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 锚定修复失败（第 ${String(repair.index + 1)} 条）：${result.error}`);
+    }
+    bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 按锚定恢复 ${String(repaired)} 条规则范围（自动=${String(isAuto)}）`);
+    if (repaired > 0) {
+        showToast(`已按锚定恢复 ${String(repaired)} 条规则的应用范围`, isAuto ? 'info' : 'success');
+    }
+    else if (!isAuto) {
+        showToast('锚定恢复失败：当前 WPS 版本不支持改应用范围', 'error');
+    }
+    return repaired;
 }
 /** 清除所有分组：回到平铺分页视图 */
 function clearExistingGroups() {
@@ -1409,6 +1541,7 @@ function renderRuleList() {
             <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="全选 / 取消本组">☑</button>
             <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="删除本组全部规则">🗑</button>
             <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="导出本组所选规则">📤</button>
+            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组：删除行列后按锚定范围自动恢复">📌</button>
           </span>
         </div>
         ${rows}
@@ -2419,6 +2552,12 @@ export function initializeConditionalFormatPage() {
     });
     byId('conditionalFormatMergeBtn')?.addEventListener('click', () => {
         mergeExistingDuplicates();
+    });
+    byId('conditionalFormatRepairAnchorBtn')?.addEventListener('click', () => {
+        repairAnchors(false);
+    });
+    byId('conditionalFormatFixCellBtn')?.addEventListener('click', () => {
+        fixRulesToCell();
     });
     byId('conditionalFormatClearGroupsBtn')?.addEventListener('click', () => {
         clearExistingGroups();
