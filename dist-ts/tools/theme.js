@@ -11,6 +11,7 @@
  */
 import { CONFIG_KEYS, getTheme, getThemeSchedule, resolveScheduledTheme, setTheme, } from './config.js';
 import { subscribeConfigPoll } from './config-poll.js';
+import { startShortcutDispatcher } from './shortcuts.js';
 const systemMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: light)')
     : null;
@@ -148,6 +149,9 @@ export function initializeTheme() {
     });
     // 定时模式常驻轮询（其它模式下每 30s 一次空转解析，开销可忽略）
     startThemeScheduleWatch();
+    // 全局快捷键分发器：借这个「所有页面都会调用」的公共入口启动（幂等），
+    // 免得再维护一份「哪几个页面入口要记得加 startShortcutDispatcher」的平行清单。
+    startShortcutDispatcher();
 }
 /**
  * 启动定时切换轮询（schedule 模式）

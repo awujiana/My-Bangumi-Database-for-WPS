@@ -12,7 +12,7 @@ import { LOG_LEVELS } from '../core/constants.js';
 import { showToast } from '../ui/dialog.js';
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js';
 import { BGM, bgmLog, findHeaderRow, getApp, getColumnMap, markConditionalFormatPaneLoaded, } from '../tools/util/index.js';
-import { getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
+import { CLUSTER_MODE_LABELS, getClusterMode, getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
 import { CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STRATEGY_FALLBACK, CONDITIONAL_FORMAT_STORE_KEY, CONDITIONAL_FORMAT_STRATEGY_KEY, EXISTING_GROUPS_STORE_KEY, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
 import { FOREIGN_RULE_PAGE_SIZE, buildForeignRuleGroupsHtml, buildForeignRuleHeadHtml, buildForeignRuleRowHtml, filterForeignRuleRows, filterRowsByScope, fcTypeLabel, paginate, selectionSummary, toForeignRuleRows, toggleSelection, } from './conditional-format-table.js';
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js';
@@ -808,22 +808,25 @@ function dissolveExistingGroupLocal(group) {
     showToast(`已解散分组「${group}」，规则回「未分组」`, 'success');
 }
 /**
- * 自动聚类：按公式模式重算所有分组
+ * 自动聚类：按设置页选定的口径重算所有分组
  *
  * 覆盖现有映射（含手动归的组）——自动聚类是「重来一遍」的语义，
- * 在 toast 里明说覆盖了几组，避免用户以为手动分组被合并。
+ * 在 toast 里明说口径与覆盖了几组，避免用户以为手动分组被合并。
+ * 口径本身在设置页「条件格式」里配置（按公式 / 按范围+公式 / 按列 / 按行），
+ * 本页每次点击现读，改完口径不必重启插件。
  */
 function autoClusterExistingGroups() {
     if (state.existing.length === 0) {
         showToast('当前表没有既有规则', 'info');
         return;
     }
-    state.existingGroups = autoClusterGroups(state.existing);
+    const mode = getClusterMode(true);
+    state.existingGroups = autoClusterGroups(state.existing, mode);
     persistExistingGroups();
     state.existingGroupCollapsed = new Set();
     renderExistingRules();
     const groupCount = new Set(Object.values(state.existingGroups)).size;
-    showToast(`已按公式模式聚成 ${String(groupCount)} 组（覆盖了原分组）`, 'success');
+    showToast(`已按「${CLUSTER_MODE_LABELS[mode]}」聚成 ${String(groupCount)} 组（覆盖了原分组）`, 'success');
 }
 /** 清除所有分组：回到平铺分页视图 */
 function clearExistingGroups() {

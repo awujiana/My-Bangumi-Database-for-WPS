@@ -448,6 +448,11 @@ export {
   setModalButtonsPosition,
   getModalButtonsPosition,
   type ModalButtonsPosition,
+  // 条件格式自动聚类口径（按公式 / 范围+公式 / 列 / 行）
+  setClusterMode,
+  getClusterMode,
+  CLUSTER_MODE_LABELS,
+  type ClusterMode,
   // 默认收藏列表类型
   setListType,
   getListType,

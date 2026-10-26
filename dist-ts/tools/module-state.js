@@ -52,6 +52,18 @@ const EMPTY_HINT_TOAST = '本页模块已全部隐藏，请到「设置 → 模�
 const EMPTY_HINT_TEXT = '本页模块已全部隐藏。请打开设置页，在「模块排序」中开启需要显示的功能模块。';
 /** 设置页「模块排序」编辑器自身所在模块：禁止隐藏，否则无法恢复其它模块 */
 const UNHIDEABLE = { page: 'settings', id: 'sec-modules' };
+/**
+ * 「功能导航（侧栏）」伪模块 id
+ *
+ * 侧栏 `.nav` 不是主区 `<section>`，因此不能进 `PAGE_MODULES`（那份注册表与页面
+ * HTML 的 `<section id>` 严格一一对应，硬塞会被 `check-nav-order.mjs` 判成结构缺失）。
+ * 但用户希望在设置页用同一个眼睛按钮把整条功能导航也藏掉，于是给它一个保留 id，
+ * 混在同一个 `bgm_module_hidden` 映射里按页存储 —— 读写两侧都必须放行，
+ * 否则 `setIds` 的「只接受注册表 id」过滤会把它静默丢掉。
+ */
+export const NAV_MODULE_ID = '__nav__';
+/** 侧栏被隐藏时加在 body 上的类名（CSS 靠它收掉侧栏列，不留空列） */
+const NAV_HIDDEN_BODY_CLASS = 'is-nav-hidden';
 // ========== 专注模式（只显示单个模块，可上下切换） ==========
 /** 模块标题里「只显示此模块」按钮的类名 */
 const SOLO_BUTTON_CLASS = 'mod-solo-btn';
@@ -307,6 +319,8 @@ function readIds(key, page, isSilent) {
     if (!Array.isArray(stored))
         return [];
     const known = new Set(modules.map((module) => module.id));
+    // 侧栏伪模块同样按页记录，见 NAV_MODULE_ID 的说明
+    known.add(NAV_MODULE_ID);
     const result = [];
     for (const item of stored) {
         if (typeof item === 'string' && known.has(item) && !result.includes(item)) {
@@ -326,6 +340,7 @@ function setIds(key, page, ids) {
         return false;
     }
     const known = new Set(modules.map((module) => module.id));
+    known.add(NAV_MODULE_ID);
     const normalized = [];
     for (const id of ids) {
         if (known.has(id) && !normalized.includes(id))
@@ -460,6 +475,10 @@ export function applyModuleState(page) {
         if (detachTrigger !== null)
             detachTrigger.hidden = isSoloTarget;
     }
+    // 侧栏功能导航是伪模块（不在注册表里）：整条 `.nav` 一起藏，同时收掉栅格里的
+    // 侧栏列（只 display:none 侧栏会留一个空列）。专注模式由 solo-mode 的 CSS 负责，
+    // 这里只处理「用户在设置页点了眼睛」这一种。
+    document.body.classList.toggle(NAV_HIDDEN_BODY_CLASS, hidden.has(NAV_MODULE_ID));
     syncEmptyHint(pageKey, modules, hidden, soloId);
 }
 /** 点击委托是否已挂到 document（模块级，避免重复挂载导致一次点击切换两次） */

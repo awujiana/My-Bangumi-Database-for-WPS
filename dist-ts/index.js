@@ -294,6 +294,8 @@ setTheme, getTheme,
 setThemeSchedule, getThemeSchedule, 
 // 模态框按钮位置（模态框内底部 / 标题栏右上角）
 setModalButtonsPosition, getModalButtonsPosition, 
+// 条件格式自动聚类口径（按公式 / 范围+公式 / 列 / 行）
+setClusterMode, getClusterMode, CLUSTER_MODE_LABELS, 
 // 默认收藏列表类型
 setListType, getListType, 
 // 默认时间筛选范围

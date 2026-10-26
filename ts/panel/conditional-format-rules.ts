@@ -19,6 +19,10 @@
 
 // ===== 规则模型 =====
 
+// 只引类型（`import type` 会被完全擦除）：本文件保持零运行时依赖，
+// 但「自动聚类口径」的取值集合由 tools/config 单点定义，不在这里再抄一份。
+import type { ClusterMode } from '../tools/config.js'
+
 /** 单条条件格式规则（Store 里的一条记录） */
 export interface ConditionalFormatRule {
   /** 唯一 id（页面创建时生成） */
@@ -322,6 +326,25 @@ export function parseExistingGroups(text: string): Record<string, string> {
 }
 
 /**
+ * 从 A1 式范围里取起始单元格的列字母与行号（多区域只取第一段）
+ *
+ * 兼容 `$J$2:$J$100` / `J2:J100` / `J:J`（整列，无行号）三种形态；
+ * 取不出来时返回 null —— 调用方把该规则留在「未分组」，不硬编一个假组名。
+ */
+function parseRangeStart(range: string): { column: string; row: number | null } | null {
+  const [firstArea = ''] = range.split(',', 1)
+  const trimmed = firstArea.trim()
+  // 两个独立的简单正则：合成一个带嵌套可选组的正则会被 detect-unsafe-regex 判成回溯风险
+  const columnMatch = /^\$?([A-Za-z]{1,3})/u.exec(trimmed)
+  if (columnMatch?.[1] === undefined) return null
+  const rowMatch = /^\$?[A-Za-z]{1,3}\$?(\d{1,7})/u.exec(trimmed)
+  return {
+    column: columnMatch[1].toUpperCase(),
+    row: rowMatch?.[1] === undefined ? null : Number(rowMatch[1]),
+  }
+}
+
+/**
  * 按公式模式自动聚类
  *
  * 模式 = 公式剥掉**字符串字面量**后的形状：`=$J2="饮品"` 与 `=$J2="大区"`
@@ -332,10 +355,17 @@ export function parseExistingGroups(text: string): Record<string, string> {
  * 组名变成 `=$J#="*"` 反而看不懂。没有字面串的公式（`=$A1>100`）原样成组，
  * 同公式的规则仍会聚在一起。
  *
- * @returns key → 组名（组名即模式串，用户之后可手动改名）
+ * `mode` 决定分组口径（设置页「条件格式」可切，见 `ClusterMode`）：
+ * - `formula`（默认）：只按公式模式；
+ * - `range-formula`：范围 + 公式模式，同公式不同范围也分开；
+ * - `column`：按范围起始列（`列 J`）；
+ * - `row`：按范围起始行（`行 2`）。
+ *
+ * @returns key → 组名（组名即模式串 / 列名 / 行名，用户之后可手动改名）
  */
 export function autoClusterGroups(
   snapshots: readonly ForeignRuleSnapshot[],
+  mode: ClusterMode = 'formula',
 ): Record<string, string> {
   const groups: Record<string, string> = {}
   // 空公式不聚（没有可识别的模式）。先 filter 再 for：no-continue 禁 continue、
@@ -344,9 +374,24 @@ export function autoClusterGroups(
   const withFormula = snapshots.filter((snapshot) => snapshot.formula !== '')
   for (const snapshot of withFormula) {
     const pattern = snapshot.formula.replace(/"[^"]*"/g, '"*"')
-    groups[snapshotGroupKey(snapshot)] = pattern
+    const name = clusterGroupName(snapshot, pattern, mode)
+    if (name !== null) groups[snapshotGroupKey(snapshot)] = name
   }
   return groups
+}
+
+/** 单条规则在某口径下的组名；口径取不到必要信息（列/行解析失败）时返回 null */
+function clusterGroupName(
+  snapshot: ForeignRuleSnapshot,
+  pattern: string,
+  mode: ClusterMode,
+): string | null {
+  if (mode === 'formula') return pattern
+  if (mode === 'range-formula') return `${snapshot.range} · ${pattern}`
+  const start = parseRangeStart(snapshot.range)
+  if (start === null) return null
+  if (mode === 'column') return `列 ${start.column}`
+  return start.row === null ? null : `行 ${String(start.row)}`
 }
 
 // ===== 既有规则分组的维护（纯函数：页面层只负责持久化与重渲染）=====

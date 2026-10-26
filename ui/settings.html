@@ -89,6 +89,9 @@
           <a href="#sec-modules" title="模块排序"
             ><span class="nav-ico">🧩</span><span class="nav-text">模块排序</span></a
           >
+          <a href="#sec-shortcuts" title="快捷键"
+            ><span class="nav-ico">⌨️</span><span class="nav-text">快捷键</span></a
+          >
           <a href="#sec-sync-pref" title="同步偏好"
             ><span class="nav-ico">🔄</span><span class="nav-text">同步偏好</span></a
           >
@@ -97,6 +100,9 @@
           >
           <a href="#sec-feature-toggles" title="功能开关"
             ><span class="nav-ico">⚙️</span><span class="nav-text">功能开关</span></a
+          >
+          <a href="#sec-cf-pref" title="条件格式"
+            ><span class="nav-ico">🎨</span><span class="nav-text">条件格式</span></a
           >
           <a href="#sec-paths" title="默认路径"
             ><span class="nav-ico">📁</span><span class="nav-text">默认路径</span></a
@@ -179,15 +185,52 @@
               02:00、浅色 08:00 表示夜间深色）。
             </p>
           </div>
-          <div class="theme-preview" id="themePreview" aria-hidden="true">
-            <div class="theme-preview-card" data-theme-card="dark">
-              <span class="theme-preview-swatch swatch-dark"></span>
-              <span class="theme-preview-name">深色</span>
-            </div>
-            <div class="theme-preview-card" data-theme-card="light">
-              <span class="theme-preview-swatch swatch-light"></span>
-              <span class="theme-preview-name">浅色</span>
-            </div>
+          <!-- 日夜切换开关（momo：用 CodePen pvbvLBN 那种按钮式开关，替代原来的两块色卡预览）。
+               点一下 = 在深色 / 浅色之间切换，太阳 / 月亮滑块滑动 + 全应用扩散动画。 -->
+          <div class="theme-toggle-row">
+            <button
+              type="button"
+              class="theme-toggle"
+              id="themeToggleBtn"
+              role="switch"
+              aria-checked="false"
+              aria-label="切换深色 / 浅色主题"
+              title="点一下在深色 / 浅色之间切换"
+            >
+              <span class="theme-toggle__container">
+                <span class="theme-toggle__clouds" aria-hidden="true"></span>
+                <span class="theme-toggle__stars" aria-hidden="true">
+                  <svg viewBox="0 0 44 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M7 1l1.15 2.6L10.75 4.75 8.15 5.9 7 8.5 5.85 5.9 3.25 4.75 5.85 3.6z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M18 6l.8 1.8 1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M28 1.5l.95 2.15 2.15.95-2.15.95-.95 2.15-.95-2.15L25 4.6l2.15-.95z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M38 7l.7 1.55 1.55.7-1.55.7-.7 1.55-.7-1.55L35.75 9.25l1.55-.7z"
+                      fill="currentColor"
+                    />
+                    <circle cx="13" cy="13" r="1" fill="currentColor" />
+                    <circle cx="33" cy="14" r="1.2" fill="currentColor" />
+                  </svg>
+                </span>
+                <span class="theme-toggle__sun" aria-hidden="true">
+                  <span class="theme-toggle__moon-mask">
+                    <span class="theme-toggle__crater"></span>
+                    <span class="theme-toggle__crater"></span>
+                    <span class="theme-toggle__crater"></span>
+                  </span>
+                </span>
+              </span>
+            </button>
+            <span class="theme-toggle-state" id="themeToggleState">当前：深色</span>
           </div>
           <label class="check-row">
             <input type="checkbox" id="chkNavIconsOnly" data-action="toggleNavIconsOnly" />
@@ -231,7 +274,44 @@
             调整各页面功能模块的显示顺序。侧栏导航与主区模块会同步重排，调整后立即保存并同步到对应页面。支持
             ↑↓ 按钮（键盘可达）与鼠标拖拽两种方式。
           </p>
+          <p class="hint">
+            每组顶部的「🧭 功能导航（侧栏）」也能点 👁️ 隐藏——把整条侧栏收掉、主区铺满宽度，
+            适合窄任务窗格；隐藏后回到这里点 🚫 即可恢复（每页独立记录）。
+          </p>
           <div class="module-order-groups" id="moduleOrderGroups"></div>
+        </section>
+
+        <!-- 快捷键（键盘组合 + 侧栏导航上的鼠标手势） -->
+        <section class="section" id="sec-shortcuts" data-detachable>
+          <h3>
+            ⌨️ 快捷键<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-shortcuts"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「快捷键」"
+            >
+              ▾
+            </button>
+          </h3>
+          <div id="shortcutPanel">
+            <label class="check-row">
+              <input type="checkbox" id="chkShortcutsEnabled" />
+              <span>启用全局快捷键（键盘组合 + 侧栏鼠标手势）</span>
+            </label>
+            <p class="hint">
+              键盘快捷键在所有页面生效；焦点在输入框 / 下拉框里时不抢键。点右侧组合按钮后按下新按键即可改绑，Esc
+              取消；与其它动作重复的组合不会保存，并在下方提示占用者。
+            </p>
+            <div class="shortcut-list" id="shortcutList"></div>
+            <p class="shortcut-conflicts" id="shortcutConflicts" hidden></p>
+            <div id="shortcutMouseRows"></div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button class="bgm-btn small" type="button" data-shortcut-reset-all="1">
+                ↩️ 全部恢复默认
+              </button>
+            </div>
+          </div>
         </section>
 
         <!-- 同步偏好（跨会话生效的同步相关默认值） -->
@@ -431,6 +511,43 @@
               💾 保存
             </button>
             <button class="bgm-btn small" data-action="reloadHighlightSettings">↩️ 放弃修改</button>
+          </div>
+        </section>
+
+        <!-- 条件格式（自动聚类的分组口径） -->
+        <section class="section" id="sec-cf-pref" data-detachable>
+          <h3>
+            🎨 条件格式<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-cf-pref"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「条件格式」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p class="hint">
+            条件格式页「规则管理器 → 自动聚类」按这里的口径分组。改完口径回到条件格式页再点一次「自动聚类」即按新口径重排（聚类只改本地视图分组，不动工作表上的规则）。
+          </p>
+          <div class="form-group">
+            <label>自动聚类口径</label>
+            <div class="theme-mode-group" role="group" aria-label="自动聚类口径">
+              <button type="button" class="theme-mode-btn" data-cluster-mode="formula">
+                按公式
+              </button>
+              <button type="button" class="theme-mode-btn" data-cluster-mode="range-formula">
+                按范围 + 公式
+              </button>
+              <button type="button" class="theme-mode-btn" data-cluster-mode="column">
+                按列
+              </button>
+              <button type="button" class="theme-mode-btn" data-cluster-mode="row">按行</button>
+            </div>
+            <p class="hint">
+              「按列」取应用范围的起始列（如「列 J」），「按行」取起始行（如「行
+              2」）；范围解析不出列 / 行时该条规则留在「未分组」。
+            </p>
           </div>
         </section>
 

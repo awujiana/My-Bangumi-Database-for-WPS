@@ -21,6 +21,8 @@ import {
   markConditionalFormatPaneLoaded,
 } from '../tools/util/index.js'
 import {
+  CLUSTER_MODE_LABELS,
+  getClusterMode,
   getConfig,
   getExportPath,
   getModalButtonsPosition,
@@ -1038,22 +1040,28 @@ function dissolveExistingGroupLocal(group: string): void {
 }
 
 /**
- * 自动聚类：按公式模式重算所有分组
+ * 自动聚类：按设置页选定的口径重算所有分组
  *
  * 覆盖现有映射（含手动归的组）——自动聚类是「重来一遍」的语义，
- * 在 toast 里明说覆盖了几组，避免用户以为手动分组被合并。
+ * 在 toast 里明说口径与覆盖了几组，避免用户以为手动分组被合并。
+ * 口径本身在设置页「条件格式」里配置（按公式 / 按范围+公式 / 按列 / 按行），
+ * 本页每次点击现读，改完口径不必重启插件。
  */
 function autoClusterExistingGroups(): void {
   if (state.existing.length === 0) {
     showToast('当前表没有既有规则', 'info')
     return
   }
-  state.existingGroups = autoClusterGroups(state.existing)
+  const mode = getClusterMode(true)
+  state.existingGroups = autoClusterGroups(state.existing, mode)
   persistExistingGroups()
   state.existingGroupCollapsed = new Set<string>()
   renderExistingRules()
   const groupCount = new Set(Object.values(state.existingGroups)).size
-  showToast(`已按公式模式聚成 ${String(groupCount)} 组（覆盖了原分组）`, 'success')
+  showToast(
+    `已按「${CLUSTER_MODE_LABELS[mode]}」聚成 ${String(groupCount)} 组（覆盖了原分组）`,
+    'success',
+  )
 }
 
 /** 清除所有分组：回到平铺分页视图 */

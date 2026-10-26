@@ -3347,53 +3347,217 @@ body {
     }
 }
 
-/* 主题预览 */
-.theme-preview {
+/* 日夜切换开关（移植自 CodePen pvbvLBN：太阳 / 月亮滑块 + 星星 / 云朵位移）
+   尺寸由 --theme-toggle-scale 一处控制（font-size 基准，其余全用 em），
+   改成 20px 就整体缩小，不必逐条改尺寸。 */
+.theme-toggle-row {
     display: flex;
+    align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
     margin-top: 4px;
 }
-.theme-preview-card {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 12px;
-    border: 2px solid var(--border);
-    border-radius: var(--r-md);
+
+.theme-toggle {
+    --base-scale: var(--theme-toggle-scale, 26px);
+    --toggle-width: 5.625em;
+    --toggle-height: 2.5em;
+    --radius-pill: 100em;
+    --sun-diameter: 2.125em;
+    --sun-offset: calc((var(--toggle-height) - var(--sun-diameter)) / 2);
+    --bg-toggle-light: #3d7eae;
+    --bg-toggle-dark: #1d1f2c;
+    --color-sun: #ecca2f;
+    --color-moon: #c4c9d1;
+    --color-crater: #959db1;
+    --color-star: #fff;
+    --color-cloud-front: #f3fdff;
+    --color-cloud-back: #aacadf;
+    --shadow-primary: rgba(0, 0, 0, 0.25);
+    --shadow-highlight: rgba(255, 255, 255, 0.94);
+    --halo-color: rgba(255, 255, 255, 0.1);
+
+    font-size: var(--base-scale);
+    line-height: 0;
+    padding: 0;
+    border: none;
+    background: none;
     cursor: pointer;
-    transition: border-color var(--dur), background var(--dur), box-shadow var(--dur);
-    background: var(--bg-surface);
 }
 
-.theme-preview-card:hover {
-    border-color: var(--border-strong);
+.theme-toggle:focus-visible {
+    outline: none;
 }
 
-.theme-preview-card.active {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--border-strong);
+.theme-toggle:focus-visible .theme-toggle__container {
+    outline: 2px solid var(--primary);
+    outline-offset: 3px;
 }
 
-.theme-preview-swatch {
+.theme-toggle__container {
+    display: block;
+    position: relative;
+    width: var(--toggle-width);
+    height: var(--toggle-height);
+    background-color: var(--bg-toggle-light);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    box-shadow: 0.06em 0.06em 0.125em var(--shadow-highlight);
+    transition: background-color 0.3s ease;
+}
+
+.theme-toggle__container::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-pill);
+    box-shadow: 0em 0.05em 0.187em rgba(0, 0, 0, 0.5) inset;
+    pointer-events: none;
+}
+
+html[data-theme='dark'] .theme-toggle__container {
+    background-color: var(--bg-toggle-dark);
+}
+
+.theme-toggle__sun {
+    position: absolute;
+    top: var(--sun-offset);
+    width: var(--sun-diameter);
+    height: var(--sun-diameter);
+    background-color: var(--color-sun);
+    border-radius: 50%;
+    overflow: hidden;
+    transform: translateX(var(--sun-offset));
+    box-shadow: 0.05em 0.125em 0.125em var(--shadow-primary),
+        0em 0.05em 0.125em var(--shadow-primary),
+        0.05em 0.05em 0.05em 0em rgba(254, 255, 239, 0.61) inset,
+        0em -0.05em 0.05em 0em #a1872a inset, 0 0 0 0.625em var(--halo-color),
+        0 0 0 1.25em var(--halo-color), 0 0 0 1.875em var(--halo-color);
+    transition: transform 0.3s ease;
+}
+
+html[data-theme='dark'] .theme-toggle__sun {
+    transform: translateX(calc(var(--toggle-width) - var(--sun-diameter) - var(--sun-offset)));
+}
+
+.theme-toggle__moon-mask {
+    display: block;
+    position: relative;
     width: 100%;
-    height: 44px;
-    border-radius: var(--r-sm);
-    border: 1px solid var(--border);
+    height: 100%;
+    background-color: var(--color-moon);
+    border-radius: inherit;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    box-shadow: 0.062em 0.062em 0.062em 0em rgba(254, 255, 239, 0.61) inset,
+        0em -0.062em 0.062em 0em #969696 inset;
 }
 
-.swatch-dark {
-    background: linear-gradient(135deg, #000000 0%, var(--bg-base) 100%);
+html[data-theme='dark'] .theme-toggle__moon-mask {
+    transform: translateX(0);
 }
 
-.swatch-light {
-    background: linear-gradient(135deg, #f5f6f8 0%, #ffffff 100%);
+.theme-toggle__crater {
+    position: absolute;
+    display: block;
+    background-color: var(--color-crater);
+    border-radius: 50%;
+    box-shadow: 0em 0.03em 0.06em var(--shadow-primary) inset;
 }
 
-.theme-preview-name {
+.theme-toggle__crater:nth-of-type(1) {
+    top: 0.75em;
+    left: 0.3em;
+    width: 0.75em;
+    height: 0.75em;
+}
+
+.theme-toggle__crater:nth-of-type(2) {
+    top: 0.9em;
+    left: 1.375em;
+    width: 0.375em;
+    height: 0.375em;
+}
+
+.theme-toggle__crater:nth-of-type(3) {
+    top: 0.3em;
+    left: 0.8em;
+    width: 0.25em;
+    height: 0.25em;
+}
+
+.theme-toggle__stars {
+    position: absolute;
+    top: 0;
+    left: 0.3em;
+    display: block;
+    width: 2.75em;
+    color: var(--color-star);
+    transform: translateY(-2em);
+    transition: transform 0.3s ease;
+}
+
+.theme-toggle__stars svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+html[data-theme='dark'] .theme-toggle__stars {
+    transform: translateY(0.5em);
+}
+
+.theme-toggle__clouds {
+    position: absolute;
+    display: block;
+    top: 2em;
+    left: 0.3em;
+    width: 1.25em;
+    height: 1.25em;
+    background-color: var(--color-cloud-front);
+    border-radius: 50%;
+    transform: translateY(0);
+    box-shadow: 0.937em 0.312em var(--color-cloud-front),
+        1.437em 0.375em var(--color-cloud-front), 2.187em 0 var(--color-cloud-front),
+        2.937em 0.312em var(--color-cloud-front), 3.625em -0.062em var(--color-cloud-front),
+        4.5em -0.312em var(--color-cloud-front),
+        4.625em -1.75em 0 0.437em var(--color-cloud-front),
+        -0.312em -0.312em var(--color-cloud-back), 0.5em -0.125em var(--color-cloud-back),
+        1.25em -0.062em var(--color-cloud-back), 2em -0.312em var(--color-cloud-back),
+        2.625em 0em var(--color-cloud-back), 3.375em -0.437em var(--color-cloud-back),
+        4em -0.625em var(--color-cloud-back),
+        4.125em -2.125em 0 0.437em var(--color-cloud-back);
+    transition: transform 0.3s ease;
+}
+
+html[data-theme='dark'] .theme-toggle__clouds {
+    transform: translateY(3em);
+}
+
+.theme-toggle__container:hover .theme-toggle__sun {
+    transform: translateX(calc(var(--sun-offset) + 0.187em));
+}
+
+html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
+    transform: translateX(
+        calc(var(--toggle-width) - var(--sun-diameter) - var(--sun-offset) - 0.187em)
+    );
+}
+
+.theme-toggle-state {
     font-size: var(--fs-sm);
     color: var(--text-2);
+}
+
+/* 减弱动效：滑块直接落位，不做位移过渡 */
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle__container,
+    .theme-toggle__sun,
+    .theme-toggle__moon-mask,
+    .theme-toggle__stars,
+    .theme-toggle__clouds {
+        transition: none;
+    }
 }
 
 /* 带单位的输入框 */

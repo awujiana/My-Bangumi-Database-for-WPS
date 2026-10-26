@@ -1460,6 +1460,72 @@ select.input option,
   cursor: not-allowed;
 }
 
+/* 「功能导航（侧栏）」行：与普通模块同款外观，但没有拖拽把手与 ↑↓
+   （侧栏顺序由注册表决定，拖它没有意义），故单独一套类名。 */
+.module-order-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: var(--bg-surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+.module-order-nav-row.is-module-hidden .module-order-label,
+.module-order-nav-row.is-module-hidden .module-order-ico {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+/* ============================ 16b. 快捷键编辑器 ======================== */
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--sp-3);
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+.shortcut-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 组合键用等宽字体：Alt+1 / Ctrl+Shift+K 里 1 与 l、0 与 O 靠形状就能分辨 */
+.shortcut-key {
+  flex: 0 0 auto;
+  min-width: 96px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: 0.02em;
+}
+.shortcut-key.is-recording {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+.shortcut-conflicts {
+  margin: 0 0 var(--sp-3);
+  padding: 8px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--r-md);
+  color: var(--warning);
+  font-size: var(--fs-sm);
+}
+
 /* 设置页顶部工具条（配置管理：保存 / 导出 / 导入 / 重置） */
 .settings-toolbar {
   display: flex;
@@ -1488,4 +1554,22 @@ select.input option,
   --info: #1565c0; /* 信息：深蓝 */
   --teal: #0d9488; /* 匹配/精确命中：深青 */
   --amber: #b45309; /* 别名匹配/警告：深琥珀 */
+}
+
+/* ============================================================================
+ * 侧栏功能导航可隐藏（设置 → 模块排序 → 「功能导航（侧栏）」的眼睛按钮）
+ * ----------------------------------------------------------------------------
+ * 只 display:none 侧栏是不够的：`.global` 的栅格列定义还在，会留一个空列
+ * （与 solo-mode 同一坑）。这里把栅格收成单列单区域，并放在文件末尾 ——
+ * 窄屏媒体查询里的 `.global` / `body.nav-icons-only .global` 权重与本规则相同，
+ * 靠「后出现」覆盖它们，否则窄屏下仍会按三行栅格留出一条空白。
+ * ==========================================================================*/
+body.is-nav-hidden .sidebar {
+  display: none;
+}
+body.is-nav-hidden .global {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'topbar'
+    'main';
 }

@@ -21,9 +21,11 @@ import {
   getLogLevel,
   getModalButtonsPosition,
   getThemeSchedule,
+  getClusterMode,
 } from '../../index.js'
 import { loadGithubConfigIntoForm } from './github-settings.js'
 import { initializeModuleOrderEditor } from './module-order.js'
+import { initializeShortcutSettings } from './shortcuts-settings.js'
 import { initializeConfigPathControls } from './path-controls.js'
 import { clearTrackedListeners, trackedAddEventListener } from './resource-tracking.js'
 
@@ -35,6 +37,7 @@ import { loadHighlightSettingsIntoForm } from './highlight-settings.js'
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js'
 import { setupEventListeners, setupMessageListener } from './panel-events.js'
 import {
+  handleClusterModeClick,
   handleEnableSyncRecordChange,
   handleListTypeChange,
   handleLogLevelChange,
@@ -43,13 +46,14 @@ import {
   handleThemeChange,
   handleModalButtonsPositionClick,
   handleThemeModeClick,
-  handleThemePreviewClick,
   handleThemeScheduleChange,
+  handleThemeToggleClick,
   handleTimeFilterChange,
   setupTimeFilterControls,
   updateModalButtonsPositionButtons,
+  updateClusterModeButtons,
   updateThemeModeButtons,
-  updateThemePreview,
+  updateThemeToggle,
 } from './settings-bindings.js'
 import { setupUpdateChecker } from './update-checker.js'
 import { syncFromPanel } from './sync.js'
@@ -190,6 +194,11 @@ export function setupButtonListeners(): void {
   for (const button of document.querySelectorAll<HTMLElement>('[data-theme-mode]')) {
     trackedAddEventListener(button, 'click', handleThemeModeClick)
   }
+  // 日夜开关（替代原「深色 / 浅色」两块色卡预览）
+  const themeToggleButton = document.getElementById('themeToggleBtn')
+  if (themeToggleButton) {
+    trackedAddEventListener(themeToggleButton, 'click', handleThemeToggleClick)
+  }
   const themeDarkStart = document.getElementById('themeDarkStart') as HTMLInputElement | null
   const themeLightStart = document.getElementById('themeLightStart') as HTMLInputElement | null
   const savedSchedule = getThemeSchedule(true)
@@ -202,20 +211,22 @@ export function setupButtonListeners(): void {
     trackedAddEventListener(themeLightStart, 'change', handleThemeScheduleChange)
   }
   updateThemeModeButtons(getTheme(true))
+  updateThemeToggle(getTheme(true))
   // 模态框按钮位置分段按钮（回填 + 点击切换）
   for (const button of document.querySelectorAll<HTMLElement>('[data-modal-buttons-position]')) {
     trackedAddEventListener(button, 'click', handleModalButtonsPositionClick)
   }
   updateModalButtonsPositionButtons(getModalButtonsPosition(true))
+  // 设置页「🎨 条件格式」：自动聚类口径分段按钮（回填 + 点击切换）
+  for (const button of document.querySelectorAll<HTMLElement>('[data-cluster-mode]')) {
+    trackedAddEventListener(button, 'click', handleClusterModeClick)
+  }
+  updateClusterModeButtons(getClusterMode(true))
 
   // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
   loadEnrichPreviewSettingsIntoForm()
   // 设置页「⚙️ 功能开关」：表单回填
   loadHighlightSettingsIntoForm()
-  document.querySelectorAll<HTMLElement>('[data-theme-card]').forEach((card) => {
-    trackedAddEventListener(card, 'click', handleThemePreviewClick)
-  })
-  updateThemePreview(getTheme(true))
 
   // 设置页「关于」：检查更新（元素不存在时内部静默跳过）
   setupUpdateChecker()
@@ -236,6 +247,13 @@ export function setupButtonListeners(): void {
     initializeModuleOrderEditor()
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化模块排序编辑器失败: ${(error as Error).message}`)
+  }
+
+  // 设置页：快捷键编辑器（绑定录制 / 冲突提示 / 鼠标手势）
+  try {
+    initializeShortcutSettings()
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化快捷键编辑器失败: ${(error as Error).message}`)
   }
 
   // 设置页：默认收藏列表类型

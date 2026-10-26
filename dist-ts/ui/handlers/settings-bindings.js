@@ -5,7 +5,7 @@
  */
 import { LOG_LEVELS, bgmLog, getRefreshInterval, saveTheme, setListType, setLogLevel, setRefreshInterval, setSyncRecordEnabled, setTimeFilter, showToast, } from '../../index.js';
 import { applyTheme, switchThemeAnimated } from '../../tools/theme.js';
-import { getTheme, setModalButtonsPosition, setThemeSchedule } from '../../tools/config.js';
+import { clusterModeLabel, getTheme, setClusterMode, setModalButtonsPosition, setThemeSchedule, } from '../../tools/config.js';
 import { renderLogEntries } from './log-panel.js';
 // ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 export const handleEnableSyncRecordChange = () => {
@@ -43,11 +43,30 @@ export const handleLogLevelChange = () => {
     }
 };
 // ========== 设置页：外观主题 / 列表类型 / 时间筛选 / 刷新间隔 ==========
-/** 同步主题预览卡片的 active 高亮 */
-export function updateThemePreview(mode) {
-    document.querySelectorAll('[data-theme-card]').forEach((card) => {
-        card.classList.toggle('active', card.dataset.themeCard === mode);
-    });
+/**
+ * 同步日夜开关的视觉 / 无障碍状态（momo：用 CodePen 那种太阳月亮按钮替代色卡预览）
+ *
+ * 开关只有「开 = 深色 / 关 = 浅色」两态，而主题模式有四种：`system` 与 `schedule`
+ * 的最终色取决于运行时解析，因此开关状态一律以 `<html data-theme>` 的**实际值**为准，
+ * 说明文字才展示用户选的是哪种模式（避免「选了跟随系统，开关却显示浅色」的困惑）。
+ */
+export function updateThemeToggle(mode) {
+    const button = document.getElementById('themeToggleBtn');
+    const state = document.getElementById('themeToggleState');
+    const isDark = resolveCurrentTheme() === 'dark';
+    if (button) {
+        button.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        button.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
+    }
+    if (state) {
+        const labels = {
+            dark: '深色',
+            light: '浅色',
+            system: '跟随系统',
+            schedule: '定时',
+        };
+        state.textContent = `当前：${labels[mode] ?? mode}（${isDark ? '深色' : '浅色'}）`;
+    }
 }
 /** 同步模式按钮组的 active 与定时框显隐 */
 export function updateThemeModeButtons(mode) {
@@ -141,18 +160,28 @@ export const handleThemeChange = () => {
         showToast('主题保存失败', 'error');
     }
 };
-export const handleThemePreviewClick = (event) => {
-    const card = event.currentTarget.closest('[data-theme-card]');
-    const mode = card?.dataset.themeCard;
-    if (!card || !mode)
+/**
+ * 日夜开关点击：在深色 / 浅色之间切换，并以开关中心为圆心做扩散动画
+ *
+ * 当前是 `system` / `schedule` 时同样可用 —— 用户按开关就是想要一个确定的颜色，
+ * 于是直接落成显式的 dark / light（模式按钮组的高亮随之切换）。
+ */
+export const handleThemeToggleClick = (event) => {
+    const button = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    const next = resolveCurrentTheme() === 'dark' ? 'light' : 'dark';
+    const rect = button?.getBoundingClientRect();
+    const origin = rect && (rect.width > 0 || rect.height > 0)
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const isOk = saveTheme(next);
+    if (!isOk) {
+        showToast('主题保存失败', 'error');
         return;
-    updateThemeModeButtons(mode);
-    const isOk = saveTheme(mode);
-    if (!isOk)
-        return;
-    // 预览卡片也支持从卡片中心扩散（与模式按钮同款动画）
-    const rect = card.getBoundingClientRect();
-    switchThemeMode(mode, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    }
+    switchThemeMode(next, origin);
+    updateThemeModeButtons(next);
+    updateThemeToggle(next);
+    showToast(`主题已切换为「${next === 'dark' ? '深色模式' : '浅色模式'}」`, 'success');
 };
 /** 同步模态框按钮位置的分段按钮与说明 */
 export function updateModalButtonsPositionButtons(position) {
@@ -183,6 +212,35 @@ export const handleModalButtonsPositionClick = (event) => {
             outside: '模态框外（标题栏右上角）',
         };
         showToast(`模态框按钮位置：${labels[position] || position}`, 'success');
+    }
+    else {
+        showToast('保存失败', 'error');
+    }
+};
+// ========== 设置页：条件格式自动聚类口径 ==========
+/** 同步聚类口径分段按钮的 active / aria 状态 */
+export function updateClusterModeButtons(mode) {
+    document.querySelectorAll('[data-cluster-mode]').forEach((button) => {
+        const isActive = button.dataset.clusterMode === mode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+/**
+ * 自动聚类口径切换（条件格式页「自动聚类」按钮按它分组）
+ *
+ * 只写配置 + 同步按钮态：条件格式页每次点「自动聚类」都现读口径，
+ * 不做跨窗格即时重算 —— 那边是用户主动触发的操作，静默重排分组反而会打断。
+ */
+export const handleClusterModeClick = (event) => {
+    const button = event.currentTarget.closest('[data-cluster-mode]');
+    const mode = button?.dataset.clusterMode;
+    if (!mode)
+        return;
+    updateClusterModeButtons(mode);
+    const isOk = setClusterMode(mode);
+    if (isOk) {
+        showToast(`自动聚类口径：${clusterModeLabel(mode)}`, 'success');
     }
     else {
         showToast('保存失败', 'error');

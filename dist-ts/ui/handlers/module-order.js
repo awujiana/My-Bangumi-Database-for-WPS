@@ -13,9 +13,27 @@
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js';
 import { CONFIG_KEYS, getConfig } from '../../tools/config.js';
 import { ORDERABLE_PAGES, PAGE_LABELS, PAGE_MODULES, getNavOrder, moveModuleBy, notifyNavOrderChanged, resetNavOrder, setNavOrder, } from '../../tools/nav-order.js';
-import { applyModuleState, canHideModule, getHiddenModules, toggleModuleHidden, } from '../../tools/module-state.js';
+import { applyModuleState, canHideModule, getHiddenModules, NAV_MODULE_ID, toggleModuleHidden, } from '../../tools/module-state.js';
 import { escapeHtml } from '../../tools/string-utilities.js';
 import { createSortable, moveInArray } from '../components/sortable-list.js';
+/**
+ * 渲染「功能导航（侧栏）」这一行
+ *
+ * 它不是可排序模块（侧栏顺序由 `PAGE_MODULES` 决定，且 `.nav` 不在主区里，
+ * 拖它没有意义），所以单独放在 `<ul>` 之外：既不会进 sortable 的拖拽项集合，
+ * 也复用同一个 `data-mod-hidden` 点击委托。
+ */
+function buildNavRowHtml(page, isHidden) {
+    const hideTitle = isHidden ? '恢复显示侧栏功能导航' : '隐藏本页的侧栏功能导航';
+    return `
+    <div class="module-order-nav-row${isHidden ? ' is-module-hidden' : ''}">
+      <span class="module-order-ico" aria-hidden="true">🧭</span>
+      <span class="module-order-label">功能导航（侧栏）</span>
+      <span class="module-order-btns">
+        <button class="bgm-btn small" data-mod-hidden="${NAV_MODULE_ID}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="功能导航 ${isHidden ? '恢复显示' : '隐藏'}">${isHidden ? '🚫' : '👁️'}</button>
+      </span>
+    </div>`;
+}
 /** 构建单个页面的排序分组 */
 function buildGroupHtml(page) {
     const modules = PAGE_MODULES[page];
@@ -62,6 +80,7 @@ function buildGroupHtml(page) {
         <span class="module-order-title">${escapeHtml(label)}</span>
         <button class="bgm-btn small" data-mod-reset="${escapeHtml(page)}">↩️ 恢复默认顺序</button>
       </div>
+      ${buildNavRowHtml(page, hidden.has(NAV_MODULE_ID))}
       <ul class="module-order-list" data-list-page="${escapeHtml(page)}">${items}</ul>
     </div>`;
 }
@@ -121,7 +140,9 @@ function onEditorClick(event) {
         }
         renderModuleOrderEditor();
         applyModuleState(hidePage);
-        showToast(isNowHidden ? '模块已隐藏，可在设置页恢复' : '模块已恢复显示', 'success');
+        const isNavRow = hideId === NAV_MODULE_ID;
+        const targetName = isNavRow ? '功能导航' : '模块';
+        showToast(isNowHidden ? `${targetName}已隐藏，可在设置页恢复` : `${targetName}已恢复显示`, 'success');
         bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`);
         return;
     }

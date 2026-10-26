@@ -18,6 +18,10 @@ export const CONFIG_KEYS = {
     THEME: 'bgm_theme',
     THEME_SCHEDULE: 'bgm_theme_schedule',
     MODAL_BUTTONS_POSITION: 'bgm_modal_buttons_position',
+    CF_CLUSTER_MODE: 'bgm_cf_cluster_mode',
+    SHORTCUTS_ENABLED: 'bgm_shortcuts_enabled',
+    SHORTCUT_BINDINGS: 'bgm_shortcut_bindings',
+    SHORTCUT_MOUSE: 'bgm_shortcut_mouse',
     LIST_TYPE: 'bgm_list_type',
     TIME_FILTER: 'bgm_time_filter',
     REFRESH_INTERVAL: 'bgm_refresh_interval',
@@ -298,6 +302,37 @@ export function getModalButtonsPosition(isSilent = false) {
     if (!isSilent)
         bgmLog(LOG_LEVELS.INFO, `[config] 获取模态框按钮位置: ${result}`);
     return result;
+}
+// ========== 条件格式「自动聚类」口径 ==========
+const CLUSTER_MODES = ['formula', 'range-formula', 'column', 'row'];
+/** 口径的中文名（设置页按钮、toast 共用，避免两处各写一份） */
+export const CLUSTER_MODE_LABELS = {
+    formula: '按公式',
+    'range-formula': '按范围 + 公式',
+    column: '按列',
+    row: '按行',
+};
+export function setClusterMode(mode) {
+    if (!CLUSTER_MODES.includes(mode)) {
+        bgmLog(LOG_LEVELS.WARN, `[config] 无效自动聚类口径: ${mode}，已忽略`);
+        return false;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[config] 设置自动聚类口径: ${mode}`);
+    return setConfig(CONFIG_KEYS.CF_CLUSTER_MODE, mode);
+}
+export function getClusterMode(isSilent = false) {
+    const value = getConfig(CONFIG_KEYS.CF_CLUSTER_MODE, 'formula', isSilent);
+    const result = CLUSTER_MODES.includes(value) ? value : 'formula';
+    if (!isSilent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取自动聚类口径: ${result}`);
+    return result;
+}
+/**
+ * 口径的中文名；未知取值原样返回（UI 提示用，避免在调用处再写一次类型断言）
+ */
+export function clusterModeLabel(mode) {
+    const labels = CLUSTER_MODE_LABELS;
+    return labels[mode] ?? mode;
 }
 // ========== 默认收藏列表类型 ==========
 const LIST_TYPES = ['all', 'collect', 'wish', 'do'];
