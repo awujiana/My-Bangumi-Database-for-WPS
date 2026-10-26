@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/donate.css" />
+  </head>
+  <body data-page="donate">
+    <script type="module" src="../dist-ts/panel/donate-bootstrap.js"></script>
+    <script src="../libs/fit-viewport.js"></script>
+    <script src="../libs/wps-sdk-loader.js"></script>
+
+    <div class="global">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title">💙 赞赏支持</span>
+            <span class="brand-sub">免费开源 · 用爱发电 · 感谢每一份心意</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="main donate-main">
+        <section class="section donate-card" aria-labelledby="donateTitle">
+          <div class="donate-hero">
+            <div class="donate-avatar" aria-hidden="true">🍥</div>
+            <h2 id="donateTitle" class="donate-name">冰山冷铁</h2>
+            <p class="donate-tagline">My Bangumi Database for WPS 的作者</p>
+          </div>
+
+          <p class="donate-intro">
+            这个插件完全免费、开源、无广告，也不限制任何功能。如果它帮你省下了整理追番表的功夫，
+            欢迎扫码请作者喝杯咖啡 —— 你的支持会让它继续更新下去（新站点适配 / 新字段 / Bug 修复）。
+          </p>
+
+          <figure class="donate-qr">
+            <img
+              src="../images/donate-qrcode.jpg"
+              alt="微信赞赏码：扫描后可向作者冰山冷铁赞赏"
+              width="240"
+              height="246"
+              loading="eager"
+            />
+            <figcaption>微信扫一扫 · 赞赏作者</figcaption>
+          </figure>
+
+          <div class="donate-links">
+            <a
+              class="donate-link"
+              href="https://github.com/awujiana"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <span class="donate-link-ico" aria-hidden="true">🐙</span>
+              <span class="donate-link-text">
+                <strong>GitHub</strong>
+                <span>github.com/awujiana</span>
+              </span>
+            </a>
+            <a class="donate-link" href="mailto:bingshanlengtie@qq.com">
+              <span class="donate-link-ico" aria-hidden="true">✉️</span>
+              <span class="donate-link-text">
+                <strong>邮箱</strong>
+                <span>bingshanlengtie@qq.com</span>
+              </span>
+            </a>
+          </div>
+
+          <p class="donate-thanks">
+            不想破费也没关系：在 GitHub 点个 Star、提个 Issue 或 PR，同样是实实在在的支持。
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
