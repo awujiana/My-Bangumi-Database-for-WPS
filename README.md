@@ -10,7 +10,7 @@
 <div align="center">
 
 [![插件图标：我的 Bangumi 数据库 (WPS版)](images/mbd-logo.svg)](images/mbd-logo.svg)
-
+<img src="images/ribbon.png" alt="功能栏"  />
 <h1>我的 Bangumi 数据库 (WPS版)</h1>
 <h2>My Bangumi Database for WPS</h2>
 
@@ -88,9 +88,6 @@
   <img src="images/screenshot-clean.png" alt="数据清洗工具：重复名称、URL 重复、空行、噪音、标签订正与执行预览" width="320" />
 </p>
 
-<p align="center">
-  <img src="images/screenshot-donate-contact.png" alt="赞赏页的联系方式：点击可复制 GitHub 链接与邮箱" width="320" />
-</p>
 
 > 截图取自实际插件界面（深色主题）；不同 WPS 版本与窗口宽度下，面板会自动切换为单列 / 双列布局。
 
