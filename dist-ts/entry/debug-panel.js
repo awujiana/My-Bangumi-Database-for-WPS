@@ -1,0 +1,642 @@
+/**
+ * @fileoverview 调试面板 - 仅在开发服务器环境显示
+ * @module debugPanel
+ * @description
+ *   - 环境检测：typeof WpsInvoke === 'undefined' 时激活
+ *   - 四个功能区：模块状态、Ribbon 测试、控制台日志、环境信息
+ *   - 无侵入：不修改现有模块逻辑，仅读取状态
+ */
+import { buildConsolePanelHTML, buildEnvironmentPanelHTML, buildHeaderHTML, buildModulesPanelHTML, buildRibbonPanelHTML, buildStatusBarHTML, buildTabsHTML, escapeHtml, getDebugGlobals, getModuleStatuses, isDebugEnvironment, } from './debug-panel-render.js';
+/** 动态加载 logger 模块并获取引用 */
+let _logger = null;
+async function getLogger() {
+    if (_logger)
+        return _logger;
+    try {
+        const module_ = await import('../tools/logger.js');
+        _logger = module_;
+        return _logger;
+    }
+    catch {
+        return null;
+    }
+}
+/** 动态加载统一导出模块并获取引用 */
+let _exporter = null;
+async function getExporter() {
+    if (_exporter)
+        return _exporter;
+    try {
+        const module_ = await import('../ui/handlers/data-export.js');
+        _exporter = module_;
+        return _exporter;
+    }
+    catch {
+        return null;
+    }
+}
+// ========== 样式 ==========
+const PANEL_CSS = `
+.bgm-dp-root {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 420px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: #1e293b;
+  background: #f8fafc;
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+  transition: transform 0.25s ease;
+}
+.bgm-dp-root.collapsed { transform: translateX(400px); }
+.bgm-dp-root * { box-sizing: border-box; }
+
+/* 标题栏 */
+.bgm-dp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.bgm-dp-header-left { display: flex; align-items: center; gap: 8px; }
+.bgm-dp-logo {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.bgm-dp-title { font-size: 14px; font-weight: 500; }
+.bgm-dp-toggle {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: #64748b; padding: 4px;
+  line-height: 1;
+}
+.bgm-dp-toggle:hover { color: #1e293b; }
+
+/* 状态条 */
+.bgm-dp-statusbar {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 6px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.bgm-dp-badge {
+  font-size: 11px; padding: 2px 8px;
+  border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 3px;
+  white-space: nowrap;
+}
+.bgm-dp-badge-ok { background: #dcfce7; color: #16a34a; }
+.bgm-dp-badge-warn { background: #fef3c7; color: #d97706; }
+.bgm-dp-badge-err { background: #fee2e2; color: #dc2626; }
+.bgm-dp-badge-muted { background: #f1f5f9; color: #64748b; }
+
+/* Tabs */
+.bgm-dp-tabs {
+  display: flex; gap: 1px;
+  padding: 0 8px;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.bgm-dp-tab {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #64748b;
+  border: none; background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.bgm-dp-tab:hover { color: #1e293b; }
+.bgm-dp-tab.active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+  font-weight: 500;
+}
+.bgm-dp-tab-count {
+  font-size: 11px; font-family: monospace;
+  background: #f1f5f9; color: #64748b;
+  padding: 0 5px; border-radius: 999px;
+  margin-left: 3px;
+}
+.bgm-dp-tab.active .bgm-dp-tab-count {
+  background: #ede9fe; color: #7c3aed;
+}
+
+/* 内容区 */
+.bgm-dp-body { flex: 1; overflow-y: auto; padding: 12px; }
+.bgm-dp-panel { display: none; }
+.bgm-dp-panel.active { display: block; }
+
+/* 模块网格 */
+.bgm-dp-mod-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.bgm-dp-mod-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+}
+.bgm-dp-mod-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.bgm-dp-mod-dot-ok { background: #16a34a; }
+.bgm-dp-mod-dot-err { background: #dc2626; }
+.bgm-dp-mod-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgm-dp-mod-tag {
+  font-size: 10px; color: #94a3b8;
+  background: #f8fafc; padding: 1px 5px; border-radius: 3px;
+}
+.bgm-dp-mod-tag-critical { color: #7c3aed; background: #ede9fe; }
+
+/* Ribbon 测试 */
+.bgm-dp-ribbon-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.bgm-dp-ribbon-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.bgm-dp-ribbon-card:hover {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px #ede9fe;
+}
+.bgm-dp-ribbon-icon { font-size: 20px; margin-bottom: 4px; }
+.bgm-dp-ribbon-label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
+.bgm-dp-ribbon-id { font-family: monospace; font-size: 11px; color: #1e293b; }
+.bgm-dp-ribbon-result {
+  margin-top: 4px; font-size: 10px; font-family: monospace;
+  min-height: 16px; color: #16a34a;
+}
+.bgm-dp-ribbon-imgurl {
+  margin-top: 2px; font-size: 9px; color: #64748b;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 控制台日志 */
+.bgm-dp-log-filter { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.bgm-dp-filter-btn {
+  font-size: 11px; padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff; color: #64748b;
+  cursor: pointer;
+}
+.bgm-dp-filter-btn.active {
+  background: #ede9fe; color: #7c3aed; border-color: #7c3aed;
+}
+.bgm-dp-log-actions { display: flex; gap: 6px; margin-left: auto; }
+.bgm-dp-log-btn {
+  font-size: 11px; padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #fff; color: #1e293b;
+  cursor: pointer;
+}
+.bgm-dp-log-btn:hover { background: #f1f5f9; }
+.bgm-dp-log-btn-primary {
+  background: #7c3aed; color: #fff; border-color: #7c3aed;
+}
+.bgm-dp-log-btn-primary:hover { background: #6366f1; }
+.bgm-dp-console {
+  background: #1a1a2e;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  color: #e2e8f0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.bgm-dp-log-line {
+  display: flex; gap: 6px;
+  padding: 1px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.bgm-dp-log-time { color: #64748b; flex-shrink: 0; }
+.bgm-dp-log-level { font-weight: 600; flex-shrink: 0; width: 40px; }
+.bgm-dp-log-level-INFO { color: #38bdf8; }
+.bgm-dp-log-level-WARN { color: #fbbf24; }
+.bgm-dp-log-level-ERROR { color: #f87171; }
+.bgm-dp-log-level-DEBUG { color: #94a3b8; }
+.bgm-dp-log-msg { flex: 1; word-break: break-all; }
+.bgm-dp-log-empty { color: #64748b; text-align: center; padding: 20px; }
+
+/* 环境信息 */
+.bgm-dp-env-grid {
+  display: grid; grid-template-columns: 1fr; gap: 8px;
+}
+.bgm-dp-env-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.bgm-dp-env-label { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+.bgm-dp-env-value {
+  font-family: monospace; font-size: 12px;
+  color: #1e293b; word-break: break-all;
+}
+.bgm-dp-env-value-ok { color: #16a34a; }
+.bgm-dp-env-value-err { color: #dc2626; }
+.bgm-dp-env-value-warn { color: #d97706; }
+.bgm-dp-env-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: 12px;
+}
+.bgm-dp-action-btn {
+  font-size: 12px; padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #fff; color: #1e293b;
+  cursor: pointer;
+}
+.bgm-dp-action-btn:hover { background: #f1f5f9; }
+.bgm-dp-action-btn-primary {
+  background: #7c3aed; color: #fff; border-color: #7c3aed;
+}
+.bgm-dp-action-btn-primary:hover { background: #6366f1; }
+
+/* 折叠态浮动按钮 */
+.bgm-dp-fab {
+  position: fixed;
+  right: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 28px; height: 60px;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 8px 0 0 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 99999;
+  font-size: 16px;
+  box-shadow: -2px 0 6px rgba(0,0,0,0.15);
+}
+.bgm-dp-fab:hover { background: #6366f1; }
+`;
+// ========== 交互逻辑 ==========
+/** 当前日志筛选级别 */
+let _currentLogLevel;
+/** 日志轮询定时器 */
+let _logInterval = null;
+/** 切换 Tab */
+function bindTabs(root) {
+    const tabs = root.querySelectorAll('.bgm-dp-tab');
+    const panels = root.querySelectorAll('.bgm-dp-panel');
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            tabs.forEach((t) => {
+                t.classList.remove('active');
+            });
+            panels.forEach((p) => {
+                p.classList.remove('active');
+            });
+            tab.classList.add('active');
+            const target = tab.dataset.tab;
+            const panel = root.querySelector(`[data-panel="${CSS.escape(target ?? '')}"]`);
+            if (panel)
+                panel.classList.add('active');
+            // 启动/停止日志轮询
+            if (target === 'console') {
+                startLogPolling(root);
+            }
+            else {
+                stopLogPolling();
+            }
+            // 环境信息 Tab 切换时刷新内容（反映最新状态）
+            if (target === 'env') {
+                const environmentPanel = root.querySelector('[data-panel="env"]');
+                if (environmentPanel) {
+                    environmentPanel.outerHTML = buildEnvironmentPanelHTML();
+                    // outerHTML 替换后重新获取元素并标记 active
+                    const environmentPanel_ = root.querySelector('[data-panel="env"]');
+                    if (environmentPanel_) {
+                        environmentPanel_.classList.add('active');
+                    }
+                    // 重新绑定环境信息按钮事件
+                    bindEnvironmentActions(root);
+                }
+            }
+        });
+    });
+}
+/** Ribbon 按钮点击测试 */
+function bindRibbonCards(root) {
+    const cards = root.querySelectorAll('.bgm-dp-ribbon-card');
+    cards.forEach((card) => {
+        card.addEventListener('click', () => {
+            const buttonId = card.dataset.btn;
+            if (!buttonId)
+                return;
+            const resultElement = root.querySelector(`[data-result="${CSS.escape(buttonId)}"]`);
+            if (!resultElement)
+                return;
+            const imageUrlElement = root.querySelector(`[data-imgurl="${CSS.escape(buttonId)}"]`);
+            resultElement.textContent = '▶ 调用中...';
+            resultElement.style.color = '#64748b';
+            // 测试 GetBangumiImage
+            try {
+                const w = getDebugGlobals();
+                if (typeof w.GetBangumiImage === 'function') {
+                    const imageUrl = w.GetBangumiImage({ Id: buttonId });
+                    if (imageUrlElement) {
+                        imageUrlElement.textContent = imageUrl;
+                        imageUrlElement.title = imageUrl;
+                    }
+                }
+            }
+            catch {
+                // ignore
+            }
+            // 测试 OnAction
+            setTimeout(() => {
+                const w2 = getDebugGlobals();
+                if (typeof w2.OnAction === 'function') {
+                    try {
+                        w2.OnAction({ Id: buttonId });
+                        resultElement.textContent = '✅ 已调用';
+                        resultElement.style.color = '#16a34a';
+                    }
+                    catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        resultElement.textContent = `❌ ${message}`;
+                        resultElement.style.color = '#dc2626';
+                    }
+                }
+                else {
+                    resultElement.textContent = '⚠️ OnAction 未定义';
+                    resultElement.style.color = '#d97706';
+                }
+            }, 100);
+        });
+    });
+}
+/** 日志筛选 */
+function bindLogFilters(root) {
+    const filters = root.querySelectorAll('.bgm-dp-filter-btn');
+    filters.forEach((button) => {
+        button.addEventListener('click', () => {
+            filters.forEach((f) => {
+                f.classList.remove('active');
+            });
+            button.classList.add('active');
+            const { level } = button.dataset;
+            _currentLogLevel = level === 'all' ? undefined : level;
+            void refreshLogs(root);
+        });
+    });
+}
+/** 日志清空和导出 */
+function bindLogActions(root) {
+    const clearButton = root.querySelector('#bgm-dp-log-clear');
+    clearButton?.addEventListener('click', () => {
+        void (async () => {
+            const logger = await getLogger();
+            if (logger) {
+                logger.clearLogs();
+                void refreshLogs(root);
+            }
+        })();
+    });
+    const exportButton = root.querySelector('#bgm-dp-log-export');
+    exportButton?.addEventListener('click', () => {
+        void (async () => {
+            const exporter = await getExporter();
+            exporter?.exportData('systemLogs', 'txt');
+        })();
+    });
+}
+/** 刷新日志显示 */
+async function refreshLogs(root) {
+    const box = root.querySelector('#bgm-dp-console-box');
+    if (!box)
+        return;
+    const logger = await getLogger();
+    if (!logger) {
+        box.innerHTML = '<div class="bgm-dp-log-empty">logger 模块未加载</div>';
+        return;
+    }
+    const logs = logger.getRecentLogs(_currentLogLevel, 200);
+    if (logs.length === 0) {
+        box.innerHTML = '<div class="bgm-dp-log-empty">暂无日志</div>';
+        return;
+    }
+    const lines = logs
+        .map((log) => {
+        const time = new Date(log.timestamp);
+        const ts = `${String(time.getMinutes()).padStart(2, '0')}:${String(time.getSeconds()).padStart(2, '0')}.${String(time.getMilliseconds()).padStart(3, '0').slice(0, 2)}`;
+        const level = log.level.toUpperCase();
+        return `<div class="bgm-dp-log-line">
+        <span class="bgm-dp-log-time">${ts}</span>
+        <span class="bgm-dp-log-level bgm-dp-log-level-${level}">${level}</span>
+        <span class="bgm-dp-log-msg">${escapeHtml(log.message)}</span>
+      </div>`;
+    })
+        .join('');
+    box.innerHTML = lines;
+    // 自动滚动到底部
+    box.scrollTop = box.scrollHeight;
+    // 更新 Tab 计数
+    const tabCount = root.querySelector(':scope .bgm-dp-tab[data-tab="console"] .bgm-dp-tab-count');
+    if (tabCount) {
+        const allLogs = logger.getRecentLogs(undefined, 1000);
+        tabCount.textContent = String(allLogs.length);
+    }
+}
+/** 启动日志轮询 */
+function startLogPolling(root) {
+    stopLogPolling();
+    void refreshLogs(root);
+    _logInterval = setInterval(() => {
+        void refreshLogs(root);
+    }, 2000);
+}
+/** 停止日志轮询 */
+function stopLogPolling() {
+    if (!_logInterval) {
+        return;
+    }
+    clearInterval(_logInterval);
+    _logInterval = null;
+}
+/** 环境信息操作按钮 */
+function bindEnvironmentActions(root) {
+    const refreshButton = root.querySelector('#bgm-dp-refresh');
+    refreshButton?.addEventListener('click', () => {
+        window.location.reload();
+    });
+    const clearCacheButton = root.querySelector('#bgm-dp-clear-cache');
+    clearCacheButton?.addEventListener('click', () => {
+        // 添加 cache-busting 参数强制刷新
+        window.location.assign(`${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`);
+    });
+    const exportReportButton = root.querySelector('#bgm-dp-export-report');
+    exportReportButton?.addEventListener('click', () => {
+        exportDiagnosticReport();
+    });
+    const reloadButton = root.querySelector('#bgm-dp-reload-modules');
+    reloadButton?.addEventListener('click', () => {
+        window.location.reload();
+    });
+}
+/** 导出诊断报告（JSON 文件下载） */
+function exportDiagnosticReport() {
+    const w = getDebugGlobals();
+    const modules = getModuleStatuses();
+    const report = {
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        wpsInvoke: typeof w.WpsInvoke,
+        ribbonReady: w._ribbonReady ?? false,
+        callbacks: {
+            OnAddinLoad: typeof w.OnAddinLoad,
+            OnAction: typeof w.OnAction,
+            GetBangumiImage: typeof w.GetBangumiImage,
+            GetIncrementalSyncPressed: typeof w.GetIncrementalSyncPressed,
+        },
+        domPurify: typeof w.DOMPurify,
+        zod: typeof w.z,
+        moduleStatuses: modules,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], {
+        type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bgm-diagnostic-${String(Date.now())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+/** 折叠/展开 */
+function bindCollapse(root, fab) {
+    const collapseButton = root.querySelector('#bgm-dp-collapse');
+    collapseButton?.addEventListener('click', () => {
+        root.classList.add('collapsed');
+        fab.style.display = 'flex';
+        stopLogPolling();
+    });
+    fab.addEventListener('click', () => {
+        root.classList.remove('collapsed');
+        fab.style.display = 'none';
+        // 如果当前在 console tab，恢复轮询
+        const activeTab = root.querySelector('.bgm-dp-tab.active');
+        if (activeTab?.dataset.tab === 'console') {
+            startLogPolling(root);
+        }
+    });
+}
+// ========== 主入口 ==========
+export function initializeDebugPanel() {
+    if (!isDebugEnvironment())
+        return;
+    if (document.getElementById('bgm-debug-panel-root'))
+        return;
+    const style = document.createElement('style');
+    style.textContent = PANEL_CSS;
+    document.head.appendChild(style);
+    const modules = getModuleStatuses();
+    const root = document.createElement('div');
+    root.id = 'bgm-debug-panel-root';
+    root.className = 'bgm-dp-root';
+    root.innerHTML = `
+    ${buildHeaderHTML()}
+    ${buildStatusBarHTML(modules)}
+    ${buildTabsHTML(0)}
+    <div class="bgm-dp-body">
+      ${buildModulesPanelHTML()}
+      ${buildRibbonPanelHTML()}
+      ${buildConsolePanelHTML()}
+      ${buildEnvironmentPanelHTML()}
+    </div>
+  `;
+    document.body.appendChild(root);
+    // 折叠态浮动按钮
+    const fab = document.createElement('div');
+    fab.className = 'bgm-dp-fab';
+    fab.textContent = '🐛';
+    fab.title = '展开调试面板';
+    fab.style.display = 'none';
+    document.body.appendChild(fab);
+    // 绑定交互
+    bindTabs(root);
+    bindRibbonCards(root);
+    bindLogFilters(root);
+    bindLogActions(root);
+    bindEnvironmentActions(root);
+    bindCollapse(root, fab);
+    // 延迟刷新模块状态（等 main.js 写入状态）
+    setTimeout(() => {
+        const currentModules = getModuleStatuses();
+        const statusbar = root.querySelector('.bgm-dp-statusbar');
+        if (statusbar) {
+            statusbar.outerHTML = buildStatusBarHTML(currentModules);
+        }
+        const modulePanel = root.querySelector('[data-panel="modules"]');
+        if (modulePanel) {
+            modulePanel.outerHTML = buildModulesPanelHTML();
+        }
+        // 更新 Tab 计数
+        const moduleTabCount = root.querySelector(':scope .bgm-dp-tab[data-tab="modules"] .bgm-dp-tab-count');
+        if (moduleTabCount) {
+            moduleTabCount.textContent = String(currentModules.length);
+        }
+    }, 500);
+    // 定期刷新状态栏（每 3 秒，反映模块加载进度）
+    const statusInterval = setInterval(() => {
+        const currentModules = getModuleStatuses();
+        const loaded = currentModules.filter((m) => m.loaded).length;
+        const isAllLoaded = loaded === currentModules.length && currentModules.length > 0;
+        if (isAllLoaded) {
+            clearInterval(statusInterval);
+        }
+        // 刷新状态栏
+        const statusbarElement = root.querySelector('.bgm-dp-statusbar');
+        if (statusbarElement) {
+            statusbarElement.outerHTML = buildStatusBarHTML(currentModules);
+        }
+        // 刷新模块面板（如果当前可见）
+        const modulePanelActive = root.querySelector('.bgm-dp-panel.active[data-panel="modules"]');
+        if (modulePanelActive) {
+            modulePanelActive.outerHTML = buildModulesPanelHTML();
+        }
+    }, 3000);
+}
+// ========== 自动启动 ==========
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeDebugPanel);
+    }
+    else {
+        initializeDebugPanel();
+    }
+}
