@@ -9,7 +9,10 @@
 
 <div align="center">
 
-<h1>My Bangumi Database for WPS</h1>
+[![我的 Bangumi 数据库 (WPS版)](images/mbd-logo.svg)](images/mbd-logo.svg)
+
+<h1>我的 Bangumi 数据库 (WPS版)</h1>
+<h2>My Bangumi Database for WPS</h2>
 
 <strong>在 WPS 表格里管理 Bangumi 番组数据：上传同步、数据同步、收藏下载、新番表富化与数据清洗</strong>
 
@@ -24,7 +27,8 @@
 - [核心特色](#sec-2)
 - [技术栈](#sec-3)
 - [目录结构](#sec-4)
-- [环境要求与安装](#sec-5)
+- [环境要求](#sec-5)
+- [安装到 WPS 使用环境](#sec-5b)
 - [开发调试](#sec-6)
 - [构建与打包](#sec-7)
 - [使用示例](#sec-8)
@@ -137,7 +141,9 @@ BGM/
 
 ---
 
-## 📥 安装步骤
+## 📥 开发者环境搭建（仅开发需要）
+
+> 这是**开发插件本身**的步骤。普通使用者安装插件请看下一节 [安装到 WPS 使用环境](#sec-5b)，无需 Node / 构建。
 
 ```bash
 # 1. 克隆仓库
@@ -149,6 +155,58 @@ npm install
 ```
 
 > `wpsjs`、`vite` 等 CLI 已作为 devDependencies 随 `npm install` 安装，无需全局安装。
+
+---
+
+<a id="sec-5b"></a>
+
+## 📦 安装到 WPS 使用环境
+
+插件是 WPS 表格（ET）加载项。部署遵循 WPS 官方「publish.xml 模式」（推荐）与「jsplugins.xml 模式」，最终用户拿到的是**构建产物**，无需 Node / 构建环境。
+
+### 方式一：开发者调试安装（仅开发时）
+
+```bash
+npm run debug
+```
+
+`wpsjs debug` 会编译 TypeScript、启动调试服务器（默认端口 `3889`），并自动在 WPS 中注册一个调试加载项；启动 WPS 表格后即可在「Bangumi同步」选项卡看到按钮。详见 [开发调试](#sec-6)。
+
+### 方式二：使用者安装（正式环境，离线 / 本地）
+
+1. **获取加载项包**
+   - 开发者：见 [构建与打包](#sec-7)，`npm run build` 产出的 `dist/` 目录（含 `index.html` / `manifest.xml` / `ribbon.xml` / `images/` / `ui/` / `dist-ts/` / `css/` / `libs/` / `assets/`）就是完整加载项包。
+   - 使用者：直接从 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases) 下载发布的 `bgm-addon-vX.Y.Z.zip`，解压得到加载项目录。
+
+2. **注册到 WPS**
+
+   WPS 在以下目录读取加载项清单（Windows）：
+
+   ```
+   %appdata%\kingsoft\wps\jsaddons
+   ```
+
+   - **(推荐) 安装器 / publish.html**：用 WPS 官方 `wpsjs` 工具链生成的 `publish.html`（离线模式）或 `wpsjs build --exe` 生成的安装器，浏览器打开后点「安装」，会自动写入上面的 `publish.xml`。
+   - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.1.0\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
+
+     ```xml
+     <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+     <jsplugins>
+       <jsplugin name="My Bangumi Database for WPS"
+                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.1.0/"
+                 enable="true"/>
+     </jsplugins>
+     ```
+
+     > `url` 指向**包含 `index.html` 的目录**，可用 `file:///` 本地路径或 `http(s)://` 服务器地址；多个加载项在同一 `publish.xml` 中各写一条 `<jsplugin>` 即可。
+
+3. **启用**：关闭并重新打开 WPS 表格。首次出现「Bangumi同步」选项卡时会请求允许，允许后约半分钟加载完成（可在 WPS「应用中心 / 加载项」里管理启用 / 禁用）。
+
+### 方式三：在线部署（局域网 / 服务器）
+
+将 `dist/` 部署到 Web 服务器（需 `https://` 或完整 `http://` 地址，例如 `https://example.com/bgm/`），再用 `wpsjs publish`（或手工生成 `publish.html`）把安装页分发给使用者；使用者在浏览器打开 `publish.html`、状态显示「正常」后点「安装」即可。`wpsjs publish` 会把 `wps-addon-build/` 部署到服务器，并把 `wps-addon-publish/publish.html` 作为安装入口。
+
+> `npm run debug` 仅用于开发联调；正式给使用者的是方式二 / 方式三的构建产物，对方无需安装 Node。
 
 ---
 
@@ -191,6 +249,25 @@ npm run build:ts
 
 - `dist-ts/`：`tsc` 编译后的 JS（被 `main.js` / `panel.html` 运行时依赖）。
 - `dist/`：`vite build` 输出，含 `manifest.xml`、`ribbon.xml`、`images/`、`ui/`、`main.js`、`dist-ts/**`、`css/` 与经哈希的 `assets/`。将此目录作为加载项发布包部署到 WPS。
+
+#### 打包发布到 Releases（离线分发）
+
+WPS 官方 `wpsjs` 工具包提供 `wpsjs build` 生成离线安装包（输出 `wps-addon-build/`，加 `--exe` 可生成 Windows 安装器），用于离线分发。本仓库的加载项由 Vite 构建，**等价的可分发目录是 `npm run build` 产出的 `dist/`**——把 `dist/` 压缩即可作为离线包上传 Releases：
+
+```bash
+# 1. 构建完整加载项包（产物在 dist/）
+npm run build
+
+# 2. 压缩为发布包（版本号取自 package.json 的 version）
+VERSION=$(node -p "require('./package.json').version")
+zip -r "bgm-addon-v${VERSION}.zip" dist
+```
+
+将 `bgm-addon-vX.Y.Z.zip` 上传到 [GitHub Releases](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases)，使用者按 [安装到 WPS 使用环境](#sec-5b) 的「方式二」下载解压、注册即可，无需 Node 与构建。
+
+> 若沿用 WPS 标准 `wpsjs` 工程布局，也可直接 `wpsjs build`（生成 `wps-addon-build/` + `wps-addon-publish/publish.html`）后将该产物压缩上传；两种产物在计算机上都是「含 `index.html` 的目录」，安装方式一致。
+
+**插件品牌图标**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字样），随 `dist/`（或 `wpsjs build` 产物）一并打包进加载项，同时作为 README 标题标识与 Releases 资源使用。
 
 ---
 

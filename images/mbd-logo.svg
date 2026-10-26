@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="200" height="200" role="img" aria-label="我的 Bangumi 数据库 (WPS版) 插件图标">
+  <!-- 文档主体（品牌色 #1296db） -->
+  <path d="M210 160 H726 L864 298 V824 a40 40 0 0 1 -40 40 H210 a40 40 0 0 1 -40 -40 V200 a40 40 0 0 1 40 -40 Z" fill="#1296db"/>
+  <!-- 折叠角（背面，浅色） -->
+  <path d="M726 160 H864 V298 Z" fill="#5bb8e8"/>
+  <!-- 品牌字样 MBD -->
+  <text x="512" y="520" font-family="Arial, 'Microsoft YaHei', 'PingFang SC', sans-serif" font-size="250" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central" letter-spacing="-6">MBD</text>
+</svg>
