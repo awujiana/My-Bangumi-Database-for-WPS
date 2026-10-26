@@ -1,7 +1,7 @@
 ﻿[![License](https://img.shields.io/badge/协议-AGPL--3.0-blue)](LICENSE)
 [![Language](https://img.shields.io/badge/语言-TypeScript-blue)](https://www.typescriptlang.org/)
 [![Platform](https://img.shields.io/badge/平台-WPS%20Office-blue)](#sec-5)
-[![Author](https://img.shields.io/badge/作者-awujian-blue)](https://github.com/awujiana)
+[![Author](https://img.shields.io/badge/作者-awujiana-blue)](https://github.com/awujiana)
 
 [![Release](https://img.shields.io/github/v/release/awujiana/My-Bangumi-Database-for-WPS?label=Release&color=blue)](https://github.com/awujiana/My-Bangumi-Database-for-WPS/releases)
 [![Stars](https://img.shields.io/github/stars/awujiana/My-Bangumi-Database-for-WPS?label=Stars&color=blue)](https://github.com/awujiana/My-Bangumi-Database-for-WPS/stargazers)
