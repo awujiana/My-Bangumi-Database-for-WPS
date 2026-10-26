@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, showConfirm, refreshData, previewSyncContent, isSyncRecordEnabled, getTheme, getListType, getTimeFilter, getRefreshInterval, getLogLevel, getModalButtonsPosition, getThemeSchedule, getClusterMode, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, showConfirm, refreshData, previewSyncContent, isSyncRecordEnabled, getTheme, getListType, getTimeFilter, getRefreshInterval, getLogLevel, getModalButtonsPosition, getThemeSchedule, getClusterMode, getMergeMode, } from '../../index.js';
 import { loadGithubConfigIntoForm } from './github-settings.js';
 import { initializeAccountManager } from './accounts.js';
 import { initializeModuleOrderEditor } from './module-order.js';
@@ -18,7 +18,7 @@ import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js'
 import { loadHighlightSettingsIntoForm } from './highlight-settings.js';
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js';
 import { setupEventListeners, setupMessageListener } from './panel-events.js';
-import { handleClusterModeClick, handleEnableSyncRecordChange, handleListTypeChange, handleLogLevelChange, handleLogLevelFilterChange, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, setupTimeFilterControls, updateModalButtonsPositionButtons, updateClusterModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
+import { handleClusterModeClick, handleMergeModeClick, handleEnableSyncRecordChange, handleListTypeChange, handleLogLevelChange, handleLogLevelFilterChange, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, setupTimeFilterControls, updateModalButtonsPositionButtons, updateClusterModeButtons, updateMergeModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
 import { setupUpdateChecker } from './update-checker.js';
 import { syncFromPanel } from './sync.js';
 import { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, } from './token.js';
@@ -164,6 +164,11 @@ export function setupButtonListeners() {
         trackedAddEventListener(button, 'click', handleClusterModeClick);
     }
     updateClusterModeButtons(getClusterMode(true));
+    // 设置页「🎨 条件格式」：合并重复项口径（回填 + 点击切换）
+    for (const button of document.querySelectorAll('[data-merge-mode]')) {
+        trackedAddEventListener(button, 'click', handleMergeModeClick);
+    }
+    updateMergeModeButtons(getMergeMode(true));
     // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
     loadEnrichPreviewSettingsIntoForm();
     // 设置页「⚙️ 功能开关」：表单回填

@@ -20,6 +20,8 @@ import { applyTheme, switchThemeAnimated } from '../../tools/theme.js'
 import {
   clusterModeLabel,
   getTheme,
+  mergeModeLabel,
+  setMergeMode,
   setClusterMode,
   setModalButtonsPosition,
   setThemeSchedule,
@@ -272,6 +274,31 @@ export const handleClusterModeClick = (event: Event): void => {
   const isOk = setClusterMode(mode)
   if (isOk) {
     showToast(`自动聚类口径：${clusterModeLabel(mode)}`, 'success')
+  } else {
+    showToast('保存失败', 'error')
+  }
+}
+
+// ========== 设置页：条件格式合并重复项口径 ==========
+
+/** 同步合并口径分段按钮的 active / aria 状态 */
+export function updateMergeModeButtons(mode: string): void {
+  document.querySelectorAll<HTMLElement>('[data-merge-mode]').forEach((button) => {
+    const isActive = button.dataset.mergeMode === mode
+    button.classList.toggle('active', isActive)
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false')
+  })
+}
+
+/** 合并口径切换（条件格式页「合并重复项」按钮按它合并） */
+export const handleMergeModeClick = (event: Event): void => {
+  const button = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-merge-mode]')
+  const mode = button?.dataset.mergeMode
+  if (!mode) return
+  updateMergeModeButtons(mode)
+  const isOk = setMergeMode(mode)
+  if (isOk) {
+    showToast(`合并重复项口径：${mergeModeLabel(mode)}`, 'success')
   } else {
     showToast('保存失败', 'error')
   }

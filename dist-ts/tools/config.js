@@ -19,6 +19,7 @@ export const CONFIG_KEYS = {
     THEME_SCHEDULE: 'bgm_theme_schedule',
     MODAL_BUTTONS_POSITION: 'bgm_modal_buttons_position',
     CF_CLUSTER_MODE: 'bgm_cf_cluster_mode',
+    CF_MERGE_MODE: 'bgm_cf_merge_mode',
     SHORTCUTS_ENABLED: 'bgm_shortcuts_enabled',
     SHORTCUT_BINDINGS: 'bgm_shortcut_bindings',
     SHORTCUT_MOUSE: 'bgm_shortcut_mouse',
@@ -333,6 +334,33 @@ export function getClusterMode(isSilent = false) {
  */
 export function clusterModeLabel(mode) {
     const labels = CLUSTER_MODE_LABELS;
+    return labels[mode] ?? mode;
+}
+// ========== 条件格式「合并重复项」口径 ==========
+const MERGE_MODES = ['adjacent', 'union'];
+/** 口径中文名（设置页按钮与 toast 共用） */
+export const MERGE_MODE_LABELS = {
+    adjacent: '仅连续行',
+    union: '强行并成一块',
+};
+export function setMergeMode(mode) {
+    if (!MERGE_MODES.includes(mode)) {
+        bgmLog(LOG_LEVELS.WARN, `[config] 无效合并口径: ${mode}，已忽略`);
+        return false;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[config] 设置合并重复项口径: ${mode}`);
+    return setConfig(CONFIG_KEYS.CF_MERGE_MODE, mode);
+}
+export function getMergeMode(isSilent = false) {
+    const value = getConfig(CONFIG_KEYS.CF_MERGE_MODE, 'adjacent', isSilent);
+    const result = MERGE_MODES.includes(value) ? value : 'adjacent';
+    if (!isSilent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取合并重复项口径: ${result}`);
+    return result;
+}
+/** 口径中文名；未知取值原样返回 */
+export function mergeModeLabel(mode) {
+    const labels = MERGE_MODE_LABELS;
     return labels[mode] ?? mode;
 }
 // ========== 默认收藏列表类型 ==========

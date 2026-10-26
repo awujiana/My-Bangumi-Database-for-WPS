@@ -583,6 +583,22 @@
               2」）；范围解析不出列 / 行时该条规则留在「未分组」。
             </p>
           </div>
+          <div class="form-group">
+            <label>合并重复项口径</label>
+            <div class="theme-mode-group" role="group" aria-label="合并重复项口径">
+              <button type="button" class="theme-mode-btn" data-merge-mode="adjacent">
+                仅连续行（安全）
+              </button>
+              <button type="button" class="theme-mode-btn" data-merge-mode="union">
+                强行并成一块
+              </button>
+            </div>
+            <p class="hint">
+              条件格式页「规则管理器 → 🔗 合并重复项」按这里的口径合并：同公式、同列的多条**单行**规则并成一条。
+              「仅连续行」只合并行号连续的一段（2,3,4 → J2:J4），断开的行保持原样；「强行并成一块」取最小到最大一次覆盖，
+              **中间空行也会被加上格式**，差距大时要留意。
+            </p>
+          </div>
         </section>
 
         <!-- 默认路径（导出位置 / 导入文件夹记忆） -->

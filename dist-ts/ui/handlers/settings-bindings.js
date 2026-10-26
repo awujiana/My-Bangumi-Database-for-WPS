@@ -5,7 +5,7 @@
  */
 import { LOG_LEVELS, bgmLog, getRefreshInterval, saveTheme, setListType, setLogLevel, setRefreshInterval, setSyncRecordEnabled, setTimeFilter, showToast, } from '../../index.js';
 import { applyTheme, switchThemeAnimated } from '../../tools/theme.js';
-import { clusterModeLabel, getTheme, setClusterMode, setModalButtonsPosition, setThemeSchedule, } from '../../tools/config.js';
+import { clusterModeLabel, getTheme, mergeModeLabel, setMergeMode, setClusterMode, setModalButtonsPosition, setThemeSchedule, } from '../../tools/config.js';
 import { renderLogEntries } from './log-panel.js';
 // ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 export const handleEnableSyncRecordChange = () => {
@@ -241,6 +241,30 @@ export const handleClusterModeClick = (event) => {
     const isOk = setClusterMode(mode);
     if (isOk) {
         showToast(`自动聚类口径：${clusterModeLabel(mode)}`, 'success');
+    }
+    else {
+        showToast('保存失败', 'error');
+    }
+};
+// ========== 设置页：条件格式合并重复项口径 ==========
+/** 同步合并口径分段按钮的 active / aria 状态 */
+export function updateMergeModeButtons(mode) {
+    document.querySelectorAll('[data-merge-mode]').forEach((button) => {
+        const isActive = button.dataset.mergeMode === mode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+}
+/** 合并口径切换（条件格式页「合并重复项」按钮按它合并） */
+export const handleMergeModeClick = (event) => {
+    const button = event.currentTarget.closest('[data-merge-mode]');
+    const mode = button?.dataset.mergeMode;
+    if (!mode)
+        return;
+    updateMergeModeButtons(mode);
+    const isOk = setMergeMode(mode);
+    if (isOk) {
+        showToast(`合并重复项口径：${mergeModeLabel(mode)}`, 'success');
     }
     else {
         showToast('保存失败', 'error');

@@ -394,6 +394,134 @@ function clusterGroupName(
   return start.row === null ? null : `行 ${String(start.row)}`
 }
 
+// ===== 合并重复项（同一公式的多条单行规则并成一条）=====
+
+/** 合并口径 */
+export type MergeMode = 'adjacent' | 'union'
+
+/** 单行范围（`J2` / `$J$2` / `J2:J2`）的解析结果 */
+interface SingleRowRange {
+  column: string
+  row: number
+  isAbsolute: boolean
+}
+
+/** 单个单元格地址（`J2` / `$J$2`）的解析：列字母 + 行号 + 是否绝对引用 */
+const CELL_PATTERN = /^\$?([A-Za-z]{1,3})\$?(\d{1,7})$/u
+
+function parseCell(text: string): { column: string; row: number } | null {
+  const matched = CELL_PATTERN.exec(text.trim())
+  if (matched?.[1] === undefined || matched[2] === undefined) return null
+  return { column: matched[1].toUpperCase(), row: Number(matched[2]) }
+}
+
+/** 只认单行范围：`J2`、`$J$2`、`J2:J2`（列相同且起止行相同） */
+function parseSingleRowRange(range: string): SingleRowRange | null {
+  const [startText, endText] = range.trim().split(':', 2)
+  const start = parseCell(startText ?? '')
+  if (start === null) return null
+  if (endText !== undefined) {
+    const end = parseCell(endText)
+    if (end === null) return null
+    // 跨列或跨行都不算「单行」：合并只处理逐行应用出来的规则
+    if (end.column !== start.column || end.row !== start.row) return null
+  }
+  return { column: start.column, row: start.row, isAbsolute: range.includes('$') }
+}
+
+/** 拼一条合并后的单列范围 */
+function buildRowRange(column: string, from: number, to: number, isAbsolute: boolean): string {
+  if (!isAbsolute) return `${column}${String(from)}:${column}${String(to)}`
+  return `$${column}$${String(from)}:$${column}$${String(to)}`
+}
+
+/** 把有序行号切成连续段（`[2,3,4,7]` → `[[2,3,4],[7]]`） */
+function splitConsecutive(rows: readonly number[]): number[][] {
+  const runs: number[][] = []
+  for (const row of rows) {
+    const lastRun = runs.at(-1)
+    if (lastRun !== undefined && row === (lastRun.at(-1) ?? 0) + 1) lastRun.push(row)
+    else runs.push([row])
+  }
+  return runs
+}
+
+/**
+ * 合并重复项：把「同一公式 + 同类型 + 同列」的多条**单行**规则并成一条
+ *
+ * 典型来源：同一公式被逐行应用（`J2:J2`、`J3:J3`、`J4:J4`…），列表里几十条长得
+ * 一模一样。合并只改范围，不动公式 / 类型 / 颜色 / 字体等其它属性。
+ *
+ * 两种口径（设置页「条件格式 → 合并重复项口径」）：
+ * - `adjacent`：只合并**行号连续**的段。`2,3,4` 合成 `J2:J4`，断开的 `7` 单独留着
+ *   —— 不会给中间没规则的行悄悄加格式，是安全默认；
+ * - `union`：同组内取 `min..max` 一次并成一块，**中间空行也会被覆盖**（用户明确要求
+ *   的「强行并成一块」）。跨段差距大时要留意副作用。
+ *
+ * 范围解析不出单行（`J2:J9`、`A1:B2`、多区域）或公式为空的规则原样保留。
+ *
+ * @returns `rules` 合并后的规则（顺序按首次出现），`mergedGroups` 实际合并的组数，
+ *   `removedCount` 减少的条数（0 表示没有可合并项）
+ */
+export function mergeDuplicateRules(
+  snapshots: readonly ForeignRuleSnapshot[],
+  mode: MergeMode = 'adjacent',
+): { rules: ForeignRuleSnapshot[]; mergedGroups: number; removedCount: number } {
+  const kept: ForeignRuleSnapshot[] = []
+  const buckets = new Map<
+    string,
+    { column: string; isAbsolute: boolean; rows: number[]; sample: ForeignRuleSnapshot }
+  >()
+
+  for (const snapshot of snapshots) {
+    const parsed = snapshot.formula === '' ? null : parseSingleRowRange(snapshot.range)
+    if (parsed === null) {
+      kept.push(snapshot)
+    } else {
+      const key = `${snapshot.formula}\u{0}${snapshot.kind}\u{0}${parsed.column}`
+      const bucket = buckets.get(key)
+      if (bucket === undefined) {
+        buckets.set(key, {
+          column: parsed.column,
+          isAbsolute: parsed.isAbsolute,
+          rows: [parsed.row],
+          sample: snapshot,
+        })
+      } else {
+        bucket.rows.push(parsed.row)
+      }
+    }
+  }
+
+  const merged: ForeignRuleSnapshot[] = []
+  let mergedGroups = 0
+  for (const bucket of buckets.values()) {
+    const rows = [...new Set(bucket.rows)].sort((left, right) => left - right)
+    if (rows.length === 1) {
+      merged.push(bucket.sample)
+    } else if (mode === 'union') {
+      merged.push({
+        ...bucket.sample,
+        range: buildRowRange(bucket.column, rows[0] ?? 0, rows.at(-1) ?? 0, bucket.isAbsolute),
+      })
+      mergedGroups += 1
+    } else {
+      for (const run of splitConsecutive(rows)) {
+        const from = run[0] ?? 0
+        const to = run.at(-1) ?? from
+        merged.push({
+          ...bucket.sample,
+          range: buildRowRange(bucket.column, from, to, bucket.isAbsolute),
+        })
+        if (run.length > 1) mergedGroups += 1
+      }
+    }
+  }
+
+  const rules = [...kept, ...merged]
+  return { rules, mergedGroups, removedCount: snapshots.length - rules.length }
+}
+
 // ===== 既有规则分组的维护（纯函数：页面层只负责持久化与重渲染）=====
 
 /**

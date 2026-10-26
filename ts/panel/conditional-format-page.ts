@@ -23,6 +23,7 @@ import {
 import {
   CLUSTER_MODE_LABELS,
   getClusterMode,
+  getMergeMode,
   getConfig,
   getExportPath,
   getModalButtonsPosition,
@@ -43,6 +44,7 @@ import {
   firstRowOfRange,
   foreignSnapshotToRule,
   groupRules,
+  mergeDuplicateRules,
   moveGroupNear,
   moveItemNear,
   normalizeHexColor,
@@ -1061,6 +1063,49 @@ function autoClusterExistingGroups(): void {
   showToast(
     `已按「${CLUSTER_MODE_LABELS[mode]}」聚成 ${String(groupCount)} 组（覆盖了原分组）`,
     'success',
+  )
+}
+
+/**
+ * 合并重复项：把「同公式 + 同列」的多条单行既有规则并成一条
+ *
+ * 只做两件事：算出合并结果 + 把结果**写进规则库**（store），不直接改工作表。
+ * 原因：写工作表要走「应用与修复」那套双策略（清空重建 / 保留手工规则），
+ * 在这里另写一份会绕过它的确认与降级逻辑，容易悄悄丢规则。
+ * 用户点一次「应用与修复」后，工作表上的重复单行规则就被合并后的规则取代。
+ *
+ * 口径由设置页「条件格式 → 合并重复项口径」决定（仅连续行 / 强行并成一块）。
+ */
+function mergeExistingDuplicates(): void {
+  if (state.existing.length === 0) {
+    showToast('当前表没有既有规则', 'info')
+    return
+  }
+  const mode = getMergeMode(true)
+  const result = mergeDuplicateRules(state.existing, mode)
+  if (result.removedCount === 0) {
+    showToast('没有可合并的单行重复规则（需要同公式、同列且为单行范围）', 'info')
+    return
+  }
+  // 快照 → 规则库条目：沿用「导入既有规则」同一条转换路径，避免两套映射
+  const stamp = Date.now()
+  const imported: ConditionalFormatRule[] = []
+  for (const [index, snapshot] of result.rules.entries()) {
+    const rule = foreignSnapshotToRule(snapshot, () => `merge-${String(stamp)}-${String(index)}`)
+    if (rule !== null) imported.push(rule)
+  }
+  state.rules = [...state.rules, ...imported]
+  persistRules()
+  renderRuleList()
+  showToast(
+    `已把 ${String(state.existing.length)} 条合并为 ${String(result.rules.length)} 条并加入规则库（口径：${
+      mode === 'union' ? '强行并成一块' : '仅连续行'
+    }）；点「应用与修复」写回工作表`,
+    'success',
+  )
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[conditionalFormat] 合并重复项: ${String(result.removedCount)} 条 → ${String(result.rules.length)} 条（${mode}）`,
   )
 }
 
@@ -2717,6 +2762,9 @@ export function initializeConditionalFormatPage(): void {
   // 既有规则分组：自动聚类 / 清除 / 归组弹窗
   byId('conditionalFormatClusterBtn')?.addEventListener('click', () => {
     autoClusterExistingGroups()
+  })
+  byId('conditionalFormatMergeBtn')?.addEventListener('click', () => {
+    mergeExistingDuplicates()
   })
   byId('conditionalFormatClearGroupsBtn')?.addEventListener('click', () => {
     clearExistingGroups()
