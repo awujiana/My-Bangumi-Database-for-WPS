@@ -255,12 +255,6 @@ export function buildForeignRuleRowHtml(row) {
         <label class="conditional-format-col-stop" title="${isHiddenStop ? '当前 WPS 未暴露该属性，无法修改' : '勾选后：本条命中就不再评估后续规则'}">
           <input type="checkbox" data-action="stop" ${row.stopIfTrue === true ? 'checked' : ''} ${isHiddenStop ? 'disabled' : ''} />
         </label>
-        <span class="conditional-format-col-actions">
-          <button type="button" data-action="import" title="导入规则库（变成可管理的插件规则）">⤵</button>
-          <button type="button" data-action="up" title="上移（提高优先级）">↑</button>
-          <button type="button" data-action="down" title="下移（降低优先级）">↓</button>
-          <button type="button" data-action="delete" title="从工作表删除这条规则">✕</button>
-        </span>
       </div>`;
 }
 /**
@@ -281,7 +275,6 @@ export function buildForeignRuleHeadHtml(isAllSelected = false) {
         <span class="conditional-format-col-range">应用于</span>
         <span class="conditional-format-col-formula">公式</span>
         <span class="conditional-format-col-stop">为真则停</span>
-        <span class="conditional-format-col-actions">操作</span>
       </div>`;
 }
 /**

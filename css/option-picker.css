@@ -1,0 +1,99 @@
+/* =====================================================================
+   通用选项选择器（ts/ui/components/option-picker.ts）
+   - ≤2 项：单选按钮
+   - 3–10 项：原生 select
+   - >10 项：搜索框 + 过滤列表
+   ===================================================================== */
+
+.bgm-option-picker-radio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bgm-option-picker-radio-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.bgm-option-picker-radio-item:has(input:checked) {
+  border-color: var(--accent, #3b82f6);
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
+.bgm-option-picker-radio-item input {
+  accent-color: var(--accent, #3b82f6);
+}
+
+.bgm-option-picker-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+.bgm-option-picker-search {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+.bgm-option-picker-list {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface);
+}
+
+.bgm-option-picker-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bgm-option-picker-item:last-child {
+  border-bottom: none;
+}
+
+.bgm-option-picker-item:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+}
+
+.bgm-option-picker-item.is-selected {
+  background: var(--bg-surface-2);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.bgm-option-picker-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}

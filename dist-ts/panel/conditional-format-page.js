@@ -18,8 +18,9 @@ import { FOREIGN_RULE_PAGE_SIZE, buildForeignRuleGroupsHtml, buildForeignRuleHea
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js';
 import { bindModalCollapse, bindModalDrag, bringModalIntoView, resetModalPosition, } from '../ui/components/modal-drag.js';
 import { bindModalMaximize, bindModalResize } from '../ui/components/window-chrome.js';
-import { attachDelegatedContextMenu } from '../ui/components/context-menu.js';
+import { attachDelegatedContextMenu, showContextMenu } from '../ui/components/context-menu.js';
 import { createSortable } from '../ui/components/sortable-list.js';
+import { renderOptionPicker } from '../ui/components/option-picker.js';
 import { applyConditionalFormatPlan, checkFormatConditionsReadable, deleteForeignRule, isFormatConditionsSupported, moveForeignRule, readForeignRules, setForeignAppliesTo, setForeignFormula, setForeignStopIfTrue, } from './conditional-format-apply.js';
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
@@ -82,54 +83,77 @@ function setText(id, text) {
         element.textContent = text;
 }
 // ===== 工作表枚举（collectSheets / activeWorksheet 见 ../tools/sheet-list.js）=====
-/** 当前选中的工作簿名（工作簿下拉的值；从选中表反推，选中为空时读下拉兜底） */
+/** 当前选中的工作簿名（从选中表反推；选中为空时为空） */
 function currentWorkbookName() {
-    const bySelected = selectedSheet()?.workbook;
-    if (bySelected)
-        return bySelected;
-    const select = selectById('conditionalFormatWorkbook');
-    return select?.value ?? '';
+    return selectedSheet()?.workbook ?? '';
 }
-/** 渲染目标工作簿下拉（去重的工作簿名，保持枚举顺序） */
-function renderWorkbookSelect() {
-    const select = selectById('conditionalFormatWorkbook');
-    if (!select)
+/**
+ * 渲染目标工作簿选择器（去重的工作簿名，保持枚举顺序）
+ *
+ * 选项 ≤2 用单选按钮、>10 带搜索 —— 统一走通用组件 option-picker。
+ */
+function renderWorkbookPicker() {
+    const container = byId('conditionalFormatWorkbookPicker');
+    if (!container)
         return;
     const workbookNames = [];
     for (const entry of state.sheets) {
         if (!workbookNames.includes(entry.workbook))
             workbookNames.push(entry.workbook);
     }
-    if (workbookNames.length === 0) {
-        select.innerHTML = '<option value="">（无已打开的工作簿）</option>';
-        return;
-    }
-    const current = currentWorkbookName();
-    select.innerHTML = workbookNames
-        .map((name) => `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>`)
-        .join('');
+    renderOptionPicker(container, workbookNames.map((name) => ({ value: name, label: name })), {
+        value: currentWorkbookName(),
+        ariaLabel: '目标工作簿',
+        emptyText: '（无已打开的工作簿）',
+        onChange: (workbook) => {
+            onWorkbookChange(workbook);
+        },
+    });
 }
-function renderSheetSelect() {
-    const select = selectById('conditionalFormatSheet');
-    if (!select)
+/** 渲染目标工作表选择器（只列当前工作簿下的表） */
+function renderSheetPicker() {
+    const container = byId('conditionalFormatSheetPicker');
+    if (!container)
         return;
-    // 二级菜单只显示**当前工作簿下**的工作表（第一级选簿、第二级选表）
     const workbook = currentWorkbookName();
     const visible = state.sheets.filter((entry) => entry.workbook === workbook);
-    // 锁定态下选中键失效：不静默跳到别的表，放一条说明让用户自己重选
-    if (state.selectionMissing) {
-        const options = visible.map((entry) => `<option value="${escapeHtml(entry.key)}">${escapeHtml(entry.sheet)}</option>`);
-        const notice = `<option value="">⚠️ 原目标表 ${escapeHtml(state.selectionMissing)} 已不存在，请重新选择</option>`;
-        select.innerHTML = notice + options.join('');
-        return;
+    renderOptionPicker(container, visible.map((entry) => ({ value: entry.key, label: entry.sheet })), {
+        value: state.selectedKey,
+        ariaLabel: '目标工作表',
+        emptyText: '（该工作簿下没有可显示的工作表）',
+        onChange: (key) => {
+            onSheetChange(key);
+        },
+    });
+    // 锁定态下选中键失效：不静默跳到别的表，用一行说明让用户自己重选
+    const notice = byId('conditionalFormatSheetNotice');
+    if (notice) {
+        notice.hidden = state.selectionMissing === '';
+        notice.textContent =
+            state.selectionMissing === ''
+                ? ''
+                : `⚠️ 原目标表 ${state.selectionMissing} 已不存在，请重新选择`;
     }
-    if (visible.length === 0) {
-        select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>';
-        return;
+}
+/** 第一级：切换工作簿（原选中表仍属于新簿则保留，否则选该簿第一张） */
+function onWorkbookChange(workbook) {
+    const inWorkbook = state.sheets.filter((entry) => entry.workbook === workbook);
+    const isStillValid = inWorkbook.some((entry) => entry.key === state.selectedKey);
+    if (!isStillValid) {
+        state.selectedKey = inWorkbook[0]?.key ?? '';
+        setConfig(KEY_SHEET, state.selectedKey);
     }
-    select.innerHTML = visible
-        .map((entry) => `<option value="${escapeHtml(entry.key)}"${entry.key === state.selectedKey ? ' selected' : ''}>${escapeHtml(entry.sheet)}</option>`)
-        .join('');
+    // 用户主动切了簿：退出「原表已不存在」状态（否则提示条会赖着不走）
+    state.selectionMissing = '';
+    renderSheetPicker();
+    loadExistingRules();
+}
+/** 第二级：切换工作表 */
+function onSheetChange(key) {
+    state.selectedKey = key;
+    state.selectionMissing = '';
+    setConfig(KEY_SHEET, state.selectedKey);
+    loadExistingRules();
 }
 function selectedSheet() {
     return state.sheets.find((entry) => entry.key === state.selectedKey) ?? null;
@@ -139,7 +163,7 @@ function selectedSheet() {
  *
  * 「目标表锁定」勾选时，选中键失效（目标簿被关 / 目标表被删）**不静默跳**到
  * 活动表或第一张 —— 那会让用户没注意就把条件格式应用到另一张表上。改为
- * 记录 `selectionMissing`，由 renderSheetSelect 提示重新选择。
+ * 记录 `selectionMissing`，由 renderSheetPicker 提示重新选择。
  */
 function reloadSheets() {
     try {
@@ -167,8 +191,8 @@ function reloadSheets() {
         else if (isSelectionValid) {
             state.selectionMissing = '';
         }
-        renderWorkbookSelect();
-        renderSheetSelect();
+        renderWorkbookPicker();
+        renderSheetPicker();
         // 工作表列表（或选中项）变了，既有规则快照必须跟着重读——
         // 用户要在这页上直接看到「这张表现在有什么条件格式」（真机反馈：看不到）
         loadExistingRules();
@@ -180,8 +204,8 @@ function reloadSheets() {
         bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 枚举工作表失败：${message}`);
         showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error');
         state.sheets = [];
-        renderWorkbookSelect();
-        renderSheetSelect();
+        renderWorkbookPicker();
+        renderSheetPicker();
     }
 }
 /**
@@ -207,7 +231,7 @@ function setSheetLock(isLocked) {
         reloadSheets();
         return;
     }
-    renderSheetSelect();
+    renderSheetPicker();
 }
 // ===== 工作表既有规则（只读）=====
 /** 读目标工作表既有规则并渲染（表格呈现，可管理） */
@@ -1519,14 +1543,14 @@ function renderRuleList() {
           <label class="conditional-format-rule-pick" title="勾选以批量删除 / 导出">
             <input type="checkbox" data-action="pick" ${state.ruleSelection.has(rule.id) ? 'checked' : ''} aria-label="勾选 ${escapeHtml(rule.name)}" />
           </label>
-          <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
-            <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
-          </label>
           <span class="conditional-format-swatch" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)}"></span>
           <div class="conditional-format-rule-main">
             <div class="conditional-format-rule-name">${escapeHtml(rule.name)}</div>
             <div class="conditional-format-rule-meta">${escapeHtml(rule.appliesTo)} · <code title="${escapeHtml(rule.formula)}">${escapeHtml(rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula)}</code></div>
           </div>
+          <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
+            <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
+          </label>
           <div class="conditional-format-rule-actions">
             <button type="button" data-action="up" title="上移（提高优先级）">↑</button>
             <button type="button" data-action="down" title="下移（降低优先级）">↓</button>
@@ -2302,6 +2326,31 @@ function saveRulesJson(rules, label) {
     showToast(`已导出 ${String(rules.length)} 条${label}到 ${result.path}`, 'success');
     return true;
 }
+/**
+ * 复制规则 JSON 到剪贴板
+ *
+ * 与导出文件同一 payload 结构（可直接粘回「粘贴规则」/ 导入），
+ * 适合「快速备份到笔记 / 发给别人」而不用先选保存位置。
+ */
+async function copyRulesJson(rules, label) {
+    if (rules.length === 0) {
+        showToast('没有可复制的规则', 'warn');
+        return;
+    }
+    const payload = {
+        format: 'bgm-conditional-format-rules',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        rules,
+    };
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+        showToast(`已复制 ${String(rules.length)} 条${label}到剪贴板`, 'success');
+    }
+    catch {
+        showToast('复制到剪贴板失败，请改用「导出到文件」', 'error');
+    }
+}
 /** 导出整个规则库（备份 / 迁移 / 分享） */
 function exportRules() {
     if (state.rules.length === 0) {
@@ -2333,28 +2382,8 @@ export function initializeConditionalFormatPage() {
         state.searchQuery = event.target.value;
         renderRuleList();
     });
-    // 目标工作簿（第一级）：切换后二级菜单只留该簿下的表；
-    // 原选中表若属于新簿则保持，否则选中该簿第一张
-    selectById('conditionalFormatWorkbook')?.addEventListener('change', (event) => {
-        const workbook = event.target.value;
-        const inWorkbook = state.sheets.filter((entry) => entry.workbook === workbook);
-        const isStillValid = inWorkbook.some((entry) => entry.key === state.selectedKey);
-        if (!isStillValid) {
-            state.selectedKey = inWorkbook[0]?.key ?? '';
-            setConfig(KEY_SHEET, state.selectedKey);
-        }
-        // 用户主动切了簿：退出「原表已不存在」状态（否则提示条会赖着不走）
-        state.selectionMissing = '';
-        renderSheetSelect();
-        loadExistingRules();
-    });
-    // 工作表选择（第二级）
-    selectById('conditionalFormatSheet')?.addEventListener('change', (event) => {
-        state.selectedKey = event.target.value;
-        state.selectionMissing = '';
-        setConfig(KEY_SHEET, state.selectedKey);
-        loadExistingRules();
-    });
+    // 目标工作簿 / 工作表：选择器（option-picker）内部通过 onChange 调
+    // onWorkbookChange / onSheetChange，不再需要在这里绑 <select> 的 change
     byId('conditionalFormatReloadSheetsBtn')?.addEventListener('click', () => {
         reloadSheets();
     });
@@ -2381,8 +2410,8 @@ export function initializeConditionalFormatPage() {
         state.selectedKey = key;
         state.selectionMissing = '';
         setConfig(KEY_SHEET, key);
-        renderWorkbookSelect();
-        renderSheetSelect();
+        renderWorkbookPicker();
+        renderSheetPicker();
         loadExistingRules();
         return true;
     });
@@ -2411,8 +2440,29 @@ export function initializeConditionalFormatPage() {
     byId('conditionalFormatImportBtn')?.addEventListener('click', () => {
         importForeign();
     });
-    byId('conditionalFormatExportBtn')?.addEventListener('click', () => {
-        exportRules();
+    byId('conditionalFormatExportBtn')?.addEventListener('click', (event) => {
+        // 「导出规则」= 下拉：导出到文件 / 复制到剪贴板（后者不用先选保存位置）
+        const button = event.currentTarget;
+        const rect = button.getBoundingClientRect();
+        showContextMenu({
+            items: [
+                {
+                    id: 'export-file',
+                    label: '📄 导出到文件',
+                    onSelect: () => {
+                        exportRules();
+                    },
+                },
+                {
+                    id: 'export-clipboard',
+                    label: '📋 复制到剪贴板',
+                    onSelect: () => copyRulesJson(state.rules, '规则库'),
+                },
+            ],
+            x: rect.left,
+            y: rect.bottom + 4,
+            anchor: button,
+        });
     });
     // 全选 / 取消全部：作用于当前**搜索后的可见集**（与既有规则表格的
     // 全选同口径——跨搜索全选再一键删，搜不到想撤回来的项最危险）。
@@ -2679,8 +2729,8 @@ function populateFromHost() {
         bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 首屏宿主读取失败：${message}`);
         showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error');
         // 下拉渲染成明确的空态（有刷新按钮可点），不是静默的空下拉
-        renderWorkbookSelect();
-        renderSheetSelect();
+        renderWorkbookPicker();
+        renderSheetPicker();
     }
 }
 // ===== 「既有规则」拖出为浮动「规则管理器」窗口 =====

@@ -181,6 +181,7 @@ describe('configService', () => {
         repo: 'imp-repo',
         branch: 'dev',
         path: 'sync.jsonl',
+        sourceType: 'github',
       })
       expect(setSyncStrategy).toHaveBeenCalledWith('force-overwrite')
     })
@@ -363,6 +364,7 @@ describe('configService', () => {
         repo: 'test-repo',
         branch: 'main',
         path: 'data.jsonl',
+        sourceType: 'github',
       })
       expect(setSyncStrategy).toHaveBeenCalledWith('add-update')
     })

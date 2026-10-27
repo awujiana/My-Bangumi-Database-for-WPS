@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/option-picker.css" />
     <link rel="stylesheet" href="../css/conditional-format.css" />
     <link rel="stylesheet" href="../css/sortable-list.css" />
   </head>
@@ -76,16 +77,8 @@
             先选目标工作簿，再在二级菜单里选该工作簿下的工作表。
           </p>
           <div class="conditional-format-sheet-row">
-            <select
-              id="conditionalFormatWorkbook"
-              class="conditional-format-select"
-              aria-label="目标工作簿"
-            ></select>
-            <select
-              id="conditionalFormatSheet"
-              class="conditional-format-select"
-              aria-label="目标工作表"
-            ></select>
+            <div id="conditionalFormatWorkbookPicker" class="conditional-format-picker"></div>
+            <div id="conditionalFormatSheetPicker" class="conditional-format-picker"></div>
             <label class="conditional-format-lock-row">
               <input type="checkbox" id="conditionalFormatSheetLock" />
               <span>锁定目标工作表（原表失效时不自动改选别的表）</span>
@@ -94,6 +87,7 @@
               🔄 刷新列表
             </button>
           </div>
+          <p id="conditionalFormatSheetNotice" class="hint" hidden></p>
         </section>
 
         <!--
@@ -229,7 +223,13 @@
             </button>
             <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
             <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
-            <button class="bgm-btn small" id="conditionalFormatExportBtn">📤 导出规则</button>
+            <button
+              class="bgm-btn small"
+              id="conditionalFormatExportBtn"
+              title="导出规则：导出到文件 / 复制到剪贴板"
+            >
+              📤 导出规则 ▾
+            </button>
             <button
               class="bgm-btn small"
               id="conditionalFormatPickAllBtn"
