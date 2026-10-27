@@ -4,9 +4,10 @@
  * @description 条件格式管理器的宿主交互全部收敛在本模块：
  *   1. {@link isFormatConditionsSupported}——老版本 WPS 不暴露 FormatConditions，
  *      探测失败时页面隐藏该功能并提示，不影响其它页；
- *   2. {@link readForeignRules}——应用前读工作表既有规则快照（供双策略决策与确认框列出）；
- *   3. {@link applyConditionalFormatPlan}——执行 {@link ConditionalFormatApplyPlan}：先清空（Delete）再逐条 Add + With，
- *      最后反序 SetFirstPriority 把 entries[0] 顶到最高优先级。
+ *   2. {@link readForeignRules}——应用前读工作表既有规则快照（供指纹比对与确认框列出）；
+ *   3. {@link applyConditionalFormatPlan}——执行 {@link ConditionalFormatApplyPlan}：
+ *      **默认不清空**，只按计划新增 / 刷新 / 删除「插件自己那一份」；
+ *      仅当 `plan.clearAll` 为真（用户显式选择「清空整表后应用」）才整表重来。
  *
  * 判断逻辑全在纯函数引擎（conditional-format-rules.ts）；本模块只做 IPC，每个宿主调用都
  * try 包裹并按条计数——单条失败不中断整批（与同步写入的「批次失败可见」一致）。
@@ -15,10 +16,24 @@ import type { ConditionalFormatApplyPlan, ForeignRuleSnapshot } from './conditio
 import type { WpsFormatCondition, WpsWorksheet } from '../tools/wps.js';
 /** 应用结果统计（进日志与完成提示） */
 export interface ConditionalFormatApplyResult {
+    /** 新写入的条数 */
     added: number;
+    /** 表上已存在、只刷新了格式的条数 */
+    refreshed: number;
+    /** 移除的「上一轮自己写的、规则库里已删掉」的条数 */
+    deleted: number;
+    /** 写入失败的条数 */
     failed: number;
-    /** 写完后回读到的实际条数（-1 = 宿主不支持回读）；页面据此判「是否真的写进去了」 */
+    /** 写完后回读到的整表条数（-1 = 宿主不支持回读）；页面据此判「是否真的写进去了」 */
     verified: number;
+    /**
+     * 写完后回读「规则库里有、表上却找不到」的规则名
+     *
+     * 这是「规则应用不上去」的唯一可靠判据：`Add` 返回了对象、整表条数也涨了，
+     * 仍可能因为公式非法 / 范围越界 / 宿主丢弃而**这一条**没生效。只报总数会
+     * 把这种局部失败说成「已写入 N 条」，用户去表上找不到却无从定位。
+     */
+    missing: string[];
 }
 /**
  * 探测宿主是否支持条件格式 API
@@ -187,12 +202,20 @@ export declare function readForeignRules(worksheet: WpsWorksheet | null | undefi
 /**
  * 执行应用计划
  *
- * 顺序：清空（Delete，失败则逐条反序删）→ 逐条 `Range(范围).FormatConditions.Add` →
- * With 上格式 → **反序 SetFirstPriority**（每调一次都把该规则顶到最高，
- * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）→
- * **回读整表条数**（写没写进去只能靠它判断，`Add` 返回对象不代表生效）。
+ * ## 顺序与「为什么不再无条件清空」
+ * 旧实现在这里第一件事就是 `clearConditions()`——于是「应用」= 抹掉整表规则
+ * 再重建。用户点一次应用，手工建的数据条 / 图标集 / 色阶规则全没了，且
+ * 第二版「保留手工规则」也只是**清空后原样重建**，同样丢掉 StopIfTrue、
+ * 字体、边框等无法回读的属性。现在的语义：
  *
- * @returns 成功 / 失败条数 + 回读到的实际条数（-1 = 宿主不支持回读）
+ * 1. `plan.clearAll` 为真（用户显式选了「清空整表后应用」）才清空；
+ * 2. 删 `plan.deletions`——**只有上一轮自己写的、规则库里已删掉的**；
+ * 3. 刷新 `plan.refreshes`——表上已有同「范围 + 公式」的规则，只更新颜色；
+ * 4. 逐条 Add `plan.entries` → With 上格式；
+ * 5. 反序 `SetFirstPriority`（每调一次把该规则顶到最高，走完 entries[0] 最高）；
+ * 6. 回读校验：整表条数 + **逐条指纹**（`missing` 指出哪几条没落地）。
+ *
+ * @returns 新增 / 刷新 / 移除 / 失败条数 + 回读条数 + 未落地的规则名
  */
 export declare function applyConditionalFormatPlan(worksheet: WpsWorksheet | null | undefined, plan: ConditionalFormatApplyPlan): ConditionalFormatApplyResult;
 //# sourceMappingURL=conditional-format-apply.d.ts.map

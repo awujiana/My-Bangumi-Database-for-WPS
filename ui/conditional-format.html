@@ -119,8 +119,8 @@
             删除，拖动行调整优先级，右键还有「如果为真则停止」等操作； 每条都能
             <strong>✎ 编辑</strong>（范围 / 公式 / 颜色）和
             <strong>⧉ 复制</strong>成新规则，改完立刻写回工作表。 数据条 / 色阶 /
-            图标集等类型插件无法重建，双策略会按你的选择处理。 <br />点「⛶
-            只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
+            图标集等类型插件无法重建——「应用条件格式」不会碰它们，「清空整表后应用」才会清掉。
+            <br />点「⛶ 只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
             底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。 <br />📌（组标题上）=
             <strong>锚定整列</strong>：把该组规则的应用范围改写成 <code>$J:$J</code>（多列
             <code>$J:$L</code>），公式不变，行增删不再影响；📎 固定单元格 = 钉到单个
@@ -911,12 +911,23 @@
             </button>
           </h3>
           <p class="hint">
-            应用 = 先读目标表现有规则 → 清空重建（幂等，重复点不会叠出重复规则；删行搞乱范围后
-            重点一次即修复）。检测到你手工建的规则时会先弹框列出，让你选「清掉后应用」或「保留手工规则」。
+            应用 =
+            把「我的规则」+「默认规则集」写进目标工作表。<strong>不会清除任何既有规则</strong>：
+            表上已有的同「范围 + 公式」规则只刷新颜色，缺的补上；只有本插件上一轮写过、
+            规则库里已删掉的才会被移除（手工规则 /
+            其它工具的规则一律不动）。重复点不会叠出重复规则；
+            删行搞乱范围后重点一次即修复。真要重来，用下面的「清空整表后应用」。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small primary" id="conditionalFormatApplyBtn">
               🖌️ 应用条件格式
+            </button>
+            <button
+              class="bgm-btn small danger"
+              id="conditionalFormatApplyReplaceBtn"
+              title="先清空目标工作表上的全部条件格式规则（含手工规则），再按规则库重建"
+            >
+              🧹 清空整表后应用
             </button>
           </div>
           <p class="conditional-format-apply-status" id="conditionalFormatApplyStatus"></p>
@@ -966,7 +977,10 @@
       </button>
     </div>
 
-    <!-- ===================== 双策略确认模态框 ===================== -->
+    <!-- ===================== 清空整表确认模态框 =====================
+         只服务「🧹 清空整表后应用」这一个危险操作：常规「应用条件格式」不清除任何
+         既有规则，不弹框。旧实现每次应用都弹这个框且默认焦点在「清掉后应用」上，
+         是用户反馈「点应用把我原来的规则都清了」的直接原因。 -->
     <div
       class="conditional-format-modal-mask"
       id="conditionalFormatConfirmMask"
@@ -979,12 +993,12 @@
         aria-labelledby="conditionalFormatConfirmTitle"
       >
         <h4 id="conditionalFormatConfirmTitle" class="conditional-format-modal-grip">
-          应用条件格式<button
+          清空整表后应用<button
             type="button"
             class="conditional-format-modal-max"
             id="conditionalFormatConfirmMax"
             aria-pressed="false"
-            aria-label="最大化 / 还原「应用条件格式」"
+            aria-label="最大化 / 还原「清空整表后应用」"
             title="最大化 / 还原"
           >
             ⛶
@@ -994,7 +1008,7 @@
             class="conditional-format-modal-collapse"
             id="conditionalFormatConfirmCollapse"
             aria-expanded="true"
-            aria-label="收起 / 展开「应用条件格式」"
+            aria-label="收起 / 展开「清空整表后应用」"
             title="收起 / 展开"
           >
             ▾
@@ -1002,13 +1016,10 @@
         </h4>
         <div class="conditional-format-modal-body" id="conditionalFormatConfirmBody"></div>
         <div class="conditional-format-modal-actions">
-          <button type="button" class="bgm-btn small primary" id="conditionalFormatConfirmClear">
-            清掉后应用
+          <button type="button" class="bgm-btn small danger" id="conditionalFormatConfirmClear">
+            确认清空整表后应用
           </button>
-          <button type="button" class="bgm-btn small" id="conditionalFormatConfirmKeep">
-            保留手工规则
-          </button>
-          <button type="button" class="bgm-btn small" id="conditionalFormatConfirmCancel">
+          <button type="button" class="bgm-btn small primary" id="conditionalFormatConfirmCancel">
             取消
           </button>
         </div>

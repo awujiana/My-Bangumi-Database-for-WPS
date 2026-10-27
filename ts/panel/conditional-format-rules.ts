@@ -6,15 +6,19 @@
  *   PluginStorage 存取校验、搜索分组、双策略应用计划。
  *
  * 设计基石——**store-as-truth**：规则以 JSON 存 PluginStorage 为唯一真相，
- * 工作表上的条件格式只是它的一次「投影」。应用 = 先读工作表快照 → 算计划 →
- * 清空重建（幂等：重复应用不产生重复规则，删除行把范围搞乱后重应用即自愈）。
+ * 工作表上的条件格式只是它的一次「投影」。
  *
- * 双策略（用户裁定两种都要）：
- * - `clear-all`：清空工作表上**全部**规则后按 Store 重建。手工规则被丢弃，
- *   应用前必须弹确认框列出（范围 + 公式）。
- * - `append-after`：保留手工规则——先把读到的公式类快照原样重建（保持原优先序），
- *   再把插件规则置后追加。含数据条 / 图标集 / 单元格值等无法重建的类型时
- *   降级为 clear-all 并在 warnings 里说明（不静默丢数据）。
+ * 双策略：
+ * - `merge`（**默认**）：增量同步，**只动插件自己那一份**。表上同「范围 + 公式」
+ *   的规则视为已存在（只刷新颜色），缺的补上；上一轮自己写过、规则库里已删掉的
+ *   才移除。**手工规则 / 其它工具的规则一律不碰**——这是用户 2026-10-27 明确
+ *   要求的语义（旧实现点一次应用就把整表规则清空，属于数据破坏级缺陷）。
+ * - `replace`：清空工作表上**全部**规则后按 Store 重建。是显式的「重来」操作，
+ *   必须由用户点危险按钮触发，确认框列出将被丢弃的规则。
+ *
+ * 幂等性由「指纹」保证（{@link ruleFingerprint}）：规则内容（范围 + 公式）就是
+ * 身份，重复应用不产生重复规则；删行把范围搞乱后重应用即自愈（旧的定位不到 →
+ * 按规则库范围重加）。
  */
 
 // ===== 规则模型 =====
@@ -64,21 +68,39 @@ export interface ForeignRuleSnapshot {
 }
 
 /** 应用策略 */
-export type ApplyStrategy = 'clear-all' | 'append-after'
+export type ApplyStrategy = 'merge' | 'replace'
 
-/** 计划里的一条待写入项 */
-export type ConditionalFormatApplyEntry =
-  | { source: 'foreign'; range: string; formula: string; interior?: string; fontColor?: string }
-  | { source: 'plugin'; rule: ConditionalFormatRule }
+/**
+ * 计划里的一条待写入项
+ *
+ * 只有「插件规则」一种来源：应用 = 把规则库投影到工作表，既有规则要么保留
+ * （不碰）、要么整体清空（`replace`），**从不原样重建别人的规则**——重建会
+ * 丢掉数据条 / 图标集 / 色阶、StopIfTrue、字体与边框，是伪「保留」。
+ */
+export interface ConditionalFormatApplyEntry {
+  rule: ConditionalFormatRule
+}
 
 /** 应用计划（由 planApply 纯函数算出，COM 层只负责执行） */
 export interface ConditionalFormatApplyPlan {
-  /** 按优先级排序的写入项（靠前 = 优先） */
+  /** 需要**新增**的写入项（按优先级排序，靠前 = 优先） */
   entries: ConditionalFormatApplyEntry[]
-  /** 将被丢弃的手工规则（供确认弹窗列出） */
+  /** 表上已存在同「范围 + 公式」的规则 → 只需刷新格式，不重复 Add */
+  refreshes: ConditionalFormatRule[]
+  /** 上一轮由插件写入、但规则库里已不存在的旧规则（按内容定位后删除） */
+  deletions: AppliedRuleRecord[]
+  /** true = 先清空整表再写（`replace` 策略）；false = 绝不碰别人的规则 */
+  clearAll: boolean
+  /** 将被丢弃的既有规则（仅 `replace` 有值，供确认弹窗列出） */
   discarded: ForeignRuleSnapshot[]
   /** 需要醒目展示的警告（如「N 条规则类型不支持保留」） */
   warnings: string[]
+}
+
+/** 插件写进工作表的一条规则的指纹（范围 + 公式，够定位就够） */
+export interface AppliedRuleRecord {
+  range: string
+  formula: string
 }
 
 // ===== 常量 =====
@@ -86,11 +108,15 @@ export interface ConditionalFormatApplyPlan {
 /** 规则 Store 的 PluginStorage 键 */
 export const CONDITIONAL_FORMAT_STORE_KEY = 'conditionalFormat.rules.v1'
 
-/** 默认应用策略的 PluginStorage 键 */
-export const CONDITIONAL_FORMAT_STRATEGY_KEY = 'conditionalFormat.strategy.v1'
-
-/** 默认策略（无历史选择时）：清掉后应用——插件规则完整生效 */
-export const CONDITIONAL_FORMAT_STRATEGY_FALLBACK: ApplyStrategy = 'clear-all'
+/**
+ * 「插件自己写入过哪些规则」的 PluginStorage 键（按工作表名分桶）
+ *
+ * 这是「应用不清除别人的规则」的前提：只有知道上一轮自己写了什么，才能
+ * 在规则库里删掉某条之后**只移除自己那条**，而不是把整表清空重来。
+ * 旧实现没有这份账本，只能靠 `clearConditions()` 一把清掉——正是用户
+ * 反馈「点应用把我原来的规则都清了」的根因。
+ */
+export const APPLIED_RULES_STORE_KEY = 'conditionalFormat.applied.v1'
 
 /** 默认分组名 */
 export const CONDITIONAL_FORMAT_GROUP_HIGHLIGHT = '番剧高亮'
@@ -891,48 +917,154 @@ export function foreignSnapshotToRule(
 
 // ===== 应用计划 =====
 
+/** 归一化公式做身份比对：去前导 `=`、压掉全部空白（`= $R3=""` 与 `$R3=""` 同一条） */
+function normalizeFormulaKey(formula: string): string {
+  return formula.replace(/\s+/gu, '').replace(/^=/u, '')
+}
+
+/** 归一化范围做身份比对：压空白、去 `$`、大写（`b2:b9` 与 `$B$2:$B$9` 同一条） */
+function normalizeRangeKey(range: string): string {
+  return range.replace(/\s+/gu, '').replace(/\$/gu, '').toUpperCase()
+}
+
+/**
+ * 规则指纹：**范围 + 公式**的归一化拼接
+ *
+ * 用作「表上这条规则是不是我要的那条」的判据。不用 1 基序号——序号会随规则
+ * 增删整体漂移；也不用颜色——颜色是可改的表现层属性，改个色不该被当成新规则。
+ * `\u{0}` 分隔防串键（公式里可以合法出现空格）。
+ */
+export function ruleFingerprint(record: { range: string; formula: string }): string {
+  return `${normalizeRangeKey(record.range)}\u{0}${normalizeFormulaKey(record.formula)}`
+}
+
+/** 插件规则（规则库条目）的指纹 */
+export function ruleFingerprintOfRule(rule: ConditionalFormatRule): string {
+  return ruleFingerprint({ range: rule.appliesTo, formula: rule.formula })
+}
+
+/**
+ * 只按公式的身份键（**降级判据**，不能当主判据）
+ *
+ * 个别 WPS 版本的 `FormatCondition.AppliesTo` 读不到（项目里已有诊断日志记录过），
+ * 此时快照的 `range` 恒为空串 —— 拿完整指纹比对会「一条都对不上」，后果是
+ * 每点一次应用就把同样的规则再 Add 一遍（规则越点越多）。故这类宿主上退化为
+ * 只比公式。同公式不同范围的规则会被当成同一条，这是**已知且可接受的降级**
+ * （宁可少加一条，也不要无限堆重复规则）。
+ */
+export function ruleFormulaKey(formula: string): string {
+  return ruleFingerprint({ range: '', formula })
+}
+
+function isAppliedRuleRecord(value: unknown): value is AppliedRuleRecord {
+  if (value === null || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return typeof record.range === 'string' && typeof record.formula === 'string'
+}
+
+/** 反序列化「插件写过的规则」账本（坏桶当空，不逐条救——账本坏了重记即可） */
+export function parseAppliedRules(text: string): Record<string, AppliedRuleRecord[]> {
+  if (!text) return {}
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const buckets: Record<string, AppliedRuleRecord[]> = {}
+    // 先 filter 再 for：no-continue 禁 continue、unicorn/prefer-continue 又禁
+    // 把循环体整个包在 if 里，两条规则互斥，filter 是同时满足两者的写法
+    const bucketsInData = Object.entries(parsed).filter((pair): pair is [string, unknown[]] =>
+      Array.isArray(pair[1]),
+    )
+    for (const [sheet, value] of bucketsInData) {
+      const records = value.filter(isAppliedRuleRecord)
+      if (records.length > 0) buckets[sheet] = records
+    }
+    return buckets
+  } catch {
+    return {}
+  }
+}
+
+/** 序列化「插件写过的规则」账本 */
+export function serializeAppliedRules(
+  buckets: Readonly<Record<string, readonly AppliedRuleRecord[]>>,
+): string {
+  return JSON.stringify(buckets)
+}
+
 /**
  * 算应用计划（纯函数：给 Store 规则 + 工作表快照 + 策略 → 执行清单）
  *
- * - clear-all：丢弃全部手工规则（进 discarded 供确认框列出），只写插件规则；
- * - append-after：公式类手工规则原样重建在前（保原优先序），插件规则置后；
- *   快照里含无法重建的类型（数据条/图标集/单元格值）时**降级 clear-all**，
- *   warnings 说明——不静默丢数据。
+ * - `merge`（默认）：**只动插件自己那一份**。
+ *   - 表上已有同指纹 → 进 `refreshes`（刷新颜色，不重复 Add）；
+ *   - 表上没有 → 进 `entries`（新增）；
+ *   - `previousApplied`（上一轮自己写的账本）里有、但本轮规则库里已经没有的 →
+ *     进 `deletions`（只删这些）。
+ *   手工规则 / 其它工具建的规则**一条都不进 `deletions`**——这是硬约束。
+ * - `replace`：`clearAll = true`，全部既有规则进 `discarded` 供确认框列出，
+ *   entries 只有插件规则。
+ *
+ * @param previousApplied 上一轮插件写入的账本（缺省空 = 首次应用，没有要清理的旧规则）
  */
 export function planApply(
   rules: readonly ConditionalFormatRule[],
   foreign: readonly ForeignRuleSnapshot[],
   strategy: ApplyStrategy,
+  previousApplied: readonly AppliedRuleRecord[] = [],
 ): ConditionalFormatApplyPlan {
   const visible = rules.filter((rule) => rule.hidden !== true)
-  const pluginEntries: ConditionalFormatApplyEntry[] = visible.map((rule) => ({
-    source: 'plugin',
-    rule,
-  }))
   const warnings: string[] = []
 
-  if (strategy === 'append-after' && foreign.every((f) => f.kind === 'expression')) {
-    const foreignEntries: ConditionalFormatApplyEntry[] = foreign.map((f) => ({
-      source: 'foreign',
-      range: f.range,
-      formula: f.formula,
-      ...(f.interior !== undefined && { interior: f.interior }),
-      ...(f.fontColor !== undefined && { fontColor: f.fontColor }),
-    }))
-    return { entries: [...foreignEntries, ...pluginEntries], discarded: [], warnings }
+  if (strategy === 'replace') {
+    if (foreign.length > 0) {
+      warnings.push(
+        `将清空工作表上全部 ${String(foreign.length)} 条规则（含手工规则），范围与公式已在确认框列出`,
+      )
+    }
+    return {
+      entries: visible.map((rule) => ({ rule })),
+      refreshes: [],
+      deletions: [],
+      clearAll: true,
+      discarded: [...foreign],
+      warnings,
+    }
   }
 
-  if (strategy === 'append-after' && foreign.length > 0) {
-    const unsupported = foreign.filter((f) => f.kind !== 'expression').length
+  const existingKeys = new Set(foreign.map((snapshot) => ruleFingerprint(snapshot)))
+  // 宿主读不到 AppliesTo 时快照 range 恒为空 → 这些规则只能用公式认（见 ruleFormulaKey）
+  const existingFormulaKeys = new Set(
+    foreign
+      .filter((snapshot) => snapshot.range === '')
+      .map((snapshot) => ruleFormulaKey(snapshot.formula)),
+  )
+  const entries: ConditionalFormatApplyEntry[] = []
+  const refreshes: ConditionalFormatRule[] = []
+  const wantedKeys = new Set<string>()
+  for (const rule of visible) {
+    const key = ruleFingerprintOfRule(rule)
+    wantedKeys.add(key)
+    const isOnSheet = existingKeys.has(key) || existingFormulaKeys.has(ruleFormulaKey(rule.formula))
+    if (isOnSheet) refreshes.push(rule)
+    else entries.push({ rule })
+  }
+
+  // 只清自己那份：账本里有、规则库里已经没有的
+  const deletions = previousApplied.filter((record) => !wantedKeys.has(ruleFingerprint(record)))
+  if (deletions.length > 0) {
     warnings.push(
-      `有 ${String(unsupported)} 条手工规则的类型不支持保留（数据条 / 图标集 / 单元格值规则），` +
-        '本次按清空处理，已在确认框列出',
+      `将移除上一轮由本插件写入、规则库里已不存在的 ${String(deletions.length)} 条旧规则` +
+        '（工作表上的其它规则不动）',
     )
-  } else if (foreign.length > 0) {
-    warnings.push(`将清空 ${String(foreign.length)} 条手工规则，范围与公式已在确认框列出`)
   }
 
-  return { entries: pluginEntries, discarded: [...foreign], warnings }
+  return {
+    entries,
+    refreshes,
+    deletions,
+    clearAll: false,
+    discarded: [],
+    warnings,
+  }
 }
 
 /**

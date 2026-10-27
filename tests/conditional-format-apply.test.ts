@@ -28,6 +28,10 @@ import {
   moveForeignRule,
   updateForeignRule,
 } from '../ts/panel/conditional-format-apply.js'
+import type {
+  ConditionalFormatApplyEntry,
+  ConditionalFormatApplyPlan,
+} from '../ts/panel/conditional-format-rules.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 
 /** 假规则：Priority 可读写，带两个「置顶/置底」间谍（断言它们永不被调） */
@@ -458,39 +462,169 @@ describe('duplicateForeignRule：复制成新规则', () => {
   })
 })
 
+/**
+ * 可清空工作表：集合带 `Delete()`（模拟真实 `FormatConditions.Delete` 清空整表）
+ *
+ * 与 {@link makeAddableWorksheet} 的区别就在这个 `Delete`：只有它能证明
+ * 「merge 路径**没有**调清空」——假集合若没有 `Delete`，`clearConditions` 会走
+ * 逐条删除的兜底分支，而假条目也没有 `Delete`，于是「清空了」和「没清空」
+ * 在断言上长得一模一样（反向验证时真的骗过了用例，故补这个假体）。
+ */
+function makeClearableWorksheet(initial: unknown[]): {
+  worksheet: WpsWorksheet
+  rules: unknown[]
+  clearAll: ReturnType<typeof vi.fn>
+} {
+  const rules = [...initial]
+  const clearAll = vi.fn(() => {
+    rules.length = 0
+  })
+  const add = (condition: { Formula1?: string }): Record<string, unknown> => {
+    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    rules.push(created)
+    return created
+  }
+  const worksheet = {
+    FormatConditions: {
+      get Count(): number {
+        return rules.length
+      },
+      Item: (index: number) => rules[index - 1],
+      Add: add,
+      Delete: clearAll,
+    },
+    Range: () => ({ FormatConditions: { Add: add } }),
+  } as unknown as WpsWorksheet
+  return { worksheet, rules, clearAll }
+}
+
+/** 造一个最小可用的 plugin 计划项 */
+function pluginEntry(
+  id: string,
+  appliesTo = 'B3:B100',
+  formula = '=$R3=""',
+): ConditionalFormatApplyEntry {
+  return { rule: { id, name: id, group: '高亮', appliesTo, formula, interior: '#00B050' } }
+}
+
+/** 空计划（各用例只覆盖自己关心的字段） */
+function planOf(overrides: Partial<ConditionalFormatApplyPlan>): ConditionalFormatApplyPlan {
+  return {
+    entries: [],
+    refreshes: [],
+    deletions: [],
+    clearAll: false,
+    discarded: [],
+    warnings: [],
+    ...overrides,
+  }
+}
+
 describe('applyConditionalFormatPlan：应用链路', () => {
   it('只有 Sheet 级集合也能写入，并回读实际条数', () => {
     const { worksheet, rules } = makeSheetLevelWorksheet()
-    const result = applyConditionalFormatPlan(worksheet, {
-      entries: [
-        {
-          source: 'plugin',
-          rule: {
-            id: 'r1',
-            name: '测试',
-            group: '高亮',
-            appliesTo: 'B3:B100',
-            formula: '=$R3=""',
-            interior: '#00B050',
-          },
-        },
-      ],
-      discarded: [],
-      warnings: [],
-    })
+    const result = applyConditionalFormatPlan(worksheet, planOf({ entries: [pluginEntry('r1')] }))
 
     expect(result.added).toBe(1)
     expect(result.failed).toBe(0)
     expect(result.verified).toBe(1)
+    expect(result.missing).toEqual([])
     expect(rules).toHaveLength(1)
   })
 
-  it('宿主不支持 Add → added 0、verified -1（页面据此报「写不进去」而不是「已写入 0 条」）', () => {
-    const result = applyConditionalFormatPlan({} as unknown as WpsWorksheet, {
-      entries: [],
-      discarded: [],
-      warnings: [],
-    })
-    expect(result).toEqual({ added: 0, failed: 0, verified: -1 })
+  it('宿主不支持 Add → added 0、verified -1、全部记为 missing', () => {
+    const result = applyConditionalFormatPlan(
+      {} as unknown as WpsWorksheet,
+      planOf({ entries: [pluginEntry('r1')] }),
+    )
+    expect(result).toMatchObject({ added: 0, failed: 1, verified: -1, missing: ['r1'] })
+  })
+
+  it('**merge 不清除既有规则**：表上已有 3 条别人的规则，应用后仍是 3 + 1 条', () => {
+    const others = [
+      { Formula1: '=$A1=1', AppliesTo: { Address: 'A1:A9' } },
+      { Formula1: '=$B1=1', AppliesTo: { Address: 'B1:B9' } },
+      { Formula1: '=$C1=1', AppliesTo: { Address: 'C1:C9' } },
+    ]
+    const { worksheet, rules, clearAll } = makeClearableWorksheet(others)
+    const result = applyConditionalFormatPlan(worksheet, planOf({ entries: [pluginEntry('r1')] }))
+    expect(result.added).toBe(1)
+    expect(result.deleted).toBe(0)
+    // 关键：清空接口一次都没被调（旧实现第一步就无条件调它）
+    expect(clearAll).not.toHaveBeenCalled()
+    expect(rules).toHaveLength(4)
+    // 别人的三条原样还在
+    expect(rules.slice(0, 3)).toEqual(others)
+  })
+
+  it('表上已有同「范围 + 公式」→ 只刷新格式，不重复 Add', () => {
+    const withSpy = vi.fn()
+    const existing = { Formula1: '$R3=""', AppliesTo: { Address: 'B3:B100' }, With: withSpy }
+    const { worksheet, rules } = makeAddableWorksheet([existing])
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({
+        refreshes: [
+          {
+            id: 'r1',
+            name: 'r1',
+            group: 'G',
+            appliesTo: 'B3:B100',
+            formula: '=$R3=""',
+            interior: '#123456',
+          },
+        ],
+      }),
+    )
+    expect(result.added).toBe(0)
+    expect(result.refreshed).toBe(1)
+    expect(rules).toHaveLength(1)
+    expect(withSpy).toHaveBeenCalledWith({ Interior: { Color: '#123456' } })
+  })
+
+  it('deletions 只删账本里指定指纹的那一条，别的规则原样保留', () => {
+    const keep = { Formula1: '=$A1=1', AppliesTo: { Address: 'A1:A9' } }
+    const drop = { Formula1: '=$R3=9', AppliesTo: { Address: 'C3:C100' }, Delete: vi.fn() }
+    const { worksheet } = makeAddableWorksheet([keep, drop])
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({ deletions: [{ range: 'C3:C100', formula: '=$R3=9' }] }),
+    )
+    expect(result.deleted).toBe(1)
+    expect(drop.Delete).toHaveBeenCalledTimes(1)
+  })
+
+  it('clearAll = true 时才清空整表', () => {
+    const { worksheet, rules, clearAll } = makeClearableWorksheet([
+      { Formula1: '=$A1=1', AppliesTo: { Address: 'A1:A9' } },
+    ])
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({ entries: [pluginEntry('r1')], clearAll: true }),
+    )
+    expect(result.added).toBe(1)
+    expect(result.deleted).toBe(0)
+    expect(clearAll).toHaveBeenCalledTimes(1)
+    // 清空后只剩新加的那一条
+    expect(rules).toHaveLength(1)
+  })
+
+  it('写进去但回读不到 → missing 指出具体规则名（「规则应用不上去」的判据）', () => {
+    const { worksheet } = makeAddableWorksheet([], { swallowAdd: true })
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({ entries: [pluginEntry('当前季高亮')] }),
+    )
+    expect(result.added).toBe(1)
+    expect(result.verified).toBe(0)
+    expect(result.missing).toEqual(['当前季高亮'])
+  })
+
+  it('空计划不炸、不清空', () => {
+    const other = { Formula1: '=$A1=1', AppliesTo: { Address: 'A1:A9' } }
+    const { worksheet, rules } = makeAddableWorksheet([other])
+    const result = applyConditionalFormatPlan(worksheet, planOf({}))
+    expect(result).toMatchObject({ added: 0, refreshed: 0, deleted: 0, failed: 0, verified: 1 })
+    expect(rules).toHaveLength(1)
   })
 })

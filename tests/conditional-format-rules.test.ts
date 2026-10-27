@@ -5,8 +5,8 @@
  * 守住的东西：
  * 1. 默认规则集的形状与顺序（当前季最优先 → 错误标红 → 四季分色）
  * 2. 自维护季节公式（TODAY 驱动、12 月跨年、两位年）——不用插件重跑就随季度演化
- * 3. 双策略应用计划：append-after 保留公式类手工规则前置；含不可重建类型时
- *    **降级清空并在 warnings 说明**（不静默丢数据）
+ * 3. 应用计划：`merge`（默认）**只动插件自己那一份**——既有规则一条都不进
+ *    deletions；`replace` 才 clearAll 并在 warnings 说明。手工规则永不被静默丢弃
  * 4. Store 存取：坏行跳过不致命；隐藏规则不进应用计划
  * 5. 公式行号平移不误伤字符串字面量（"26年10月" / TEXT "00"）
  * 6. 既有规则分组的维护：重命名按**组名**整组换、解散只清映射不动规则，
@@ -46,6 +46,9 @@ import {
   toAbsoluteCell,
   toFullColumnRange,
   planApply,
+  parseAppliedRules,
+  ruleFingerprint,
+  serializeAppliedRules,
   serializeRules,
   shiftFormulaRows,
 } from '../ts/panel/conditional-format-rules.js'
@@ -318,9 +321,9 @@ describe('groupRules', () => {
   })
 })
 
-// ========== 应用计划（双策略）==========
+// ========== 应用计划（merge 增量 / replace 整表重来）==========
 
-describe('planApply：双策略', () => {
+describe('planApply：merge 只动自己那份', () => {
   const pluginRules: ConditionalFormatRule[] = [
     {
       id: 'p1',
@@ -359,68 +362,135 @@ describe('planApply：双策略', () => {
     },
   ]
 
-  it('clear-all 无手工规则：只写可见插件规则，无警告', () => {
-    const plan = planApply(pluginRules, [], 'clear-all')
-    expect(
-      plan.entries.map((entry) => (entry.source === 'plugin' ? entry.rule.id : 'foreign')),
-    ).toEqual(['p1', 'p3'])
+  it('空表：全部进 entries（新增），无刷新 / 无删除 / 不警告', () => {
+    const plan = planApply(pluginRules, [], 'merge')
+    expect(plan.entries.map((entry) => entry.rule.id)).toEqual(['p1', 'p3'])
+    expect(plan.refreshes).toEqual([])
+    expect(plan.deletions).toEqual([])
+    expect(plan.clearAll).toBe(false)
     expect(plan.discarded).toEqual([])
     expect(plan.warnings).toEqual([])
   })
 
-  it('clear-all 有手工规则：进 discarded 供确认框列出 + 警告报数', () => {
-    const plan = planApply(pluginRules, foreign, 'clear-all')
-    expect(plan.discarded).toEqual(foreign)
-    expect(plan.warnings).toHaveLength(1)
-    expect(plan.warnings[0]).toContain('1 条手工规则')
+  it('有手工规则：**一条都不进 deletions**，也不进 discarded（不清除别人的规则）', () => {
+    const plan = planApply(pluginRules, foreign, 'merge')
+    expect(plan.deletions).toEqual([])
+    expect(plan.discarded).toEqual([])
     expect(plan.entries).toHaveLength(2)
-  })
-
-  it('append-after 公式类手工规则：原样重建在前（保原优先序），插件置后', () => {
-    const plan = planApply(pluginRules, foreign, 'append-after')
-    expect(plan.discarded).toEqual([])
     expect(plan.warnings).toEqual([])
-    expect(plan.entries).toHaveLength(3)
-    expect(plan.entries[0]).toEqual({
-      source: 'foreign',
-      range: 'B3:B100',
-      formula: '=$R3>5',
-      interior: '#123456',
-      fontColor: '#ABCDEF',
-    })
-    expect(plan.entries[1]).toMatchObject({ source: 'plugin' })
-    expect(plan.entries[2]).toMatchObject({ source: 'plugin' })
   })
 
-  it('append-after 含不可重建类型：降级清空，全部进 discarded + 警告说明', () => {
-    const mixed: ForeignRuleSnapshot[] = [
+  it('表上已有同「范围 + 公式」的规则 → 进 refreshes，不重复 Add', () => {
+    const same: ForeignRuleSnapshot[] = [{ range: 'B3:B100', formula: '$R3=1', kind: 'expression' }]
+    const plan = planApply(pluginRules, same, 'merge')
+    expect(plan.refreshes.map((rule) => rule.id)).toEqual(['p1'])
+    expect(plan.entries.map((entry) => entry.rule.id)).toEqual(['p3'])
+  })
+
+  it('指纹归一化：$B$3:$B$100 / 小写 / 带 = 与空格 都视为同一条', () => {
+    const same: ForeignRuleSnapshot[] = [
+      { range: '$B$3:$B$100', formula: ' = $R3 = 1 ', kind: 'expression' },
+    ]
+    const plan = planApply(pluginRules, same, 'merge')
+    expect(plan.refreshes.map((rule) => rule.id)).toEqual(['p1'])
+    expect(plan.entries.map((entry) => entry.rule.id)).toEqual(['p3'])
+  })
+
+  it('账本里有、规则库里已删掉的 → 进 deletions 并警告；仍在库里的不动', () => {
+    const previous = [
+      { range: 'C3:C100', formula: '=$R3=9' },
+      { range: 'B3:B100', formula: '=$R3=1' },
+    ]
+    const plan = planApply(pluginRules, [], 'merge', previous)
+    expect(plan.deletions).toEqual([{ range: 'C3:C100', formula: '=$R3=9' }])
+    expect(plan.warnings[0]).toContain('1 条旧规则')
+    expect(plan.warnings[0]).toContain('其它规则不动')
+  })
+
+  it('隐藏规则不进 entries 也不进 refreshes', () => {
+    const plan = planApply(pluginRules, [], 'merge')
+    expect(plan.entries.some((entry) => entry.rule.id === 'p2')).toBe(false)
+    expect(plan.refreshes.some((rule) => rule.id === 'p2')).toBe(false)
+  })
+
+  it('幂等：重复应用同一份规则，第二次全是 refreshes、零新增', () => {
+    const onSheet: ForeignRuleSnapshot[] = [
+      { range: 'B3:B100', formula: '=$R3=1', kind: 'expression' },
+      { range: 'B3:B100', formula: '=$R3=3', kind: 'expression' },
+    ]
+    const plan = planApply(pluginRules, onSheet, 'merge')
+    expect(plan.entries).toEqual([])
+    expect(plan.refreshes.map((rule) => rule.id)).toEqual(['p1', 'p3'])
+    expect(plan.deletions).toEqual([])
+  })
+})
+
+describe('planApply：replace 整表重来', () => {
+  const pluginRules: ConditionalFormatRule[] = [
+    {
+      id: 'p1',
+      name: '当前季高亮',
+      group: '番剧高亮',
+      appliesTo: 'B3:B100',
+      formula: '=$R3=1',
+      interior: '#00B050',
+    },
+  ]
+
+  it('clearAll = true，既有规则全部进 discarded 供确认框列出 + 警告报数', () => {
+    const foreign: ForeignRuleSnapshot[] = [
       { range: 'B3:B100', formula: '=$R3>5', kind: 'expression' },
       { range: 'C3:C100', formula: '', kind: 'other' },
     ]
-    const plan = planApply(pluginRules, mixed, 'append-after')
-    expect(plan.discarded).toHaveLength(2)
-    expect(plan.entries.every((entry) => entry.source === 'plugin')).toBe(true)
-    expect(plan.warnings[0]).toContain('1 条手工规则的类型不支持保留')
+    const plan = planApply(pluginRules, foreign, 'replace')
+    expect(plan.clearAll).toBe(true)
+    expect(plan.discarded).toEqual(foreign)
+    expect(plan.warnings[0]).toContain('2 条规则')
+    expect(plan.entries.map((entry) => entry.rule.id)).toEqual(['p1'])
   })
 
-  it('隐藏规则两种策略都不进应用计划', () => {
-    for (const strategy of ['clear-all', 'append-after'] as const) {
-      const plan = planApply(pluginRules, [], strategy)
-      expect(
-        plan.entries.some((entry) => entry.source === 'plugin' && entry.rule.id === 'p2'),
-      ).toBe(false)
-    }
+  it('空表：clearAll 仍为 true，但不产生警告', () => {
+    const plan = planApply(pluginRules, [], 'replace')
+    expect(plan.clearAll).toBe(true)
+    expect(plan.discarded).toEqual([])
+    expect(plan.warnings).toEqual([])
+  })
+})
+
+describe('ruleFingerprint：规则身份', () => {
+  it('忽略 $ / 大小写 / 空白 / 前导 =', () => {
+    expect(ruleFingerprint({ range: '$b$2:$B$9', formula: ' = $R2 = "" ' })).toBe(
+      ruleFingerprint({ range: 'B2:B9', formula: '$R2=""' }),
+    )
   })
 
-  it('多条外来规则按读取顺序重建（priority = 数组序）', () => {
-    const many: ForeignRuleSnapshot[] = [
-      { range: 'B3:B100', formula: '=1', kind: 'expression' },
-      { range: 'C3:C100', formula: '=2', kind: 'expression' },
-    ]
-    const plan = planApply(pluginRules, many, 'append-after')
+  it('范围或公式不同 → 不同指纹', () => {
+    expect(ruleFingerprint({ range: 'B2:B9', formula: '=$R2=1' })).not.toBe(
+      ruleFingerprint({ range: 'C2:C9', formula: '=$R2=1' }),
+    )
+    expect(ruleFingerprint({ range: 'B2:B9', formula: '=$R2=1' })).not.toBe(
+      ruleFingerprint({ range: 'B2:B9', formula: '=$R2=2' }),
+    )
+  })
+})
+
+describe('「插件写过的规则」账本存取', () => {
+  it('往返一致', () => {
+    const buckets = { Sheet1: [{ range: 'B3:B100', formula: '=$R3=1' }] }
+    expect(parseAppliedRules(serializeAppliedRules(buckets))).toEqual(buckets)
+  })
+
+  it('坏 JSON / 非对象 / 数组 → 空账本', () => {
+    expect(parseAppliedRules('{oops')).toEqual({})
+    expect(parseAppliedRules('[]')).toEqual({})
+    expect(parseAppliedRules('null')).toEqual({})
+    expect(parseAppliedRules('')).toEqual({})
+  })
+
+  it('非法条目被过滤；整桶非法则不留空壳', () => {
     expect(
-      plan.entries.slice(0, 2).map((entry) => (entry.source === 'foreign' ? entry.formula : '')),
-    ).toEqual(['=1', '=2'])
+      parseAppliedRules('{"S1":[{"range":"A1:A2","formula":"=1"},{"range":1}],"S2":[{"x":1}]}'),
+    ).toEqual({ S1: [{ range: 'A1:A2', formula: '=1' }] })
   })
 })
 

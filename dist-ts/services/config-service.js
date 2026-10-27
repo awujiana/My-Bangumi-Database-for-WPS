@@ -98,7 +98,9 @@ const EXPORTABLE_PREFERENCE_KEYS = [
     'highlight.includeNonAnime',
     // ---- 条件格式管理页 ----
     'conditionalFormat.rules.v1',
-    'conditionalFormat.strategy.v1',
+    // 「本插件在某张表上写过哪些规则」的账本：丢了不会丢数据，但插件从此分不清
+    // 哪些规则是自己写的，旧规则再也清不掉（只能一直留着）→ 随配置带走
+    'conditionalFormat.applied.v1',
     'conditionalFormat.sheet.v1',
     'conditionalFormat.sheetLock',
     CONFIG_KEYS.CF_CLUSTER_MODE,

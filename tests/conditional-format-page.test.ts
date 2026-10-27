@@ -264,7 +264,14 @@ beforeEach(() => {
   m.setForeignStopIfTrue.mockReturnValue({ ok: true })
   m.setForeignAppliesTo.mockReturnValue({ ok: true })
   m.setForeignFormula.mockReturnValue({ ok: true })
-  m.applyConditionalFormatPlan.mockReturnValue({ added: 0, failed: 0, verified: 0 })
+  m.applyConditionalFormatPlan.mockReturnValue({
+    added: 0,
+    refreshed: 0,
+    deleted: 0,
+    failed: 0,
+    verified: 0,
+    missing: [],
+  })
   m.updateForeignRule.mockReturnValue({ ok: true, changed: ['公式'], warnings: [] })
   m.duplicateForeignRule.mockReturnValue({ ok: true, range: 'B2:B9' })
 })
@@ -1449,5 +1456,132 @@ describe('浮动窗口工具条', () => {
     ]) {
       expect(document.getElementById(id)).not.toBeNull()
     }
+  })
+})
+
+// ========== 应用逻辑：默认不清除既有规则 ==========
+
+/** 取最近一次交给 applyConditionalFormatPlan 的计划 */
+function lastPlan(): {
+  entries: { rule: { id: string } }[]
+  refreshes: { id: string }[]
+  deletions: { range: string; formula: string }[]
+  clearAll: boolean
+  discarded: unknown[]
+} {
+  const call = m.applyConditionalFormatPlan.mock.calls.at(-1)
+  if (call === undefined) throw new Error('applyConditionalFormatPlan 没被调用')
+  return call[1] as ReturnType<typeof lastPlan>
+}
+
+/** 取最近一次写入「插件写过的规则」账本的条目 */
+function lastAppliedRecords(): { range: string; formula: string }[] {
+  const call = m.setConfig.mock.calls
+    .filter(([key]) => key === 'conditionalFormat.applied.v1')
+    .at(-1)
+  if (call === undefined) throw new Error('没写 applied 账本')
+  const buckets = JSON.parse(call[1]) as Record<string, { range: string; formula: string }[]>
+  return buckets.Sheet1 ?? []
+}
+
+describe('应用条件格式：默认增量、不清除既有规则', () => {
+  it('有既有规则时**不弹确认框**，计划 clearAll=false、discarded 为空', async () => {
+    mockWorksheetRules()
+    await openPage()
+    m.applyConditionalFormatPlan.mockClear()
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    // 旧实现在这里会弹出「清掉后应用 / 保留手工规则」，且默认焦点在「清掉」上
+    expect(document.getElementById('conditionalFormatConfirmMask')!.style.display).toBe('none')
+    const plan = lastPlan()
+    expect(plan.clearAll).toBe(false)
+    expect(plan.discarded).toEqual([])
+    expect(plan.deletions).toEqual([])
+    // 表上那两条既有规则与规则库不同指纹 → 规则库三条都进 entries（新增），
+    // 但**既有规则一条都不在 deletions 里**。顺序 = state.rules 的存储序（不是分组视图序）
+    expect(plan.entries.map((entry) => entry.rule.id)).toEqual(['r1', 'r2', 'r3'])
+  })
+
+  it('只删「账本里有、规则库里已没有」的旧规则，手工规则不进 deletions', async () => {
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.getConfig.mockImplementation((key: string) => {
+      if (key === 'conditionalFormat.sheet.v1') return SHEET_ENTRY.key
+      if (key === 'conditionalFormat.rules.v1') return serializeRules(RULES)
+      if (key === 'conditionalFormat.applied.v1') {
+        return JSON.stringify({
+          Sheet1: [
+            { range: 'Z3:Z100', formula: '=$R3=99' },
+            { range: 'B:B', formula: '=1' },
+          ],
+        })
+      }
+      return ''
+    })
+    // 表上有一条用户手工建的规则（不在账本里）
+    m.readForeignRules.mockReturnValue([
+      { range: 'E3:E100', formula: '=$R3=7', kind: 'expression' },
+    ])
+    await openPage()
+    m.applyConditionalFormatPlan.mockClear()
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    const plan = lastPlan()
+    expect(plan.deletions).toEqual([{ range: 'Z3:Z100', formula: '=$R3=99' }])
+    expect(plan.discarded).toEqual([])
+  })
+
+  it('应用后记账：把本轮可见规则的范围 + 公式写进 applied 账本', async () => {
+    mockWorksheetRules()
+    await openPage()
+    m.setConfig.mockClear()
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    expect(lastAppliedRecords()).toEqual([
+      { range: 'B:B', formula: '=1' },
+      { range: 'C:C', formula: '=2' },
+      { range: 'D:D', formula: '=3' },
+    ])
+  })
+
+  it('「清空整表后应用」才弹确认框，确认后 clearAll=true 并列出将被丢弃的规则', async () => {
+    mockWorksheetRules()
+    await openPage()
+    m.applyConditionalFormatPlan.mockClear()
+
+    document.getElementById('conditionalFormatApplyReplaceBtn')!.click()
+    const mask = document.getElementById('conditionalFormatConfirmMask')!
+    expect(mask.style.display).toBe('flex')
+    expect(document.getElementById('conditionalFormatConfirmBody')?.textContent).toContain(
+      '清空目标工作表上的全部 2 条条件格式规则',
+    )
+
+    document.getElementById('conditionalFormatConfirmClear')!.click()
+    const plan = lastPlan()
+    expect(plan.clearAll).toBe(true)
+    expect(plan.discarded).toHaveLength(2)
+    expect(mask.style.display).toBe('none')
+  })
+
+  it('回读有规则没落地 → 明确报出是哪几条（不报「已写入 N 条」）', async () => {
+    mockWorksheetRules()
+    await openPage()
+    m.applyConditionalFormatPlan.mockReturnValue({
+      added: 3,
+      refreshed: 0,
+      deleted: 0,
+      failed: 0,
+      verified: 2,
+      missing: ['当前季', '春季'],
+    })
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('2 条规则没写进工作表：当前季 / 春季'),
+      'error',
+    )
   })
 })

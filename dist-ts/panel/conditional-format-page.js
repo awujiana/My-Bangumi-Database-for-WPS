@@ -2,8 +2,8 @@
  * @fileoverview 条件格式管理页 UI 控制器
  * @module panel/conditionalFormatPage
  * @description 「条件格式管理」独立页：任意工作表可选、规则搜索/分组/隐藏/排序/
- *   复制粘贴/编辑、默认规则集生成、双策略应用（应用前读手工规则快照，弹模态框
- *   列出范围+公式，用户选「清掉后应用」或「保留手工规则」）。
+ *   复制粘贴/编辑、默认规则集生成、应用（默认**增量**：只增改插件自己那份规则，
+ *   不清除表上既有规则；另有显式「清空整表后应用」走确认弹框）。
  *
  * 本页面只做渲染与编排，判断逻辑全在纯函数引擎（conditional-format-rules.ts），宿主交互全在
  * conditional-format-apply.ts——单测覆盖在那一层，页面保持薄。
@@ -13,7 +13,7 @@ import { showToast } from '../ui/dialog.js';
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js';
 import { BGM, bgmLog, copyTextWithResult, findHeaderRow, getApp, getColumnMap, markConditionalFormatPaneLoaded, } from '../tools/util/index.js';
 import { CLUSTER_MODE_LABELS, getClusterMode, getMergeMode, getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
-import { CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STRATEGY_FALLBACK, CONDITIONAL_FORMAT_STORE_KEY, CONDITIONAL_FORMAT_STRATEGY_KEY, EXISTING_GROUPS_STORE_KEY, EXISTING_ANCHORS_STORE_KEY, anchorKeyOf, parseAnchors, planAnchorRepair, serializeAnchors, toAbsoluteCell, toFullColumnRange, toFullRowRange, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, mergeDuplicateRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, parseRulesPayload, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
+import { APPLIED_RULES_STORE_KEY, CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STORE_KEY, EXISTING_GROUPS_STORE_KEY, EXISTING_ANCHORS_STORE_KEY, anchorKeyOf, parseAnchors, parseAppliedRules, planAnchorRepair, serializeAnchors, serializeAppliedRules, toAbsoluteCell, toFullColumnRange, toFullRowRange, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, mergeDuplicateRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, parseRulesPayload, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
 import { FOREIGN_RULE_PAGE_SIZE, buildForeignRuleGroupsHtml, buildForeignRuleHeadHtml, buildForeignRuleRowHtml, filterForeignRuleRows, filterRowsByScope, fcTypeLabel, paginate, selectionSummary, toForeignRuleRows, toggleSelection, } from './conditional-format-table.js';
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js';
 import { bindModalCollapse, bindModalDrag, bringModalIntoView, resetModalPosition, } from '../ui/components/modal-drag.js';
@@ -53,7 +53,6 @@ const state = {
     editingExistingIndex: 0,
     editingBaseline: null,
     searchQuery: '',
-    pendingStrategy: CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
     existing: [],
     existingError: null,
     existingQuery: '',
@@ -888,9 +887,9 @@ function autoClusterExistingGroups() {
  * 合并重复项：把「同公式 + 同列」的多条单行既有规则并成一条
  *
  * 只做两件事：算出合并结果 + 把结果**写进规则库**（store），不直接改工作表。
- * 原因：写工作表要走「应用与修复」那套双策略（清空重建 / 保留手工规则），
- * 在这里另写一份会绕过它的确认与降级逻辑，容易悄悄丢规则。
- * 用户点一次「应用与修复」后，工作表上的重复单行规则就被合并后的规则取代。
+ * 原因：写工作表要走「应用与修复」那条唯一链路（指纹比对 / 增量写入 / 回读校验），
+ * 在这里另写一份会绕过它的去重与校验逻辑，容易悄悄丢规则或叠出重复规则。
+ * 用户点一次「应用条件格式」后，工作表上的重复单行规则就被合并后的规则取代。
  *
  * 口径由设置页「条件格式 → 合并重复项口径」决定（仅连续行 / 强行并成一块）。
  */
@@ -2658,11 +2657,32 @@ function generateDefaults() {
     renderRuleList();
     showToast(`已追加 ${String(defaults.length)} 条默认规则（季列 ${detected.seasonColumn} · 名称列 ${detected.nameColumn}）`, 'success');
 }
-// ===== 应用流程（双策略）=====
-function lastStrategy() {
-    const stored = getConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, '', true);
-    return stored === 'append-after' ? 'append-after' : 'clear-all';
+// ===== 应用流程（merge 增量 / replace 整表重来）=====
+/** 读「插件写过哪些规则」的账本（按工作表名分桶） */
+function readAppliedBuckets() {
+    return parseAppliedRules(getConfig(APPLIED_RULES_STORE_KEY, '', true));
 }
+/**
+ * 记下这一轮写进工作表的规则指纹
+ *
+ * 下一轮靠它区分「自己上一轮写的」与「用户手工建的」——只有前者才允许被移除。
+ * 写入失败也照记：指纹只是「曾经想写这些」，下一轮仍以工作表实际快照为准
+ * （找不到就重加，找到就刷新），记多了不会误删别人的规则。
+ *
+ * @param records 空数组 = 这张表已无插件规则，把桶摘掉（不留空壳）
+ */
+function saveAppliedRecords(sheetName, records) {
+    const buckets = readAppliedBuckets();
+    const next = Object.fromEntries(Object.entries(buckets).filter(([name]) => name !== sheetName));
+    if (records.length > 0)
+        next[sheetName] = [...records];
+    setConfig(APPLIED_RULES_STORE_KEY, serializeAppliedRules(next));
+}
+/**
+ * 执行一次应用
+ *
+ * @param strategy `merge`（默认，只动自己那份）/ `replace`（清空整表后重建）
+ */
 function runApply(strategy) {
     const entry = selectedSheet();
     if (!entry) {
@@ -2673,56 +2693,79 @@ function runApply(strategy) {
         showToast('当前 WPS 版本不支持条件格式 API，该功能不可用', 'error');
         return;
     }
-    const visibleCount = state.rules.filter((rule) => rule.hidden !== true).length;
-    if (visibleCount === 0) {
+    const visible = state.rules.filter((rule) => rule.hidden !== true);
+    if (visible.length === 0) {
         showToast('没有可应用的规则（全部隐藏了？）', 'warn');
         return;
     }
     const foreign = readForeignRules(entry.worksheet);
-    setConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, strategy);
-    const plan = planApply(state.rules, foreign, strategy);
+    const previous = readAppliedBuckets()[entry.sheet] ?? [];
+    const plan = planApply(state.rules, foreign, strategy, previous);
+    // 计划自带的说明（要移除几条自己的旧规则 / 整表将被清空多少条）进日志：
+    // toast 只报结果条数，这些「为什么动了 N 条」的上下文排障时才用得上
+    if (plan.warnings.length > 0) {
+        bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 应用计划：${plan.warnings.join('；')}`);
+    }
     const result = applyConditionalFormatPlan(entry.worksheet, plan);
-    // 写调用返回成功 ≠ 真写进去了：`verified` 是写完回读到的实际条数，
-    // 为 0 说明宿主把规则丢了（只读代理 / 老版本），必须明说而不是报「已写入」。
-    if (result.added > 0 && result.verified === 0) {
-        showToast('写入调用返回成功，但回读工作表仍是 0 条 —— 宿主可能丢弃了规则，请检查 WPS 版本或改用「工作表规则」逐条核对', 'error');
+    // 记账：下一轮「只清自己那份」全靠它
+    saveAppliedRecords(entry.sheet, visible.map((rule) => ({ range: rule.appliesTo, formula: rule.formula })));
+    // 写调用返回成功 ≠ 每条都真落地：`missing` 是写后回读不到的具体规则名。
+    // 只报总数会把「局部失败」说成「已写入 N 条」，用户去表上找不到却无从定位。
+    if (result.missing.length > 0) {
+        const shown = result.missing.slice(0, 3).join(' / ');
+        const more = result.missing.length > 3 ? ` 等 ${String(result.missing.length)} 条` : '';
+        showToast(`${String(result.missing.length)} 条规则没写进工作表：${shown}${more}（详见日志，可先检查范围与公式是否合法）`, 'error');
     }
     else if (result.failed > 0) {
-        showToast(`写入 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`, 'warn');
+        showToast(`新增 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`, 'warn');
     }
     else {
-        const verifiedNote = result.verified > 0 ? `，回读 ${String(result.verified)} 条` : '';
-        showToast(`已写入 ${String(result.added)} 条条件格式规则${verifiedNote}`, 'success');
+        const parts = [`新增 ${String(result.added)} 条`];
+        if (result.refreshed > 0)
+            parts.push(`刷新 ${String(result.refreshed)} 条`);
+        if (result.deleted > 0)
+            parts.push(`移除旧规则 ${String(result.deleted)} 条`);
+        const verifiedNote = result.verified >= 0 ? `，表上共 ${String(result.verified)} 条` : '';
+        showToast(`已应用：${parts.join('，')}${verifiedNote}`, 'success');
     }
-    const discardedNote = plan.discarded.length > 0 ? ` · 清理手工规则 ${String(plan.discarded.length)} 条` : '';
-    const verifiedText = result.verified >= 0 ? ` · 回读 ${String(result.verified)} 条` : '';
-    setText('conditionalFormatApplyStatus', `上次应用：${entry.sheet} · ${String(result.added)} 条（失败 ${String(result.failed)}）${verifiedText}${discardedNote}`);
+    const summary = [
+        `新增 ${String(result.added)}`,
+        `刷新 ${String(result.refreshed)}`,
+        `移除 ${String(result.deleted)}`,
+        `失败 ${String(result.failed)}`,
+    ].join(' · ');
+    const verifiedText = result.verified >= 0 ? ` · 表上 ${String(result.verified)} 条` : '';
+    const missingText = result.missing.length > 0 ? ` · 未落地 ${String(result.missing.length)}` : '';
+    setText('conditionalFormatApplyStatus', `上次应用（${strategy === 'replace' ? '清空整表' : '增量'}）：${entry.sheet} · ${summary}${verifiedText}${missingText}`);
     // 应用完重读表：让「工作表规则」立刻显示刚落地的规则（不再需要手动点「重新读取」）
     loadExistingRules();
 }
+/**
+ * 打开「清空整表后应用」的确认弹框
+ *
+ * 只有这条路会动别人的规则，所以必须先把将被丢弃的规则列清楚。
+ * 常规「应用条件格式」走 {@link runApply}('merge')，不弹框——它不清除任何东西，
+ * 弹框只会让用户误以为有风险（旧实现每次应用都弹，是「点应用规则没了」的帮凶）。
+ */
 function openConfirmModal(foreign) {
     const mask = byId('conditionalFormatConfirmMask');
     const body = byId('conditionalFormatConfirmBody');
     if (!mask || !body)
         return;
-    const last = lastStrategy();
     const rows = foreign
         .map((rule) => `<li><code>${escapeHtml(rule.range)}</code> — ${escapeHtml(rule.formula ||
         `（${rule.kind === 'expression' ? '公式类' : '非公式类'}规则，公式未读到）`)}</li>`)
         .join('');
     body.innerHTML = `
-    <p>目标工作表上检测到 <strong>${String(foreign.length)}</strong> 条既有条件格式规则（你手工建的或别的工具建的）。</p>
-    <p class="conditional-format-modal-label">将被处理的规则：</p>
+    <p>这一步会<strong>清空目标工作表上的全部 ${String(foreign.length)} 条条件格式规则</strong>，再按规则库重建。</p>
+    <p class="conditional-format-modal-label">将被清掉的规则：</p>
     <ul class="conditional-format-modal-list">${rows}</ul>
-    <p class="conditional-format-modal-label">怎么处理它们？</p>`;
+    <p class="conditional-format-modal-label">
+      只想把规则库写进表、保留这些规则？关掉本框，点「🖌️ 应用条件格式」即可——它不会清除任何既有规则。
+    </p>`;
     const clearButton = byId('conditionalFormatConfirmClear');
-    const keepButton = byId('conditionalFormatConfirmKeep');
-    if (clearButton) {
-        clearButton.textContent = last === 'clear-all' ? '清掉后应用（上次选择）' : '清掉后应用';
-    }
-    if (keepButton) {
-        keepButton.textContent = last === 'append-after' ? '保留手工规则（上次选择）' : '保留手工规则';
-    }
+    if (clearButton)
+        clearButton.textContent = '确认清空整表后应用';
     // mask 在函数入口已判非 null（!mask || !body 早退），直接用
     const modal = mask.querySelector('.conditional-format-modal');
     if (modal) {
@@ -2734,7 +2777,7 @@ function openConfirmModal(foreign) {
     if (modal)
         bringModalIntoView(mask, modal);
     lockModalScroll();
-    clearButton?.focus();
+    byId('conditionalFormatConfirmCancel')?.focus();
 }
 function closeConfirmModal() {
     const mask = byId('conditionalFormatConfirmMask');
@@ -2747,7 +2790,12 @@ function closeConfirmModal() {
     }
     unlockModalScroll();
 }
+/** 常规应用：增量写规则库，**不清除任何既有规则**（无确认框） */
 function applyFlow() {
+    runApply('merge');
+}
+/** 整表重来：清空目标表全部规则后重建（危险操作，先列清单再确认） */
+function replaceFlow() {
     const entry = selectedSheet();
     if (!entry) {
         showToast('请先选择目标工作表', 'warn');
@@ -2764,7 +2812,7 @@ function applyFlow() {
     }
     const foreign = readForeignRules(entry.worksheet);
     if (foreign.length === 0) {
-        runApply(lastStrategy());
+        runApply('replace');
         return;
     }
     openConfirmModal(foreign);
@@ -3529,6 +3577,11 @@ export function initializeConditionalFormatPage() {
     byId('conditionalFormatApplyBtn')?.addEventListener('click', () => {
         applyFlow();
     });
+    // 危险操作：清空目标表全部条件格式后重建。与「应用」分开成两个按钮，
+    // 是为了让「不清除任何既有规则」成为默认路径（旧实现只有一个按钮且默认清空）。
+    byId('conditionalFormatApplyReplaceBtn')?.addEventListener('click', () => {
+        replaceFlow();
+    });
     // 编辑器
     byId('conditionalFormatEditorSave')?.addEventListener('click', () => {
         saveEditor();
@@ -3720,14 +3773,10 @@ export function initializeConditionalFormatPage() {
         renderExistingRules();
         setText('conditionalFormatImportConfirm', `导入所选（${String(next.size)}）`);
     });
-    // 确认模态框（双策略）
+    // 确认模态框（只服务「清空整表后应用」这一个危险操作）
     byId('conditionalFormatConfirmClear')?.addEventListener('click', () => {
         closeConfirmModal();
-        runApply('clear-all');
-    });
-    byId('conditionalFormatConfirmKeep')?.addEventListener('click', () => {
-        closeConfirmModal();
-        runApply('append-after');
+        runApply('replace');
     });
     byId('conditionalFormatConfirmCancel')?.addEventListener('click', () => {
         closeConfirmModal();

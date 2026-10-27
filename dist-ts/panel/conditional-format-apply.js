@@ -4,9 +4,10 @@
  * @description 条件格式管理器的宿主交互全部收敛在本模块：
  *   1. {@link isFormatConditionsSupported}——老版本 WPS 不暴露 FormatConditions，
  *      探测失败时页面隐藏该功能并提示，不影响其它页；
- *   2. {@link readForeignRules}——应用前读工作表既有规则快照（供双策略决策与确认框列出）；
- *   3. {@link applyConditionalFormatPlan}——执行 {@link ConditionalFormatApplyPlan}：先清空（Delete）再逐条 Add + With，
- *      最后反序 SetFirstPriority 把 entries[0] 顶到最高优先级。
+ *   2. {@link readForeignRules}——应用前读工作表既有规则快照（供指纹比对与确认框列出）；
+ *   3. {@link applyConditionalFormatPlan}——执行 {@link ConditionalFormatApplyPlan}：
+ *      **默认不清空**，只按计划新增 / 刷新 / 删除「插件自己那一份」；
+ *      仅当 `plan.clearAll` 为真（用户显式选择「清空整表后应用」）才整表重来。
  *
  * 判断逻辑全在纯函数引擎（conditional-format-rules.ts）；本模块只做 IPC，每个宿主调用都
  * try 包裹并按条计数——单条失败不中断整批（与同步写入的「批次失败可见」一致）。
@@ -14,7 +15,7 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { bgmLog } from '../tools/util/index.js';
 import { describeRangeForDiagnosis, readRangeAddress } from '../tools/wps-range.js';
-import { XL_EXPRESSION } from './conditional-format-rules.js';
+import { XL_EXPRESSION, ruleFingerprint, ruleFingerprintOfRule, ruleFormulaKey, } from './conditional-format-rules.js';
 /**
  * 取本表可用的 FormatConditions 集合（**Sheet 级优先，回退 UsedRange**）
  *
@@ -568,28 +569,18 @@ export function readForeignRules(worksheet) {
     }
     return snapshots;
 }
-/** 取计划项的公式（插件规则与外来快照都是 Formula1 原样回写） */
-function entryFormula(entry) {
-    return entry.source === 'plugin' ? entry.rule.formula : entry.formula;
-}
-/** 取计划项的范围（联合类型两分支字段名不同，收敛到一处） */
-function entryRange(entry) {
-    return entry.source === 'plugin' ? entry.rule.appliesTo : entry.range;
-}
 /** 给单条规则上格式（With 对象形式；字体三属性全空时不上 Font） */
 function applyEntryFormat(fc, entry) {
     const withFormat = fc.With;
     if (withFormat === undefined)
         return;
-    const interior = entry.source === 'plugin' ? entry.rule.interior : entry.interior;
-    const fontColor = entry.source === 'plugin' ? entry.rule.fontColor : entry.fontColor;
-    const fontBold = entry.source === 'plugin' ? entry.rule.fontBold : undefined;
+    const { rule } = entry;
     withFormat({
-        ...(interior !== undefined && { Interior: { Color: interior } }),
-        ...((fontColor !== undefined || fontBold !== undefined) && {
+        Interior: { Color: rule.interior },
+        ...((rule.fontColor !== undefined || rule.fontBold !== undefined) && {
             Font: {
-                ...(fontColor !== undefined && { Color: fontColor }),
-                ...(fontBold !== undefined && { Bold: fontBold }),
+                ...(rule.fontColor !== undefined && { Color: rule.fontColor }),
+                ...(rule.fontBold !== undefined && { Bold: rule.fontBold }),
             },
         }),
     });
@@ -621,34 +612,128 @@ function clearConditions(collection) {
         }
     }
 }
+function locateConditions(worksheet) {
+    const collection = resolveFormatConditions(worksheet);
+    const located = {
+        byFingerprint: new Map(),
+        byFormula: new Map(),
+        count: 0,
+    };
+    if (!collection?.Count || typeof collection.Item !== 'function')
+        return located;
+    const count = collection.Count;
+    for (let index = 1; index <= count; index += 1) {
+        try {
+            const fc = collection.Item(index);
+            if (fc) {
+                located.count += 1;
+                const formula = readFormulaSafe(fc);
+                const fingerprint = ruleFingerprint({ range: readAppliesToAddress(fc, index), formula });
+                if (!located.byFingerprint.has(fingerprint))
+                    located.byFingerprint.set(fingerprint, index);
+                const formulaKey = ruleFormulaKey(formula);
+                if (!located.byFormula.has(formulaKey))
+                    located.byFormula.set(formulaKey, index);
+            }
+        }
+        catch {
+            // 单条读不到不影响其余（与 readForeignRules 同口径）
+        }
+    }
+    return located;
+}
+/** 按主判据定位（删除用；找不到 = 不动，绝不猜） */
+function indexOfFingerprint(located, record) {
+    return located.byFingerprint.get(ruleFingerprint(record));
+}
+/** 空索引（跳过定位那一轮时用，避免再判一次 null） */
+const EMPTY_LOCATED = {
+    byFingerprint: new Map(),
+    byFormula: new Map(),
+    count: 0,
+};
+/** 按主判据定位，落空时退到只比公式（刷新 / 回读校验用） */
+function indexOfRule(located, rule) {
+    return (located.byFingerprint.get(ruleFingerprintOfRule(rule)) ??
+        located.byFormula.get(ruleFormulaKey(rule.formula)));
+}
 /**
  * 执行应用计划
  *
- * 顺序：清空（Delete，失败则逐条反序删）→ 逐条 `Range(范围).FormatConditions.Add` →
- * With 上格式 → **反序 SetFirstPriority**（每调一次都把该规则顶到最高，
- * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）→
- * **回读整表条数**（写没写进去只能靠它判断，`Add` 返回对象不代表生效）。
+ * ## 顺序与「为什么不再无条件清空」
+ * 旧实现在这里第一件事就是 `clearConditions()`——于是「应用」= 抹掉整表规则
+ * 再重建。用户点一次应用，手工建的数据条 / 图标集 / 色阶规则全没了，且
+ * 第二版「保留手工规则」也只是**清空后原样重建**，同样丢掉 StopIfTrue、
+ * 字体、边框等无法回读的属性。现在的语义：
  *
- * @returns 成功 / 失败条数 + 回读到的实际条数（-1 = 宿主不支持回读）
+ * 1. `plan.clearAll` 为真（用户显式选了「清空整表后应用」）才清空；
+ * 2. 删 `plan.deletions`——**只有上一轮自己写的、规则库里已删掉的**；
+ * 3. 刷新 `plan.refreshes`——表上已有同「范围 + 公式」的规则，只更新颜色；
+ * 4. 逐条 Add `plan.entries` → With 上格式；
+ * 5. 反序 `SetFirstPriority`（每调一次把该规则顶到最高，走完 entries[0] 最高）；
+ * 6. 回读校验：整表条数 + **逐条指纹**（`missing` 指出哪几条没落地）。
+ *
+ * @returns 新增 / 刷新 / 移除 / 失败条数 + 回读条数 + 未落地的规则名
  */
 export function applyConditionalFormatPlan(worksheet, plan) {
     const sheetConditions = resolveFormatConditions(worksheet);
     if (!worksheet || typeof sheetConditions?.Add !== 'function') {
-        return { added: 0, failed: plan.entries.length, verified: -1 };
+        return {
+            added: 0,
+            refreshed: 0,
+            deleted: 0,
+            failed: plan.entries.length,
+            verified: -1,
+            missing: plan.entries.map((entry) => entry.rule.name),
+        };
     }
-    // 1. 清空（快照已由调用方读过并按策略确认；含插件旧规则，保证幂等）
-    clearConditions(sheetConditions);
-    // 2. 逐条重建
+    // 1. 仅显式「清空整表」才清空——默认路径一条别人的规则都不碰
+    if (plan.clearAll)
+        clearConditions(sheetConditions);
+    // 2. 定位一次：删除与刷新共用同一份索引（无需删除/刷新时省掉这一整轮 COM 读）
+    const hasLocateTargets = plan.deletions.length > 0 || plan.refreshes.length > 0;
+    const located = hasLocateTargets ? locateConditions(worksheet) : EMPTY_LOCATED;
+    // 3. 移除「上一轮自己写的、规则库里已没有的」：**倒序**删，低下标才不失效
+    let deleted = 0;
+    const deletionTargets = plan.deletions
+        .map((record) => indexOfFingerprint(located, record))
+        .filter((index) => index !== undefined)
+        .sort((left, right) => right - left);
+    for (const index of deletionTargets) {
+        try {
+            sheetConditions.Item?.(index)?.Delete?.();
+            deleted += 1;
+        }
+        catch (error) {
+            bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 移除旧规则失败（第 ${String(index)} 条）: ${error.message}`);
+        }
+    }
+    // 4. 表上已有同指纹的规则：不重复 Add，只把颜色刷成规则库里的设定
+    let refreshed = 0;
+    for (const rule of plan.refreshes) {
+        const index = indexOfRule(located, rule);
+        const fc = index === undefined ? null : getForeignCondition(worksheet, index);
+        if (fc) {
+            try {
+                applyEntryFormat(fc, { rule });
+                refreshed += 1;
+            }
+            catch (error) {
+                bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 刷新规则格式失败（${rule.name}）: ${error.message}`);
+            }
+        }
+    }
+    // 5. 逐条新增
     let added = 0;
     let failed = 0;
     const created = [];
     for (const entry of plan.entries) {
-        const label = entry.source === 'plugin' ? entry.rule.name : entry.range;
+        const { rule } = entry;
         try {
-            const target = worksheet.Range(entryRange(entry));
+            const target = worksheet.Range(rule.appliesTo);
             const fc = target.FormatConditions?.Add?.({
                 Type: XL_EXPRESSION,
-                Formula1: entryFormula(entry),
+                Formula1: rule.formula,
             });
             if (fc) {
                 applyEntryFormat(fc, entry);
@@ -657,14 +742,15 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             }
             else {
                 failed += 1;
+                bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）：宿主未返回规则对象`);
             }
         }
         catch (error) {
             failed += 1;
-            bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 写入规则失败（${label}）: ${error.message}`);
+            bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）: ${error.message}`);
         }
     }
-    // 3. 优先级：entries[0] 最高 → 反序逐个置顶
+    // 6. 优先级：entries[0] 最高 → 反序逐个置顶（只影响新加的，既有规则相对序不变）
     for (let index = created.length - 1; index >= 0; index -= 1) {
         try {
             created[index]?.SetFirstPriority?.();
@@ -673,10 +759,18 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             // 优先级微调失败不致命（多数宿主按添加序即可满足）
         }
     }
-    // 4. 回读：Add 返回了对象但宿主没真加进去时，这里是唯一能发现的地方
-    const verified = readForeignRules(worksheet).length;
-    if (verified === 0 && added > 0) {
-        bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 写入 ${String(added)} 条但回读为 0 条（宿主可能丢弃了规则）`);
+    // 7. 回读：整表条数 + 逐条指纹（`Add` 返回对象不代表这一条真的生效了）
+    const after = locateConditions(worksheet);
+    const expected = [
+        ...plan.refreshes,
+        ...plan.entries.map((entry) => entry.rule),
+    ];
+    const missing = expected
+        .filter((rule) => indexOfRule(after, rule) === undefined)
+        .map((rule) => rule.name);
+    const verified = after.count;
+    if (missing.length > 0) {
+        bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] ${String(missing.length)} 条规则写后回读不到: ${missing.join(' / ')}`);
     }
-    return { added, failed, verified };
+    return { added, refreshed, deleted, failed, verified, missing };
 }
