@@ -1285,3 +1285,143 @@ describe('粘贴规则弹窗', () => {
     expect(ruleRows()).toHaveLength(3)
   })
 })
+
+// ========== 表格列宽 / 行高（四张表共用 ts/ui/components/table-resize.ts） ==========
+
+/** 表头的把手统计：格子数 = 子元素数 - 行高把手数（行高把手也是表头的子元素） */
+function headStats(head: HTMLElement): { cells: number; columns: number; rows: number } {
+  const rows = head.querySelectorAll(':scope > .table-resize-row-handle').length
+  return {
+    cells: head.children.length - rows,
+    columns: head.querySelectorAll('.table-resize-handle').length,
+    rows,
+  }
+}
+
+/** 取某张表的表头行（没有就让用例直接失败，而不是后续断言拿到 undefined） */
+function headOf(containerId: string): HTMLElement {
+  const head = document.querySelector<HTMLElement>(`#${containerId} > .table-resize-head`)
+  expect(head).not.toBeNull()
+  return head!
+}
+
+describe('表格列宽 / 行高', () => {
+  it('我的规则：表头 6 格 → 5 个列宽把手 + 1 个行高把手', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const stats = headStats(headOf('conditionalFormatRuleList'))
+    expect(stats.cells).toBe(6)
+    // 最后一列右边没有下一列，不插列宽把手
+    expect(stats.columns).toBe(5)
+    expect(stats.rows).toBe(1)
+    // 表头是标签不是数据：不该混进规则行集合（否则批量勾选/拖拽排序会多出一条）
+    expect(ruleRows()).toHaveLength(3)
+    // 行子元素数 == 列数：少一格 → 最后一格会掉到隐式的下一行，看起来像「串行」
+    expect(ruleRows()[0]!.children).toHaveLength(stats.cells)
+  })
+
+  it('工作表规则：表头 8 格 → 7 个列宽把手', async () => {
+    mockConfigWithRules([], SHEET_ENTRY.key)
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue([
+      { range: 'B2:B9', formula: '=$B2="x"', kind: 'expression', type: 2, interior: '#00B050' },
+    ])
+    await openPage()
+
+    const stats = headStats(headOf('conditionalFormatExistingList'))
+    expect(stats.cells).toBe(8)
+    expect(stats.columns).toBe(7)
+    expect(stats.rows).toBe(1)
+    const row = document.querySelector<HTMLElement>('.conditional-format-row[data-row-index]')!
+    expect(row.children).toHaveLength(stats.cells)
+  })
+
+  it('导入弹框：表头 5 格 → 4 个列宽把手（打开弹框后才补）', async () => {
+    mockConfigWithRules([], SHEET_ENTRY.key)
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue([
+      { range: 'B2:B9', formula: '=$B2="x"', kind: 'expression', type: 2, interior: '#00B050' },
+    ])
+    const list = await openImportModalForTest()
+
+    const stats = headStats(list.querySelector<HTMLElement>(':scope > .table-resize-head')!)
+    expect(stats.cells).toBe(5)
+    expect(stats.columns).toBe(4)
+    expect(stats.rows).toBe(1)
+    // 可导入的行是 4 格（第 5 列是「类型不支持」标记位，空着），不可导入的是 5 格
+    const row = list.querySelector<HTMLElement>(
+      '.conditional-format-import-row[data-import-index]',
+    )!
+    expect(row.children.length).toBeLessThanOrEqual(stats.cells)
+  })
+
+  it('粘贴表格：表头 5 格 → 4 个列宽把手（多条才有表格）', async () => {
+    await openBatchPaste()
+
+    const stats = headStats(headOf('conditionalFormatPasteTable'))
+    expect(stats.cells).toBe(5)
+    expect(stats.columns).toBe(4)
+    expect(stats.rows).toBe(1)
+    const row = document.querySelector<HTMLElement>('[data-paste-row="1"]')!
+    expect(row.children).toHaveLength(stats.cells)
+  })
+
+  it('拖一列 → 宽度写进 PluginStorage（conditionalFormat.tableSizes.v1）', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const handle = document.querySelector<HTMLElement>(
+      '#conditionalFormatRuleList .table-resize-handle[data-col="0"]',
+    )!
+    const cell = handle.parentElement!
+    cell.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, right: 100, bottom: 20, width: 100, height: 20 }) as DOMRect
+
+    pointer(handle, 'pointerdown', 100, 10)
+    pointer(window, 'pointermove', 140, 10)
+    pointer(window, 'pointerup', 140, 10)
+
+    // 只有被拖的那一列被钉成固定 px，其余仍走 CSS 默认模板
+    const list = document.getElementById('conditionalFormatRuleList')!
+    expect(list.style.getPropertyValue('--table-col-0')).toBe('140px')
+    expect(list.style.getPropertyValue('--table-col-1')).toBe('')
+
+    const written = m.setConfig.mock.calls.filter(
+      ([key]) => key === 'conditionalFormat.tableSizes.v1',
+    )
+    expect(written).toHaveLength(1)
+    const payload = JSON.parse(written[0]?.[1] ?? '') as {
+      library?: { cols?: (number | null)[] }
+    }
+    expect(payload.library?.cols?.[0]).toBe(140)
+  })
+
+  it('重开页面：读回上次的列宽（渲染前就带上变量，不闪一下再变）', async () => {
+    m.getConfig.mockImplementation((key: string) => {
+      if (key === 'conditionalFormat.rules.v1') return serializeRules(RULES)
+      if (key === 'conditionalFormat.tableSizes.v1') {
+        return JSON.stringify({ library: { cols: [140], rowHeight: 40 } })
+      }
+      return ''
+    })
+    await openPage()
+
+    const list = document.getElementById('conditionalFormatRuleList')!
+    expect(list.style.getPropertyValue('--table-col-0')).toBe('140px')
+    expect(list.style.getPropertyValue('--table-row-h')).toBe('40px')
+  })
+
+  it('存储里是坏 JSON → 退化为全自动，页面照常初始化', async () => {
+    m.getConfig.mockImplementation((key: string) => {
+      if (key === 'conditionalFormat.rules.v1') return serializeRules(RULES)
+      if (key === 'conditionalFormat.tableSizes.v1') return '{不是 JSON'
+      return ''
+    })
+    await openPage()
+
+    const list = document.getElementById('conditionalFormatRuleList')!
+    expect(list.style.getPropertyValue('--table-col-0')).toBe('')
+    expect(list.style.getPropertyValue('--table-row-h')).toBe('auto')
+  })
+})

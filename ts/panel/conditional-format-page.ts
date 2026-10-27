@@ -98,6 +98,8 @@ import { bindModalMaximize, bindModalResize } from '../ui/components/window-chro
 import { attachDelegatedContextMenu, showContextMenu } from '../ui/components/context-menu.js'
 import { createSortable } from '../ui/components/sortable-list.js'
 import type { SortableHandle } from '../ui/components/sortable-list.js'
+import { bindTableResize } from '../ui/components/table-resize.js'
+import type { TableResizeController, TableSizeState } from '../ui/components/table-resize.js'
 import { renderOptionPicker } from '../ui/components/option-picker.js'
 import {
   applyConditionalFormatPlan,
@@ -256,6 +258,8 @@ interface PageState {
   groupSortable: SortableHandle | null
   /** 既有规则表格的拖拽排序句柄（renderExistingRules 后 refresh） */
   existingSortable: SortableHandle | null
+  /** 四张表的列宽/行高拖拽句柄（容器节点常驻，只建一次；渲染后调 decorate） */
+  tableResize: Record<TableResizeId, TableResizeController | null>
 }
 
 const state: PageState = {
@@ -287,6 +291,7 @@ const state: PageState = {
   ruleSortable: null,
   groupSortable: null,
   existingSortable: null,
+  tableResize: { existing: null, library: null, importDialog: null, paste: null },
 }
 
 // ===== DOM 辅助 =====
@@ -603,6 +608,8 @@ function renderExistingRulesInner(container: HTMLElement): void {
   syncFloatToolbarState()
   // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
   state.existingSortable?.refresh()
+  // 列宽/行高把手：表头是新节点，每次渲染都要重插（decorate 幂等）
+  state.tableResize.existing?.decorate()
 }
 
 /** 浮动窗口顶栏按钮的可用性（选中数为 0 时 ↑↓ / 删除禁用） */
@@ -1947,7 +1954,7 @@ function setElementVisible(id: string, isVisible: boolean): void {
 function renderPasteTable(): void {
   const container = byId('conditionalFormatPasteTable')
   if (!container) return
-  const head = `<div class="conditional-format-paste-row conditional-format-paste-row--head">
+  const head = `<div class="conditional-format-paste-row conditional-format-paste-row--head conditional-format-table-head table-resize-head">
       <span>#</span><span>规则名</span><span>公式</span><span>色</span><span>应用范围</span>
     </div>`
   const rows = pasteRows
@@ -1970,6 +1977,8 @@ function renderPasteTable(): void {
     )
     .join('')
   container.innerHTML = head + rows
+  // 表头是新节点，重插列宽/行高把手（decorate 幂等）
+  state.tableResize.paste?.decorate()
 }
 
 /** 表格里逐条改范围：把输入框的值写回模型（不重渲染，免得打断输入） */
@@ -2494,14 +2503,26 @@ function renderRuleList(): void {
   )
 
   const groups = groupRules(visible)
-  container.innerHTML = groups
-    .map(([group, rules]) => {
-      // 搜索时忽略折叠态：折叠组里的命中也该可见，否则用户以为搜不到
-      const isCollapsed = state.searchQuery === '' && state.collapsedGroups.has(group)
-      const rows = rules
-        .map((rule) => {
-          const isHidden = rule.hidden === true
-          return `
+  // 表头：规则库原来一行标签都没有——「勾选」列（批量删除/导出）与「👁」列
+  // （是否应用）长得一样，用户分不清哪个是哪个。顺带它也是行高把手的落点。
+  const head = `<div class="conditional-format-rule conditional-format-rule--head conditional-format-table-head table-resize-head">
+          <span title="拖拽把手：按住上下拖可调整优先级"></span>
+          <span title="勾选以批量删除 / 导出 / 改颜色">选</span>
+          <span title="条件格式的填充色">色</span>
+          <span>规则 / 公式</span>
+          <span title="是否应用这条规则（取消勾选 = 留在规则库但不写进工作表）">显</span>
+          <span>操作</span>
+        </div>`
+  container.innerHTML =
+    head +
+    groups
+      .map(([group, rules]) => {
+        // 搜索时忽略折叠态：折叠组里的命中也该可见，否则用户以为搜不到
+        const isCollapsed = state.searchQuery === '' && state.collapsedGroups.has(group)
+        const rows = rules
+          .map((rule) => {
+            const isHidden = rule.hidden === true
+            return `
         <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}" title="拖拽调整优先级 · 右键打开操作菜单">
           <span class="conditional-format-rule-handle" title="拖拽调整优先级（也可用键盘：Space 拾起、↑↓ 移动）" aria-hidden="true">⋮⋮</span>
           <label class="conditional-format-rule-pick" title="勾选以批量删除 / 导出">
@@ -2523,9 +2544,9 @@ function renderRuleList(): void {
             <button type="button" data-action="delete" title="删除">✕</button>
           </div>
         </div>`
-        })
-        .join('')
-      return `
+          })
+          .join('')
+        return `
       <div class="conditional-format-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
         <div class="conditional-format-group-title" title="拖动调整分组顺序（整组一起动）">
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
@@ -2541,8 +2562,8 @@ function renderRuleList(): void {
         </div>
         ${rows}
       </div>`
-    })
-    .join('')
+      })
+      .join('')
 
   container
     .querySelectorAll<HTMLButtonElement>('button[data-action="toggle-group"]')
@@ -2646,6 +2667,8 @@ function renderRuleList(): void {
   // 拖拽排序：DOM 换了新节点，重新扫描补 tabindex / aria（键盘排序的前提）
   state.ruleSortable?.refresh()
   state.groupSortable?.refresh()
+  // 表头是新节点，重插列宽/行高把手（decorate 幂等）
+  state.tableResize.library?.decorate()
   // 顶部批量条跟随勾选数显隐
   renderRuleBatchBar()
 }
@@ -3509,15 +3532,26 @@ function renderImportList(): void {
   const container = byId('conditionalFormatImportList')
   if (!container) return
   const selection = state.existingSelection
-  container.innerHTML = groupImportSnapshots()
-    .map(([group, entries]) => {
-      const isCollapsed = state.importGroupCollapsed.has(group)
-      const rows = entries
-        .map(([index, snapshot]) => {
-          const canImport = isSnapshotImportable(snapshot)
-          const formulaPreview =
-            snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
-          return `
+  // 表头：导入弹框的行是 5 列（勾选 / 序号 / 范围 / 公式 / 类型警示），
+  // 原来没有列名，范围与公式两串等宽等长的文本全靠猜。也是行高把手的落点。
+  const head = `<div class="conditional-format-import-row conditional-format-import-row--head conditional-format-table-head table-resize-head">
+        <span></span>
+        <span>#</span>
+        <span>应用范围</span>
+        <span>公式</span>
+        <span></span>
+      </div>`
+  container.innerHTML =
+    head +
+    groupImportSnapshots()
+      .map(([group, entries]) => {
+        const isCollapsed = state.importGroupCollapsed.has(group)
+        const rows = entries
+          .map(([index, snapshot]) => {
+            const canImport = isSnapshotImportable(snapshot)
+            const formulaPreview =
+              snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
+            return `
       <label class="conditional-format-import-row${canImport ? '' : ' is-disabled'}" data-import-index="${String(index)}">
         <input type="checkbox" data-import-check="${String(index)}" ${selection.has(index) ? 'checked' : ''} ${canImport ? '' : 'disabled'} aria-label="选择第 ${String(index)} 条规则" />
         <span class="conditional-format-import-index">${String(index)}</span>
@@ -3525,9 +3559,9 @@ function renderImportList(): void {
         <code class="conditional-format-import-formula" title="${escapeHtml(snapshot.formula)}">${escapeHtml(formulaPreview)}</code>
         ${canImport ? '' : '<em class="conditional-format-tag-warn">类型不支持</em>'}
       </label>`
-        })
-        .join('')
-      return `
+          })
+          .join('')
+        return `
       <div class="conditional-format-group conditional-format-existing-group${isCollapsed ? ' is-collapsed' : ''}" data-import-group="${escapeHtml(group)}">
         <div class="conditional-format-group-title">
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-import-group" data-import-group="${escapeHtml(group)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
@@ -3537,9 +3571,11 @@ function renderImportList(): void {
         </div>
         ${rows}
       </div>`
-    })
-    .join('')
+      })
+      .join('')
   setText('conditionalFormatImportConfirm', `导入所选（${String(selection.size)}）`)
+  // 表头是新节点，重插列宽/行高把手（decorate 幂等）
+  state.tableResize.importDialog?.decorate()
 }
 
 /**
@@ -3712,6 +3748,103 @@ function exportSelectedRules(rules: readonly ConditionalFormatRule[], label: str
 
 // ===== 初始化 =====
 
+// =====================================================================
+// 表格列宽 / 行高（四张表共用 ts/ui/components/table-resize.ts）
+// =====================================================================
+
+/** 四张可拖列宽/行高的表 */
+type TableResizeId = 'existing' | 'library' | 'importDialog' | 'paste'
+
+/** 遍历顺序 = 写入顺序（存储里 key 的次序稳定，diff 好读） */
+const TABLE_RESIZE_IDS: readonly TableResizeId[] = ['existing', 'library', 'importDialog', 'paste']
+
+/**
+ * 表格尺寸的存储键
+ *
+ * 四张表共用一个键：都在同一页、读一次就够，也不会出现「四个键写了一半」的
+ * 半新半旧状态。结构：`{ existing: {cols, rowHeight}, … }`，缺项 = 全自动。
+ */
+const TABLE_RESIZE_STORE_KEY = 'conditionalFormat.tableSizes.v1'
+
+/**
+ * 把存储里的一个条目收敛成 {@link TableSizeState}
+ *
+ * 存储是用户可改的（PluginStorage 本质是个字符串表），所以逐字段验型：
+ * 非数字 / 非正数 / NaN 一律当 `null`（= 自动），不让一个坏值把整表钉成 0px。
+ *
+ * @param value 存储里读出的原始值
+ * @returns 收敛后的状态；不是对象则 `null`
+ */
+function toTableSizeState(value: unknown): TableSizeState | null {
+  if (typeof value !== 'object' || value === null) return null
+  const record = value as Record<string, unknown>
+  const rawWidths: unknown[] = Array.isArray(record.cols) ? (record.cols as unknown[]) : []
+  const widths = rawWidths.map((width) =>
+    typeof width === 'number' && Number.isFinite(width) && width > 0 ? Math.round(width) : null,
+  )
+  const rawRowHeight = record.rowHeight
+  const rowHeight =
+    typeof rawRowHeight === 'number' && Number.isFinite(rawRowHeight) && rawRowHeight > 0
+      ? Math.round(rawRowHeight)
+      : null
+  return { cols: widths, rowHeight }
+}
+
+/** 读四张表的尺寸（坏 JSON / 坏条目都退化为「全自动」，不让页面初始化失败） */
+function readTableSizes(): Partial<Record<TableResizeId, TableSizeState>> {
+  const raw = getConfig(TABLE_RESIZE_STORE_KEY, '', true)
+  if (raw === '') return {}
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return {}
+    const record = parsed as Record<string, unknown>
+    const entries = TABLE_RESIZE_IDS.map(
+      (id) => [id, toTableSizeState(record[id])] as const,
+    ).filter((entry): entry is readonly [TableResizeId, TableSizeState] => entry[1] !== null)
+    return Object.fromEntries(entries)
+  } catch {
+    return {}
+  }
+}
+
+/** 把四张表的当前尺寸写回存储（任一表拖动结束都会触发） */
+function saveTableSizes(): void {
+  const payload: Record<string, TableSizeState> = {}
+  for (const id of TABLE_RESIZE_IDS) {
+    const controller = state.tableResize[id]
+    if (controller !== null) payload[id] = controller.getState()
+  }
+  setConfig(TABLE_RESIZE_STORE_KEY, JSON.stringify(payload))
+}
+
+/**
+ * 给四张表接上列宽/行高拖拽（只建一次）
+ *
+ * 句柄挂在**容器**上，容器节点在渲染时只换子节点不换自己，所以只建一次即可；
+ * 每次重渲染后由各自的 render 函数调 `decorate()` 补把手。
+ */
+function setupTableResize(): void {
+  const stored = readTableSizes()
+  const bindings: readonly { id: TableResizeId; elementId: string }[] = [
+    { id: 'existing', elementId: 'conditionalFormatExistingList' },
+    { id: 'library', elementId: 'conditionalFormatRuleList' },
+    { id: 'importDialog', elementId: 'conditionalFormatImportList' },
+    { id: 'paste', elementId: 'conditionalFormatPasteTable' },
+  ]
+  for (const { id, elementId } of bindings) {
+    const container = byId(elementId)
+    if (container) {
+      state.tableResize[id] = bindTableResize({
+        container,
+        initial: stored[id] ?? {},
+        onChange: () => {
+          saveTableSizes()
+        },
+      })
+    }
+  }
+}
+
 export function initializeConditionalFormatPage(): void {
   markConditionalFormatPaneLoaded()
   initializeShellNav()
@@ -3779,6 +3912,8 @@ export function initializeConditionalFormatPage(): void {
   bindExistingToolbar()
   // 两个列表的拖拽排序 + 行右键菜单（通用组件接入，只建一次）
   setupSortablesAndMenus()
+  // 四张表的列宽/行高拖拽（通用组件接入，只建一次；每次重渲染后 decorate）
+  setupTableResize()
 
   // 规则操作
   byId('conditionalFormatNewRuleBtn')?.addEventListener('click', () => {

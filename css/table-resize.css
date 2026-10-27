@@ -1,0 +1,99 @@
+/* =====================================================================
+   表格列宽 / 行高拖拽（配套 ts/ui/components/table-resize.ts）
+   =====================================================================
+
+   约定（组件与样式表之间的契约，改一边必须改另一边）：
+
+   1. 容器：`bindTableResize()` 在容器上按需写 `--table-col-<i>`（被拖过的那一列，
+       固定 px）与 `--table-row-h`（单行最小高度，`auto` = 自动）。
+       **没拖过的列不写属性**，各行自己声明兜底值：
+        `grid-template-columns: var(--table-col-0, 30px) var(--table-col-1, 34px) …;`
+       —— 默认列模板因此只存在于 CSS（各表各写一份，不跨文件重复），
+       组件不需要知道有几列、每列多宽，也就不会出现「JS 与 CSS 两份默认值漂移」。
+   2. 表头行：带 `.table-resize-head` 类，`decorate()` 会往里补把手。
+   3. 把手：`.table-resize-handle`（列宽，绝对定位在格右侧边缘）、
+      `.table-resize-row-handle`（行高，绝对定位在表头下边缘）。
+      把手是**纯标记**，不绑监听器——监听统一委托在容器上，所以表头
+      每次重渲染换新节点也不会丢事件。
+   4. 拖动中容器带 `.is-resizing` + `data-resize-axis`（禁选中、全程保持拖拽光标）。
+
+   ⚠ `.table-resize-head { position: relative }` 会把同特异性的
+   `position: sticky` 盖掉（吸顶表头）。需要吸顶的表头请用更高特异性
+   的选择器声明 `sticky`（例：`.xxx-table .xxx-row--head`）。
+   ===================================================================== */
+
+/* 表头行是行高把手的定位上下文；格子是列宽把手的定位上下文 */
+.table-resize-head {
+  position: relative;
+}
+
+.table-resize-head > * {
+  position: relative;
+}
+
+/* 列宽把手：贴格子右侧，向两侧各溢出 4px（命中区 8px，视觉上仍是 1px 竖线）
+   `pointer-events: auto` 不能省：表头常对纯展示的列名写 `pointer-events: none`
+   （免得它们吃掉勾选列的事件），而 `none` 会连带让子元素不可命中 → 把手点不到。 */
+.table-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 2;
+  width: 8px;
+  height: 100%;
+  pointer-events: auto;
+  cursor: col-resize;
+  /* 竖线只在悬停/拖动时显形：常显会像「每列都有边框」 */
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.table-resize-handle:hover,
+.is-resizing .table-resize-handle {
+  background: var(--accent, #4f8cff);
+  opacity: 0.55;
+}
+
+/* 行高把手：贴表头下边缘（命中区 8px） */
+.table-resize-row-handle {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  left: 0;
+  z-index: 2;
+  height: 8px;
+  pointer-events: auto;
+  cursor: row-resize;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.table-resize-row-handle:hover,
+.is-resizing .table-resize-row-handle {
+  background: var(--accent, #4f8cff);
+  opacity: 0.55;
+}
+
+/* 拖动中：禁选中 + 全程保持拖拽光标（指针移出把手也不跳回默认箭头） */
+.is-resizing {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.is-resizing,
+.is-resizing * {
+  cursor: col-resize;
+}
+
+/* 行高拖动与列宽拖动共用一个类，靠容器上的 data 属性区分光标方向 */
+.is-resizing[data-resize-axis='row'],
+.is-resizing[data-resize-axis='row'] * {
+  cursor: row-resize;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-resize-handle,
+  .table-resize-row-handle {
+    transition: none;
+  }
+}

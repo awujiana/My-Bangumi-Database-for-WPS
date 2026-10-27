@@ -285,16 +285,34 @@
   opacity: 0.7;
 }
 
+/* 规则库的行：6 列网格（拖动把手 / 勾选 / 色块 / 名称+公式 / 可见性 / 操作）。
+   原来是 flex——列宽写死在内容里，用户改不了，窄窗格下长公式只能被截断。
+   改网格后每列宽度走 `var(--table-col-<i>, <默认>)`（见
+   ts/ui/components/table-resize.ts），没拖过的列仍是下面这套自适应模板。 */
 .conditional-format-rule {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    var(--table-col-0, 18px)
+    var(--table-col-1, 20px)
+    var(--table-col-2, 14px)
+    var(--table-col-3, minmax(0, 1fr))
+    var(--table-col-4, 22px)
+    var(--table-col-5, 84px);
   align-items: center;
   gap: var(--sp-3);
+  min-height: var(--table-row-h, auto);
   padding: 8px 0;
   border-bottom: 1px solid var(--border-faint);
 }
 
 .conditional-format-rule:last-child {
   border-bottom: none;
+}
+
+/* 规则库的表头行：比数据行紧一点（它是标签，不是内容） */
+.conditional-format-rule--head {
+  padding: 4px 0;
+  font-size: 12px;
 }
 
 .conditional-format-rule-hidden {
@@ -457,10 +475,19 @@
   border-radius: var(--r-md);
 }
 
+/* 导入弹框的行：5 列网格（勾选 / 序号 / 范围 / 公式 / 警示标记）。
+   与另外三张表同一套列宽拖拽（`--table-col-<i>` / `--table-row-h`）。 */
 .conditional-format-import-row {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    var(--table-col-0, 20px)
+    var(--table-col-1, 28px)
+    var(--table-col-2, minmax(60px, 0.8fr))
+    var(--table-col-3, minmax(0, 1.6fr))
+    var(--table-col-4, auto);
   align-items: center;
   gap: var(--sp-2);
+  min-height: var(--table-row-h, auto);
   padding: 6px 10px;
   border-bottom: 1px solid var(--border-faint);
   font-size: 12px;
@@ -471,7 +498,20 @@
   border-bottom: none;
 }
 
-.conditional-format-import-row:hover {
+/* 导入弹框的表头行：吸顶（列表本身 max-height 320px 可滚），所以底色必须
+   **不透明**，否则下面的行会透上来。
+   多一层 `.conditional-format-import-list` 是为了压过 `css/table-resize.css`
+   里同特异性的 `.table-resize-head { position: relative }`（行高把手的定位上下文）。 */
+.conditional-format-import-list .conditional-format-import-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: default;
+  background: var(--bg-surface-2);
+}
+
+/* 表头行不参与 hover 高亮：吸顶时它盖在数据行上，半透明底色会让下面的行透上来 */
+.conditional-format-import-row:not(.conditional-format-import-row--head):hover {
   background: var(--bg-2, rgba(255, 255, 255, 0.04));
 }
 
@@ -481,16 +521,14 @@
 }
 
 .conditional-format-import-index {
-  flex: 0 0 auto;
-  min-width: 1.6em;
+  min-width: 0;
   color: var(--text-3);
   font-family: var(--font-mono);
   text-align: right;
 }
 
 .conditional-format-import-range {
-  flex: 0 0 auto;
-  max-width: 30%;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-1);
   font-family: var(--font-mono);
@@ -499,7 +537,6 @@
 }
 
 .conditional-format-import-formula {
-  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--text-2);
@@ -566,9 +603,15 @@
 
 .conditional-format-paste-row {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1.3fr) 26px minmax(0, 1fr);
+  grid-template-columns:
+    var(--table-col-0, 26px)
+    var(--table-col-1, minmax(0, 1fr))
+    var(--table-col-2, minmax(0, 1.3fr))
+    var(--table-col-3, 26px)
+    var(--table-col-4, minmax(0, 1fr));
   gap: var(--sp-2);
   align-items: center;
+  min-height: var(--table-row-h, auto);
   padding: 6px 8px;
   border-bottom: 0.5px solid var(--border);
   font-size: var(--fs-sm);
@@ -578,8 +621,11 @@
   border-bottom: none;
 }
 
-/* 表头吸顶：规则多时往下滚，列名不跟着滚走 */
-.conditional-format-paste-row--head {
+/* 表头吸顶：规则多时往下滚，列名不跟着滚走。
+   选择器刻意多一层 `.conditional-format-paste-table`：`position: sticky` 要压过
+   `css/table-resize.css` 里同特异性的 `.table-resize-head { position: relative }`
+   （那是行高把手的定位上下文），否则吸顶静默失效。 */
+.conditional-format-paste-table .conditional-format-paste-row--head {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -782,12 +828,27 @@
   background: var(--bg-1, transparent);
 }
 
-/* 行：7 列网格。序号/格式/停止/操作固定宽，范围与公式吃剩余空间 */
+/* 行：8 列网格（勾选 / 序号 / 类型 / 格式 / 应用于 / 公式 / 为真则停 / 操作）。
+   每列宽度走 `var(--table-col-<i>, <默认>)`：用户拖过的那列由
+   ts/ui/components/table-resize.ts 写成固定 px，没拖过的列连属性都不写，
+   直接吃下面的默认值 —— 默认模板**只有这一份**，不会与 JS 侧漂移。
+   行高同理读 `--table-row-h`。
+   （2026-10-27 之前本文件把列模板定义了两遍，第 786 / 941 行，后一份静默
+   覆盖前一份，改前一份等于没改 —— 合并时顺手把缺的第 8 列补上了。） */
 .conditional-format-table .conditional-format-row {
   display: grid;
-  grid-template-columns: 34px minmax(72px, 0.9fr) 58px minmax(110px, 1.1fr) minmax(140px, 1.6fr) 46px;
+  grid-template-columns:
+    var(--table-col-0, 30px)
+    var(--table-col-1, 34px)
+    var(--table-col-2, minmax(72px, 0.9fr))
+    var(--table-col-3, 58px)
+    var(--table-col-4, minmax(110px, 1.1fr))
+    var(--table-col-5, minmax(140px, 1.6fr))
+    var(--table-col-6, 46px)
+    var(--table-col-7, 46px);
   gap: var(--sp-2, 6px);
   align-items: center;
+  min-height: var(--table-row-h, auto);
   padding: 6px var(--sp-2, 6px);
   border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -801,16 +862,22 @@
   background: var(--bg-2, rgba(255, 255, 255, 0.04));
 }
 
-.conditional-format-row-head {
+/* 四张表的表头行共用一套观感（列名灰、加粗、浅底）。
+   `.conditional-format-row-head` 保留为「既有规则表格表头」的语义标记类
+   （测试用它断言「分组里不该再出现表头」），样式统一收到这里，不再各写一份。
+
+   不再整行 pointer-events:none：那会让表头的「全选」复选框点不动
+   （momo 实测：点了没反应）。表头没有别的交互，只需让纯展示的列标签
+   不吃事件，勾选列（label + checkbox）保持可点。
+   ⚠ 列宽/行高把手是这些 span 的子元素，`pointer-events: none` 会连带让它
+   不可命中 —— `css/table-resize.css` 里给把手单独写了 `pointer-events: auto`。 */
+.conditional-format-table-head {
   color: var(--text-3);
   font-weight: 600;
   background: var(--bg-2, rgba(255, 255, 255, 0.03));
-  /* 不再整行 pointer-events:none：那会让表头的「全选」复选框点不动
-     （momo 实测：点了没反应）。表头没有别的交互，只需让纯展示的列标签
-     不吃事件，勾选列（label + checkbox）保持可点。 */
 }
 
-.conditional-format-row-head > span {
+.conditional-format-table-head > span {
   pointer-events: none;
 }
 
@@ -936,14 +1003,8 @@
 /* =====================================================================
    多选列 / 选中行 / 批量操作条
    ===================================================================== */
-
-/* 行网格从 7 列变 8 列（最前插入 checkbox 列） */
-.conditional-format-table .conditional-format-row {
-  grid-template-columns: 30px 34px minmax(72px, 0.9fr) 58px minmax(110px, 1.1fr) minmax(
-      140px,
-      1.6fr
-    ) 46px;
-}
+/* 注：行网格的列模板统一在上方 `.conditional-format-table .conditional-format-row`
+   里定义（8 列，已含最前的 checkbox 列），此处不再重复覆盖。 */
 
 .conditional-format-col-check {
   display: flex;

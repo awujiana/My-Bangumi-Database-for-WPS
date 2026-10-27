@@ -37,6 +37,41 @@ momo 真机：下载完只得到一句「关闭 WPS → 解压覆盖 → 重新�
 
 ## [未发布]
 
+### 表格组件复用：抽出通用列宽 / 行高拖拽，四张表统一接入（2026-10-27）
+
+momo 两条：「表格组件复用检查项目有没有重复实现」+「工作表规则和我的规则和其他的表格
+能手动拖动改变行宽和列高，默认显示自动调整后的行列高度宽度」。
+
+**复用审计结论**：`ts/ui/components/` 原有 8 个组件（context-menu / detachable-panel /
+modal-a11y / modal-drag / option-picker / progress / sortable-list / window-chrome），
+**没有表格组件**。条件格式页四张表各写一套行渲染（工作表规则 = CSS Grid、
+我的规则 = flex、导入弹框 = flex、粘贴表格 = CSS Grid），列宽全写死在 CSS 里，
+用户改不了。另外 `.conditional-format-table .conditional-format-row` 的
+`grid-template-columns` 在同一个文件里定义了**两遍**（7 列 + 8 列），后一份静默覆盖
+前一份 —— 改前一份等于没改。
+
+- **新组件 `ts/ui/components/table-resize.ts`**：`bindTableResize()` 给容器接上
+  「拖列宽 / 拖行高」，拖完记住、**双击把手回到自动**。关键设计：**一列一个 CSS 变量**
+  `--table-col-<i>`，没拖过的列**不写属性**，各行用 `var(--table-col-<i>, <默认>)` 兜底
+  —— 默认列模板因此**只存在于 CSS**，组件不需要知道有几列、每列多宽，也就不会出现
+  「JS 与 CSS 两份默认值漂移」。事件委托挂在容器上（表头每次重渲染换新节点也不丢），
+  `decorate()` 幂等补把手（行高把手本身是表头子元素，必须排除，否则第二次会把它
+  当成一格「列」再插一个把手）。
+- **四张表全部接入**：列宽/行高统一按 `--table-col-<i>` / `--table-row-h` 消费。
+  我的规则与导入弹框原来是 flex 且**没有表头**，改成网格并补了表头行 —— 顺带解决
+  「两个勾选列长得一样、分不清哪个是批量选择、哪个是是否应用」。粘贴表格与导入弹框的
+  表头**吸顶**（`position: sticky` 用更高特异性压过组件的 `position: relative`）。
+- **持久化**：`conditionalFormat.tableSizes.v1` 一个键存四张表（`{existing, library,
+importDialog, paste}`）；坏 JSON / 坏条目（非数字、非正数）退化为「全自动」，
+  不会把整表钉成 0px，也不会让页面初始化失败。
+- **修**：合并那两处重复的 `grid-template-columns`，并补上原先缺的第 8 列
+  （操作列此前落在隐式 `auto` 上）；`.conditional-format-row-head` 的表头观感
+  收敛成共用的 `.conditional-format-table-head`。
+- **测试**：新增 `tests/table-resize.test.ts` 17 例（把手插入 / 幂等 / 默认自动 /
+  拖动夹取最小值 / 双击回自动 / 拖动中光标轴 / reset / destroy / 回调只在松手时触发）；
+  页面测试补 7 例（四张表的表头格数与把手数、拖一列写进存储、重开读回、坏 JSON 兜底）。
+  全量 **176 文件 / 5296 例通过**（上一版 175 / 5272）。
+
 ### 条件格式：批量修改（范围 / 公式 / 颜色）+ 导入下拉 + 粘贴表格（2026-10-27）
 
 momo 三条：「我的规则」的「导入手工规则」要改名「导入工作表规则」，还要有 dropdown

@@ -141,6 +141,11 @@ export declare function buildForeignRuleRowHtml(row: ForeignRuleRow): string;
  *
  * 全选复选框带 `data-action="select-all"`，`indeterminate` 由页面层在渲染后设置
  * （HTML 属性表达不了三态，必须走 DOM property）。
+ *
+ * 三个类各有分工，缺一个都会静默失效：
+ * - `conditional-format-row`：与数据行共用同一套 `--table-cols` 列模板；
+ * - `conditional-format-table-head`：表头观感（灰字/加粗/浅底 + 列名不吃事件）；
+ * - `table-resize-head`：列宽/行高把手的插入点（`decorate()` 只认这个类）。
  */
 export declare function buildForeignRuleHeadHtml(isAllSelected?: boolean): string;
 /**
