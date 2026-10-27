@@ -33,6 +33,7 @@ import {
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
+  parseRulesPayload,
   renameGroupMapping,
   reorderGroups,
   serializeExistingGroups,
@@ -196,6 +197,72 @@ describe('serializeRules / parseRules', () => {
     expect(parseRules('')).toEqual({ rules: [], dropped: 0 })
     expect(parseRules('{"not":"array"}')).toEqual({ rules: [], dropped: 1 })
     expect(parseRules('{oops')).toEqual({ rules: [], dropped: 1 })
+  })
+})
+
+// ========== 规则文件 / 剪贴板 JSON（导入通道） ==========
+
+describe('parseRulesPayload', () => {
+  const sample: ConditionalFormatRule[] = [
+    {
+      id: 'a',
+      name: '当前季高亮',
+      group: '番剧高亮',
+      appliesTo: 'B3:B100',
+      formula: '=$R3=1',
+      interior: '#00B050',
+    },
+    {
+      id: 'b',
+      name: '错误',
+      group: '数据质量',
+      appliesTo: 'C:C',
+      formula: '=$R3="日期格式错误"',
+      interior: '#FFC7CE',
+    },
+  ]
+
+  /** 项目「导出规则」写进文件的包装格式（saveRulesJson 的载荷） */
+  function wrap(rules: readonly ConditionalFormatRule[]): string {
+    return JSON.stringify(
+      {
+        format: 'bgm-conditional-format-rules',
+        version: 1,
+        exportedAt: '2026-10-27T00:00:00.000Z',
+        rules,
+      },
+      null,
+      2,
+    )
+  }
+
+  it('吃导出文件的包装格式', () => {
+    expect(parseRulesPayload(wrap(sample))).toEqual({ rules: sample, dropped: 0 })
+  })
+
+  it('也吃裸数组（PluginStorage 格式 / 手工整理的数组）', () => {
+    expect(parseRulesPayload(JSON.stringify(sample))).toEqual({ rules: sample, dropped: 0 })
+  })
+
+  it('去掉 UTF-8 BOM 与首尾空白（粘贴来的文本常带）', () => {
+    expect(parseRulesPayload(`\u{FEFF}\n  ${wrap(sample)}  \n`)).toEqual({
+      rules: sample,
+      dropped: 0,
+    })
+  })
+
+  it('坏条目计入 dropped，好条目照样导入', () => {
+    const text = wrap([...sample, { id: 'x' }, null] as unknown as ConditionalFormatRule[])
+    const { rules, dropped } = parseRulesPayload(text)
+    expect(rules).toEqual(sample)
+    expect(dropped).toBe(2)
+  })
+
+  it('空文本 / 非法 JSON / 有对象但没有 rules 数组 → 空规则集', () => {
+    expect(parseRulesPayload(' '.repeat(3))).toEqual({ rules: [], dropped: 0 })
+    expect(parseRulesPayload('{oops')).toEqual({ rules: [], dropped: 1 })
+    expect(parseRulesPayload('{"format":"x","items":[]}')).toEqual({ rules: [], dropped: 1 })
+    expect(parseRulesPayload('{"rules":"nope"}')).toEqual({ rules: [], dropped: 1 })
   })
 })
 
@@ -567,11 +634,21 @@ describe('moveItemNear', () => {
 
   it('移到某项之后 / 之前', () => {
     expect(moveItemNear(items, 'a', 'c', true).map((item) => item.id)).toEqual(['b', 'c', 'a', 'd'])
-    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual(['a', 'd', 'b', 'c'])
+    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual([
+      'a',
+      'd',
+      'b',
+      'c',
+    ])
   })
 
   it('overId 为 null = 移到最后', () => {
-    expect(moveItemNear(items, 'a', null, true).map((item) => item.id)).toEqual(['b', 'c', 'd', 'a'])
+    expect(moveItemNear(items, 'a', null, true).map((item) => item.id)).toEqual([
+      'b',
+      'c',
+      'd',
+      'a',
+    ])
   })
 
   it('from / over 有一个不存在就原样返回（调用方跳过持久化）', () => {
@@ -583,7 +660,12 @@ describe('moveItemNear', () => {
     // a 移到 c 之后：先移除 a（b,c,d）再插到 c 后 → b,c,a,d
     expect(moveItemNear(items, 'a', 'c', true).map((item) => item.id)).toEqual(['b', 'c', 'a', 'd'])
     // d 移到 b 之前：移除 d（a,b,c）再插到 b 前 → a,d,b,c
-    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual(['a', 'd', 'b', 'c'])
+    expect(moveItemNear(items, 'd', 'b', false).map((item) => item.id)).toEqual([
+      'a',
+      'd',
+      'b',
+      'c',
+    ])
   })
 })
 
@@ -639,14 +721,20 @@ function singleRow(
 
 describe('mergeDuplicateRules', () => {
   it('仅连续行：连续段合成一条，断开的单独留着', () => {
-    const result = mergeDuplicateRules([singleRow('J2:J2'), singleRow('J3:J3'), singleRow('J4:J4'), singleRow('J7:J7')], 'adjacent')
+    const result = mergeDuplicateRules(
+      [singleRow('J2:J2'), singleRow('J3:J3'), singleRow('J4:J4'), singleRow('J7:J7')],
+      'adjacent',
+    )
     expect(result.rules.map((rule) => rule.range)).toEqual(['J2:J4', 'J7:J7'])
     expect(result.removedCount).toBe(2)
     expect(result.mergedGroups).toBe(1)
   })
 
   it('强行并成一块：取 min..max 一次覆盖（中间空行也被包含）', () => {
-    const result = mergeDuplicateRules([singleRow('J2:J2'), singleRow('J3:J3'), singleRow('J7:J7')], 'union')
+    const result = mergeDuplicateRules(
+      [singleRow('J2:J2'), singleRow('J3:J3'), singleRow('J7:J7')],
+      'union',
+    )
     expect(result.rules.map((rule) => rule.range)).toEqual(['J2:J7'])
     expect(result.removedCount).toBe(2)
   })
@@ -696,7 +784,9 @@ describe('锚定（planAnchorRepair）', () => {
 
   it('范围未变 → 不产生修复项', () => {
     const snapshots = [{ range: 'J2:J100', formula: '=$J2=""', kind: 'expression' as const }]
-    expect(planAnchorRepair(snapshots, { [anchorKeyOf(snapshots[0]!)]: 'J2:J100' }).repairs).toEqual([])
+    expect(
+      planAnchorRepair(snapshots, { [anchorKeyOf(snapshots[0]!)]: 'J2:J100' }).repairs,
+    ).toEqual([])
   })
 
   it('规则已不存在 → 计入 unmatched，不写回', () => {

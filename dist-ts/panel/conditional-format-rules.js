@@ -152,6 +152,18 @@ export function serializeRules(rules) {
     return JSON.stringify(rules);
 }
 /** 反序列化：坏行跳过不致命（与分片解析「非法行不中断」同口径） */
+/** 从数组里挑出合法规则（非法项计数，不静默丢） */
+function collectRules(items) {
+    const rules = [];
+    let dropped = 0;
+    for (const item of items) {
+        if (isConditionalFormatRule(item))
+            rules.push(item);
+        else
+            dropped += 1;
+    }
+    return { rules, dropped };
+}
 export function parseRules(text) {
     if (!text)
         return { rules: [], dropped: 0 };
@@ -164,15 +176,41 @@ export function parseRules(text) {
     }
     if (!Array.isArray(parsed))
         return { rules: [], dropped: 1 };
-    const rules = [];
-    let dropped = 0;
-    for (const item of parsed) {
-        if (isConditionalFormatRule(item))
-            rules.push(item);
-        else
-            dropped += 1;
+    return collectRules(parsed);
+}
+/**
+ * 解析「规则文件 / 剪贴板里的规则 JSON」
+ *
+ * 与 {@link parseRules} 的区别：导出文件是**包装格式**
+ * `{format, version, exportedAt, rules: [...]}`，而 PluginStorage 里存的是裸数组。
+ * 导入必须两种都吃——用户从「导出规则 → 复制到剪贴板」拿到的就是包装格式。
+ *
+ * `dropped` 的语义与 parseRules 一致：1 = 整体不是可识别的 JSON；>1 = 条数不合法。
+ *
+ * @param text 文件内容或粘贴的文本（允许带 UTF-8 BOM 与首尾空白）
+ * @returns 合法规则与丢弃计数
+ */
+export function parseRulesPayload(text) {
+    // BOM：FileReader 会按 BOM 选解码方式，但不会替我们去掉 U+FEFF；手工粘贴
+    // 的文本也可能带 → 直接喂给 JSON.parse 会报错，用户只看到「格式不对」。
+    const trimmed = text.replace(/^\u{FEFF}/u, '').trim();
+    if (trimmed === '')
+        return { rules: [], dropped: 0 };
+    let parsed;
+    try {
+        parsed = JSON.parse(trimmed);
     }
-    return { rules, dropped };
+    catch {
+        return { rules: [], dropped: 1 };
+    }
+    if (Array.isArray(parsed))
+        return collectRules(parsed);
+    if (typeof parsed === 'object' && parsed !== null && 'rules' in parsed) {
+        const { rules } = parsed;
+        if (Array.isArray(rules))
+            return collectRules(rules);
+    }
+    return { rules: [], dropped: 1 };
 }
 // ===== 既有规则的本地分组（视图层：只归组展示，不写工作表）=====
 /** 既有规则分组映射的 PluginStorage 键（key = 公式@范围 → 组名） */

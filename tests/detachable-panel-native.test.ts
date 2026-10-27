@@ -84,7 +84,7 @@ afterEach(() => {
 /** 注册一个 native 模式面板 */
 function createNative(): ReturnType<typeof createDetachablePanel> {
   return createDetachablePanel(section, {
-    title: '规则管理器',
+    title: '工作表规则',
     mode: 'native',
     nativeUrl: './manager.html',
     trigger,

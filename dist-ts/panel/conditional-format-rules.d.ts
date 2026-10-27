@@ -146,8 +146,23 @@ export interface DefaultRulesOptions {
 export declare function buildDefaultRules(options: DefaultRulesOptions): ConditionalFormatRule[];
 /** 序列化（顺序即优先级，原样保留） */
 export declare function serializeRules(rules: readonly ConditionalFormatRule[]): string;
-/** 反序列化：坏行跳过不致命（与分片解析「非法行不中断」同口径） */
 export declare function parseRules(text: string): {
+    rules: ConditionalFormatRule[];
+    dropped: number;
+};
+/**
+ * 解析「规则文件 / 剪贴板里的规则 JSON」
+ *
+ * 与 {@link parseRules} 的区别：导出文件是**包装格式**
+ * `{format, version, exportedAt, rules: [...]}`，而 PluginStorage 里存的是裸数组。
+ * 导入必须两种都吃——用户从「导出规则 → 复制到剪贴板」拿到的就是包装格式。
+ *
+ * `dropped` 的语义与 parseRules 一致：1 = 整体不是可识别的 JSON；>1 = 条数不合法。
+ *
+ * @param text 文件内容或粘贴的文本（允许带 UTF-8 BOM 与首尾空白）
+ * @returns 合法规则与丢弃计数
+ */
+export declare function parseRulesPayload(text: string): {
     rules: ConditionalFormatRule[];
     dropped: number;
 };

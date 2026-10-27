@@ -144,8 +144,11 @@ describe('buildForeignRuleRowHtml', () => {
     expect(html).toContain(`title="${long}"`)
   })
 
-  it('行内不再渲染操作按钮（统一走右键菜单，省出列宽）', () => {
+  it('行内只有 ✎ 编辑 / ⧉ 复制，其余操作统一走右键菜单', () => {
     const html = buildForeignRuleRowHtml(baseRow)
+    expect(html).toContain('data-action="edit"')
+    expect(html).toContain('data-action="duplicate"')
+    // 导入 / 上下移 / 删除仍在右键菜单与批量条里，行内不再占列宽
     for (const action of ['import', 'up', 'down', 'delete']) {
       expect(html).not.toContain(`data-action="${action}"`)
     }
@@ -187,12 +190,11 @@ describe('formatSwatchHtml', () => {
 })
 
 describe('buildForeignRuleHeadHtml', () => {
-  it('七列表头与行列一一对应（不再有「操作」列）', () => {
+  it('八列表头与行列一一对应（含「操作」列）', () => {
     const head = buildForeignRuleHeadHtml()
-    for (const label of ['#', '类型', '格式', '应用于', '公式', '为真则停']) {
+    for (const label of ['#', '类型', '格式', '应用于', '公式', '为真则停', '操作']) {
       expect(head).toContain(`>${label}<`)
     }
-    expect(head).not.toContain('>操作<')
   })
 })
 

@@ -114,7 +114,12 @@ function loadRememberedRect(panelId: string): PanelRect | null {
     const candidate = parsed as Record<string, unknown>
     const numbers = ['left', 'top', 'width', 'height'].map((key) => candidate[key])
     if (numbers.some((value) => typeof value !== 'number' || !Number.isFinite(value))) return null
-    return { left: numbers[0] as number, top: numbers[1] as number, width: numbers[2] as number, height: numbers[3] as number }
+    return {
+      left: numbers[0] as number,
+      top: numbers[1] as number,
+      width: numbers[2] as number,
+      height: numbers[3] as number,
+    }
   } catch {
     // 隐私模式 / 存储被禁：静默回退，不影响当前会话
     return null
@@ -237,7 +242,7 @@ export interface DetachablePanelOptions {
   height?: number | undefined
   /** 挂进窗口标题栏的工具条元素（随窗口显示，不随内容搬家） */
   toolbar?: HTMLElement | null | undefined
-  /** 外部已有的触发按钮（例：条件格式页的「🔍 规则管理器」） */
+  /** 外部已有的触发按钮（例：条件格式页的「工作表规则」） */
   trigger?: HTMLElement | null | undefined
   /**
    * 拖出方式
@@ -692,9 +697,13 @@ export function createDetachablePanel(
         return { ...remembered, left: clamped.left, top: clamped.top }
       })()
     : {
-        ...defaultPanelRect(detachedClosers.length, readViewport(), resolved.width, resolved.height),
+        ...defaultPanelRect(
+          detachedClosers.length,
+          readViewport(),
+          resolved.width,
+          resolved.height,
+        ),
       }
-
 
   function applyPosition(): void {
     root.style.left = `${String(rect.left)}px`

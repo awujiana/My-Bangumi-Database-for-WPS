@@ -21,7 +21,13 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: vi.fn(),
 }))
 
-import { getForeignCondition, moveForeignRule } from '../ts/panel/conditional-format-apply.js'
+import {
+  applyConditionalFormatPlan,
+  duplicateForeignRule,
+  getForeignCondition,
+  moveForeignRule,
+  updateForeignRule,
+} from '../ts/panel/conditional-format-apply.js'
 import type { WpsWorksheet } from '../ts/tools/wps.js'
 
 /** 假规则：Priority 可读写，带两个「置顶/置底」间谍（断言它们永不被调） */
@@ -76,6 +82,59 @@ function makeWorksheet(sheetRules: unknown[], usedRangeRules?: unknown[]): WpsWo
     worksheet.UsedRange = { FormatConditions: makeCollection(usedRangeRules) }
   }
   return worksheet as unknown as WpsWorksheet
+}
+
+/** 可写工作表：Add 会真的往集合里加一条（Count 可观测；`swallowAdd` 模拟静默丢弃） */
+function makeAddableWorksheet(
+  initial: unknown[],
+  options: { swallowAdd?: boolean } = {},
+): { worksheet: WpsWorksheet; rules: unknown[] } {
+  const rules = [...initial]
+  const add = (condition: { Formula1?: string }): Record<string, unknown> => {
+    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    if (options.swallowAdd !== true) rules.push(created)
+    return created
+  }
+  const worksheet = {
+    FormatConditions: {
+      get Count(): number {
+        return rules.length
+      },
+      Item: (index: number) => rules[index - 1],
+      Add: add,
+    },
+    Range: () => ({ FormatConditions: { Add: add } }),
+  } as unknown as WpsWorksheet
+  return { worksheet, rules }
+}
+
+/**
+ * 只有 Sheet 级 FormatConditions 的宿主（没有 UsedRange 级）
+ *
+ * 回归钉：旧实现只认 `UsedRange.FormatConditions`，这种宿主上读取能列出规则、
+ * 点应用却一条也写不进去（added = 0）——用户看到的就是「修改后无法应用到工作表」。
+ */
+function makeSheetLevelWorksheet(): { worksheet: WpsWorksheet; rules: unknown[] } {
+  const rules: unknown[] = []
+  const add = (condition: { Formula1?: string }): Record<string, unknown> => {
+    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    rules.push(created)
+    return created
+  }
+  const worksheet = {
+    FormatConditions: {
+      get Count(): number {
+        return rules.length
+      },
+      Item: (index: number) => rules[index - 1],
+      Delete: () => {
+        rules.length = 0
+      },
+      Add: add,
+    },
+    Range: () => ({ FormatConditions: { Add: add } }),
+  } as unknown as WpsWorksheet
+  return { worksheet, rules }
 }
 
 beforeEach(() => {
@@ -229,5 +288,209 @@ describe('getForeignCondition', () => {
   it('越界下标宿主返回 undefined → 收敛成 null', () => {
     const worksheet = makeWorksheet([makeRule(1)])
     expect(getForeignCondition(worksheet, 5)).toBeNull()
+  })
+})
+
+// ===== 编辑 / 复制既有规则（2026-10-27 用户反馈：改了不生效、不能编辑和复制）=====
+
+interface EditableRuleState {
+  formula: string
+  range: string
+  fill: number
+  font: number
+  /** true = 公式赋值被宿主静默忽略（只读代理） */
+  ignoreFormulaWrite?: boolean
+  /** true = ModifyAppliesToRange 被静默忽略 */
+  ignoreRangeWrite?: boolean
+}
+
+/**
+ * 假规则：公式 / 范围 / 颜色都可读写，可按需模拟「接受写入但不生效」
+ *
+ * 颜色用数字（与宿主 Interior.Color 同口径），断言时按 hex 比对。
+ */
+function makeEditableRule(initial: EditableRuleState): {
+  rule: Record<string, unknown>
+  state: EditableRuleState
+} {
+  const state = { ...initial }
+  const rule: Record<string, unknown> = {
+    get Formula1(): string {
+      return state.formula
+    },
+    set Formula1(next: string) {
+      if (state.ignoreFormulaWrite !== true) state.formula = next
+    },
+    get AppliesTo(): { Address: string } {
+      return { Address: state.range }
+    },
+    ModifyAppliesToRange(next: string): void {
+      if (state.ignoreRangeWrite !== true) state.range = next
+    },
+    get Interior(): { Color: number } {
+      return { Color: state.fill }
+    },
+    get Font(): { Color: number } {
+      return { Color: state.font }
+    },
+    With: vi.fn((options: { Interior?: { Color?: string | number } }) => {
+      const color = options.Interior?.Color
+      if (typeof color === 'number') state.fill = color
+    }),
+  }
+  return { rule, state }
+}
+
+describe('updateForeignRule：编辑既有规则（范围 / 公式 / 颜色）', () => {
+  it('改公式：写入成功并回报改了哪项', () => {
+    const { rule, state } = makeEditableRule({
+      formula: '=$R3="26年10月"',
+      range: 'B3:B100',
+      fill: 0x00_00_ff,
+      font: 0x00_00_00,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { formula: '=$R3="26年7月"' })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.changed).toEqual(['公式'])
+    expect(state.formula).toBe('=$R3="26年7月"')
+  })
+
+  it('宿主静默忽略公式写入 → 回读抓到，明确报错（不报假成功）', () => {
+    const { rule } = makeEditableRule({
+      formula: '=$R3="26年10月"',
+      range: 'B3:B100',
+      fill: 0,
+      font: 0,
+      ignoreFormulaWrite: true,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { formula: '=$R3="26年7月"' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('公式未写入')
+  })
+
+  it('改范围：ModifyAppliesToRange 生效后回读一致', () => {
+    const { rule, state } = makeEditableRule({
+      formula: '=$R3=""',
+      range: 'B3:B100',
+      fill: 0,
+      font: 0,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { range: 'C3:C100' })
+
+    expect(result.ok).toBe(true)
+    expect(state.range).toBe('C3:C100')
+  })
+
+  it('范围写入被忽略 → 报「范围未写入」并带上宿主回读值', () => {
+    const { rule } = makeEditableRule({
+      formula: '=$R3=""',
+      range: 'B3:B100',
+      fill: 0,
+      font: 0,
+      ignoreRangeWrite: true,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { range: 'C3:C100' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toContain('范围未写入')
+      expect(result.error).toContain('B3:B100')
+    }
+  })
+
+  it('没有任何改动时明确失败（不发空写入）', () => {
+    const { rule } = makeEditableRule({ formula: '=A1', range: 'A1:A9', fill: 0, font: 0 })
+    const worksheet = makeWorksheet([rule])
+    const result = updateForeignRule(worksheet, 1, {})
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('没有任何改动')
+  })
+
+  it('规则不存在 → 明说定位不到，不抛异常', () => {
+    const worksheet = makeWorksheet([])
+    const result = updateForeignRule(worksheet, 3, { formula: '=A1' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('定位不到')
+  })
+})
+
+describe('duplicateForeignRule：复制成新规则', () => {
+  it('复制到指定范围：条数 +1，公式与格式照搬', () => {
+    const { rule } = makeEditableRule({ formula: '=$R3=""', range: 'B3:B100', fill: 0, font: 0 })
+    const { worksheet, rules } = makeAddableWorksheet([rule])
+
+    const result = duplicateForeignRule(worksheet, 1, 'C3:C100')
+
+    expect(result).toEqual({ ok: true, range: 'C3:C100' })
+    expect(rules).toHaveLength(2)
+  })
+
+  it('不传范围时复制到原范围', () => {
+    const { rule } = makeEditableRule({ formula: '=$R3=""', range: 'B3:B100', fill: 0, font: 0 })
+    const { worksheet } = makeAddableWorksheet([rule])
+    const result = duplicateForeignRule(worksheet, 1)
+    expect(result).toEqual({ ok: true, range: 'B3:B100' })
+  })
+
+  it('Add 返回对象但条数没涨 → 报「复制未生效」', () => {
+    const { rule } = makeEditableRule({ formula: '=$R3=""', range: 'B3:B100', fill: 0, font: 0 })
+    const { worksheet } = makeAddableWorksheet([rule], { swallowAdd: true })
+    const result = duplicateForeignRule(worksheet, 1, 'C3:C100')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('复制未生效')
+  })
+
+  it('公式读不到（数据条 / 色阶等）→ 明确拒绝', () => {
+    const { worksheet } = makeAddableWorksheet([{ Formula1: '', AppliesTo: { Address: 'A1:A9' } }])
+    const result = duplicateForeignRule(worksheet, 1, 'B1:B9')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('无法复制')
+  })
+})
+
+describe('applyConditionalFormatPlan：应用链路', () => {
+  it('只有 Sheet 级集合也能写入，并回读实际条数', () => {
+    const { worksheet, rules } = makeSheetLevelWorksheet()
+    const result = applyConditionalFormatPlan(worksheet, {
+      entries: [
+        {
+          source: 'plugin',
+          rule: {
+            id: 'r1',
+            name: '测试',
+            group: '高亮',
+            appliesTo: 'B3:B100',
+            formula: '=$R3=""',
+            interior: '#00B050',
+          },
+        },
+      ],
+      discarded: [],
+      warnings: [],
+    })
+
+    expect(result.added).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(result.verified).toBe(1)
+    expect(rules).toHaveLength(1)
+  })
+
+  it('宿主不支持 Add → added 0、verified -1（页面据此报「写不进去」而不是「已写入 0 条」）', () => {
+    const result = applyConditionalFormatPlan({} as unknown as WpsWorksheet, {
+      entries: [],
+      discarded: [],
+      warnings: [],
+    })
+    expect(result).toEqual({ added: 0, failed: 0, verified: -1 })
   })
 })

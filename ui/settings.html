@@ -303,7 +303,8 @@
               <span>启用全局快捷键（键盘组合 + 侧栏鼠标手势）</span>
             </label>
             <p class="hint">
-              键盘快捷键在所有页面生效；焦点在输入框 / 下拉框里时不抢键。点右侧组合按钮后按下新按键即可改绑，Esc
+              键盘快捷键在所有页面生效；焦点在输入框 /
+              下拉框里时不抢键。点右侧组合按钮后按下新按键即可改绑，Esc
               取消；与其它动作重复的组合不会保存，并在下方提示占用者。
             </p>
             <div class="shortcut-list" id="shortcutList"></div>
@@ -342,8 +343,8 @@
               </button>
             </div>
             <p class="hint">
-              「记录当前账号」把现在生效的 Token 与识别到的用户 ID 存成一条档案（同一账号重复记录只更新，不重复）。最多保留
-              8 个。
+              「记录当前账号」把现在生效的 Token 与识别到的用户 ID
+              存成一条档案（同一账号重复记录只更新，不重复）。最多保留 8 个。
             </p>
           </div>
         </section>
@@ -562,7 +563,8 @@
             </button>
           </h3>
           <p class="hint">
-            条件格式页「规则管理器 → 自动聚类」按这里的口径分组。改完口径回到条件格式页再点一次「自动聚类」即按新口径重排（聚类只改本地视图分组，不动工作表上的规则）。
+            条件格式页「工作表规则 →
+            自动聚类」按这里的口径分组。改完口径回到条件格式页再点一次「自动聚类」即按新口径重排（聚类只改本地视图分组，不动工作表上的规则）。
           </p>
           <div class="form-group">
             <label>自动聚类口径</label>
@@ -573,9 +575,7 @@
               <button type="button" class="theme-mode-btn" data-cluster-mode="range-formula">
                 按范围 + 公式
               </button>
-              <button type="button" class="theme-mode-btn" data-cluster-mode="column">
-                按列
-              </button>
+              <button type="button" class="theme-mode-btn" data-cluster-mode="column">按列</button>
               <button type="button" class="theme-mode-btn" data-cluster-mode="row">按行</button>
             </div>
             <p class="hint">
@@ -594,8 +594,10 @@
               </button>
             </div>
             <p class="hint">
-              条件格式页「规则管理器 → 🔗 合并重复项」按这里的口径合并：同公式、同列的多条**单行**规则并成一条。
-              「仅连续行」只合并行号连续的一段（2,3,4 → J2:J4），断开的行保持原样；「强行并成一块」取最小到最大一次覆盖，
+              条件格式页「工作表规则 → 🔗
+              合并重复项」按这里的口径合并：同公式、同列的多条**单行**规则并成一条。
+              「仅连续行」只合并行号连续的一段（2,3,4 →
+              J2:J4），断开的行保持原样；「强行并成一块」取最小到最大一次覆盖，
               **中间空行也会被加上格式**，差距大时要留意。
             </p>
           </div>
@@ -711,23 +713,27 @@
           <p class="hint">
             <strong>导出范围</strong>：Bangumi Token 与多账号列表（含用户资料与过期时间）、GitHub
             仓库配置（含同步源类型、Gist ID、分片选择、同步策略）、外观（主题 / 定时切换 /
-            模态框按钮位置）、导航（图标模式 / 分块排序 / 折叠隐藏）、快捷键绑定、同步选项、默认导入导出路径、日志级别、富化（预览设置 /
-            自动探测）、番剧高亮（列映射 / 模式 / 筛选范围 / 非动漫）、<strong>条件格式</strong>（规则库 /
-            应用策略 / 目标工作表 / 聚类与合并口径 / 分组命名 / <strong>锚定与固定记录</strong>）、数据清理的规则开关。
+            模态框按钮位置）、导航（图标模式 / 分块排序 /
+            折叠隐藏）、快捷键绑定、同步选项、默认导入导出路径、日志级别、富化（预览设置 /
+            自动探测）、番剧高亮（列映射 / 模式 / 筛选范围 /
+            非动漫）、<strong>条件格式</strong>（规则库 / 应用策略 / 目标工作表 / 聚类与合并口径 /
+            分组命名 / <strong>锚定与固定记录</strong>）、数据清理的规则开关。
           </p>
           <p class="hint">
             <strong>不在导出范围</strong>（刻意的，非遗漏）：会话态与缓存 —— 各页锁定的工作表实例
-            <code>bgm_locked_sheet_*</code>、面板显示信号 <code>bgm_panel_shown_at</code>、COM 卡顿观测
-            <code>bgm_com_stall_*</code>、数据上下文 <code>bgm_data_context</code>、目标探测缓存
+            <code>bgm_locked_sheet_*</code>、面板显示信号 <code>bgm_panel_shown_at</code>、COM
+            卡顿观测 <code>bgm_com_stall_*</code>、数据上下文
+            <code>bgm_data_context</code>、目标探测缓存
             <code>bgm_target_detect_cache</code>；以及按工作簿记住的清理勾选
-            <code>bgm_clean_sheets:</code>（键里是本机文件绝对路径，换机器对不上，到新机器重新勾选即可）。
+            <code>bgm_clean_sheets:</code
+            >（键里是本机文件绝对路径，换机器对不上，到新机器重新勾选即可）。
           </p>
           <p class="hint">
             <strong>更新会不会丢配置</strong>：所有配置存在 WPS 的 PluginStorage（按加载项 ID
-            存放），<strong>更新插件（替换加载项目录 / 覆盖 dist）不会清除</strong>，规则库、锚定与固定记录、
-            账号与偏好都会原样保留；只有卸载加载项、清理 WPS 缓存或换机器才会丢 ——
-            这些场景用上面的导出 / 导入兜底。各工具的运行记录（同步 / 富化 / 清理日志）在「数据导出」里另行导出为
-            CSV / TXT。
+            存放），<strong>更新插件（替换加载项目录 / 覆盖 dist）不会清除</strong
+            >，规则库、锚定与固定记录、 账号与偏好都会原样保留；只有卸载加载项、清理 WPS
+            缓存或换机器才会丢 —— 这些场景用上面的导出 / 导入兜底。各工具的运行记录（同步 / 富化 /
+            清理日志）在「数据导出」里另行导出为 CSV / TXT。
           </p>
         </section>
 

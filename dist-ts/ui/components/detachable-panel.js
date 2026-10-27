@@ -89,7 +89,12 @@ function loadRememberedRect(panelId) {
         const numbers = ['left', 'top', 'width', 'height'].map((key) => candidate[key]);
         if (numbers.some((value) => typeof value !== 'number' || !Number.isFinite(value)))
             return null;
-        return { left: numbers[0], top: numbers[1], width: numbers[2], height: numbers[3] };
+        return {
+            left: numbers[0],
+            top: numbers[1],
+            width: numbers[2],
+            height: numbers[3],
+        };
     }
     catch {
         // 隐私模式 / 存储被禁：静默回退，不影响当前会话

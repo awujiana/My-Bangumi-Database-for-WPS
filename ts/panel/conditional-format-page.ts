@@ -15,6 +15,7 @@ import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js'
 import {
   BGM,
   bgmLog,
+  copyTextWithResult,
   findHeaderRow,
   getApp,
   getColumnMap,
@@ -58,6 +59,7 @@ import {
   normalizeHexColor,
   parseExistingGroups,
   parseRules,
+  parseRulesPayload,
   planApply,
   renameGroupMapping,
   reorderGroups,
@@ -101,13 +103,16 @@ import {
   applyConditionalFormatPlan,
   checkFormatConditionsReadable,
   deleteForeignRule,
+  duplicateForeignRule,
   isFormatConditionsSupported,
   moveForeignRule,
   readForeignRules,
   setForeignAppliesTo,
   setForeignFormula,
   setForeignStopIfTrue,
+  updateForeignRule,
 } from './conditional-format-apply.js'
+import type { ForeignRulePatch } from './conditional-format-apply.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
@@ -148,6 +153,30 @@ interface PageState {
   editingId: string | null
   /** 编辑器是否为「新建」模式 */
   editingIsNew: boolean
+  /**
+   * 编辑器作用于哪里：`library` = 「我的规则」里的条目（写 PluginStorage）；
+   * `worksheet` = 工作表上的一条既有规则（直接写 COM）
+   *
+   * 两种模式共用同一个弹窗（颜色选择器 / 最大化 / 拖动缩放都复用），
+   * 靠这个字段在 {@link saveEditor} 里分流——不复制一份弹窗出来。
+   */
+  editingTarget: 'library' | 'worksheet'
+  /** 编辑工作表规则时的 1 基序号（editingTarget === 'worksheet' 时有效） */
+  editingExistingIndex: number
+  /**
+   * 打开编辑器时的字段初值（工作表规则模式）
+   *
+   * 保存时只写**与初值不同**的字段：颜色字段在宿主读不到时会预填默认色
+   * （填充 `#00B050` / 字体 `#000000`），直接拿「当前值 vs 快照」比会把默认色
+   * 当成用户的修改写回工作表 —— 用户只改了公式，字体却被顺手染成黑色。
+   */
+  editingBaseline: {
+    range: string
+    formula: string
+    fill: string
+    font: string
+    bold: boolean
+  } | null
   /** 搜索词（规则库） */
   searchQuery: string
   /**
@@ -202,7 +231,7 @@ interface PageState {
    * 导入弹框打开时的快照副本（确认导入直接用它，不走可能已过期的 state.existing）
    *
    * 弹框里的勾选**不单独存 state**：与表格共用 {@link existingSelection}
-   * （momo：规则管理器勾选与「选择要导入的规则」弹框要联动——两处勾的是
+   * （momo：工作表规则勾选与「选择要导入的规则」弹框要联动——两处勾的是
    * 同一批工作表规则，各存一套必然「没联动」）。
    */
   importForeignRules: ForeignRuleSnapshot[]
@@ -237,6 +266,9 @@ const state: PageState = {
   clipboard: [],
   editingId: null,
   editingIsNew: false,
+  editingTarget: 'library',
+  editingExistingIndex: 0,
+  editingBaseline: null,
   searchQuery: '',
   pendingStrategy: CONDITIONAL_FORMAT_STRATEGY_FALLBACK,
   existing: [],
@@ -609,6 +641,7 @@ function renderExistingBatchBar(): void {
   bar.innerHTML = `
     <span class="conditional-format-batch-count">已选 ${String(selectedCount)} 条</span>
     <button type="button" class="bgm-btn small" data-batch-action="group" title="把所选规则归入一个分组（本地视图分组，可收起展开；导入时组名会带进规则库）">🏷 归入分组</button>
+    <button type="button" class="bgm-btn small" data-batch-action="edit" title="批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填；改完立刻写表）">✎ 批量修改</button>
     <button type="button" class="bgm-btn small" data-batch-action="import" ${
       rebuildableCount === 0 ? 'disabled' : ''
     } title="${rebuildableCount === 0 ? '所选规则里没有可导入的公式类规则' : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
@@ -714,7 +747,8 @@ function handleExistingTableClick(event: MouseEvent): void {
   )
   if (anchorGroupButton) {
     const group = anchorGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
-    const axis = anchorGroupButton.dataset.action === 'anchor-existing-group-rows' ? 'row' : 'column'
+    const axis =
+      anchorGroupButton.dataset.action === 'anchor-existing-group-rows' ? 'row' : 'column'
     if (group !== '') anchorExistingGroup(group, axis)
     return
   }
@@ -755,6 +789,14 @@ function handleExistingTableClick(event: MouseEvent): void {
       deleteForeignRuleRow(index)
       break
     }
+    case 'edit': {
+      openExistingRuleEditor(index)
+      break
+    }
+    case 'duplicate': {
+      openDuplicateModal(index)
+      break
+    }
     case 'up': {
       moveForeignRuleRow(index, -1)
       break
@@ -774,6 +816,10 @@ function handleBatchAction(action: string): void {
   switch (action) {
     case 'group': {
       openGroupNameModal()
+      break
+    }
+    case 'edit': {
+      openBatchEdit('worksheet')
       break
     }
     case 'import': {
@@ -953,7 +999,7 @@ function openGroupNameModal(): void {
     const onlyName = names.size === 1 ? names.values().next().value : undefined
     input.value = typeof onlyName === 'string' ? onlyName : ''
   }
-  setText('conditionalFormatGroupTitle', '归入分组')
+  setText('conditionalFormatGroupLabel', '归入分组')
   setText(
     'conditionalFormatGroupHint',
     `把所选的 ${String(indices.length)} 条规则归入同一分组。分组只影响本页展示（可收起展开），并会在导入规则库时作为组名带过去。`,
@@ -977,7 +1023,7 @@ function openRenameGroupModal(group: string): void {
   state.renamingGroup = group
   const input = inputById('conditionalFormatGroupName')
   if (input) input.value = group
-  setText('conditionalFormatGroupTitle', '重命名分组')
+  setText('conditionalFormatGroupLabel', '重命名分组')
   setText(
     'conditionalFormatGroupHint',
     `分组「${group}」下有 ${String(count)} 条规则，将全部改用新组名。分组只影响本页展示，不会改写工作表。`,
@@ -1279,7 +1325,11 @@ function repairAnchors(isAuto: boolean): number {
   for (const repair of plan.repairs) {
     const result = setForeignAppliesTo(entry.worksheet, repair.index + 1, repair.range)
     if (result.ok) repaired += 1
-    else bgmLog(LOG_LEVELS.WARN, `[conditionalFormat] 锚定修复失败（第 ${String(repair.index + 1)} 条）：${result.error}`)
+    else
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[conditionalFormat] 锚定修复失败（第 ${String(repair.index + 1)} 条）：${result.error}`,
+      )
   }
   bgmLog(
     LOG_LEVELS.INFO,
@@ -1598,7 +1648,7 @@ function syncImportedRulesInStore(
       ...(patch.formula !== undefined && { formula: patch.formula }),
     }
   })
-  if (synced > 0) persistRules()
+  if (synced > 0) persistRules(false)
   return synced
 }
 
@@ -1670,8 +1720,33 @@ function loadRules(): void {
   }
 }
 
-function persistRules(): void {
+/**
+ * 落盘规则库
+ *
+ * @param shouldNotifyApply 是否提示「还没写进工作表」。默认 true：规则库是本地库，
+ *   改完不点应用表上不会有变化——这句话原先写死在模块提示里，用户滑过去就看不见，
+ *   改完以为该生效。工作表 → 规则库的同步（`syncImportedRulesInStore`）传 false：
+ *   那种改动本来就已经在表上了，再提示「去点应用」是错的。
+ */
+function persistRules(shouldNotifyApply = true): void {
   setConfig(CONDITIONAL_FORMAT_STORE_KEY, serializeRules(state.rules))
+  if (shouldNotifyApply) notifyApplyNeeded()
+}
+
+/** 上次「未应用到工作表」提示的时间（防抖：拖拽连续调序会连写多次盘，不该刷屏） */
+let lastApplyNoticeAt = 0
+
+/**
+ * 提示「改动只在『我的规则』里，还没写进工作表」
+ *
+ * 2 秒内重复触发只提示一次：拖拽调序 / 连续勾选隐藏都会连写，逐次弹 toast 会盖住
+ * 用户正在看的表格。
+ */
+function notifyApplyNeeded(): void {
+  const now = Date.now()
+  if (now - lastApplyNoticeAt < 2000) return
+  lastApplyNoticeAt = now
+  showToast('改动已存进「我的规则」，点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表', 'info')
 }
 
 function loadExistingGroups(): void {
@@ -1718,8 +1793,65 @@ function deleteRule(id: string): void {
 
 function copyRules(ids: readonly string[]): void {
   if (ids.length === 0) return
+  // 内部剪贴板（「粘贴」出副本用）与系统剪贴板是两回事：
+  // 只写内部的话，用户按 Ctrl+V 到别处什么也拿不到，会以为「复制没生效」。
   state.clipboard = [...ids]
-  showToast(`已复制 ${String(ids.length)} 条规则到剪贴板`, 'success')
+  const sources = state.rules.filter((rule) => ids.includes(rule.id))
+  void copyRulesToSystemClipboard(sources)
+}
+
+/** 规则的 JSON 载荷（系统剪贴板与「导出到剪贴板」共用同一格式，粘回来能直接导） */
+function rulesPayloadJson(rules: readonly ConditionalFormatRule[]): string {
+  return JSON.stringify(
+    {
+      format: 'bgm-conditional-format-rules',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      rules,
+    },
+    null,
+    2,
+  )
+}
+
+/**
+ * 把文本写进**系统**剪贴板
+ *
+ * 先走 execCommand（WPS WebView 里 Clipboard API 常不可用，这是唯一可靠路径），
+ * 失败再退回 `navigator.clipboard`（普通浏览器 / 安全上下文）。
+ *
+ * @returns 是否真的写进去了（调用方据此决定提示语气）
+ */
+async function copyTextToSystemClipboard(text: string): Promise<boolean> {
+  if (copyTextWithResult(text).ok) return true
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 复制规则到系统剪贴板（⧉ 按钮）
+ *
+ * 失败不静默：内部剪贴板仍然可用（「粘贴」照样能出副本），但必须说清
+ * 「系统剪贴板没写进去」，否则用户粘到别处是空的还以为功能坏了。
+ */
+async function copyRulesToSystemClipboard(rules: readonly ConditionalFormatRule[]): Promise<void> {
+  if (rules.length === 0) {
+    showToast('已复制到插件剪贴板（规则已不存在）', 'warn')
+    return
+  }
+  const isOk = await copyTextToSystemClipboard(rulesPayloadJson(rules))
+  if (isOk) {
+    showToast(
+      `已复制 ${String(rules.length)} 条规则到系统剪贴板（点「粘贴」可生成副本）`,
+      'success',
+    )
+  } else {
+    showToast('系统剪贴板不可用：仍可用「粘贴」生成副本，或改用「导出规则 → 复制到剪贴板」', 'warn')
+  }
 }
 
 function pasteRules(): void {
@@ -1740,17 +1872,159 @@ function pasteRules(): void {
 /** 粘贴来源的会话态（弹窗开着期间的数据源；关闭即清） */
 let pasteSources: ConditionalFormatRule[] = []
 
+/**
+ * 粘贴弹窗的模式：`library` = 粘贴规则库条目（生成副本进库）；
+ * `worksheet` = 复制工作表上的一条既有规则（直接 Add 到工作表）
+ *
+ * 两种操作本质都是「同公式同格式、换个范围」，故共用同一个弹窗（同一个范围输入框、
+ * 同一套定位与滚动锁），只有确认后的落点不同。
+ */
+let pasteTarget: 'library' | 'worksheet' = 'library'
+
+/** 复制工作表规则时的源序号（1 基；`pasteTarget === 'library'` 时无意义） */
+let pasteWorksheetIndex = 0
+
+/** 粘贴弹窗里的一条待粘贴项（多条规则时逐条可改范围） */
+interface PasteRow {
+  source: ConditionalFormatRule
+  range: string
+  formula: string
+  interior: string
+  fontColor: string
+  fontBold: boolean
+}
+
+/** 待粘贴的多条规则（单条粘贴时为空：那条走 #conditionalFormatPasteRange） */
+let pasteRows: PasteRow[] = []
+
 /** 打开「粘贴规则」弹窗：预填原范围，定位三件套与其它模态框一致 */
 function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
   pasteSources = [...sources]
-  const firstRange = sources[0]?.appliesTo ?? ''
+  pasteTarget = 'library'
+  pasteWorksheetIndex = 0
+  setText('conditionalFormatPasteLabel', '📋 粘贴规则')
+  const hint = byId('conditionalFormatPasteHint')
+  const isBatch = sources.length > 1
+  // 两套视图：单条 = 一个范围输入框；多条 = 表格（逐条看公式/配色、逐条改范围）
+  setElementVisible('conditionalFormatPasteRange', !isBatch)
+  setElementVisible('conditionalFormatPasteBatch', isBatch)
+  if (isBatch) {
+    pasteRows = sources.map((rule) => ({
+      source: rule,
+      range: rule.appliesTo,
+      formula: rule.formula,
+      interior: rule.interior,
+      fontColor: rule.fontColor ?? '',
+      fontBold: rule.fontBold === true,
+    }))
+    if (hint) {
+      hint.textContent = `将粘贴 ${String(sources.length)} 条规则。可在表格里逐条改应用范围，或用上面的输入框批量统一。`
+    }
+    renderPasteTable()
+  } else {
+    pasteRows = []
+    if (hint) {
+      hint.textContent = `将粘贴 ${String(sources.length)} 条规则。目标范围（留空保持原范围）：`
+    }
+    const input = inputById('conditionalFormatPasteRange')
+    if (input) input.value = sources[0]?.appliesTo ?? ''
+  }
+  showPasteMask()
+}
+
+/** 按 id 显示 / 隐藏一个元素（同时清 hidden 属性与内联 display，两边都不留死角） */
+function setElementVisible(id: string, isVisible: boolean): void {
+  const element = byId(id)
+  if (element) {
+    // hidden 属性优先级高于内联 display：只改 style 的话，HTML 里带 hidden 的
+    // 节点「显示」时依旧看不见（粘贴表格的初始态就是 hidden）
+    element.hidden = !isVisible
+    element.style.display = isVisible ? '' : 'none'
+  }
+}
+
+/** 渲染粘贴弹窗里的规则表格（表头 + 每行：序号 / 名称 / 公式 / 色块 / 范围输入） */
+function renderPasteTable(): void {
+  const container = byId('conditionalFormatPasteTable')
+  if (!container) return
+  const head = `<div class="conditional-format-paste-row conditional-format-paste-row--head">
+      <span>#</span><span>规则名</span><span>公式</span><span>色</span><span>应用范围</span>
+    </div>`
+  const rows = pasteRows
+    .map(
+      (row, index) => `
+    <div class="conditional-format-paste-row" data-paste-row="${String(index + 1)}">
+      <span>${String(index + 1)}</span>
+      <span class="conditional-format-paste-name" title="${escapeHtml(row.source.name)}">${escapeHtml(row.source.name)}</span>
+      <span class="conditional-format-paste-formula" title="${escapeHtml(row.formula)}">${escapeHtml(row.formula)}</span>
+      <span class="conditional-format-paste-swatch" style="background:${escapeHtml(row.interior)}" title="${escapeHtml(row.interior)}"></span>
+      <input
+        type="text"
+        class="conditional-format-input"
+        data-paste-range="${String(index + 1)}"
+        value="${escapeHtml(row.range)}"
+        placeholder="如 B3:B1048576"
+        aria-label="第 ${String(index + 1)} 条的应用范围"
+      />
+    </div>`,
+    )
+    .join('')
+  container.innerHTML = head + rows
+}
+
+/** 表格里逐条改范围：把输入框的值写回模型（不重渲染，免得打断输入） */
+function handlePasteTableInput(event: Event): void {
+  const { target } = event
+  if (!(target instanceof HTMLInputElement)) return
+  const index = Number(target.dataset.pasteRange ?? '0')
+  const row = pasteRows[index - 1]
+  if (row) row.range = target.value.trim()
+}
+
+/** 「应用到全部」：把统一范围填进每一行 */
+function applyPasteUniformRange(): void {
+  const value = (inputById('conditionalFormatPasteUniformRange')?.value ?? '').trim()
+  if (value === '') {
+    showToast('先在上面填一个应用范围', 'warn')
+    return
+  }
+  if (pasteRows.length === 0) return
+  for (const row of pasteRows) row.range = value
+  renderPasteTable()
+  showToast(`已把 ${String(pasteRows.length)} 条的应用范围统一为 ${value}`, 'success')
+}
+
+/**
+ * 打开「复制工作表规则」弹窗（⧉）
+ *
+ * 与粘贴同一个框：预填源规则的范围，用户改成新范围即可在同一张表上得到副本。
+ * 留空 = 复制到原范围（用于「同一范围再加一条不同优先级的规则」）。
+ */
+function openDuplicateModal(index: number): void {
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    return
+  }
+  if (snapshot.kind !== 'expression' || snapshot.formula === '') {
+    showToast('这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）', 'warn')
+    return
+  }
+  pasteSources = []
+  pasteTarget = 'worksheet'
+  pasteWorksheetIndex = index
+  setText('conditionalFormatPasteLabel', '⧉ 复制规则')
   const hint = byId('conditionalFormatPasteHint')
   if (hint) {
-    hint.textContent = `将粘贴 ${String(sources.length)} 条规则。目标范围（留空保持原范围）：`
+    hint.textContent = `将把第 ${String(index)} 条（${snapshot.range || '范围未知'}）复制成一条新规则，公式与格式照搬。目标范围（留空保持原范围）：`
   }
   const input = inputById('conditionalFormatPasteRange')
-  if (input) input.value = firstRange
+  if (input) input.value = snapshot.range
+  showPasteMask()
+}
 
+/** 打开粘贴 / 复制弹窗的遮罩（两模式共用定位三件套） */
+function showPasteMask(): void {
   const mask = byId('conditionalFormatPasteMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
@@ -1763,12 +2037,16 @@ function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
     if (modal) bringModalIntoView(mask, modal)
   }
   lockModalScroll()
-  // 打开即聚焦：用户可以直接改范围回车确认，不用先点一下输入框
+  // 打开即聚焦：用户可以直接改范围回车确认，不用先点一下输入框。
+  // 多条规则时焦点给「统一范围」——逐条改属于例外路径，不抢焦点。
+  const focusId =
+    pasteRows.length > 1 ? 'conditionalFormatPasteUniformRange' : 'conditionalFormatPasteRange'
+  const input = inputById(focusId)
   input?.focus()
   input?.select()
 }
 
-/** 关闭「粘贴规则」弹窗（没开时 no-op：Esc 块连调五个 close，别乱解滚动锁） */
+/** 关闭「粘贴 / 复制」弹窗（没开时 no-op：Esc 块连调五个 close，别乱解滚动锁） */
 function closePasteModal(): void {
   const mask = byId('conditionalFormatPasteMask')
   // 没开 = no-op：Esc 块连调五个 close，没开的不能解别人的滚动锁
@@ -1776,12 +2054,28 @@ function closePasteModal(): void {
   if (mask) {
     mask.style.display = 'none'
     pasteSources = []
+    pasteRows = []
+    pasteTarget = 'library'
+    pasteWorksheetIndex = 0
+    setElementVisible('conditionalFormatPasteBatch', false)
+    setElementVisible('conditionalFormatPasteRange', true)
+    const uniform = inputById('conditionalFormatPasteUniformRange')
+    if (uniform) uniform.value = ''
     unlockModalScroll()
   }
 }
 
 /** 确认粘贴：按弹窗里的目标范围生成副本（公式行号引用跟着平移） */
 function confirmPaste(): void {
+  if (pasteTarget === 'worksheet') {
+    confirmDuplicateRule()
+    return
+  }
+  // 多条：逐行用自己的范围（表格里改过），批量修改过的公式/配色也一并带上
+  if (pasteRows.length > 0) {
+    confirmBatchPaste()
+    return
+  }
   const sources = pasteSources
   if (sources.length === 0) {
     closePasteModal()
@@ -1805,6 +2099,375 @@ function confirmPaste(): void {
   closePasteModal()
   renderRuleList()
   showToast(`已粘贴 ${String(copies.length)} 条规则到 ${targetRange}`, 'success')
+}
+
+/**
+ * 确认粘贴（多条）：逐行按各自的范围生成副本
+ *
+ * 行号平移只在「公式没被批量改过」时做：用户显式填的公式是**按目标范围写好的**，
+ * 再按行差平移一次反而错位（例如统一填 `=$R3="x"` 又换了范围）。
+ */
+function confirmBatchPaste(): void {
+  const rows = pasteRows
+  const copies = rows.map((row) => {
+    const range = row.range === '' ? row.source.appliesTo : row.range
+    const isFormulaEdited = row.formula !== row.source.formula
+    const formula = isFormulaEdited
+      ? row.formula
+      : shiftFormulaRows(
+          row.formula,
+          firstRowOfRange(range) - firstRowOfRange(row.source.appliesTo),
+        )
+    return {
+      ...row.source,
+      id: nextId(),
+      name: `${row.source.name} 副本`,
+      appliesTo: range,
+      formula,
+      interior: row.interior,
+      ...(row.fontColor !== '' && { fontColor: row.fontColor }),
+      fontBold: row.fontBold,
+    }
+  })
+  state.rules = [...state.rules, ...copies]
+  persistRules()
+  closePasteModal()
+  renderRuleList()
+  const ranges = new Set(copies.map((copy) => copy.appliesTo))
+  const target = ranges.size === 1 ? [...ranges][0] : `${String(ranges.size)} 个范围`
+  showToast(`已粘贴 ${String(copies.length)} 条规则到 ${target ?? ''}`, 'success')
+}
+
+// ===== 批量修改（应用范围 / 公式 / 颜色）=====
+
+/**
+ * 批量修改的目标
+ *
+ * 三处入口共用同一个弹窗：`library` = 我的规则里勾选的条目（改完要再点应用）、
+ * `worksheet` = 工作表上勾选的既有规则（立刻写表）、`paste` = 粘贴弹窗里待粘贴的副本
+ * （改的是内存里的草稿，点「确定」才进库）。
+ */
+type BatchTarget = 'library' | 'worksheet' | 'paste'
+
+let batchTarget: BatchTarget = 'library'
+
+/** 弹窗标题里显示的目标名 */
+const BATCH_TARGET_LABELS: Record<BatchTarget, string> = {
+  library: '我的规则',
+  worksheet: '工作表规则',
+  paste: '待粘贴的规则',
+}
+
+/** 下拉里「统一为某个已有值」的前缀（避免与 keep / custom 撞） */
+const BATCH_VALUE_PREFIX = 'value:'
+
+/** 参与批量修改的四个「值型」字段（加粗是布尔，单独处理） */
+const BATCH_VALUE_FIELDS = [
+  {
+    key: 'range',
+    pickId: 'conditionalFormatBatchRangePick',
+    inputId: 'conditionalFormatBatchRange',
+  },
+  {
+    key: 'formula',
+    pickId: 'conditionalFormatBatchFormulaPick',
+    inputId: 'conditionalFormatBatchFormula',
+  },
+  {
+    key: 'interior',
+    pickId: 'conditionalFormatBatchFillPick',
+    inputId: 'conditionalFormatBatchFill',
+  },
+  {
+    key: 'fontColor',
+    pickId: 'conditionalFormatBatchFontPick',
+    inputId: 'conditionalFormatBatchFont',
+  },
+] as const
+
+/** 一条规则的可改字段（三个来源先统一成这个形状，再拿去填下拉） */
+interface BatchRowValues {
+  range: string
+  formula: string
+  interior: string
+  fontColor: string
+  fontBold: boolean
+}
+
+/** 取某个目标的当前值列表（空数组 = 没勾选，弹窗不该开） */
+function batchRowsOf(target: BatchTarget): BatchRowValues[] {
+  if (target === 'library') {
+    const ids = new Set(state.ruleSelection)
+    return state.rules
+      .filter((rule) => ids.has(rule.id))
+      .map((rule) => ({
+        range: rule.appliesTo,
+        formula: rule.formula,
+        interior: rule.interior,
+        fontColor: rule.fontColor ?? '',
+        fontBold: rule.fontBold === true,
+      }))
+  }
+  if (target === 'worksheet') {
+    return [...state.existingSelection]
+      .sort((a, b) => a - b)
+      .flatMap((index) => {
+        const snapshot = state.existing[index - 1]
+        if (!snapshot) return []
+        return [
+          {
+            range: snapshot.range,
+            formula: snapshot.formula,
+            interior: snapshot.interior ?? '',
+            fontColor: snapshot.fontColor ?? '',
+            fontBold: false,
+          },
+        ]
+      })
+  }
+  return pasteRows.map((row) => ({
+    range: row.range,
+    formula: row.formula,
+    interior: row.interior,
+    fontColor: row.fontColor,
+    fontBold: row.fontBold,
+  }))
+}
+
+/**
+ * 填四个字段的下拉：保持不变 / 各现有值（去重）/ 自定义
+ *
+ * 现有值就是「统一为某条已有的格式或范围」那条路——用户不用记公式，直接从
+ * 下拉里挑一条；右侧输入框同步成第一个值，选「自定义」时不用从空开始。
+ */
+function fillBatchValueFields(rows: readonly BatchRowValues[]): void {
+  for (const field of BATCH_VALUE_FIELDS) {
+    const pick = selectById(field.pickId)
+    if (pick) {
+      const values = [...new Set(rows.map((row) => row[field.key]).filter((value) => value !== ''))]
+      const options = ['<option value="keep">保持不变</option>']
+      for (const value of values) {
+        options.push(
+          `<option value="${BATCH_VALUE_PREFIX}${escapeHtml(value)}">${escapeHtml(value)}</option>`,
+        )
+      }
+      options.push('<option value="custom">自定义…</option>')
+      pick.innerHTML = options.join('')
+      const input = byId(field.inputId)
+      if (input instanceof HTMLInputElement) input.value = values[0] ?? ''
+    }
+  }
+}
+
+/**
+ * 读一个字段的下拉 + 输入框
+ *
+ * @returns `null` = 保持不变；字符串 = 要写入的值（空串由调用方判非法）
+ */
+function readBatchValue(pickId: string, inputId: string): string | null {
+  const pick = selectById(pickId)
+  if (!pick) return null
+  if (pick.value === 'keep') return null
+  if (pick.value === 'custom') {
+    const input = byId(inputId)
+    return input instanceof HTMLInputElement ? input.value.trim() : null
+  }
+  return pick.value.startsWith(BATCH_VALUE_PREFIX)
+    ? pick.value.slice(BATCH_VALUE_PREFIX.length)
+    : pick.value
+}
+
+/** 打开批量修改弹窗（按目标预填「现有值」下拉） */
+function openBatchEdit(target: BatchTarget): void {
+  const rows = batchRowsOf(target)
+  if (rows.length === 0) {
+    showToast('先勾选要修改的规则', 'warn')
+    return
+  }
+  batchTarget = target
+  setText('conditionalFormatBatchLabel', `✎ 批量修改（${BATCH_TARGET_LABELS[target]}）`)
+  setText(
+    'conditionalFormatBatchHint',
+    `将对 ${String(rows.length)} 条生效；「保持不变」的项不动。下拉里列的是这些规则现有的值——选它即统一成那一条，选「自定义…」才用右边的输入框。`,
+  )
+  fillBatchValueFields(rows)
+  const bold = selectById('conditionalFormatBatchBold')
+  if (bold) bold.value = 'keep'
+  openModalById('conditionalFormatBatchMask')
+}
+
+/** 关闭批量修改弹窗（没开时 no-op，别乱解滚动锁） */
+function closeBatchEdit(): void {
+  const mask = byId('conditionalFormatBatchMask')
+  if (mask?.style.display === 'none') return
+  if (mask) mask.style.display = 'none'
+  unlockModalScroll()
+}
+
+/** 确认批量修改：把非「保持不变」的字段组成补丁，按目标落盘 */
+function confirmBatchEdit(): void {
+  const patch: ForeignRulePatch = {}
+  const labels: string[] = []
+  const range = readBatchValue('conditionalFormatBatchRangePick', 'conditionalFormatBatchRange')
+  const formula = readBatchValue(
+    'conditionalFormatBatchFormulaPick',
+    'conditionalFormatBatchFormula',
+  )
+  const interior = readBatchValue('conditionalFormatBatchFillPick', 'conditionalFormatBatchFill')
+  const fontColor = readBatchValue('conditionalFormatBatchFontPick', 'conditionalFormatBatchFont')
+
+  if (range !== null) {
+    if (range === '') {
+      showToast('应用范围不能为空（不想改就选「保持不变」）', 'warn')
+      return
+    }
+    patch.range = range
+    labels.push('范围')
+  }
+  if (formula !== null) {
+    if (formula === '') {
+      showToast('公式不能为空（不想改就选「保持不变」）', 'warn')
+      return
+    }
+    patch.formula = formula
+    labels.push('公式')
+  }
+  if (interior !== null) {
+    patch.interior = normalizeHexColor(interior) ?? interior
+    labels.push('填充色')
+  }
+  if (fontColor !== null) {
+    patch.fontColor = normalizeHexColor(fontColor) ?? fontColor
+    labels.push('字体色')
+  }
+  const boldValue = selectById('conditionalFormatBatchBold')?.value ?? 'keep'
+  if (boldValue !== 'keep') {
+    patch.fontBold = boldValue === 'bold'
+    labels.push('加粗')
+  }
+  if (labels.length === 0) {
+    showToast('每项都是「保持不变」，没有要改的内容', 'warn')
+    return
+  }
+  closeBatchEdit()
+  applyBatchPatch(patch, labels)
+}
+
+/** 把补丁落到当前目标上 */
+function applyBatchPatch(patch: ForeignRulePatch, labels: readonly string[]): void {
+  const suffix = `（${labels.join(' / ')}）`
+  if (batchTarget === 'paste') {
+    pasteRows = pasteRows.map((row) => ({
+      ...row,
+      ...(patch.range !== undefined && { range: patch.range }),
+      ...(patch.formula !== undefined && { formula: patch.formula }),
+      ...(patch.interior !== undefined && { interior: patch.interior }),
+      ...(patch.fontColor !== undefined && { fontColor: patch.fontColor }),
+      ...(patch.fontBold !== undefined && { fontBold: patch.fontBold }),
+    }))
+    renderPasteTable()
+    showToast(`已批量修改待粘贴的 ${String(pasteRows.length)} 条${suffix}`, 'success')
+    return
+  }
+
+  if (batchTarget === 'worksheet') {
+    const entry = selectedSheet()
+    if (!entry) {
+      showToast('请先选择目标工作表', 'warn')
+      return
+    }
+    const indices = [...state.existingSelection].sort((a, b) => a - b)
+    let done = 0
+    const failures: string[] = []
+    const warnings: string[] = []
+    for (const index of indices) {
+      const result = updateForeignRule(entry.worksheet, index, patch)
+      if (result.ok) {
+        done += 1
+        warnings.push(...result.warnings)
+      } else {
+        failures.push(`第 ${String(index)} 条：${result.error}`)
+      }
+    }
+    loadExistingRules()
+    if (done === 0) {
+      showToast(`批量修改失败：${failures[0] ?? '未知原因'}`, 'error')
+      return
+    }
+    const failureText =
+      failures.length > 0 ? `，${String(failures.length)} 条失败（${failures[0] ?? ''}）` : ''
+    const warningText = warnings.length > 0 ? `；${String(warnings.length)} 项回读不一致` : ''
+    showToast(
+      `已批量修改 ${String(done)} 条工作表规则${suffix}${failureText}${warningText}`,
+      failures.length > 0 ? 'warn' : 'success',
+    )
+    return
+  }
+
+  // library：改本地规则库（要再点「应用条件格式」才写表）
+  const ids = new Set(state.ruleSelection)
+  let changed = 0
+  state.rules = state.rules.map((rule) => {
+    if (!ids.has(rule.id)) return rule
+    changed += 1
+    return {
+      ...rule,
+      ...(patch.range !== undefined && { appliesTo: patch.range }),
+      ...(patch.formula !== undefined && { formula: patch.formula }),
+      ...(patch.interior !== undefined && { interior: patch.interior }),
+      ...(patch.fontColor !== undefined && { fontColor: patch.fontColor }),
+      ...(patch.fontBold !== undefined && { fontBold: patch.fontBold }),
+    }
+  })
+  // 不弹 persistRules 的通用提示：下面这条自带同样的指引，两条连发会互相覆盖
+  persistRules(false)
+  renderRuleList()
+  showToast(
+    `已批量修改 ${String(changed)} 条${suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表`,
+    'success',
+  )
+}
+
+/** 打开一个模态框遮罩（定位三件套 + 滚动锁，与其它弹窗同一套） */
+function openModalById(maskId: string): void {
+  const mask = byId(maskId)
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
+  if (mask) {
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
+  }
+  lockModalScroll()
+}
+
+/**
+ * 确认复制工作表规则：直接在工作表上 Add 一条同公式同格式的副本
+ *
+ * 与「粘贴」不同，这里**不挪公式行号**：复制既有规则要的是「同一条规则换个范围」，
+ * 相对引用由宿主按新范围自行解释，挪了反而错位。
+ */
+function confirmDuplicateRule(): void {
+  const entry = selectedSheet()
+  const index = pasteWorksheetIndex
+  const snapshot = state.existing[index - 1]
+  if (!entry || !snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    closePasteModal()
+    return
+  }
+  const typed = (inputById('conditionalFormatPasteRange')?.value ?? '').trim()
+  const result = duplicateForeignRule(entry.worksheet, index, typed)
+  if (!result.ok) {
+    showToast(`复制失败：${result.error}`, 'error')
+    return
+  }
+  closePasteModal()
+  showToast(`已复制到 ${result.range}（优先级最低，可用「↑」上调）`, 'success')
+  loadExistingRules()
 }
 
 function renderRuleList(): void {
@@ -1855,8 +2518,6 @@ function renderRuleList(): void {
             <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
           </label>
           <div class="conditional-format-rule-actions">
-            <button type="button" data-action="up" title="上移（提高优先级）">↑</button>
-            <button type="button" data-action="down" title="下移（降低优先级）">↓</button>
             <button type="button" data-action="copy" title="复制">⧉</button>
             <button type="button" data-action="edit" title="编辑">✎</button>
             <button type="button" data-action="delete" title="删除">✕</button>
@@ -1960,15 +2621,9 @@ function renderRuleList(): void {
     row.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((button) => {
       button.addEventListener('click', () => {
         const { action } = button.dataset
+        // 行内不再有 ↑↓：调序统一走拖拽（含键盘 Space + ↑↓）与右键菜单，
+        // 省掉一列按钮，规则名与公式能多显示几个字
         switch (action) {
-          case 'up': {
-            moveRule(id, -1)
-            break
-          }
-          case 'down': {
-            moveRule(id, 1)
-            break
-          }
           case 'copy': {
             copyRules([id])
             break
@@ -2013,6 +2668,8 @@ function renderRuleBatchBar(): void {
   bar.classList.add('is-visible')
   bar.innerHTML = `
     <span class="conditional-format-batch-count">已选 ${String(count)} 条</span>
+    <button type="button" class="bgm-btn small" data-rule-batch="copy" title="把所选规则复制进剪贴板（多条一起复制后，「粘贴」会以表格列出，可批量改范围）">⧉ 复制所选</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="edit" title="批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填）">✎ 批量修改</button>
     <button type="button" class="bgm-btn small" data-rule-batch="delete" title="删除所选规则">🗑 删除所选</button>
     <button type="button" class="bgm-btn small" data-rule-batch="export" title="导出所选规则为 JSON（选保存位置）">📤 导出所选</button>
     <button type="button" class="bgm-btn small" data-rule-batch="clear" title="取消选择">取消选择</button>`
@@ -2166,24 +2823,14 @@ function blankRule(): ConditionalFormatRule {
   }
 }
 
-function openEditor(id: string | null, isNew: boolean): void {
-  state.editingId = id
-  state.editingIsNew = isNew
-  const rule = id ? state.rules.find((r) => r.id === id) : blankRule()
-  if (!rule) return
-  const nameInput = inputById('conditionalFormatEditName')
-  const groupInput = inputById('conditionalFormatEditGroup')
-  const rangeInput = inputById('conditionalFormatEditRange')
-  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
-  const boldInput = inputById('conditionalFormatEditBold')
-  if (nameInput) nameInput.value = rule.name
-  if (groupInput) groupInput.value = rule.group
-  if (rangeInput) rangeInput.value = rule.appliesTo
-  if (formulaInput) formulaInput.value = rule.formula
-  // 颜色两件套一起写：只写一边会让文本与色块不一致（用户看到的是旧色）
-  setColorField(COLOR_FIELD_FILL, normalizeHexColor(rule.interior) ?? '#00B050')
-  setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
-  if (boldInput) boldInput.checked = rule.fontBold === true
+/** 「名称 / 分组」两块只在规则库模式显示（工作表上的规则没有名字与分组） */
+function setEditorLibraryFieldsVisible(isVisible: boolean): void {
+  const fields = byId('conditionalFormatEditLibraryFields')
+  if (fields) fields.hidden = !isVisible
+}
+
+/** 打开编辑器遮罩（定位三件套 + 滚动锁；两种模式共用） */
+function openEditorMask(): void {
   const mask = byId('conditionalFormatEditorMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
   if (mask) {
@@ -2200,12 +2847,79 @@ function openEditor(id: string | null, isNew: boolean): void {
     if (modal) bringModalIntoView(mask, modal)
   }
   lockModalScroll()
-  setText('conditionalFormatEditorTitle', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
+}
+
+function openEditor(id: string | null, isNew: boolean): void {
+  state.editingId = id
+  state.editingIsNew = isNew
+  state.editingTarget = 'library'
+  state.editingExistingIndex = 0
+  const rule = id ? state.rules.find((r) => r.id === id) : blankRule()
+  if (!rule) return
+  setEditorLibraryFieldsVisible(true)
+  const nameInput = inputById('conditionalFormatEditName')
+  const groupInput = inputById('conditionalFormatEditGroup')
+  const rangeInput = inputById('conditionalFormatEditRange')
+  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
+  const boldInput = inputById('conditionalFormatEditBold')
+  if (nameInput) nameInput.value = rule.name
+  if (groupInput) groupInput.value = rule.group
+  if (rangeInput) rangeInput.value = rule.appliesTo
+  if (formulaInput) formulaInput.value = rule.formula
+  // 颜色两件套一起写：只写一边会让文本与色块不一致（用户看到的是旧色）
+  setColorField(COLOR_FIELD_FILL, normalizeHexColor(rule.interior) ?? '#00B050')
+  setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
+  if (boldInput) boldInput.checked = rule.fontBold === true
+  openEditorMask()
+  setText('conditionalFormatEditorLabel', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
+}
+
+/**
+ * 打开编辑器编辑工作表上第 index 条既有规则（范围 / 公式 / 颜色）
+ *
+ * 与规则库编辑共用弹窗，但保存路径完全不同：这里**直接写工作表**（COM），
+ * 不碰 PluginStorage —— 用户看到的那条规则改完立刻生效，不用再去点应用。
+ * 「名称 / 分组」隐藏：宿主没有这两个概念，露出来只会让人以为能改。
+ */
+function openExistingRuleEditor(index: number): void {
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    return
+  }
+  state.editingTarget = 'worksheet'
+  state.editingExistingIndex = index
+  state.editingId = null
+  state.editingIsNew = false
+  setEditorLibraryFieldsVisible(false)
+  const rangeInput = inputById('conditionalFormatEditRange')
+  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
+  const boldInput = inputById('conditionalFormatEditBold')
+  if (rangeInput) rangeInput.value = snapshot.range
+  if (formulaInput) formulaInput.value = snapshot.formula
+  const fill = normalizeHexColor(snapshot.interior ?? '') ?? '#00B050'
+  const font = normalizeHexColor(snapshot.fontColor ?? '') ?? '#000000'
+  setColorField(COLOR_FIELD_FILL, fill)
+  setColorField(COLOR_FIELD_FONT, font)
+  // 既有规则的加粗读不到（快照里没有该字段），一律按未勾处理：不勾 = 不改
+  if (boldInput) boldInput.checked = false
+  state.editingBaseline = {
+    range: snapshot.range,
+    formula: snapshot.formula,
+    fill,
+    font,
+    bold: false,
+  }
+  openEditorMask()
+  setText('conditionalFormatEditorLabel', `编辑工作表规则 #${String(index)}`)
 }
 
 function closeEditor(): void {
   state.editingId = null
   state.editingIsNew = false
+  state.editingTarget = 'library'
+  state.editingExistingIndex = 0
+  state.editingBaseline = null
   const mask = byId('conditionalFormatEditorMask')
   // 没开 = no-op：Esc 块连调五个 close，没开的弹窗不能动共享的滚动锁计数
   // （modalScrollLockCount 是计数式；空关一次就把别的弹窗的锁解掉了）
@@ -2216,7 +2930,72 @@ function closeEditor(): void {
   unlockModalScroll()
 }
 
+/**
+ * 保存「工作表规则」的编辑（直接写 COM）
+ *
+ * 逐字段只写**真的改了**的项：范围 / 公式 / 颜色分别落到 ModifyAppliesToRange /
+ * Formula1 / With 上。写失败（含回读不一致）时**弹窗不关**，把错误留在用户眼前，
+ * 避免「以为改了、其实没改」——这正是这次反馈的核心问题。
+ */
+function saveExistingRuleEdit(): void {
+  const entry = selectedSheet()
+  if (!entry) {
+    showToast('请先选择目标工作表', 'warn')
+    return
+  }
+  const index = state.editingExistingIndex
+  const snapshot = state.existing[index - 1]
+  if (!snapshot) {
+    showToast('规则已不存在，请重新读取', 'warn')
+    closeEditor()
+    return
+  }
+  const rangeInput = inputById('conditionalFormatEditRange')
+  const formulaInput = byId('conditionalFormatEditFormula') as HTMLTextAreaElement | null
+  const boldInput = inputById('conditionalFormatEditBold')
+  const range = rangeInput?.value.trim() ?? ''
+  if (range === '') {
+    showToast('应用范围不能为空', 'warn')
+    return
+  }
+  const formula = formulaInput?.value.trim() ?? ''
+  // 公式只在「原本就有公式」时必填：数据条 / 色阶 / 图标集这类规则的 Formula1 本来就是空的，
+  // 强制必填会让用户连范围都改不了
+  if (formula === '' && snapshot.formula !== '') {
+    showToast('公式不能为空', 'warn')
+    return
+  }
+  const fillColor = readColorField(COLOR_FIELD_FILL, snapshot.interior ?? '#00B050')
+  const fontColor = readColorField(COLOR_FIELD_FONT, snapshot.fontColor ?? '#000000')
+  const isBold = boldInput?.checked === true
+  // 与「打开时的初值」比，而不是与快照比：宿主读不到颜色时预填的是默认色，
+  // 拿快照比会把默认色当成改动写回去（只改公式却把字体染黑）
+  const baseline = state.editingBaseline
+
+  const result = updateForeignRule(entry.worksheet, index, {
+    ...(range !== (baseline?.range ?? snapshot.range) && { range }),
+    ...(formula !== (baseline?.formula ?? snapshot.formula) && formula !== '' && { formula }),
+    ...(fillColor !== baseline?.fill && { interior: fillColor }),
+    ...(fontColor !== baseline?.font && { fontColor }),
+    ...(isBold !== (baseline?.bold ?? false) && { fontBold: isBold }),
+  })
+  if (!result.ok) {
+    showToast(`修改失败：${result.error}`, 'error')
+    return
+  }
+  closeEditor()
+  showToast(`第 ${String(index)} 条已更新：${result.changed.join(' / ')}`, 'success')
+  for (const warning of result.warnings) showToast(warning, 'warn')
+  // 写回成功后重新读表：以宿主实际状态为准（也顺带刷新分组 key 的锚定）
+  loadExistingRules()
+  renderRuleList()
+}
+
 function saveEditor(): void {
+  if (state.editingTarget === 'worksheet') {
+    saveExistingRuleEdit()
+    return
+  }
   const nameInput = inputById('conditionalFormatEditName')
   const groupInput = inputById('conditionalFormatEditGroup')
   const rangeInput = inputById('conditionalFormatEditRange')
@@ -2255,6 +3034,8 @@ function saveEditor(): void {
   persistRules()
   closeEditor()
   renderRuleList()
+  // 不在这里单独提示「要去点应用」：persistRules 已统一弹「未应用」toast，
+  // 两处各弹一条会让同一次保存出现两个内容相近的提示
 }
 
 // ===== 默认规则集 =====
@@ -2317,20 +3098,31 @@ function runApply(strategy: ApplyStrategy): void {
   setConfig(CONDITIONAL_FORMAT_STRATEGY_KEY, strategy)
   const plan = planApply(state.rules, foreign, strategy)
   const result = applyConditionalFormatPlan(entry.worksheet, plan)
-  if (result.failed > 0) {
+  // 写调用返回成功 ≠ 真写进去了：`verified` 是写完回读到的实际条数，
+  // 为 0 说明宿主把规则丢了（只读代理 / 老版本），必须明说而不是报「已写入」。
+  if (result.added > 0 && result.verified === 0) {
+    showToast(
+      '写入调用返回成功，但回读工作表仍是 0 条 —— 宿主可能丢弃了规则，请检查 WPS 版本或改用「工作表规则」逐条核对',
+      'error',
+    )
+  } else if (result.failed > 0) {
     showToast(
       `写入 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`,
       'warn',
     )
   } else {
-    showToast(`已写入 ${String(result.added)} 条条件格式规则`, 'success')
+    const verifiedNote = result.verified > 0 ? `，回读 ${String(result.verified)} 条` : ''
+    showToast(`已写入 ${String(result.added)} 条条件格式规则${verifiedNote}`, 'success')
   }
   const discardedNote =
     plan.discarded.length > 0 ? ` · 清理手工规则 ${String(plan.discarded.length)} 条` : ''
+  const verifiedText = result.verified >= 0 ? ` · 回读 ${String(result.verified)} 条` : ''
   setText(
     'conditionalFormatApplyStatus',
-    `上次应用：${entry.sheet} · ${String(result.added)} 条（失败 ${String(result.failed)}）${discardedNote}`,
+    `上次应用：${entry.sheet} · ${String(result.added)} 条（失败 ${String(result.failed)}）${verifiedText}${discardedNote}`,
   )
+  // 应用完重读表：让「工作表规则」立刻显示刚落地的规则（不再需要手动点「重新读取」）
+  loadExistingRules()
 }
 
 function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
@@ -2408,7 +3200,7 @@ function applyFlow(): void {
   openConfirmModal(foreign)
 }
 
-// ===== 导入手工规则 =====
+// ===== 导入规则（工作表规则 / 文件 / 文本）=====
 
 function importForeign(): void {
   const entry = selectedSheet()
@@ -2428,6 +3220,194 @@ function importForeign(): void {
   }
   // 不再一键全导：弹选择框让用户挑（momo：#conditionalFormatImportBtn 直接导了全部）
   openImportModal(foreign, entry.sheet)
+}
+
+/**
+ * 「导入」主按钮旁的 ▾ 菜单：三个来源
+ *
+ * 主按钮仍是「导入工作表规则」（当前表既有规则）；文件 / 文本两条用于
+ * 「别的表、别的电脑、备份文件」——「导出规则 → 导出到文件」得到的 .json
+ * 就走文件这条，也是跨设备迁移规则的唯一通道。
+ */
+function openImportMenu(button: HTMLElement): void {
+  const rect = button.getBoundingClientRect()
+  showContextMenu({
+    items: [
+      {
+        id: 'import-worksheet',
+        label: '📥 导入工作表规则（当前表）',
+        onSelect: () => {
+          importForeign()
+        },
+      },
+      {
+        id: 'import-file',
+        label: '📂 从文件导入（.json 规则文件）',
+        onSelect: () => {
+          importRulesFromFile()
+        },
+      },
+      {
+        id: 'import-text',
+        label: '📋 从文本导入（粘贴 JSON）',
+        onSelect: () => {
+          openTextImportModal()
+        },
+      },
+    ],
+    x: rect.left,
+    y: rect.bottom + 4,
+    anchor: button,
+  })
+}
+
+/**
+ * 打开文件选择器（项目导出的 .json 规则文件）
+ *
+ * 用 `input[type=file]` + FileReader 而不是 COM：FileReader 自带 BOM 嗅探，
+ * 项目导出的 UTF-16 LE（带 BOM）和别处的 UTF-8 都能读；FSO 的 OpenTextFile
+ * 必须**事先知道**编码，读错就是乱码。
+ */
+function importRulesFromFile(): void {
+  const input = byId('conditionalFormatImportFile')
+  if (!(input instanceof HTMLInputElement)) {
+    showToast('当前宿主不支持文件选择，改用「从文本导入」', 'warn')
+    return
+  }
+  // 清空 value：连续选同一个文件也要触发 change
+  input.value = ''
+  input.click()
+}
+
+/** 文件选择器的 change：读文本 → 走与文本导入同一条合并通道 */
+function handleImportFileChange(event: Event): void {
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) return
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.addEventListener('load', () => {
+    const text = typeof reader.result === 'string' ? reader.result : ''
+    importRulesFromText(text, file.name)
+  })
+  reader.addEventListener('error', () => {
+    showToast(`读取文件失败：${file.name}`, 'error')
+  })
+  // 不传编码：交给 FileReader 按 BOM 判断（见 importRulesFromFile 的注释）。
+  // 不能用 file.text()：它只按 UTF-8 解码，读项目自己导出的 UTF-16 LE 就是乱码。
+  // eslint-disable-next-line unicorn/prefer-blob-reading-methods -- 见上：需按 BOM 嗅探解码
+  reader.readAsText(file)
+}
+
+/** 规则身份键：导入去重用（同一条规则重复导入只会把库撑大） */
+function ruleIdentity(rule: ConditionalFormatRule): string {
+  return [
+    rule.name,
+    rule.appliesTo,
+    rule.formula,
+    rule.interior,
+    rule.fontColor ?? '',
+    String(rule.fontBold === true),
+  ].join('\u{0}')
+}
+
+/**
+ * 把外来规则并进「我的规则」
+ *
+ * id 一律重新生成：文件里的 id 来自别的库，直接沿用会和现有条目撞。
+ * 与库里**完全相同**的条目（名称/范围/公式/配色全等）跳过——重复导入同一份
+ * 文件不该让规则翻倍。
+ */
+function mergeRulesIntoLibrary(incoming: readonly ConditionalFormatRule[]): {
+  added: number
+  skipped: number
+} {
+  const seen = new Set(state.rules.map((rule) => ruleIdentity(rule)))
+  const merged: ConditionalFormatRule[] = []
+  let skipped = 0
+  for (const rule of incoming) {
+    const key = ruleIdentity(rule)
+    if (seen.has(key)) {
+      skipped += 1
+    } else {
+      seen.add(key)
+      merged.push({ ...rule, id: nextId() })
+    }
+  }
+  if (merged.length > 0) {
+    state.rules = [...state.rules, ...merged]
+    // 不弹 persistRules 的「未应用」提示：下面这条 toast 自带同样的指引，
+    // 两条连发会互相覆盖，用户只看得到后一条
+    persistRules(false)
+    renderRuleList()
+  }
+  return { added: merged.length, skipped }
+}
+
+/** 解析并导入一段规则 JSON（文件与文本两条通道共用） */
+function importRulesFromText(text: string, source: string): void {
+  const { rules, dropped } = parseRulesPayload(text)
+  if (rules.length === 0) {
+    showToast(
+      dropped > 0
+        ? `「${source}」里没有可识别的规则（不是规则 JSON？）`
+        : `「${source}」是空的，没有可导入的规则`,
+      'warn',
+    )
+    return
+  }
+  const { added, skipped } = mergeRulesIntoLibrary(rules)
+  const details: string[] = []
+  if (skipped > 0) details.push(`跳过 ${String(skipped)} 条重复`)
+  if (dropped > 0) details.push(`${String(dropped)} 条格式不对未导入`)
+  const suffix = details.length === 0 ? '' : `（${details.join('，')}）`
+  if (added === 0) {
+    showToast(`「${source}」里的规则都已存在${suffix}`, 'info')
+    return
+  }
+  showToast(
+    `已从「${source}」导入 ${String(added)} 条到「我的规则」${suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表`,
+    'success',
+  )
+}
+
+/** 打开「从文本导入」弹窗（文件选择被宿主拦时的兜底通道） */
+function openTextImportModal(): void {
+  const textarea = byId('conditionalFormatTextImportInput')
+  if (textarea instanceof HTMLTextAreaElement) textarea.value = ''
+  const mask = byId('conditionalFormatTextImportMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
+  if (mask) {
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
+  }
+  lockModalScroll()
+  if (textarea instanceof HTMLTextAreaElement) textarea.focus()
+}
+
+/** 关闭「从文本导入」弹窗（没开时 no-op，别乱解滚动锁） */
+function closeTextImportModal(): void {
+  const mask = byId('conditionalFormatTextImportMask')
+  if (mask?.style.display === 'none') return
+  if (mask) mask.style.display = 'none'
+  unlockModalScroll()
+}
+
+/** 确认从文本导入 */
+function confirmTextImport(): void {
+  const textarea = byId('conditionalFormatTextImportInput')
+  const text = textarea instanceof HTMLTextAreaElement ? textarea.value : ''
+  if (text.trim() === '') {
+    showToast('先把规则 JSON 粘进来', 'warn')
+    return
+  }
+  closeTextImportModal()
+  importRulesFromText(text, '粘贴的文本')
 }
 
 /** 快照是否可导入（与 foreignSnapshotToRule 的判据一致：公式类且有公式） */
@@ -2707,12 +3687,9 @@ async function copyRulesJson(
     exportedAt: new Date().toISOString(),
     rules,
   }
-  try {
-    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
-    showToast(`已复制 ${String(rules.length)} 条${label}到剪贴板`, 'success')
-  } catch {
-    showToast('复制到剪贴板失败，请改用「导出到文件」', 'error')
-  }
+  const isOk = await copyTextToSystemClipboard(JSON.stringify(payload, null, 2))
+  if (isOk) showToast(`已复制 ${String(rules.length)} 条${label}到剪贴板`, 'success')
+  else showToast('复制到剪贴板失败，请改用「导出到文件」', 'error')
 }
 
 /** 导出整个规则库（备份 / 迁移 / 分享） */
@@ -2724,7 +3701,7 @@ function exportRules(): void {
   saveRulesJson(state.rules, '规则库')
 }
 
-/** 导出所选规则（规则管理勾选 / 分组内勾选 / 规则管理器批量条共用） */
+/** 导出所选规则（我的规则勾选 / 分组内勾选 / 工作表规则批量条共用） */
 function exportSelectedRules(rules: readonly ConditionalFormatRule[], label: string): void {
   if (rules.length === 0) {
     showToast('没有选中的规则', 'warn')
@@ -2798,7 +3775,7 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatExistingPanel')?.addEventListener('click', handleExistingTableClick)
   byId('conditionalFormatExistingPanel')?.addEventListener('change', handleExistingTableChange)
 
-  // 浮动「规则管理器」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
+  // 浮动「工作表规则」窗口：拖动 / 缩放 / 收起 + 开关与 DOM 搬家
   bindExistingToolbar()
   // 两个列表的拖拽排序 + 行右键菜单（通用组件接入，只建一次）
   setupSortablesAndMenus()
@@ -2812,6 +3789,21 @@ export function initializeConditionalFormatPage(): void {
   })
   byId('conditionalFormatImportBtn')?.addEventListener('click', () => {
     importForeign()
+  })
+  // ▾：从文件 / 从文本（项目导出的 .json 走文件这条）
+  byId('conditionalFormatImportMenuBtn')?.addEventListener('click', (event) => {
+    const button = event.currentTarget
+    if (button instanceof HTMLElement) openImportMenu(button)
+  })
+  byId('conditionalFormatImportFile')?.addEventListener('change', handleImportFileChange)
+  byId('conditionalFormatTextImportOk')?.addEventListener('click', () => {
+    confirmTextImport()
+  })
+  byId('conditionalFormatTextImportCancel')?.addEventListener('click', () => {
+    closeTextImportModal()
+  })
+  byId('conditionalFormatTextImportMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatTextImportMask')) closeTextImportModal()
   })
   byId('conditionalFormatExportBtn')?.addEventListener('click', (event) => {
     // 「导出规则」= 下拉：导出到文件 / 复制到剪贴板（后者不用先选保存位置）
@@ -2862,6 +3854,14 @@ export function initializeConditionalFormatPage(): void {
     const button = target?.closest<HTMLButtonElement>('[data-rule-batch]')
     if (!button) return
     switch (button.dataset.ruleBatch) {
+      case 'copy': {
+        copyRules([...state.ruleSelection])
+        break
+      }
+      case 'edit': {
+        openBatchEdit('library')
+        break
+      }
       case 'delete': {
         deleteSelectedRules([...state.ruleSelection])
         break
@@ -2901,7 +3901,7 @@ export function initializeConditionalFormatPage(): void {
     if (event.target === byId('conditionalFormatEditorMask')) closeEditor()
   })
 
-  // 五个模态框统一补「窗口三件套」：拖标题栏移动 + ⛶ 最大化/还原 + ▾ 收起 +
+  // 六个模态框统一补「窗口三件套」：拖标题栏移动 + ⛶ 最大化/还原 + ▾ 收起 +
   // 右下角缩放把手——能力原语在 window-chrome（与浮动窗共用的窗口能力层）。
   // 窄任务窗格里遮罩居中的模态框又小又挡内容，此前只能看不能调（momo：加上
   // 浮动窗口模块的收起和放大等功能）。
@@ -2942,6 +3942,20 @@ export function initializeConditionalFormatPage(): void {
       'conditionalFormatPasteMax',
       'conditionalFormatPasteResize',
     ],
+    [
+      'conditionalFormatTextImportMask',
+      'conditionalFormatTextImportTitle',
+      'conditionalFormatTextImportCollapse',
+      'conditionalFormatTextImportMax',
+      'conditionalFormatTextImportResize',
+    ],
+    [
+      'conditionalFormatBatchMask',
+      'conditionalFormatBatchTitle',
+      'conditionalFormatBatchCollapse',
+      'conditionalFormatBatchMax',
+      'conditionalFormatBatchResize',
+    ],
   ]
   for (const [maskId, titleId, collapseId, maximizeId, resizeId] of MODAL_SPECS) {
     const mask = byId(maskId)
@@ -2966,6 +3980,25 @@ export function initializeConditionalFormatPage(): void {
   })
   pasteMask?.addEventListener('click', (event) => {
     if (event.target === pasteMask) closePasteModal()
+  })
+  // 多条粘贴：表格里逐条改范围 / 统一范围 / 批量修改（范围·公式·颜色）
+  byId('conditionalFormatPasteTable')?.addEventListener('input', handlePasteTableInput)
+  byId('conditionalFormatPasteApplyRange')?.addEventListener('click', () => {
+    applyPasteUniformRange()
+  })
+  byId('conditionalFormatPasteBatchEdit')?.addEventListener('click', () => {
+    openBatchEdit('paste')
+  })
+
+  // 批量修改弹窗（三处入口共用）
+  byId('conditionalFormatBatchOk')?.addEventListener('click', () => {
+    confirmBatchEdit()
+  })
+  byId('conditionalFormatBatchCancel')?.addEventListener('click', () => {
+    closeBatchEdit()
+  })
+  byId('conditionalFormatBatchMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatBatchMask')) closeBatchEdit()
   })
 
   // 颜色字段：选择器 / 十六进制手输 / 吸管三边联动（吸管按钮不支持时保持隐藏）
@@ -3064,6 +4097,8 @@ export function initializeConditionalFormatPage(): void {
     closeImportModal()
     closeGroupNameModal()
     closePasteModal()
+    closeTextImportModal()
+    closeBatchEdit()
   })
 
   // ---- 宿主读取放在全部绑定之后：抛错也只损失首屏数据，不损失交互 ----
@@ -3101,14 +4136,14 @@ function populateFromHost(): void {
   }
 }
 
-// ===== 「既有规则」拖出为浮动「规则管理器」窗口 =====
+// ===== 「工作表规则」拖出为浮动窗口 =====
 
 /**
- * 绑定「规则管理器」工具条（显示其格式规则 + ↑↓ 调序 + 删除）
+ * 绑定「工作表规则」工具条（显示其格式规则 + ↑↓ 调序 + 删除）
  *
  * 工具条常显在「既有规则」区内（任务窗格与专注模式共用同一份 DOM）。
  * 进入专注模式的入口在模块标题的「⛶ 只显示此模块」按钮（module-state
- * 运行时注入）——工具栏原先那个「🔍 规则管理器」按钮与之完全同一件事
+ * 运行时注入）——工具栏原先那个「🔍 规则管理器」按钮与之完全同一件事（该模块现名「工作表规则」）
  * （同调 enterSoloMode('conditional-format', 'sec-existing')），momo：
  * 按钮功能重复，已删。
  */
@@ -3137,7 +4172,7 @@ function bindExistingToolbar(): void {
 }
 
 /**
- * 「规则管理器」的专注模式入口：模块标题的「⛶ 只显示此模块」按钮
+ * 「工作表规则」的专注模式入口：模块标题的「⛶ 只显示此模块」按钮
  * （module-state 运行时注入，本文件不再装配任何入口）。
  *
  * 历史备注：这里曾有 setupRuleManagerEntry 给工具栏按钮
@@ -3295,6 +4330,22 @@ function setupSortablesAndMenus(): void {
           disabledReason: '该类型插件无法重建，不能导入',
           onSelect: () => {
             importForeignRule(index)
+          },
+        },
+        {
+          id: 'edit',
+          label: '✎ 编辑（范围 / 公式 / 颜色）',
+          onSelect: () => {
+            openExistingRuleEditor(index)
+          },
+        },
+        {
+          id: 'duplicate',
+          label: '⧉ 复制成新规则',
+          disabled: !canImport,
+          disabledReason: '该类型读不到公式，无法复制',
+          onSelect: () => {
+            openDuplicateModal(index)
           },
         },
         {

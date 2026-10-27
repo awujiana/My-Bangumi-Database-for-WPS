@@ -17,12 +17,14 @@ import type { WpsFormatCondition, WpsWorksheet } from '../tools/wps.js';
 export interface ConditionalFormatApplyResult {
     added: number;
     failed: number;
+    /** 写完后回读到的实际条数（-1 = 宿主不支持回读）；页面据此判「是否真的写进去了」 */
+    verified: number;
 }
 /**
  * 探测宿主是否支持条件格式 API
  *
- * 判据是 UsedRange 上能拿到 FormatConditions 且 Add 是函数——只读属性、
- * 不创建任何规则。部分 WPS 版本 / 只读代理下为 false。
+ * 判据是能拿到 FormatConditions 且 Add 是函数——只读属性、不创建任何规则。
+ * 部分 WPS 版本 / 只读代理下为 false。
  */
 export declare function isFormatConditionsSupported(worksheet: WpsWorksheet | null | undefined): boolean;
 /**
@@ -71,7 +73,9 @@ export declare function setForeignStopIfTrue(worksheet: WpsWorksheet | null | un
 /**
  * 改第 index 条既有规则的应用范围
  *
- * 走 FormatCondition.ModifyAppliesToRange（WPS 文档方法）。
+ * 走 FormatCondition.ModifyAppliesToRange（WPS 文档方法），**写后回读比对**：
+ * 宿主接受调用却不生效时（只读代理 / 老版本），不回读就会提示「已改为 X」
+ * 而表上没变——正是用户反馈的「修改后无法应用到工作表」。
  * 写不进去就明说（宿主版本不支持 / 范围字符串非法），由页面还原输入。
  */
 export declare function setForeignAppliesTo(worksheet: WpsWorksheet | null | undefined, index: number, range: string): {
@@ -85,9 +89,62 @@ export declare function setForeignAppliesTo(worksheet: WpsWorksheet | null | und
  *
  * 与 setForeignStopIfTrue 同款：VBA 口径 Formula1 可写，JS 侧属性赋值；
  * 宿主只读时抛错，返回错误文案由页面提示并还原输入框。
+ * 同样**写后回读**——赋值不抛错不代表生效。
  */
 export declare function setForeignFormula(worksheet: WpsWorksheet | null | undefined, index: number, formula: string): {
     ok: true;
+} | {
+    ok: false;
+    error: string;
+};
+/**
+ * 编辑一条既有规则时可改的字段（未提供的字段不动）
+ *
+ * 范围走 `ModifyAppliesToRange`、公式走 `Formula1` 赋值、颜色走 `With`——
+ * 与新建规则用的同一套宿主能力，避免「编辑器里改得了、应用时改不了」的两套口径。
+ */
+export interface ForeignRulePatch {
+    range?: string;
+    formula?: string;
+    interior?: string;
+    fontColor?: string;
+    fontBold?: boolean;
+}
+/** 编辑既有规则的结果：`warnings` 是「写进去了但回读不一致」的软告警 */
+export type ForeignRuleUpdateResult = {
+    ok: true;
+    changed: string[];
+    warnings: string[];
+} | {
+    ok: false;
+    error: string;
+    warnings: string[];
+};
+/**
+ * 编辑工作表上第 index 条既有规则（范围 / 公式 / 填充色 / 字体色 / 加粗）
+ *
+ * ## 为什么每条都要回读校验
+ * WPS 的 `Formula1` / `ModifyAppliesToRange` 在部分版本上是**接受赋值但不生效**的
+ * 只读代理：不校验就会提示「已更新」，而表上纹丝不动——这正是用户反馈的
+ * 「规则管理器修改后无法应用到工作表」。故写后立刻回读：
+ *   - 公式 / 范围不一致 → 硬失败（还原输入、明确报错）；
+ *   - 颜色不一致 → 软告警（宿主可能按调色板就近取色，不该阻断用户）。
+ * 读不到（宿主不暴露该属性）时**不判失败**——无法验证不等于没写进去。
+ */
+export declare function updateForeignRule(worksheet: WpsWorksheet | null | undefined, index: number, patch: ForeignRulePatch): ForeignRuleUpdateResult;
+/**
+ * 把第 index 条既有规则复制成一条新规则（同公式、同格式，范围可换）
+ *
+ * ## 为什么必须回读条数
+ * `FormatConditions.Add` 在只读代理上可能返回对象却什么也没加。写前写后各读一次
+ * `Count`，没涨就是没生效——否则用户看到「已复制」却找不到副本。
+ *
+ * 副本按 Add 的默认顺序排在**最低优先级**（列表末尾），不抢原规则的优先级；
+ * 要提前就点 ↑ 上调（与「上移一格」同一套逻辑，不会整条蹦到表顶）。
+ */
+export declare function duplicateForeignRule(worksheet: WpsWorksheet | null | undefined, index: number, targetRange?: string): {
+    ok: true;
+    range: string;
 } | {
     ok: false;
     error: string;
@@ -130,11 +187,12 @@ export declare function readForeignRules(worksheet: WpsWorksheet | null | undefi
 /**
  * 执行应用计划
  *
- * 顺序：UsedRange 上 Delete() 清空 → 逐条 Range(范围).FormatConditions.Add →
+ * 顺序：清空（Delete，失败则逐条反序删）→ 逐条 `Range(范围).FormatConditions.Add` →
  * With 上格式 → **反序 SetFirstPriority**（每调一次都把该规则顶到最高，
- * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）。
+ * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）→
+ * **回读整表条数**（写没写进去只能靠它判断，`Add` 返回对象不代表生效）。
  *
- * @returns 成功 / 失败条数（失败进 WARN 日志，不中断整批）
+ * @returns 成功 / 失败条数 + 回读到的实际条数（-1 = 宿主不支持回读）
  */
 export declare function applyConditionalFormatPlan(worksheet: WpsWorksheet | null | undefined, plan: ConditionalFormatApplyPlan): ConditionalFormatApplyResult;
 //# sourceMappingURL=conditional-format-apply.d.ts.map

@@ -599,6 +599,30 @@ body.nav-icons-only .nav a:hover::after {
   flex: 1;
 }
 
+/* 拆分按钮（主按钮 + ▾ 下拉）：两者共占一个按钮位、中间不留缝。
+   工具栏是 flex 行，故整组按 flex:1 与其它按钮等宽，内部主按钮吃掉剩余宽度。 */
+.bgm-btn-split {
+  display: inline-flex;
+  flex: 1;
+  min-width: 0;
+}
+.bgm-btn-split > .bgm-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bgm-btn-split > .bgm-btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.bgm-btn-split > .bgm-btn:last-child {
+  flex: 0 0 auto;
+  padding-right: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 /* ============================ 7. 表单 ==================================== */
 .form-group {
   margin-bottom: var(--sp-4);

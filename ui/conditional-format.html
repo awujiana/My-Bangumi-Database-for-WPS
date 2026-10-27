@@ -42,11 +42,11 @@
           <a href="#sec-target" title="目标工作表"
             ><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a
           >
-          <a href="#sec-existing" title="规则管理器"
-            ><span class="nav-ico">👀</span><span class="nav-text">规则管理器</span></a
+          <a href="#sec-existing" title="工作表规则"
+            ><span class="nav-ico">👀</span><span class="nav-text">工作表规则</span></a
           >
-          <a href="#sec-rules" title="规则管理"
-            ><span class="nav-ico">☑️</span><span class="nav-text">规则管理</span></a
+          <a href="#sec-rules" title="我的规则"
+            ><span class="nav-ico">☑️</span><span class="nav-text">我的规则</span></a
           >
           <a href="#sec-defaults" title="默认规则集"
             ><span class="nav-ico">📦</span><span class="nav-text">默认规则集</span></a
@@ -102,26 +102,30 @@
         -->
         <section class="section section-wide" id="sec-existing">
           <h3>
-            👀 规则管理器<button
+            👀 工作表规则<button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-existing"
               aria-expanded="true"
-              aria-label="折叠 / 展开「规则管理器」"
+              aria-label="折叠 / 展开「工作表规则」"
             >
               ▾
             </button>
           </h3>
           <p class="hint">
             目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
-            可以直接管理：勾选后批量导入 / 删除，或单条上移下移 / 「如果为真则停止」。 数据条 / 色阶
-            / 图标集等类型插件无法重建，双策略会按你的选择处理。
-            <br />点「⛶ 只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
-            底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。
-            <br />📌（组标题上）= <strong>锚定整列</strong>：把该组规则的应用范围改写成
-            <code>$J:$J</code>（多列 <code>$J:$L</code>），公式不变，行增删不再影响；📎
-            固定单元格 = 钉到单个 <code>$J$5</code>，删行删列后仍只作用于该单元格。两者都记在
-            PluginStorage 里，<strong>随「设置 → 配置管理 → 导出配置」一起备份，更新插件不会丢</strong>。
+            可以直接管理：勾选后批量导入 /
+            删除，拖动行调整优先级，右键还有「如果为真则停止」等操作； 每条都能
+            <strong>✎ 编辑</strong>（范围 / 公式 / 颜色）和
+            <strong>⧉ 复制</strong>成新规则，改完立刻写回工作表。 数据条 / 色阶 /
+            图标集等类型插件无法重建，双策略会按你的选择处理。 <br />点「⛶
+            只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
+            底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。 <br />📌（组标题上）=
+            <strong>锚定整列</strong>：把该组规则的应用范围改写成 <code>$J:$J</code>（多列
+            <code>$J:$L</code>），公式不变，行增删不再影响；📎 固定单元格 = 钉到单个
+            <code>$J$5</code>，删行删列后仍只作用于该单元格。两者都记在 PluginStorage 里，<strong
+              >随「设置 → 配置管理 → 导出配置」一起备份，更新插件不会丢</strong
+            >。
           </p>
           <div class="conditional-format-toolbar">
             <input
@@ -175,7 +179,7 @@
               🔄 重新读取
             </button>
             <!-- 进入专注模式的入口 = 模块标题的「⛶ 只显示此模块」按钮（module-state
-                 运行时注入）；原先这里的「🔍 规则管理器」按钮与之功能重复，已删
+                 运行时注入）；原先这里的「🔍 规则管理器」按钮与之功能重复，已删（该模块现名「工作表规则」）
                  （2026-10-25 momo 反馈）。 -->
           </div>
           <!-- 工具栏 + 表格 + 分页 + 批量条：常驻在本 section 内，任务窗格与专注模式共用同一份 DOM。 -->
@@ -190,21 +194,28 @@
           </div>
         </section>
 
-        <!-- 规则管理 -->
+        <!-- 我的规则（本地规则库） -->
         <section class="section section-wide" id="sec-rules" data-detachable>
           <h3>
-            ☑️ 规则管理<button
+            ☑️ 我的规则<button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-rules"
               aria-expanded="true"
-              aria-label="折叠 / 展开「规则管理」"
+              aria-label="折叠 / 展开「我的规则」"
             >
               ▾
             </button>
           </h3>
           <p class="hint">
-            列表顺序即优先级（靠前先生效）。取消勾选 = 隐藏（留在库里不应用）。复制后可粘贴出副本。
+            这里是<strong>存在本地、可复用的规则库</strong>（不在这张表上）。
+            <strong>拖动行即可调整顺序</strong>，顺序即优先级（靠前先生效）。 取消勾选 =
+            隐藏（留在库里不应用）。⧉ 复制会把规则写进系统剪贴板，同时可在本页「粘贴」出副本。
+            <strong>📥 导入工作表规则</strong> = 把当前表已有的条件格式挑进来；按钮右侧 ▾
+            还有<strong>从文件导入</strong>（项目「导出规则 → 导出到文件」得到的 .json，跨表 /
+            跨电脑迁移走这条）和<strong>从文本导入</strong>（粘贴 JSON）。 这里的
+            <strong>✎ 只改本地库</strong>，不会立刻写表（「工作表规则」里的 ✎ 才直接写表）；
+            改完点「🖌️ 应用与修复 → 应用条件格式」才写进工作表——每次改动后会弹提示再说明一次。
           </p>
           <div class="conditional-format-toolbar">
             <input
@@ -222,7 +233,35 @@
               ➕ 新建规则
             </button>
             <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
-            <button class="bgm-btn small" id="conditionalFormatImportBtn">📥 导入手工规则</button>
+            <!-- 拆分按钮：主按钮直接「导入当前工作表规则」，▾ 展开其它来源
+                 （从文件 / 从文本）——项目导出的 .json 规则文件走文件那条 -->
+            <span class="bgm-btn-split">
+              <button
+                class="bgm-btn small"
+                id="conditionalFormatImportBtn"
+                title="把当前工作表已有的条件格式导入到「我的规则」"
+              >
+                📥 导入工作表规则
+              </button>
+              <button
+                class="bgm-btn small"
+                id="conditionalFormatImportMenuBtn"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                title="其它导入方式：从文件导入（项目导出的规则文件）/ 从文本导入"
+              >
+                ▾
+              </button>
+            </span>
+            <!-- 文件选择器：项目导出的规则文件（.json）。用 input[type=file] +
+                 FileReader，而不是 COM——FileReader 自带 BOM 嗅探，UTF-8 / UTF-16
+                 导出的文件都能读（项目导出写的是 UTF-16 LE 带 BOM）。 -->
+            <input
+              type="file"
+              id="conditionalFormatImportFile"
+              accept=".json,application/json"
+              hidden
+            />
             <button
               class="bgm-btn small"
               id="conditionalFormatExportBtn"
@@ -243,7 +282,7 @@
           <div id="conditionalFormatRuleList" class="conditional-format-rule-list"></div>
         </section>
 
-        <!-- 规则编辑器（浮动弹窗：独立于任何 section，「规则管理器」拖成浮动窗时也能编辑） -->
+        <!-- 规则编辑器（浮动弹窗：独立于任何 section，「工作表规则」拖成浮动窗时也能编辑） -->
         <div
           class="conditional-format-modal-mask"
           id="conditionalFormatEditorMask"
@@ -255,37 +294,56 @@
             aria-modal="true"
             aria-labelledby="conditionalFormatEditorTitle"
           >
+            <!-- 标题栏必须是 .conditional-format-modal 的**直接子元素**：
+                 收起态 CSS（css/conditional-format.css 的
+                 `.conditional-format-modal.is-collapsed > :not(.conditional-format-modal-grip)`）
+                 只保留直接子元素里的标题栏。它原先被包在 #conditionalFormatEditor 里，
+                 一点「收起」连标题栏一起藏掉 → 只剩一个空白框，拖不动也展不开
+                 （2026-10-27 用户截图）。tests/conditional-format-modal-structure.test.ts 锁住这条不变量。 -->
+            <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">
+              <span id="conditionalFormatEditorLabel">编辑规则</span
+              ><button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatEditorMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「编辑规则」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatEditorCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「编辑规则」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
             <div id="conditionalFormatEditor" class="conditional-format-editor">
-              <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">
-                编辑规则<button
-                  type="button"
-                  class="conditional-format-modal-max"
-                  id="conditionalFormatEditorMax"
-                  aria-pressed="false"
-                  aria-label="最大化 / 还原「编辑规则」"
-                  title="最大化 / 还原"
+              <!-- 名称 / 分组只属于「我的规则」（规则库条目）；编辑工作表上的既有规则时
+                   这两项没有对应概念（COM 的 FormatCondition 没有名字与分组），整块隐藏 -->
+              <div id="conditionalFormatEditLibraryFields">
+                <label class="conditional-format-field-label" for="conditionalFormatEditName"
+                  >名称</label
                 >
-                  ⛶
-                </button>
-                <button
-                  type="button"
-                  class="conditional-format-modal-collapse"
-                  id="conditionalFormatEditorCollapse"
-                  aria-expanded="true"
-                  aria-label="收起 / 展开「编辑规则」"
-                  title="收起 / 展开"
+                <input
+                  type="text"
+                  id="conditionalFormatEditName"
+                  class="conditional-format-input"
+                />
+                <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
+                  >分组</label
                 >
-                  ▾
-                </button>
-              </h4>
-              <label class="conditional-format-field-label" for="conditionalFormatEditName"
-                >名称</label
-              >
-              <input type="text" id="conditionalFormatEditName" class="conditional-format-input" />
-              <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
-                >分组</label
-              >
-              <input type="text" id="conditionalFormatEditGroup" class="conditional-format-input" />
+                <input
+                  type="text"
+                  id="conditionalFormatEditGroup"
+                  class="conditional-format-input"
+                />
+              </div>
               <label class="conditional-format-field-label" for="conditionalFormatEditRange"
                 >应用范围（A1 风格）</label
               >
@@ -442,6 +500,210 @@
           </div>
         </div>
 
+        <!-- 从文本导入：把「导出规则 → 复制到剪贴板」得到的内容（或手工整理的
+             同格式 JSON）粘进来。文件选择器在个别宿主里可能被拦，这里是兜底通道。 -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatTextImportMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--editor"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatTextImportTitle"
+          >
+            <h4 id="conditionalFormatTextImportTitle" class="conditional-format-modal-grip">
+              从文本导入规则<button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatTextImportMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「从文本导入规则」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatTextImportCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「从文本导入规则」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
+            <p class="conditional-format-import-hint">
+              粘贴「导出规则 → 复制到剪贴板」得到的内容，或任何同格式的规则 JSON （<code
+                >{"format":"bgm-conditional-format-rules",…,"rules":[…]}</code
+              >
+              或直接一个规则数组）。导入的规则追加到「我的规则」，与库里完全相同的条目会跳过。
+            </p>
+            <textarea
+              id="conditionalFormatTextImportInput"
+              class="conditional-format-textarea"
+              rows="10"
+              spellcheck="false"
+              placeholder='{"format":"bgm-conditional-format-rules","version":1,"rules":[…]}'
+            ></textarea>
+            <div class="conditional-format-modal-actions">
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatTextImportOk"
+              >
+                导入
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatTextImportCancel">
+                取消
+              </button>
+            </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
+          </div>
+        </div>
+
+        <!-- 批量修改：工作表规则 / 我的规则 / 粘贴浮动窗口 三处共用
+             每个字段「下拉（保持不变 / 统一为某条已有的值 / 自定义）+ 输入框」：
+             下拉列的是**所选规则里出现过的值**，选它 = 统一成那条；选「自定义」才用输入框。 -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatBatchMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--editor"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatBatchTitle"
+          >
+            <h4 id="conditionalFormatBatchTitle" class="conditional-format-modal-grip">
+              <span id="conditionalFormatBatchLabel">✎ 批量修改</span
+              ><button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatBatchMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「批量修改」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatBatchCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「批量修改」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
+            <p id="conditionalFormatBatchHint" class="conditional-format-import-hint"></p>
+
+            <label class="conditional-format-field-label" for="conditionalFormatBatchRange">
+              应用范围
+            </label>
+            <div class="conditional-format-batch-row">
+              <select
+                id="conditionalFormatBatchRangePick"
+                class="conditional-format-select"
+                aria-label="应用范围：选一个已有的值，或选「自定义」"
+              ></select>
+              <input
+                type="text"
+                id="conditionalFormatBatchRange"
+                class="conditional-format-input"
+                placeholder="如 B3:B1048576"
+              />
+            </div>
+
+            <label class="conditional-format-field-label" for="conditionalFormatBatchFormula">
+              公式
+            </label>
+            <div class="conditional-format-batch-row">
+              <select
+                id="conditionalFormatBatchFormulaPick"
+                class="conditional-format-select"
+                aria-label="公式：选一个已有的值，或选「自定义」"
+              ></select>
+              <input
+                type="text"
+                id="conditionalFormatBatchFormula"
+                class="conditional-format-input"
+                placeholder='如 =$R3="26年10月"'
+              />
+            </div>
+
+            <label class="conditional-format-field-label" for="conditionalFormatBatchFill">
+              填充色
+            </label>
+            <div class="conditional-format-batch-row">
+              <select
+                id="conditionalFormatBatchFillPick"
+                class="conditional-format-select"
+                aria-label="填充色：选一个已有的颜色，或选「自定义」"
+              ></select>
+              <input
+                type="color"
+                id="conditionalFormatBatchFill"
+                class="conditional-format-color-picker"
+              />
+            </div>
+
+            <label class="conditional-format-field-label" for="conditionalFormatBatchFont">
+              字体色
+            </label>
+            <div class="conditional-format-batch-row">
+              <select
+                id="conditionalFormatBatchFontPick"
+                class="conditional-format-select"
+                aria-label="字体色：选一个已有的颜色，或选「自定义」"
+              ></select>
+              <input
+                type="color"
+                id="conditionalFormatBatchFont"
+                class="conditional-format-color-picker"
+              />
+            </div>
+
+            <label class="conditional-format-field-label" for="conditionalFormatBatchBold">
+              加粗
+            </label>
+            <select
+              id="conditionalFormatBatchBold"
+              class="conditional-format-select"
+              aria-label="加粗：保持不变 / 加粗 / 不加粗"
+            >
+              <option value="keep">保持不变</option>
+              <option value="bold">加粗</option>
+              <option value="normal">不加粗</option>
+            </select>
+
+            <div class="conditional-format-modal-actions">
+              <button type="button" class="bgm-btn small primary" id="conditionalFormatBatchOk">
+                应用到所选
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatBatchCancel">
+                取消
+              </button>
+            </div>
+            <div
+              class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
+          </div>
+        </div>
+
         <!-- 既有规则归组：组名输入小弹窗（本地视图分组，不写工作表） -->
         <div
           class="conditional-format-modal-mask"
@@ -455,7 +717,8 @@
             aria-labelledby="conditionalFormatGroupTitle"
           >
             <h4 id="conditionalFormatGroupTitle" class="conditional-format-modal-grip">
-              归入分组<button
+              <span id="conditionalFormatGroupLabel">归入分组</span
+              ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatGroupMax"
@@ -529,7 +792,8 @@
             aria-labelledby="conditionalFormatPasteTitle"
           >
             <h4 id="conditionalFormatPasteTitle" class="conditional-format-modal-grip">
-              📋 粘贴规则<button
+              <span id="conditionalFormatPasteLabel">📋 粘贴规则</span
+              ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatPasteMax"
@@ -551,12 +815,37 @@
               </button>
             </h4>
             <p id="conditionalFormatPasteHint" class="conditional-format-import-hint"></p>
+            <!-- 单条规则：一个范围输入框就够 -->
             <input
               type="text"
               id="conditionalFormatPasteRange"
               class="conditional-format-input"
               placeholder="如 B3:B1048576"
             />
+            <!-- 多条规则：改成表格——逐条看公式/配色、逐条改范围，并可批量统一
+                 （用户：粘贴一批规则时要用表格展示条件格式与应用范围，且能批量管理范围） -->
+            <div id="conditionalFormatPasteBatch" hidden>
+              <div class="conditional-format-paste-tools">
+                <input
+                  type="text"
+                  id="conditionalFormatPasteUniformRange"
+                  class="conditional-format-input"
+                  placeholder="统一应用范围（留空则不改）"
+                />
+                <button type="button" class="bgm-btn small" id="conditionalFormatPasteApplyRange">
+                  应用到全部
+                </button>
+                <button
+                  type="button"
+                  class="bgm-btn small"
+                  id="conditionalFormatPasteBatchEdit"
+                  title="批量修改这批规则的应用范围 / 公式 / 颜色（可选「统一为某一条已有的值」或自己填）"
+                >
+                  ✎ 批量修改
+                </button>
+              </div>
+              <div class="conditional-format-paste-table" id="conditionalFormatPasteTable"></div>
+            </div>
             <div class="conditional-format-modal-actions">
               <button type="button" class="bgm-btn small primary" id="conditionalFormatPasteOk">
                 确定
@@ -625,7 +914,7 @@
       </main>
     </div>
 
-    <!-- ===================== 规则管理器工具条（拖出时才显示） =====================
+    <!-- ===================== 工作表规则工具条（拖出时才显示） =====================
          这是通用浮动窗口组件的「工具条插槽」内容：组件在窗口打开时把它搬进标题栏，
          收回时再搬回这里并隐藏。按钮与 WPS 原生对齐：显示其格式规则 + ↑↓ 调序 + 删除。
          编辑与 ↑↓ 需要「有选中行」才有意义，故默认禁用，选中后由 JS 放开。 -->

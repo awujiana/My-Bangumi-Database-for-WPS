@@ -26,6 +26,8 @@ import pageHtml from '../ui/conditional-format.html?raw'
 const m = vi.hoisted(() => ({
   // tools/util/index.js
   bgmLog: vi.fn<(level: number, message?: string) => void>(),
+  // 系统剪贴板：默认成功（jsdom 无 execCommand，走真实实现会一路失败）
+  copyTextWithResult: vi.fn<(text: string) => { ok: boolean }>(() => ({ ok: true })),
   findHeaderRow: vi.fn<(worksheet: unknown) => number>(),
   getApp: vi.fn<() => unknown>(),
   getColumnMap: vi.fn<(worksheet: unknown) => unknown>(),
@@ -49,12 +51,14 @@ const m = vi.hoisted(() => ({
   applyConditionalFormatPlan: vi.fn<(worksheet: unknown, plan: unknown) => unknown>(),
   checkFormatConditionsReadable: vi.fn<(worksheet: unknown) => string | null>(),
   deleteForeignRule: vi.fn<(worksheet: unknown, index: number) => unknown>(),
+  duplicateForeignRule: vi.fn<(worksheet: unknown, index: number, range?: string) => unknown>(),
   isFormatConditionsSupported: vi.fn<(worksheet: unknown) => boolean>(),
   moveForeignRule: vi.fn<(worksheet: unknown, index: number, direction: number) => unknown>(),
   readForeignRules: vi.fn<(worksheet: unknown) => unknown[]>(),
   setForeignAppliesTo: vi.fn<(worksheet: unknown, index: number, range: string) => unknown>(),
   setForeignFormula: vi.fn<(worksheet: unknown, index: number, formula: string) => unknown>(),
   setForeignStopIfTrue: vi.fn<(worksheet: unknown, index: number, isStop: boolean) => unknown>(),
+  updateForeignRule: vi.fn<(worksheet: unknown, index: number, patch: unknown) => unknown>(),
   // panel/shell-nav.js
   initializeShellNav: vi.fn<() => void>(),
   // panel/action-buttons-gate.js
@@ -74,6 +78,7 @@ const m = vi.hoisted(() => ({
 
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: m.bgmLog,
+  copyTextWithResult: m.copyTextWithResult,
   findHeaderRow: m.findHeaderRow,
   getApp: m.getApp,
   getColumnMap: m.getColumnMap,
@@ -108,6 +113,8 @@ vi.mock('../ts/panel/conditional-format-apply.js', () => ({
   setForeignAppliesTo: m.setForeignAppliesTo,
   setForeignFormula: m.setForeignFormula,
   setForeignStopIfTrue: m.setForeignStopIfTrue,
+  updateForeignRule: m.updateForeignRule,
+  duplicateForeignRule: m.duplicateForeignRule,
 }))
 
 vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: m.initializeShellNav }))
@@ -190,6 +197,13 @@ async function nextFrames(count = 2): Promise<void> {
   }
 }
 
+/** 等一个宏任务（页面里 `void asyncFn()` 的收尾：剪贴板写入是 async 的） */
+async function flushAsync(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
 /** 给一组元素打上垂直排列的矩形（jsdom 默认全 0，碰撞检测需要真实高度） */
 function stubRects(elements: Element[], height = 40): void {
   for (const [index, element] of elements.entries()) {
@@ -250,7 +264,9 @@ beforeEach(() => {
   m.setForeignStopIfTrue.mockReturnValue({ ok: true })
   m.setForeignAppliesTo.mockReturnValue({ ok: true })
   m.setForeignFormula.mockReturnValue({ ok: true })
-  m.applyConditionalFormatPlan.mockReturnValue({ added: 0, failed: 0 })
+  m.applyConditionalFormatPlan.mockReturnValue({ added: 0, failed: 0, verified: 0 })
+  m.updateForeignRule.mockReturnValue({ ok: true, changed: ['公式'], warnings: [] })
+  m.duplicateForeignRule.mockReturnValue({ ok: true, range: 'B2:B9' })
 })
 
 /** 让 getConfig 按 key 分流返回（规则库 / 目标表 / 其余空） */
@@ -270,6 +286,52 @@ function writtenRuleIds(): string[][] {
       const parsed: unknown = JSON.parse(value)
       return Array.isArray(parsed) ? parsed.map((entry) => (entry as { id?: string }).id ?? '') : []
     })
+}
+
+/** 打开导入 ▾ 菜单并点某一项 */
+function clickImportMenuItem(menuItemId: string): void {
+  document.getElementById('conditionalFormatImportMenuBtn')!.click()
+  const item = menuItems().find((entry) => entry.dataset.menuItem === menuItemId)
+  expect(item).toBeDefined()
+  item!.click()
+}
+
+/** 规则文件的包装格式（= 项目「导出规则」写进文件的内容） */
+function payloadOf(rules: unknown[]): string {
+  return JSON.stringify(
+    { format: 'bgm-conditional-format-rules', version: 1, exportedAt: '2026-10-27', rules },
+    null,
+    2,
+  )
+}
+
+/** 勾选规则库前两条 → 批量条「复制所选」→ 打开粘贴弹窗 */
+async function openBatchPaste(): Promise<void> {
+  mockConfigWithRules()
+  await openPage()
+  const boxes = [...document.querySelectorAll<HTMLInputElement>('input[data-action="pick"]')]
+  for (const box of boxes.slice(0, 2)) {
+    box.checked = true
+    box.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  const bar = document.getElementById('conditionalFormatRuleBatchBar')!
+  bar.querySelector<HTMLButtonElement>('[data-rule-batch="copy"]')!.click()
+  await flushAsync()
+  document.getElementById('conditionalFormatPasteBtn')!.click()
+}
+
+/** 让工作表有两条既有规则（快照） */
+function mockWorksheetRules(): void {
+  m.collectSheets.mockReturnValue([SHEET_ENTRY])
+  m.getConfig.mockImplementation((key: string) => {
+    if (key === 'conditionalFormat.sheet.v1') return SHEET_ENTRY.key
+    if (key === 'conditionalFormat.rules.v1') return serializeRules(RULES)
+    return ''
+  })
+  m.readForeignRules.mockReturnValue([
+    { range: 'B3:B100', formula: '=$R3=1', kind: 'expression', interior: '#00B050' },
+    { range: 'C3:C100', formula: '=$R3=2', kind: 'expression', interior: '#FF0000' },
+  ])
 }
 
 describe('初始化与渲染', () => {
@@ -323,6 +385,345 @@ describe('规则库右键菜单', () => {
     // 第一行（DOM 序）禁用上移
     expect(items[2]?.getAttribute('aria-disabled')).toBe('true')
     expect(items[3]?.getAttribute('aria-disabled')).toBeNull()
+  })
+})
+
+describe('系统剪贴板（行内 ⧉ 复制）', () => {
+  it('⧉ 把规则 JSON 写进系统剪贴板，并提示已复制', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    ruleRows()[0]!.querySelector<HTMLButtonElement>('button[data-action="copy"]')!.click()
+    await flushAsync()
+
+    // 只写内部剪贴板时用户按 Ctrl+V 拿不到东西 → 必须真写系统剪贴板
+    expect(m.copyTextWithResult).toHaveBeenCalledTimes(1)
+    const payload = JSON.parse(m.copyTextWithResult.mock.calls[0]![0]) as {
+      format?: string
+      version?: number
+      rules?: { id?: string }[]
+    }
+    expect(payload.format).toBe('bgm-conditional-format-rules')
+    expect(payload.version).toBe(1)
+    expect(payload.rules?.map((rule) => rule.id)).toEqual(['r1'])
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('已复制 1 条规则到系统剪贴板'),
+      'success',
+    )
+  })
+
+  it('系统剪贴板不可用 → 明说没写进去，但「粘贴」仍能出副本', async () => {
+    mockConfigWithRules()
+    await openPage()
+    m.copyTextWithResult.mockReturnValue({ ok: false })
+    // 两条路径都断掉：execCommand 返回失败 + Clipboard API 拒绝
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    })
+
+    ruleRows()[0]!.querySelector<HTMLButtonElement>('button[data-action="copy"]')!.click()
+    await flushAsync()
+
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('系统剪贴板不可用'), 'warn')
+    // 内部剪贴板不受影响：粘贴弹窗照样打开并预填源范围
+    document.getElementById('conditionalFormatPasteBtn')!.click()
+    expect(document.getElementById('conditionalFormatPasteMask')!.style.display).toBe('flex')
+    expect(document.getElementById('conditionalFormatPasteHint')?.textContent).toContain(
+      '将粘贴 1 条规则',
+    )
+
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+})
+
+describe('「改动未写进工作表」提示', () => {
+  it('改规则库后 toast 提醒去点「应用条件格式」', async () => {
+    mockConfigWithRules()
+    await openPage()
+    m.showToast.mockClear()
+
+    // 取消勾选 = 隐藏（规则库改动的典型入口）
+    const toggle = ruleRows()[0]!.querySelector<HTMLInputElement>('input[data-action="toggle"]')!
+    toggle.checked = false
+    toggle.dispatchEvent(new Event('change', { bubbles: true }))
+
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('应用条件格式'), 'info')
+  })
+
+  it('2 秒内连续改动只提示一次（拖拽调序不该刷屏）', async () => {
+    mockConfigWithRules()
+    await openPage()
+    m.showToast.mockClear()
+
+    // 每次改完都会重渲染，故逐次重新取行（拿旧引用会脱树、事件冒不上去）
+    for (const index of [0, 1]) {
+      const toggle = ruleRows()[index]!.querySelector<HTMLInputElement>(
+        'input[data-action="toggle"]',
+      )!
+      toggle.checked = false
+      toggle.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    const notices = m.showToast.mock.calls.filter(([, type]) => type === 'info')
+    expect(notices).toHaveLength(1)
+  })
+})
+
+describe('导入通道（工作表规则 / 文件 / 文本）', () => {
+  /** 一条与库里 r1 完全不同的新规则 */
+  const NEW_RULE = {
+    id: 'x1',
+    name: '从文件来的规则',
+    group: '导入',
+    appliesTo: 'E:E',
+    formula: '=$R3="x"',
+    interior: '#123456',
+  }
+
+  it('▾ 菜单列出三个来源（工作表规则 / 文件 / 文本）', async () => {
+    mockConfigWithRules()
+    await openPage()
+    document.getElementById('conditionalFormatImportMenuBtn')!.click()
+    const labels = menuItems().map((item) => item.textContent.trim())
+    expect(labels).toHaveLength(3)
+    expect(labels[0]).toContain('导入工作表规则')
+    expect(labels[1]).toContain('从文件导入')
+    expect(labels[2]).toContain('从文本导入')
+  })
+
+  it('从文本导入：包装格式解析成功 → 追加到库，完全相同的条目跳过', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    clickImportMenuItem('import-text')
+    const textarea = document.getElementById(
+      'conditionalFormatTextImportInput',
+    ) as HTMLTextAreaElement
+    expect(document.getElementById('conditionalFormatTextImportMask')!.style.display).toBe('flex')
+    // 一条新的 + 一条与库里 r1 完全相同的（后者应被跳过）
+    textarea.value = payloadOf([NEW_RULE, { ...RULES[0] }])
+    document.getElementById('conditionalFormatTextImportOk')!.click()
+
+    const ids = writtenRuleIds().at(-1) ?? []
+    expect(ids).toHaveLength(4)
+    expect(ids).toContain('r1')
+    expect(ids.filter((id) => id !== 'r1' && id !== 'r2' && id !== 'r3')).toHaveLength(1)
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('导入 1 条到「我的规则」'),
+      'success',
+    )
+    // 弹窗关掉
+    expect(document.getElementById('conditionalFormatTextImportMask')!.style.display).toBe('none')
+  })
+
+  it('从文本导入：空文本 / 不是规则 JSON 都给出可操作提示', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    clickImportMenuItem('import-text')
+    document.getElementById('conditionalFormatTextImportOk')!.click()
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('先把规则 JSON 粘进来'),
+      'warn',
+    )
+
+    const textarea = document.getElementById(
+      'conditionalFormatTextImportInput',
+    ) as HTMLTextAreaElement
+    textarea.value = '这不是 JSON'
+    document.getElementById('conditionalFormatTextImportOk')!.click()
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('没有可识别的规则'), 'warn')
+  })
+
+  it('从文件导入：FileReader 读出的包装格式照样进库', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const input = document.getElementById('conditionalFormatImportFile') as HTMLInputElement
+    const file = new File([payloadOf([NEW_RULE])], 'bgm-rules.json', {
+      type: 'application/json',
+    })
+    // input.files 是只读的（jsdom 也一样）→ 只能重定义属性
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    // FileReader 是异步的：等它 load
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20)
+    })
+
+    const ids = writtenRuleIds().at(-1) ?? []
+    expect(ids).toHaveLength(4)
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('bgm-rules.json'), 'success')
+  })
+})
+
+describe('粘贴一批规则（表格视图 + 批量范围）', () => {
+  it('多条 → 表格列出每条的名称/公式/色块/范围，单条输入框隐藏', async () => {
+    await openBatchPaste()
+
+    // hidden 属性与内联 display 都要放开：只改一个的话表格依旧看不见
+    const batch = document.getElementById('conditionalFormatPasteBatch')!
+    expect(batch.hidden).toBe(false)
+    expect(batch.style.display).not.toBe('none')
+    expect(document.getElementById('conditionalFormatPasteRange')!.style.display).toBe('none')
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-paste-row]')]
+    expect(rows).toHaveLength(2)
+    // 第一条是 r1（B:B），第二条是 r3（D:D）——按规则库顺序
+    const inputs = rows.map((row) => row.querySelector<HTMLInputElement>('[data-paste-range]')!)
+    expect(inputs.map((input) => input.value)).toEqual(['B:B', 'D:D'])
+    expect(rows[0]?.textContent).toContain('当前季')
+    expect(rows[0]?.querySelector('.conditional-format-paste-formula')?.textContent).toBe('=1')
+  })
+
+  it('「应用到全部」把统一范围写进每一行', async () => {
+    await openBatchPaste()
+
+    const uniform = document.getElementById(
+      'conditionalFormatPasteUniformRange',
+    ) as HTMLInputElement
+    uniform.value = 'Z:Z'
+    document.getElementById('conditionalFormatPasteApplyRange')!.click()
+
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('[data-paste-range]')]
+    expect(inputs.map((input) => input.value)).toEqual(['Z:Z', 'Z:Z'])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('统一为 Z:Z'), 'success')
+  })
+
+  it('表格里逐条改范围 → 确定后各按自己的范围生成副本', async () => {
+    await openBatchPaste()
+
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('[data-paste-range]')]
+    inputs[0]!.value = 'B:B'
+    inputs[0]!.dispatchEvent(new Event('input', { bubbles: true }))
+    inputs[1]!.value = 'F:F'
+    inputs[1]!.dispatchEvent(new Event('input', { bubbles: true }))
+    document.getElementById('conditionalFormatPasteOk')!.click()
+
+    const written = JSON.parse(
+      m.setConfig.mock.calls.filter(([key]) => key === 'conditionalFormat.rules.v1').at(-1)![1],
+    ) as { appliesTo: string; name: string }[]
+    const copies = written.filter((rule) => rule.name.endsWith('副本'))
+    expect(copies.map((rule) => rule.appliesTo)).toEqual(['B:B', 'F:F'])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已粘贴 2 条'), 'success')
+  })
+
+  it('批量修改（待粘贴）：统一填充色 + 公式', async () => {
+    await openBatchPaste()
+
+    document.getElementById('conditionalFormatPasteBatchEdit')!.click()
+    expect(document.getElementById('conditionalFormatBatchMask')!.style.display).toBe('flex')
+    // 标题带目标名
+    expect(document.getElementById('conditionalFormatBatchLabel')?.textContent).toContain(
+      '待粘贴的规则',
+    )
+    // 填充色下拉里应有两条现有色
+    const fillPick = document.getElementById('conditionalFormatBatchFillPick') as HTMLSelectElement
+    const fillOptions = [...fillPick.options].map((option) => option.value)
+    expect(fillOptions[0]).toBe('keep')
+    expect(fillOptions).toContain('value:#00B050')
+    expect(fillOptions.at(-1)).toBe('custom')
+
+    fillPick.value = 'value:#00B050'
+    const formulaPick = document.getElementById(
+      'conditionalFormatBatchFormulaPick',
+    ) as HTMLSelectElement
+    formulaPick.value = 'custom'
+    const formulaInput = document.getElementById(
+      'conditionalFormatBatchFormula',
+    ) as HTMLInputElement
+    formulaInput.value = '=$R3="批量"'
+    document.getElementById('conditionalFormatBatchOk')!.click()
+
+    // 表格里的公式列已更新（颜色不可见，断言公式）
+    const formulas = [...document.querySelectorAll('.conditional-format-paste-formula')]
+    expect(formulas.map((node) => node.textContent)).toEqual(['=$R3="批量"', '=$R3="批量"'])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('待粘贴的 2 条'), 'success')
+  })
+})
+
+describe('批量修改（工作表规则 / 我的规则）', () => {
+  it('工作表规则：勾选两条 → 批量统一范围，逐条走 updateForeignRule', async () => {
+    mockWorksheetRules()
+    await openPage()
+
+    // 每勾一条都会重渲染表格 → 拿旧引用会脱树，故逐次重新取
+    for (const index of [0, 1]) {
+      const box = document.querySelectorAll<HTMLInputElement>(
+        '#conditionalFormatExistingList [data-action="select"]',
+      )[index]!
+      box.checked = true
+      box.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    document
+      .getElementById('conditionalFormatExistingBatchBar')!
+      .querySelector<HTMLButtonElement>('[data-batch-action="edit"]')!
+      .click()
+
+    expect(document.getElementById('conditionalFormatBatchMask')!.style.display).toBe('flex')
+    const rangePick = document.getElementById(
+      'conditionalFormatBatchRangePick',
+    ) as HTMLSelectElement
+    expect([...rangePick.options].map((option) => option.value)).toEqual([
+      'keep',
+      'value:B3:B100',
+      'value:C3:C100',
+      'custom',
+    ])
+    rangePick.value = 'custom'
+    ;(document.getElementById('conditionalFormatBatchRange') as HTMLInputElement).value = 'E:E'
+    document.getElementById('conditionalFormatBatchOk')!.click()
+
+    expect(m.updateForeignRule).toHaveBeenCalledTimes(2)
+    expect(m.updateForeignRule).toHaveBeenCalledWith(expect.anything(), 1, { range: 'E:E' })
+    expect(m.updateForeignRule).toHaveBeenCalledWith(expect.anything(), 2, { range: 'E:E' })
+    expect(m.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('已批量修改 2 条工作表规则'),
+      'success',
+    )
+  })
+
+  it('我的规则：批量统一填充色 → 只改本地库并提示要再应用', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[data-action="pick"]')]
+    for (const box of boxes) {
+      box.checked = true
+      box.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    document
+      .getElementById('conditionalFormatRuleBatchBar')!
+      .querySelector<HTMLButtonElement>('[data-rule-batch="edit"]')!
+      .click()
+
+    const fillPick = document.getElementById('conditionalFormatBatchFillPick') as HTMLSelectElement
+    fillPick.value = 'value:#FF0000'
+    document.getElementById('conditionalFormatBatchOk')!.click()
+
+    const written = JSON.parse(
+      m.setConfig.mock.calls.filter(([key]) => key === 'conditionalFormat.rules.v1').at(-1)![1],
+    ) as { interior: string }[]
+    expect(written.map((rule) => rule.interior)).toEqual(['#FF0000', '#FF0000', '#FF0000'])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('应用条件格式'), 'success')
+  })
+
+  it('三项都「保持不变」→ 不落盘，只提示', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[data-action="pick"]')]
+    boxes[0]!.checked = true
+    boxes[0]!.dispatchEvent(new Event('change', { bubbles: true }))
+    document
+      .getElementById('conditionalFormatRuleBatchBar')!
+      .querySelector<HTMLButtonElement>('[data-rule-batch="edit"]')!
+      .click()
+
+    m.setConfig.mockClear()
+    document.getElementById('conditionalFormatBatchOk')!.click()
+    expect(m.setConfig).not.toHaveBeenCalled()
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('保持不变'), 'warn')
   })
 })
 
@@ -390,7 +791,7 @@ describe('既有规则表格', () => {
     },
   ]
 
-  it('读到快照后渲染表格行；右键菜单含导入/归组/停止，边界禁用', async () => {
+  it('读到快照后渲染表格行；右键菜单含导入/编辑/复制/归组/停止，边界禁用', async () => {
     mockConfigWithRules([], SHEET_ENTRY.key)
     m.collectSheets.mockReturnValue([SHEET_ENTRY])
     m.readForeignRules.mockReturnValue(SNAPSHOTS)
@@ -408,6 +809,8 @@ describe('既有规则表格', () => {
     const items = menuItems()
     expect(items.map((item) => item.dataset.menuItem)).toEqual([
       'import',
+      'edit',
+      'duplicate',
       'group',
       'stop',
       'up',
@@ -416,7 +819,74 @@ describe('既有规则表格', () => {
     ])
     // 公式类可导入（不禁用）；第一条禁用上移
     expect(items[0]?.getAttribute('aria-disabled')).toBeNull()
-    expect(items[3]?.getAttribute('aria-disabled')).toBe('true')
+    expect(items[5]?.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('行内 ✎ 打开编辑器：隐藏名称 / 分组，预填范围与公式，保存走 updateForeignRule', async () => {
+    mockConfigWithRules([], SHEET_ENTRY.key)
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue(SNAPSHOTS)
+    await openPage()
+    // 先关掉上一个用例可能留下的右键菜单：它的「点外面关闭」是 document 捕获阶段监听，
+    // 会吃掉这一次点击（不关就会看到「点了没反应」）
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+
+    const firstRow = document.querySelector<HTMLElement>('.conditional-format-row[data-row-index]')
+    firstRow?.querySelector<HTMLButtonElement>('[data-action="edit"]')?.click()
+
+    const mask = document.getElementById('conditionalFormatEditorMask')
+    expect(mask?.style.display).toBe('flex')
+    // 工作表规则没有「名称 / 分组」这两个概念，整块隐藏
+    const libraryFields = document.getElementById('conditionalFormatEditLibraryFields')
+    expect(libraryFields?.hidden).toBe(true)
+    expect(document.getElementById('conditionalFormatEditRange')?.getAttribute('value')).toBeNull()
+    expect((document.getElementById('conditionalFormatEditRange') as HTMLInputElement).value).toBe(
+      'B2:B9',
+    )
+    expect(
+      (document.getElementById('conditionalFormatEditFormula') as HTMLTextAreaElement).value,
+    ).toBe('=$B2="x"')
+    expect(document.getElementById('conditionalFormatEditorLabel')?.textContent).toContain(
+      '工作表规则 #1',
+    )
+
+    // 改公式后保存 → 写回 COM（不走规则库）
+    const formulaInput = document.getElementById(
+      'conditionalFormatEditFormula',
+    ) as HTMLTextAreaElement
+    formulaInput.value = '=$B2="改过"'
+    document.getElementById('conditionalFormatEditorSave')?.click()
+
+    expect(m.updateForeignRule).toHaveBeenCalledTimes(1)
+    const [, index, patch] = m.updateForeignRule.mock.calls[0] ?? []
+    expect(index).toBe(1)
+    expect(patch).toEqual({ formula: '=$B2="改过"' })
+    expect(mask?.style.display).toBe('none')
+  })
+
+  it('行内 ⧉ 打开复制弹窗：标题与提示是「复制」，确定后按填写的范围 Add 副本', async () => {
+    mockConfigWithRules([], SHEET_ENTRY.key)
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue(SNAPSHOTS)
+    await openPage()
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+
+    const firstRow = document.querySelector<HTMLElement>('.conditional-format-row[data-row-index]')
+    firstRow?.querySelector<HTMLButtonElement>('[data-action="duplicate"]')?.click()
+
+    expect(document.getElementById('conditionalFormatPasteMask')?.style.display).toBe('flex')
+    expect(document.getElementById('conditionalFormatPasteLabel')?.textContent).toContain(
+      '复制规则',
+    )
+    expect(document.getElementById('conditionalFormatPasteHint')?.textContent).toContain('第 1 条')
+    const rangeInput = document.getElementById('conditionalFormatPasteRange') as HTMLInputElement
+    expect(rangeInput.value).toBe('B2:B9')
+
+    rangeInput.value = 'F2:F9'
+    document.getElementById('conditionalFormatPasteOk')?.click()
+
+    expect(m.duplicateForeignRule).toHaveBeenCalledWith(expect.anything(), 1, 'F2:F9')
+    expect(document.getElementById('conditionalFormatPasteMask')?.style.display).toBe('none')
   })
 
   it('拖行下移两格 → 逐格相邻交换 COM（|Δ| 次 moveForeignRule）', async () => {

@@ -425,6 +425,8 @@
 /* 浮层化后：外层 .conditional-format-modal 已是卡片，这里只做内容排布，
    不再自带边框/背景/外边距（否则双重卡片）。 */
 .conditional-format-editor {
+  /* 标题栏已移出本容器（必须是 .conditional-format-modal 的直接子元素，否则
+     收起态会把标题栏一起藏掉）；这里只装表单字段，无需自身留白。 */
   padding: 0;
   border: none;
   background: transparent;
@@ -506,12 +508,8 @@
   text-overflow: ellipsis;
 }
 
-.conditional-format-editor h4 {
-  margin: 0 0 var(--sp-3);
-  font-size: var(--fs-h3);
-  font-weight: 500;
-}
-
+/* 标题栏 h4 的样式统一由 `.conditional-format-modal h4` 提供（原
+   `.conditional-format-editor h4` 与之逐字相同，且标题栏已移出编辑器容器 → 删） */
 .conditional-format-field-label {
   display: block;
   margin: var(--sp-3) 0 var(--sp-1);
@@ -535,6 +533,78 @@
   font-family: var(--font-mono);
   font-size: 13px;
   resize: vertical;
+}
+
+/* ---- 批量修改弹窗：每个字段 = 下拉（保持不变 / 统一为某条已有值 / 自定义）+ 输入 ---- */
+.conditional-format-batch-row {
+  display: grid;
+  /* 下拉给「已有值」看全（公式可能很长），输入框略窄——它是「自定义」时才用 */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+/* ---- 粘贴弹窗：多条规则时改成表格（逐条看公式/配色 + 逐条改范围） ---- */
+.conditional-format-paste-tools {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin: var(--sp-2) 0;
+}
+
+.conditional-format-paste-tools .conditional-format-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.conditional-format-paste-table {
+  max-height: 46vh;
+  overflow: auto;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.conditional-format-paste-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1.3fr) 26px minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 0.5px solid var(--border);
+  font-size: var(--fs-sm);
+}
+
+.conditional-format-paste-row:last-child {
+  border-bottom: none;
+}
+
+/* 表头吸顶：规则多时往下滚，列名不跟着滚走 */
+.conditional-format-paste-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--text-2);
+  background: var(--bg-surface-2);
+  font-size: var(--fs-sm);
+}
+
+.conditional-format-paste-row .conditional-format-paste-name,
+.conditional-format-paste-row .conditional-format-paste-formula {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conditional-format-paste-row .conditional-format-paste-formula {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+
+.conditional-format-paste-swatch {
+  width: 18px;
+  height: 18px;
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
 }
 
 .conditional-format-color-row {
@@ -1029,7 +1099,12 @@
 /* 收起态：只留标题栏一行——除标题栏（h4.grip）外的直接子元素全藏。
    通用规则替代旧的逐类枚举（hint / input / actions）：编辑器表单、导入
    列表、确认正文各自的类名不同，枚举漏一个就是「收起了还赖着半截」。
-   拖过的 fixed 位置不受影响，展开后还在原处。 */
+   拖过的 fixed 位置不受影响，展开后还在原处。
+
+   ⚠ 前提：标题栏必须是 `.conditional-format-modal` 的**直接子元素**。
+   一旦被包进容器（编辑器曾把 h4 放在 #conditionalFormatEditor 里），这条
+   规则会把容器连同标题栏一起藏掉 → 只剩空白框，拖不动也展不开（2026-10-27
+   用户截图）。不变量由 tests/conditional-format-modal-structure.test.ts 锁住。 */
 .conditional-format-modal.is-collapsed > :not(.conditional-format-modal-grip) {
   display: none;
 }

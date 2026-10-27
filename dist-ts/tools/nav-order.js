@@ -59,8 +59,8 @@ export const PAGE_MODULES = {
     ],
     'conditional-format': [
         { id: 'sec-target', label: '目标工作表', icon: '🎯' },
-        { id: 'sec-existing', label: '规则管理器', icon: '👀' },
-        { id: 'sec-rules', label: '规则管理', icon: '☑️' },
+        { id: 'sec-existing', label: '工作表规则', icon: '👀' },
+        { id: 'sec-rules', label: '我的规则', icon: '☑️' },
         { id: 'sec-defaults', label: '默认规则集', icon: '📦' },
         { id: 'sec-apply', label: '应用与修复', icon: '🖌️' },
     ],

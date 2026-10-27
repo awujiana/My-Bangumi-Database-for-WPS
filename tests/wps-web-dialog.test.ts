@@ -106,7 +106,7 @@ describe('openWebDialog', () => {
 
     const session = openWebDialog({
       url: 'http://host/ui/manager.html',
-      title: '规则管理器',
+      title: '工作表规则',
       width: 400,
       height: 300,
     })
@@ -125,7 +125,7 @@ describe('openWebDialog', () => {
 
     const session = openWebDialog({
       url: 'http://host/ui/manager.html',
-      title: '规则管理器',
+      title: '工作表规则',
       width: 400,
       height: 300,
     })
@@ -133,7 +133,7 @@ describe('openWebDialog', () => {
     expect(session?.strategy).toBe('show-dialog')
     expect(showDialog).toHaveBeenCalledWith(
       'http://host/ui/manager.html',
-      '规则管理器',
+      '工作表规则',
       800,
       600,
       false,

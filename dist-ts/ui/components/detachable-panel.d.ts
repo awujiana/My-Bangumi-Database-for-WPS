@@ -126,7 +126,7 @@ export interface DetachablePanelOptions {
     height?: number | undefined;
     /** 挂进窗口标题栏的工具条元素（随窗口显示，不随内容搬家） */
     toolbar?: HTMLElement | null | undefined;
-    /** 外部已有的触发按钮（例：条件格式页的「🔍 规则管理器」） */
+    /** 外部已有的触发按钮（例：条件格式页的「工作表规则」） */
     trigger?: HTMLElement | null | undefined;
     /**
      * 拖出方式

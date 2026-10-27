@@ -16,15 +16,25 @@ import { bgmLog } from '../tools/util/index.js';
 import { describeRangeForDiagnosis, readRangeAddress } from '../tools/wps-range.js';
 import { XL_EXPRESSION } from './conditional-format-rules.js';
 /**
+ * 取本表可用的 FormatConditions 集合（**Sheet 级优先，回退 UsedRange**）
+ *
+ * ## 为什么必须与 readForeignRules 同序
+ * 读取走 Sheet 级（全表规则），而应用与探测原先只认 `UsedRange.FormatConditions`。
+ * 在「Sheet 级有、UsedRange 级没有（或只在 UsedRange 上 Add 不生效）」的宿主上，
+ * 界面能列出规则、点应用却一条也写不进去（`added = 0`），表现就是
+ * **「规则管理器修改后无法应用到工作表」**——两侧口径不一致的静默后果。
+ */
+function resolveFormatConditions(worksheet) {
+    return worksheet?.FormatConditions ?? worksheet?.UsedRange?.FormatConditions;
+}
+/**
  * 探测宿主是否支持条件格式 API
  *
- * 判据是 UsedRange 上能拿到 FormatConditions 且 Add 是函数——只读属性、
- * 不创建任何规则。部分 WPS 版本 / 只读代理下为 false。
+ * 判据是能拿到 FormatConditions 且 Add 是函数——只读属性、不创建任何规则。
+ * 部分 WPS 版本 / 只读代理下为 false。
  */
 export function isFormatConditionsSupported(worksheet) {
-    if (!worksheet?.UsedRange)
-        return false;
-    return typeof worksheet.UsedRange.FormatConditions?.Add === 'function';
+    return typeof resolveFormatConditions(worksheet)?.Add === 'function';
 }
 /**
  * 检查能否枚举既有规则
@@ -35,11 +45,23 @@ export function isFormatConditionsSupported(worksheet) {
 export function checkFormatConditionsReadable(worksheet) {
     if (!isFormatConditionsSupported(worksheet))
         return '当前 WPS 版本不支持条件格式 API';
-    const formatConditions = worksheet?.UsedRange?.FormatConditions;
-    if (typeof formatConditions?.Item !== 'function') {
+    if (typeof resolveFormatConditions(worksheet)?.Item !== 'function') {
         return '宿主未提供 FormatConditions.Item，无法枚举既有规则';
     }
     return null;
+}
+/** 归一化公式用于回读比对：去首尾空白、去前导 `=`、压掉全部空格 */
+function normalizeFormulaForCompare(formula) {
+    return formula.replace(/\s+/gu, '').replace(/^=/u, '');
+}
+/** 归一化范围用于回读比对：去空白、去 `$`、转大写（`b2:b50001` 与 `$B$2:$B$50001` 等价） */
+function normalizeRangeForCompare(range) {
+    return range.replace(/\s+/gu, '').replace(/\$/gu, '').toUpperCase();
+}
+/** 归一化颜色：`#00b050` / `00B050` 都收敛成 `#00B050` */
+function normalizeColorForCompare(color) {
+    const bare = color.replace(/^#/u, '').toUpperCase();
+    return `#${bare}`;
 }
 /** 读一条规则的填充色（尽力而为；宿主拒绝时留空） */
 function readInteriorColor(fc) {
@@ -73,6 +95,15 @@ function readStopIfTrue(fc) {
     }
     catch {
         return undefined;
+    }
+}
+/** 读规则公式（宿主不暴露 / 抛错时收敛成空串） */
+function readFormulaSafe(fc) {
+    try {
+        return typeof fc.Formula1 === 'string' ? fc.Formula1 : '';
+    }
+    catch {
+        return '';
     }
 }
 /** 读 Areas 联合选区：多个不连续区域拼成 "A1:C38,D1:D38"（对标 WPS 原生规则管理器） */
@@ -232,7 +263,9 @@ export function setForeignStopIfTrue(worksheet, index, isStopIfTrue) {
 /**
  * 改第 index 条既有规则的应用范围
  *
- * 走 FormatCondition.ModifyAppliesToRange（WPS 文档方法）。
+ * 走 FormatCondition.ModifyAppliesToRange（WPS 文档方法），**写后回读比对**：
+ * 宿主接受调用却不生效时（只读代理 / 老版本），不回读就会提示「已改为 X」
+ * 而表上没变——正是用户反馈的「修改后无法应用到工作表」。
  * 写不进去就明说（宿主版本不支持 / 范围字符串非法），由页面还原输入。
  */
 export function setForeignAppliesTo(worksheet, index, range) {
@@ -244,17 +277,22 @@ export function setForeignAppliesTo(worksheet, index, range) {
     }
     try {
         fc.ModifyAppliesToRange(range);
-        return { ok: true };
     }
     catch (error) {
         return { ok: false, error: error.message };
     }
+    const actual = readAppliesToAddress(fc, index);
+    if (actual !== '' && normalizeRangeForCompare(actual) !== normalizeRangeForCompare(range)) {
+        return { ok: false, error: `范围未写入（宿主回读为「${actual}」）` };
+    }
+    return { ok: true };
 }
 /**
  * 改第 index 条既有规则的公式（Formula1 赋值）
  *
  * 与 setForeignStopIfTrue 同款：VBA 口径 Formula1 可写，JS 侧属性赋值；
  * 宿主只读时抛错，返回错误文案由页面提示并还原输入框。
+ * 同样**写后回读**——赋值不抛错不代表生效。
  */
 export function setForeignFormula(worksheet, index, formula) {
     const fc = getForeignCondition(worksheet, index);
@@ -262,11 +300,164 @@ export function setForeignFormula(worksheet, index, formula) {
         return { ok: false, error: '定位不到该规则（可能已被删除）' };
     try {
         fc.Formula1 = formula;
-        return { ok: true };
     }
     catch (error) {
         return { ok: false, error: error.message };
     }
+    const actual = readFormulaSafe(fc);
+    if (actual !== '' && normalizeFormulaForCompare(actual) !== normalizeFormulaForCompare(formula)) {
+        return { ok: false, error: `公式未写入（宿主回读为「${actual}」）` };
+    }
+    return { ok: true };
+}
+/**
+ * 编辑工作表上第 index 条既有规则（范围 / 公式 / 填充色 / 字体色 / 加粗）
+ *
+ * ## 为什么每条都要回读校验
+ * WPS 的 `Formula1` / `ModifyAppliesToRange` 在部分版本上是**接受赋值但不生效**的
+ * 只读代理：不校验就会提示「已更新」，而表上纹丝不动——这正是用户反馈的
+ * 「规则管理器修改后无法应用到工作表」。故写后立刻回读：
+ *   - 公式 / 范围不一致 → 硬失败（还原输入、明确报错）；
+ *   - 颜色不一致 → 软告警（宿主可能按调色板就近取色，不该阻断用户）。
+ * 读不到（宿主不暴露该属性）时**不判失败**——无法验证不等于没写进去。
+ */
+export function updateForeignRule(worksheet, index, patch) {
+    const fc = getForeignCondition(worksheet, index);
+    if (!fc)
+        return { ok: false, error: '定位不到该规则（可能已被删除）', warnings: [] };
+    const changed = [];
+    const warnings = [];
+    if (patch.formula !== undefined) {
+        const wanted = patch.formula.trim();
+        if (wanted !== '') {
+            try {
+                fc.Formula1 = wanted;
+            }
+            catch (error) {
+                return { ok: false, error: `公式写入失败：${error.message}`, warnings };
+            }
+            const actual = readFormulaSafe(fc);
+            if (actual !== '' &&
+                normalizeFormulaForCompare(actual) !== normalizeFormulaForCompare(wanted)) {
+                return {
+                    ok: false,
+                    error: `公式未写入（宿主回读为「${actual}」），请改用「清空后应用」重写整表规则`,
+                    warnings,
+                };
+            }
+            changed.push('公式');
+        }
+    }
+    if (patch.range !== undefined) {
+        const wanted = patch.range.trim();
+        if (wanted !== '') {
+            if (typeof fc.ModifyAppliesToRange !== 'function') {
+                return { ok: false, error: '当前 WPS 版本不支持修改应用范围', warnings };
+            }
+            try {
+                fc.ModifyAppliesToRange(wanted);
+            }
+            catch (error) {
+                return { ok: false, error: `范围写入失败：${error.message}`, warnings };
+            }
+            const actual = readAppliesToAddress(fc, index);
+            if (actual !== '' && normalizeRangeForCompare(actual) !== normalizeRangeForCompare(wanted)) {
+                return {
+                    ok: false,
+                    error: `范围未写入（宿主回读为「${actual}」），请改用「清空后应用」重写整表规则`,
+                    warnings,
+                };
+            }
+            changed.push('范围');
+        }
+    }
+    const hasFormatPatch = patch.interior !== undefined || patch.fontColor !== undefined || patch.fontBold !== undefined;
+    if (hasFormatPatch) {
+        try {
+            fc.With?.({
+                ...(patch.interior !== undefined && { Interior: { Color: patch.interior } }),
+                ...((patch.fontColor !== undefined || patch.fontBold !== undefined) && {
+                    Font: {
+                        ...(patch.fontColor !== undefined && { Color: patch.fontColor }),
+                        ...(patch.fontBold !== undefined && { Bold: patch.fontBold }),
+                    },
+                }),
+            });
+        }
+        catch (error) {
+            return { ok: false, error: `格式写入失败：${error.message}`, warnings };
+        }
+        if (patch.interior !== undefined) {
+            const actualFill = readInteriorColor(fc);
+            if (actualFill !== undefined &&
+                normalizeColorForCompare(actualFill) !== normalizeColorForCompare(patch.interior)) {
+                warnings.push(`填充色回读为 ${actualFill}（与设定的 ${patch.interior} 不一致）`);
+            }
+            changed.push('填充色');
+        }
+        if (patch.fontColor !== undefined) {
+            const actualFont = readFontColor(fc);
+            if (actualFont !== undefined &&
+                normalizeColorForCompare(actualFont) !== normalizeColorForCompare(patch.fontColor)) {
+                warnings.push(`字体色回读为 ${actualFont}（与设定的 ${patch.fontColor} 不一致）`);
+            }
+            changed.push('字体色');
+        }
+        if (patch.fontBold !== undefined)
+            changed.push(patch.fontBold ? '加粗' : '取消加粗');
+    }
+    if (changed.length === 0)
+        return { ok: false, error: '没有任何改动', warnings };
+    return { ok: true, changed, warnings };
+}
+/**
+ * 把第 index 条既有规则复制成一条新规则（同公式、同格式，范围可换）
+ *
+ * ## 为什么必须回读条数
+ * `FormatConditions.Add` 在只读代理上可能返回对象却什么也没加。写前写后各读一次
+ * `Count`，没涨就是没生效——否则用户看到「已复制」却找不到副本。
+ *
+ * 副本按 Add 的默认顺序排在**最低优先级**（列表末尾），不抢原规则的优先级；
+ * 要提前就点 ↑ 上调（与「上移一格」同一套逻辑，不会整条蹦到表顶）。
+ */
+export function duplicateForeignRule(worksheet, index, targetRange) {
+    const fc = getForeignCondition(worksheet, index);
+    if (!fc)
+        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    const formula = readFormulaSafe(fc);
+    if (formula === '') {
+        return { ok: false, error: '这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）' };
+    }
+    const sourceRange = readAppliesToAddress(fc, index);
+    const range = (targetRange ?? '').trim() === '' ? sourceRange : (targetRange ?? '').trim();
+    if (range === '') {
+        return { ok: false, error: '读不到这条规则的应用范围，请先手动填写目标范围' };
+    }
+    const collection = resolveFormatConditions(worksheet);
+    if (typeof collection?.Add !== 'function') {
+        return { ok: false, error: '当前 WPS 版本不支持添加条件格式' };
+    }
+    const countBefore = typeof collection.Count === 'number' ? collection.Count : -1;
+    const fill = readInteriorColor(fc);
+    const fontColor = readFontColor(fc);
+    try {
+        const target = worksheet?.Range(range);
+        const created = target?.FormatConditions?.Add?.({ Type: XL_EXPRESSION, Formula1: formula });
+        if (!created)
+            return { ok: false, error: '添加副本失败（宿主未返回规则对象）' };
+        created.With?.({
+            ...(fill !== undefined && { Interior: { Color: fill } }),
+            ...(fontColor !== undefined && { Font: { Color: fontColor } }),
+        });
+    }
+    catch (error) {
+        return { ok: false, error: `添加副本失败：${error.message}` };
+    }
+    const countAfter = typeof collection.Count === 'number' ? collection.Count : -1;
+    if (countBefore >= 0 && countAfter >= 0 && countAfter <= countBefore) {
+        return { ok: false, error: '复制未生效（工作表上的规则条数没有增加）' };
+    }
+    return { ok: true, range };
 }
 /**
  * 读规则的 Priority（非数字 / 抛错统一收敛成 null）
@@ -404,25 +595,49 @@ function applyEntryFormat(fc, entry) {
     });
 }
 /**
- * 执行应用计划
+ * 清空一个 FormatConditions 集合（`Delete()` 优先，没有就逐条反序删）
  *
- * 顺序：UsedRange 上 Delete() 清空 → 逐条 Range(范围).FormatConditions.Add →
- * With 上格式 → **反序 SetFirstPriority**（每调一次都把该规则顶到最高，
- * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）。
- *
- * @returns 成功 / 失败条数（失败进 WARN 日志，不中断整批）
+ * 逐条删的意义：个别 WPS 版本的 `FormatConditions.Delete` 只清「与该区域相交」的规则
+ * （UsedRange 级尤其如此），整列规则会残留下来，随后 Add 又叠一层 ——
+ * 用户看到的就是「越点应用，规则越多」。
  */
-export function applyConditionalFormatPlan(worksheet, plan) {
-    const sheetConditions = worksheet?.UsedRange?.FormatConditions;
-    if (!worksheet || !sheetConditions?.Add)
-        return { added: 0, failed: plan.entries.length };
-    // 1. 清空（快照已由调用方读过并按策略确认；含插件旧规则，保证幂等）
+function clearConditions(collection) {
     try {
-        sheetConditions.Delete?.();
+        if (typeof collection.Delete === 'function') {
+            collection.Delete();
+            return;
+        }
     }
     catch (error) {
         bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 清空旧规则失败: ${error.message}`);
     }
+    const count = typeof collection.Count === 'number' ? collection.Count : 0;
+    for (let index = count; index >= 1; index -= 1) {
+        try {
+            collection.Item?.(index)?.Delete?.();
+        }
+        catch (error) {
+            bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 逐条删除第 ${String(index)} 条失败: ${error.message}`);
+        }
+    }
+}
+/**
+ * 执行应用计划
+ *
+ * 顺序：清空（Delete，失败则逐条反序删）→ 逐条 `Range(范围).FormatConditions.Add` →
+ * With 上格式 → **反序 SetFirstPriority**（每调一次都把该规则顶到最高，
+ * 反序走完后 entries[0] 即为最高优先级——不依赖 Add 的默认优先序）→
+ * **回读整表条数**（写没写进去只能靠它判断，`Add` 返回对象不代表生效）。
+ *
+ * @returns 成功 / 失败条数 + 回读到的实际条数（-1 = 宿主不支持回读）
+ */
+export function applyConditionalFormatPlan(worksheet, plan) {
+    const sheetConditions = resolveFormatConditions(worksheet);
+    if (!worksheet || typeof sheetConditions?.Add !== 'function') {
+        return { added: 0, failed: plan.entries.length, verified: -1 };
+    }
+    // 1. 清空（快照已由调用方读过并按策略确认；含插件旧规则，保证幂等）
+    clearConditions(sheetConditions);
     // 2. 逐条重建
     let added = 0;
     let failed = 0;
@@ -458,5 +673,10 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             // 优先级微调失败不致命（多数宿主按添加序即可满足）
         }
     }
-    return { added, failed };
+    // 4. 回读：Add 返回了对象但宿主没真加进去时，这里是唯一能发现的地方
+    const verified = readForeignRules(worksheet).length;
+    if (verified === 0 && added > 0) {
+        bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 写入 ${String(added)} 条但回读为 0 条（宿主可能丢弃了规则）`);
+    }
+    return { added, failed, verified };
 }

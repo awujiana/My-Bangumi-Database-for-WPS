@@ -244,7 +244,7 @@ export function buildForeignRuleRowHtml(row) {
         : row.formula;
     return `
       <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}" title="拖拽调整优先级 · 右键打开操作菜单">
-        <label class="conditional-format-col-check" title="选中后可批量操作（删除 / 导入 / 复制）">
+        <label class="conditional-format-col-check" title="选中后可批量操作（删除 / 导入 / 导出）">
           <input type="checkbox" data-action="select" ${row.selected ? 'checked' : ''} aria-label="选择第 ${String(row.index)} 条规则" />
         </label>
         <span class="conditional-format-col-index" title="优先级（靠前先生效）">${String(row.index)}</span>
@@ -255,6 +255,10 @@ export function buildForeignRuleRowHtml(row) {
         <label class="conditional-format-col-stop" title="${isHiddenStop ? '当前 WPS 未暴露该属性，无法修改' : '勾选后：本条命中就不再评估后续规则'}">
           <input type="checkbox" data-action="stop" ${row.stopIfTrue === true ? 'checked' : ''} ${isHiddenStop ? 'disabled' : ''} />
         </label>
+        <span class="conditional-format-col-actions">
+          <button type="button" data-action="edit" title="编辑这条规则（范围 / 公式 / 颜色）">✎</button>
+          <button type="button" data-action="duplicate" title="复制成一条新规则（同公式同格式，可换范围）">⧉</button>
+        </span>
       </div>`;
 }
 /**
@@ -275,6 +279,7 @@ export function buildForeignRuleHeadHtml(isAllSelected = false) {
         <span class="conditional-format-col-range">应用于</span>
         <span class="conditional-format-col-formula">公式</span>
         <span class="conditional-format-col-stop">为真则停</span>
+        <span class="conditional-format-col-actions">操作</span>
       </div>`;
 }
 /**
