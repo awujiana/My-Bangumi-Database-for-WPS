@@ -1425,3 +1425,29 @@ describe('表格列宽 / 行高', () => {
     expect(list.style.getPropertyValue('--table-row-h')).toBe('auto')
   })
 })
+
+// ========== 浮动窗口工具条（拖出「我的规则」时的标题栏内容） ==========
+
+describe('浮动窗口工具条', () => {
+  it('「我的规则」区块声明了 data-detachable-toolbar，且指向真实存在的元素', () => {
+    const section = document.getElementById('sec-rules')
+    expect(section).not.toBeNull()
+    const toolbarId = section!.dataset.detachableToolbar
+    // 漏写这个属性**不会报错**：工具条永远带着 hidden 留在页面里，
+    // 拖出浮动窗口后标题栏是空的，「显示其格式规则 / ↑↓ / 删除」全点不到。
+    // （2026-10-27 实测踩到过，且连带 check:guards-reverse 的变异锚点一起失效。）
+    expect(toolbarId).toBe('conditionalFormatFloatToolbar')
+    expect(document.getElementById(toolbarId!)).not.toBeNull()
+  })
+
+  it('工具条里的三个操作按钮都在（组件搬进标题栏后靠 id 绑定，改 id 会静默失效）', () => {
+    for (const id of [
+      'conditionalFormatFloatScope',
+      'conditionalFormatFloatUp',
+      'conditionalFormatFloatDown',
+      'conditionalFormatFloatDelete',
+    ]) {
+      expect(document.getElementById(id)).not.toBeNull()
+    }
+  })
+})

@@ -594,13 +594,40 @@ body.nav-icons-only .nav a:hover::after {
 }
 .bgm-btn-group.bgm-btn-row {
   flex-direction: row;
+  /* 窄窗格下允许换行：放不下就整项掉到下一行，而不是把每一项继续压窄。
+     2026-10-27 真浏览器实测（audit:layout）：条件格式的规则工具栏 500px 下
+     容器只有 ~276px，三个 `flex: 1` 硬挤 → 「📥 导入工作表规则」被压到 **34px 宽、
+     换行 8 行**（连带整行高度被撑到 150px）。 */
+  flex-wrap: wrap;
 }
-.bgm-btn-group.bgm-btn-row .bgm-btn {
-  flex: 1;
+/* 每项给一个「读得下去」的最小宽度。取值是**量出来的**，不是拍的：
+   条件格式那行有 5 项（新建 / 粘贴 / 导入▾ / 导出▾ / 全选），实测容器内容宽
+   500px 窗格 ~460px、900px 窗格 ~597px。5 项全在一行至少需要 ~620px，所以 900px 下
+   必然有一项要换行 —— 选择让**最后一项（全选）整项掉下去**，而不是把文字压成两行：
+   112/168 这组值下最长的两个标签（「📥 导入工作表规则」~130px、
+   「📋 加载工作表」~108px）在所有宽度都能单行显示（拆分按钮的主按钮分到 168−▾≈141px）。
+   用 `>` 而不是后代选择器：`.bgm-btn-split` 里的主按钮有自己的 flex 规则，
+   被这条命中会把拆分按钮内部也钉死。 */
+.bgm-btn-group.bgm-btn-row > .bgm-btn,
+.bgm-btn-group.bgm-btn-row > .bgm-btn-split {
+  flex: 1 1 112px;
+  min-width: 112px;
+}
+/* 拆分按钮比普通按钮多一个 ▾，最小宽度要把那一格也算进去 */
+.bgm-btn-group.bgm-btn-row > .bgm-btn-split {
+  flex-basis: 168px;
+  min-width: 168px;
+}
+/* 单行里只有它一个时（换行后独占一行）让它铺满，别留半截 */
+.bgm-btn-group.bgm-btn-row > .bgm-btn-split > .bgm-btn {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* 拆分按钮（主按钮 + ▾ 下拉）：两者共占一个按钮位、中间不留缝。
-   工具栏是 flex 行，故整组按 flex:1 与其它按钮等宽，内部主按钮吃掉剩余宽度。 */
+   整组与其它按钮同宽（在按钮行里由 `.bgm-btn-group.bgm-btn-row > .bgm-btn-split`
+   的 flex/min-width 决定，比这里的默认值更具体），内部主按钮吃掉剩余宽度。
+   这里的 `flex: 1; min-width: 0` 只兜住「不在按钮行里」的孤立用法。 */
 .bgm-btn-split {
   display: inline-flex;
   flex: 1;

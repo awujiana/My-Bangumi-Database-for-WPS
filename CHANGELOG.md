@@ -37,6 +37,30 @@ momo 真机：下载完只得到一句「关闭 WPS → 解压覆盖 → 重新�
 
 ## [未发布]
 
+### 修「规则工具栏按钮被压成 8 行」+ 补回浮动窗工具条（2026-10-27）
+
+真浏览器布局审计（`npm run audit:layout`）在条件格式页抓到 7 项，全部落在 `#sec-rules`
+的按钮行上；顺着排查又发现浮动窗工具条早就「失联」了。
+
+- **按钮行允许换行**：`.bgm-btn-group.bgm-btn-row` 加 `flex-wrap: wrap`，每项给
+  `flex: 1 1 112px; min-width: 112px`（拆分按钮 168px）。原来 5 个 `flex: 1` 在
+  ~460px 的内容宽里均分 → 每个只有 88px，「📥 导入工作表规则」被压到 **34px 宽、
+  换行 8 行**，连带整行高度被撑到 150px。现在 500px 两行、400px 三行，
+  任何宽度都不再把文字压折。数值是量出来的：低于 112「📋 加载工作表」会折行，
+  低于 168「导入工作表规则」会折行（拆分按钮还要分一格给 ▾）。
+- **补回 `data-detachable-toolbar`**：`#sec-rules` 拖出成浮动窗口时，通用组件会把
+  `#conditionalFormatFloatToolbar`（显示其格式规则 / ↑↓ / 删除）搬进窗口标题栏。
+  这个属性在某次改动里丢了 → 工具条永远带着 `hidden` 留在页面里，那三个操作全点不到，
+  `syncFloatToolbarState()` 成了空转（它禁用的按钮没人看得见）。
+  补回后顺带修好了 `check:guards-reverse` 里 `detachable-contract` 的变异锚点——
+  它注入的正是这条属性，锚点不存在就意味着该守卫的**反向验证长期空跑**。
+- **测试**：`tests/conditional-format-page.test.ts` 补 2 例锁住这条契约
+  （属性存在且指向真实元素 / 工具条四个控件 id 都在），并做过反向验证
+  （删掉属性 → 用例变红且报 `expected undefined to be 'conditionalFormatFloatToolbar'`）。
+- **验证**：`audit:layout` 全 7 页 × 500/400px 从 **9 项降到 2 项**
+  （剩下 2 项是 `donate.html` 的 `donate-links` 横向溢出，HEAD 上就有、与本次无关）；
+  `check:guards-reverse` 从「有效 8 / 有问题 1」变成 **有效 9 / 有问题 0**。
+
 ### 表格组件复用：抽出通用列宽 / 行高拖拽，四张表统一接入（2026-10-27）
 
 momo 两条：「表格组件复用检查项目有没有重复实现」+「工作表规则和我的规则和其他的表格

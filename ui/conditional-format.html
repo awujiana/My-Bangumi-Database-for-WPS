@@ -195,8 +195,17 @@
           </div>
         </section>
 
-        <!-- 我的规则（本地规则库） -->
-        <section class="section section-wide" id="sec-rules" data-detachable>
+        <!-- 我的规则（本地规则库）
+             `data-detachable-toolbar` 指向页面底部的 #conditionalFormatFloatToolbar：
+             拖出成浮动窗口时，组件会把那条工具条搬进窗口标题栏，收回时再搬回来。
+             ⚠ 漏写这个属性不会报错 —— 工具条会永远带着 hidden 留在页面里，
+             「显示其格式规则 / ↑↓ / 删除」全部点不到（2026-10-27 实测踩到过）。 -->
+        <section
+          class="section section-wide"
+          id="sec-rules"
+          data-detachable
+          data-detachable-toolbar="conditionalFormatFloatToolbar"
+        >
           <h3>
             ☑️ 我的规则<button
               type="button"
