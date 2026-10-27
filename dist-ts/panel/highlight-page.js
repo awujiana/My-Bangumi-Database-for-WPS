@@ -27,6 +27,7 @@ import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js';
 import { mountDataContextNotice, registerTargetSheetApplier, saveDataContext, snapshotFromWorksheet, } from '../tools/data-context.js';
+import { renderOptionPicker } from '../ui/components/option-picker.js';
 // ===== 配置键（PluginStorage，跨会话缓存）=====
 const KEY_SOURCE = 'highlight.source';
 const KEY_COLUMNS = 'highlight.columns';
@@ -178,24 +179,34 @@ function rebuildColumns() {
     columns.sort((a, b) => Number(b.name === state.sourceKey) - Number(a.name === state.sourceKey));
     state.columns = columns;
 }
-function renderSourceSelect() {
-    const select = selectById('highlightSource');
-    if (!select)
+/** 渲染识别列选择器（列多时自动带搜索） */
+function renderSourcePicker() {
+    const container = byId('highlightSourcePicker');
+    if (!container)
         return;
     const configured = getConfig(KEY_SOURCE, '__auto__', true);
     // 列出全部列供用户选「识别列」；默认「自动识别」按日期候选挑
-    const options = ['__auto__'];
+    const values = ['__auto__'];
     for (const [name] of state.columnMap) {
         if (name && name !== '__auto__')
-            options.push(name);
+            values.push(name);
     }
-    select.innerHTML = options
-        .map((value) => {
-        const label = value === '__auto__' ? '自动识别（日期列优先）' : value;
-        const isSelected = configured === value;
-        return `<option value="${escapeHtml(value)}"${isSelected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-    })
-        .join('');
+    renderOptionPicker(container, values.map((value) => ({
+        value,
+        label: value === '__auto__' ? '自动识别（日期列优先）' : value,
+    })), {
+        value: configured,
+        ariaLabel: '识别列',
+        onChange: (value) => {
+            onSourceChange(value);
+        },
+    });
+}
+/** 识别列切换：写配置 + 重算预览 */
+function onSourceChange(value) {
+    setConfig(KEY_SOURCE, value === '__auto__' ? '__auto__' : value);
+    refreshPreview();
+    renderColumnListIfChanged();
 }
 function renderColumnList() {
     const container = byId('highlightColList');
@@ -245,76 +256,70 @@ function persistColumns() {
 function selectedSheetEntry() {
     return state.sheets.find((entry) => entry.key === state.selectedKey) ?? null;
 }
-/** 当前选中的工作簿名（从选中表反推；选中为空时读下拉兜底） */
+/** 当前选中的工作簿名（从选中表反推；选中为空时为空） */
 function currentWorkbookName() {
-    const bySelected = selectedSheetEntry()?.workbook;
-    if (bySelected)
-        return bySelected;
-    const select = selectById('highlightWorkbook');
-    return select?.value ?? '';
+    return selectedSheetEntry()?.workbook ?? '';
 }
-/** 渲染工作簿下拉（去重的工作簿名，保持枚举顺序） */
-function renderWorkbookSelect() {
-    const select = selectById('highlightWorkbook');
-    if (!select)
+/** 渲染工作簿选择器（去重的工作簿名，保持枚举顺序） */
+function renderWorkbookPicker() {
+    const container = byId('highlightWorkbookPicker');
+    if (!container)
         return;
     const workbookNames = [];
     for (const entry of state.sheets) {
         if (!workbookNames.includes(entry.workbook))
             workbookNames.push(entry.workbook);
     }
-    if (workbookNames.length === 0) {
-        select.innerHTML = '<option value="">（无已打开的工作簿）</option>';
-        return;
-    }
-    const current = currentWorkbookName();
-    select.innerHTML = workbookNames
-        .map((name) => `<option value="${escapeHtml(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>`)
-        .join('');
+    renderOptionPicker(container, workbookNames.map((name) => ({ value: name, label: name })), {
+        value: currentWorkbookName(),
+        ariaLabel: '工作簿',
+        emptyText: '（无已打开的工作簿）',
+        onChange: (workbook) => {
+            onWorkbookChange(workbook);
+        },
+    });
 }
-/** 渲染工作表下拉：只显示当前工作簿下的表（两级联动） */
-function renderSheetSelect() {
-    const select = selectById('highlightSheet');
-    if (!select)
+/** 渲染工作表选择器：只显示当前工作簿下的表（两级联动） */
+function renderSheetPicker() {
+    const container = byId('highlightSheetPicker');
+    if (!container)
         return;
-    // 二级菜单只显示**当前工作簿下**的工作表（第一级选簿、第二级选表）
     const workbook = currentWorkbookName();
     const visible = state.sheets.filter((entry) => entry.workbook === workbook);
-    // 锁定态下选中键失效：不静默跳到别的表，放一条说明让用户自己重选
-    if (state.selectionMissing) {
-        const options = visible.map((entry) => `<option value="${escapeHtml(entry.key)}">${escapeHtml(entry.sheet)}</option>`);
-        const notice = `<option value="">⚠️ 原目标表 ${escapeHtml(state.selectionMissing)} 已不存在，请重新选择</option>`;
-        select.innerHTML = notice + options.join('');
-        return;
+    renderOptionPicker(container, visible.map((entry) => ({ value: entry.key, label: entry.sheet })), {
+        value: state.selectedKey,
+        ariaLabel: '工作表',
+        emptyText: '（该工作簿下没有可显示的工作表）',
+        onChange: (key) => {
+            onSheetChange(key);
+        },
+    });
+    // 锁定态下选中键失效：不静默跳到别的表，用一行说明让用户自己重选
+    const notice = byId('highlightSheetNotice');
+    if (notice) {
+        notice.hidden = state.selectionMissing === '';
+        notice.textContent =
+            state.selectionMissing === ''
+                ? ''
+                : `⚠️ 原目标表 ${state.selectionMissing} 已不存在，请重新选择`;
     }
-    if (visible.length === 0) {
-        select.innerHTML = '<option value="">（该工作簿下没有可显示的工作表）</option>';
-        return;
-    }
-    select.innerHTML = visible
-        .map((entry) => `<option value="${escapeHtml(entry.key)}"${entry.key === state.selectedKey ? ' selected' : ''}>${escapeHtml(entry.sheet)}</option>`)
-        .join('');
 }
-/** 工作簿切换：只重渲工作表下拉（轻量，不读数据） */
-function onWorkbookChange() {
-    const select = selectById('highlightWorkbook');
-    if (!select)
-        return;
+/** 工作簿切换：只重渲工作表选择器（轻量，不读数据） */
+function onWorkbookChange(workbook) {
     // 切到新工作簿后，默认选中该簿下第一张表
-    const first = state.sheets.find((entry) => entry.workbook === select.value);
+    const first = state.sheets.find((entry) => entry.workbook === workbook);
     if (first) {
         state.selectedKey = first.key;
         state.worksheet = first.worksheet;
         state.selectionMissing = '';
         setConfig(KEY_SHEET, first.key);
     }
-    renderSheetSelect();
+    renderSheetPicker();
     resetSheetData();
 }
 /** 工作表切换：只记录选择（轻量），真正读表等用户点「加载并预览」 */
-function onSheetChange() {
-    const select = selectById('highlightSheet');
-    const entry = state.sheets.find((item) => item.key === select?.value);
+function onSheetChange(key) {
+    const entry = state.sheets.find((item) => item.key === key);
     state.selectedKey = entry?.key ?? '';
     state.worksheet = entry?.worksheet ?? null;
     // 用户已经重新选了：退出「原表已不存在」状态
@@ -329,9 +334,7 @@ function resetSheetData() {
     state.columns = [];
     state.sourceKey = '';
     state.sourceCol = 0;
-    const sourceSelect = selectById('highlightSource');
-    if (sourceSelect)
-        sourceSelect.innerHTML = '<option value="__auto__">自动识别（先加载数据）</option>';
+    renderSourcePicker();
     setText('highlightSheetName', selectedSheetEntry()?.sheet ?? '请选择工作表');
     renderPreviewEmpty('点「加载并预览」读取该表并生成预览');
 }
@@ -859,7 +862,7 @@ function reloadSheet() {
     setText('highlightSheetName', worksheet.Name);
     // 跨页共享：把刚加载的工作簿/表/列/行写入数据上下文，其它页进入时重放显示
     saveDataContext(snapshotFromWorksheet(worksheet, state.headerRow, 'highlight'));
-    renderSourceSelect();
+    renderSourcePicker();
     rebuildColumns();
     renderColumnList();
 }
@@ -896,7 +899,7 @@ function highlightPhaseConfig() {
     }
     else if (isSheetLocked()) {
         // 锁定：选中键失效也不静默跳走（用户要去套用到别处的表时，
-        // 原表可能已被关掉），交给 renderSheetSelect 提示重选。
+        // 原表可能已被关掉），交给 renderSheetPicker 提示重选。
         state.selectedKey = '';
         state.selectionMissing = savedKey;
     }
@@ -906,8 +909,8 @@ function highlightPhaseConfig() {
         state.selectedKey = (matched ?? state.sheets[0])?.key ?? '';
     }
     state.worksheet = selectedSheetEntry()?.worksheet ?? null;
-    renderWorkbookSelect();
-    renderSheetSelect();
+    renderWorkbookPicker();
+    renderSheetPicker();
     resetSheetData();
     // 「一键套用」：把别处选中的簿/表落到本页的 KEY_SHEET 上
     registerTargetSheetApplier('highlight', (snap) => {
@@ -921,8 +924,8 @@ function highlightPhaseConfig() {
         state.worksheet = selectedSheetEntry()?.worksheet ?? null;
         state.selectionMissing = '';
         setConfig(KEY_SHEET, key);
-        renderWorkbookSelect();
-        renderSheetSelect();
+        renderWorkbookPicker();
+        renderSheetPicker();
         resetSheetData();
         return true;
     });
@@ -939,7 +942,7 @@ function setSheetLock(isLocked) {
     if (!isLocked && state.selectionMissing) {
         reloadSheetSelection();
     }
-    renderSheetSelect();
+    renderSheetPicker();
 }
 /** 重新枚举并按既有优先级定位（锁定态不跳活动表） */
 function reloadSheetSelection() {
@@ -961,24 +964,14 @@ function reloadSheetSelection() {
         state.selectionMissing = '';
     }
     state.worksheet = selectedSheetEntry()?.worksheet ?? null;
-    renderWorkbookSelect();
-    renderSheetSelect();
+    renderWorkbookPicker();
+    renderSheetPicker();
     resetSheetData();
 }
 /** 分片 2：事件接线 + 启用按钮（纯 DOM，零 COM） */
 function highlightPhaseBind() {
-    const workbookSelect = selectById('highlightWorkbook');
-    workbookSelect?.addEventListener('change', onWorkbookChange);
-    const sheetSelect = selectById('highlightSheet');
-    sheetSelect?.addEventListener('change', onSheetChange);
-    // 事件接线（直接用元素引用，不绕 event.target）
-    const sourceSelect = selectById('highlightSource');
-    sourceSelect?.addEventListener('change', () => {
-        const { value } = sourceSelect;
-        setConfig(KEY_SOURCE, value === '__auto__' ? '__auto__' : value);
-        refreshPreview();
-        renderColumnListIfChanged();
-    });
+    // 工作簿 / 工作表 / 识别列：选择器内部通过 onChange 调
+    // onWorkbookChange / onSheetChange / onSourceChange，不再绑 <select> 的 change
     // 高亮模式已上移设置页「⚙️ 功能开关」统一管理；此处按钮只读展示当前模式，点击给指引
     byId('highlightModeAuto')?.addEventListener('click', () => {
         showToast('高亮模式请在「设置 · 功能开关」中修改', 'info');

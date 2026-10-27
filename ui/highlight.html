@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/detachable-panel.css" />
     <link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/option-picker.css" />
     <link rel="stylesheet" href="../css/highlight.css" />
   </head>
   <body data-page="highlight">
@@ -67,10 +68,11 @@
               ▾
             </button>
           </h3>
-          <label class="highlight-field-label" for="highlightWorkbook">工作簿</label>
-          <select id="highlightWorkbook" class="highlight-select"></select>
-          <label class="highlight-field-label" for="highlightSheet">工作表</label>
-          <select id="highlightSheet" class="highlight-select"></select>
+          <span class="highlight-field-label">工作簿</span>
+          <div id="highlightWorkbookPicker" class="highlight-picker"></div>
+          <span class="highlight-field-label">工作表</span>
+          <div id="highlightSheetPicker" class="highlight-picker"></div>
+          <p id="highlightSheetNotice" class="hint" hidden></p>
           <label class="highlight-watch-row">
             <input type="checkbox" id="highlightSheetLock" />
             <span>锁定目标工作表（原表失效时不自动改选别的表）</span>
@@ -83,8 +85,8 @@
             文本 / <code>2026-10-01</code> / 真实日期单元格）。
           </p>
 
-          <label class="highlight-field-label" for="highlightSource">识别列（匹配依据）</label>
-          <select id="highlightSource" class="highlight-select"></select>
+          <span class="highlight-field-label">识别列（匹配依据）</span>
+          <div id="highlightSourcePicker" class="highlight-picker"></div>
           <p class="hint">
             选「自动识别」会按 开播季度 &gt; 开播日期 &gt; 完播日
             挑日期列；也可直接指定任意一列来识别季度。
