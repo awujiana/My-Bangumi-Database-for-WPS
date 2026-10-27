@@ -1,6 +1,0 @@
-dist/
-dist-ts/
-wps-addon-build/
-node_modules/
-*.min.js
-wpsjsrpcsdk.js
