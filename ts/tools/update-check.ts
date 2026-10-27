@@ -4,16 +4,16 @@
  * @description
  *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）。
  *
- *   为什么只做到「下载」而不自动覆盖加载项目录：任务窗格运行期覆盖自身文件
- *   可能因文件锁失败、且半途失败会把插件写坏。下载完成后由页面给出「关闭 WPS
- *   → 解压覆盖 → 重新打开」的明确指引，把破坏性操作交给用户确认。
+ *   本模块只负责「查版本 + 下载字节」；真正的安装（关 WPS → 覆盖 → 重启）在
+ *   `tools/update-install.ts`：任务窗格运行期覆盖自身文件会因文件锁失败，
+ *   必须交给等 WPS 退出的外部进程来做。
  *
  *   版本号口径：去掉 `v` 前缀，按 `.` / `-` / `+` 切段，逐段比数字；缺失段按 0
  *   处理（`2.1` == `2.1.0`），预发布后缀（`2.1.0-beta.1`）按数字段继续比较。
  */
 
 /** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
-export const CURRENT_VERSION = '2.2.2'
+export const CURRENT_VERSION = '2.2.3'
 
 /** 更新来源仓库 */
 export const UPDATE_OWNER = 'awujiana'

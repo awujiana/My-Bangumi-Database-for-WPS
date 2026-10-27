@@ -200,6 +200,9 @@ export function exportConfig() {
     const userId = _getBgmUserId();
     const githubConfig = getGithubConfig();
     const strategy = getSyncStrategy();
+    // Gist 源才有值；非空才落档（空串会让 setGithubConfig 写入一个空 Gist ID）。
+    // 单独提出来而不是写成条件展开：unicorn/consistent-conditional-object-spread 要求全仓统一风格
+    const exportedGistFields = githubConfig.gistId ? { gistId: githubConfig.gistId } : {};
     const config = {
         version: CONFIG_VERSION,
         exportedAt: new Date().toISOString(),
@@ -210,8 +213,7 @@ export function exportConfig() {
             path: githubConfig.path,
             strategy,
             sourceType: githubConfig.sourceType,
-            // Gist 源才有值；非空才落档（空串会让 setGithubConfig 写入一个空 Gist ID）
-            ...(githubConfig.gistId ? { gistId: githubConfig.gistId } : {}),
+            ...exportedGistFields,
         },
         preferences: collectPreferences(),
     };
@@ -277,13 +279,14 @@ export function importConfig(json) {
     // 不传就会把 Gist / Gitee 等源静默改成 GitHub（2026-10-27 修）。
     if (config.githubConfig) {
         const gc = config.githubConfig;
+        const restoredGistFields = gc.gistId ? { gistId: gc.gistId } : {};
         setGithubConfig({
             owner: gc.owner,
             repo: gc.repo,
             branch: gc.branch,
             path: gc.path,
             sourceType: gc.sourceType,
-            ...(gc.gistId ? { gistId: gc.gistId } : {}),
+            ...restoredGistFields,
         });
         if (gc.strategy) {
             // 配置里的 default 已经保证 value ∈ SyncStrategy；这里用一次 schema 缩窄

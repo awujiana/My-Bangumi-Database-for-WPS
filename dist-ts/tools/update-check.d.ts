@@ -1,0 +1,87 @@
+/**
+ * @fileoverview 从 GitHub Release 检查更新 / 下载更新包（纯逻辑 + 网络，零 WPS 依赖）
+ * @module tools/update-check
+ * @description
+ *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）。
+ *
+ *   本模块只负责「查版本 + 下载字节」；真正的安装（关 WPS → 覆盖 → 重启）在
+ *   `tools/update-install.ts`：任务窗格运行期覆盖自身文件会因文件锁失败，
+ *   必须交给等 WPS 退出的外部进程来做。
+ *
+ *   版本号口径：去掉 `v` 前缀，按 `.` / `-` / `+` 切段，逐段比数字；缺失段按 0
+ *   处理（`2.1` == `2.1.0`），预发布后缀（`2.1.0-beta.1`）按数字段继续比较。
+ */
+/** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
+export declare const CURRENT_VERSION = "2.2.3";
+/** 更新来源仓库 */
+export declare const UPDATE_OWNER = "awujiana";
+export declare const UPDATE_REPO = "My-Bangumi-Database-for-WPS";
+/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../main/download/<repo>-v2.2.1.zip`） */
+export declare function repoAssetUrl(version: string): string;
+/** 发布包信息 */
+export interface ReleaseAsset {
+    /** 文件名（如 `My-Bangumi-Database-for-WPS-v2.2.0.zip`） */
+    name: string;
+    /** 字节数（0 = 未知） */
+    size: number;
+    /** 主下载地址（仓库内 `download/` 的 raw 地址，允许跨域） */
+    downloadUrl: string;
+    /** 回退下载地址（GitHub Release 资产；CORS 受限，仅作兜底） */
+    fallbackDownloadUrl?: string;
+}
+/** 一次「检查更新」的结果 */
+export interface ReleaseInfo {
+    /** 版本号（tag_name，如 `v2.2.0`） */
+    version: string;
+    /** Release 正文（更新简述） */
+    notes: string;
+    /** 发布时间（ISO 字符串，可能为空） */
+    publishedAt: string;
+    /** Release 页面地址 */
+    htmlUrl: string;
+    /** 匹配到的 zip 资产；没有 zip 时为 null */
+    asset: ReleaseAsset | null;
+}
+/** 下载进度 */
+export interface DownloadProgress {
+    /** 已下载字节 */
+    loaded: number;
+    /** 总字节（0 = 未知） */
+    total: number;
+}
+/**
+ * 解析版本号为数字段数组
+ *
+ * `v2.1.0` → `[2, 1, 0]`；`2.1.0-beta.1` → `[2, 1, 0, 1]`。
+ */
+export declare function parseVersion(text: string): number[];
+/**
+ * 比较两个版本号
+ * @returns 1 = a 更新；-1 = b 更新；0 = 相同
+ */
+export declare function compareVersions(a: string, b: string): number;
+/** 最新版是否比当前版新 */
+export declare function isNewerVersion(latest: string, current: string): boolean;
+/**
+ * 查询最新 Release
+ *
+ * @param fetchImpl 可注入的 fetch（测试用；默认全局 fetch）
+ * @throws 网络错误 / 非 2xx / 响应缺版本号
+ */
+export declare function fetchLatestRelease(fetchFunction?: typeof fetch): Promise<ReleaseInfo>;
+/**
+ * 下载更新包（带进度回调）
+ *
+ * @param url 资产下载地址
+ * @param onProgress 每次读到一块数据时回调（`total` 未知时为 0）
+ * @param fetchImpl 可注入的 fetch（测试用）
+ */
+export declare function downloadReleaseAsset(url: string, onProgress: (progress: DownloadProgress) => void, fetchFunction?: typeof fetch): Promise<Uint8Array<ArrayBuffer>>;
+/**
+ * 触发浏览器下载（落 CEF 下载目录），二进制安全
+ *
+ * @param bytes 文件内容
+ * @param fileName 建议文件名
+ */
+export declare function saveZipViaBrowser(bytes: Uint8Array<ArrayBuffer>, fileName: string): void;
+//# sourceMappingURL=update-check.d.ts.map

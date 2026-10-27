@@ -8,11 +8,24 @@
  * 3. 点「下载并安装」→ 进度条 + 日志；
  * 4. 失败 → 弹可复制的日志与失败原因。
  *
- * 安装策略：下载 zip 后交给浏览器落盘，并给出「关闭 WPS → 解压覆盖 → 重新打开」
- * 的指引。不在运行期覆盖自身文件——文件锁与半途失败都可能把插件写坏。
+ * 安装策略（v2.2.3 起「一键」）：
+ * - 本地安装环境（能定位加载项目录）：下载完成后确认一次 → 交给外部 PowerShell
+ *   辅助脚本 → 关闭 WPS → 覆盖解压（失败回滚）→ 自动重新打开。用户不需要解压、
+ *   不需要手动重启。
+ * - 开发环境（`http://localhost` 跑 Vite）或宿主不给 ShellExecute：回落老流程，
+ *   把 zip 交给浏览器落盘并给出手动步骤。
+ * 细节见 `tools/update-install.ts` 的模块注释。
  */
 
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js'
+import { getNotifyApi } from '../../core/ui-bridge.js'
+import { getUrlPath } from '../../tools/util/index.js'
+import {
+  countUnsavedDocuments,
+  quitWps,
+  resolveAddinDirectory,
+  runAutoInstall,
+} from '../../tools/update-install.js'
 import {
   CURRENT_VERSION,
   downloadReleaseAsset,
@@ -246,6 +259,88 @@ async function checkForUpdates(): Promise<void> {
   }
 }
 
+/** 手动安装：把 zip 交给浏览器落盘 + 给步骤（自动安装不可用时的兜底） */
+function finishWithManualInstall(release: ReleaseInfo, bytes: Uint8Array<ArrayBuffer>): void {
+  saveZipViaBrowser(bytes, release.asset?.name ?? 'update.zip')
+  appendLog('✅ 更新包已保存到浏览器下载目录')
+  appendLog('安装步骤：关闭 WPS → 解压更新包并覆盖加载项目录 → 重新打开 WPS')
+  showToast('更新包已下载，请按日志中的步骤完成安装', 'success')
+  revealCopyButton()
+}
+
+/**
+ * 确认后走一键安装：辅助脚本覆盖加载项目录，WPS 自动关闭并重启
+ *
+ * 确认放在**启动脚本之前**：脚本会等 WPS 退出最长 180 秒，
+ * 先启动再确认的话用户一取消就留下一个空等的外部进程。
+ */
+function confirmThenAutoInstall(
+  release: ReleaseInfo,
+  bytes: Uint8Array<ArrayBuffer>,
+  baseUrl: string,
+): void {
+  const targetDirectory = resolveAddinDirectory(baseUrl)
+
+  // 数据安全第一道闸：有未保存的文档就不启动安装（连脚本都不生成）
+  const unsaved = countUnsavedDocuments()
+  if (unsaved !== null && unsaved > 0) {
+    bgmLog(LOG_LEVELS.WARN, `[update] 有 ${String(unsaved)} 个未保存文档，暂停自动安装`)
+    appendLog(`检测到 ${String(unsaved)} 个未保存的文档，已暂停自动安装`)
+    appendLog('请先保存文档，再重新点「下载并安装」')
+    getNotifyApi().alert(
+      `检测到 ${String(unsaved)} 个未保存的文档。\n\n自动安装会关闭 WPS，为避免丢失未保存的内容，已暂停安装。\n请先保存文档，再重新点「下载并安装」。`,
+      '请先保存文档',
+    )
+    return
+  }
+
+  getNotifyApi().confirm(
+    [
+      `即将把 v${release.version} 安装到：`,
+      targetDirectory ?? '（无法定位加载项目录）',
+      '',
+      '安装只替换程序文件：插件的设置、Token、条件格式规则都存在 WPS 的插件存储里，',
+      '不在此目录中，不会被覆盖；安装前还会先整份备份，失败自动回滚。',
+      '',
+      '安装期间 WPS 会自动关闭，完成后再自动打开。',
+      '',
+      '继续吗？',
+    ].join('\n'),
+    (isConfirmed) => {
+      if (!isConfirmed) {
+        appendLog('已取消自动安装（更新包未写入，可稍后重试或按手动步骤安装）')
+        return
+      }
+      const outcome = runAutoInstall({
+        baseUrl,
+        version: release.version,
+        bytes,
+        downloadUrl: release.asset?.downloadUrl ?? '',
+      })
+      if (outcome.status !== 'launched') {
+        appendLog(`自动安装不可用：${outcome.detail}`)
+        appendLog('改用手动安装…')
+        finishWithManualInstall(release, bytes)
+        return
+      }
+      appendLog('✅ 更新包已交给安装程序')
+      appendLog(`安装目录：${outcome.targetDirectory}`)
+      appendLog(`安装日志：${outcome.logPath}`)
+      appendLog('WPS 将在 3 秒后自动关闭，安装完成后自动重新打开（无需手动解压）')
+      showToast('正在安装更新，WPS 即将重启', 'success')
+      // 留 3 秒让上面的日志与 toast 被看到，再请求退出
+      window.setTimeout(() => {
+        try {
+          quitWps()
+        } catch {
+          appendLog('⚠️ 自动关闭 WPS 失败，请手动关闭；安装程序会等待 3 分钟，超时自动放弃')
+        }
+      }, 3000)
+    },
+    '自动安装更新',
+  )
+}
+
 /** 下载并安装 */
 async function installUpdate(): Promise<void> {
   const release = pendingRelease
@@ -289,11 +384,13 @@ async function installUpdate(): Promise<void> {
     }
 
     appendLog(`下载完成：${formatBytes(bytes.byteLength)}`)
-    saveZipViaBrowser(bytes, release.asset.name)
-    appendLog('✅ 更新包已保存到浏览器下载目录')
-    appendLog('安装步骤：关闭 WPS → 解压更新包并覆盖加载项目录 → 重新打开 WPS')
-    showToast('更新包已下载，请按日志中的步骤完成安装', 'success')
-    revealCopyButton()
+    // 能定位加载项目录 = 本地安装环境，可走一键安装；否则（开发期 HTTP）回落手动
+    const baseUrl = getUrlPath()
+    if (resolveAddinDirectory(baseUrl) === null) {
+      finishWithManualInstall(release, bytes)
+      return
+    }
+    confirmThenAutoInstall(release, bytes, baseUrl)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     appendLog(`❌ 下载失败：${message}`)

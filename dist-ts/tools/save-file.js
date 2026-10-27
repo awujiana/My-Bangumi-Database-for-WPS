@@ -84,11 +84,15 @@ export function pickSavePath(options) {
     }
 }
 /**
- * 用 FSO 把文本写到绝对路径（UTF-8，覆盖已存在文件）
+ * 用 FSO 把文本写到绝对路径（默认 UTF-8，覆盖已存在文件）
  *
+ * @param filePath 目标绝对路径
+ * @param content 文本内容
+ * @param isUnicode 是否以 UTF-16 LE（带 BOM）写入。默认 true —— 中文不会乱码；
+ *   纯 ASCII 的大块内容（如 base64 更新包）传 false，体积只有一半。
  * @returns 成功 true；FSO 不可用 / 写失败 false（调用方回退下载通道）
  */
-export function canWriteTextFile(filePath, content) {
+export function canWriteTextFile(filePath, content, isUnicode = true) {
     try {
         const { wps } = window;
         const coCreate = wps?.OAAssist?.CoCreateInstance;
@@ -101,8 +105,8 @@ export function canWriteTextFile(filePath, content) {
             bgmLog(LOG_LEVELS.WARN, '[save-file] FileSystemObject 创建失败');
             return false;
         }
-        // isOverwrite=true, isUnicode=true（UTF-16 LE；中文规则名不会乱码）
-        const stream = fso.CreateTextFile(filePath, true, true);
+        // isOverwrite=true；isUnicode=true 时写 UTF-16 LE（中文规则名不会乱码）
+        const stream = fso.CreateTextFile(filePath, true, isUnicode);
         stream.Write(content);
         stream.Close();
         return true;

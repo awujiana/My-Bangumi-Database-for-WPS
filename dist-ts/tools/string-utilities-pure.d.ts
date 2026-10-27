@@ -1,0 +1,51 @@
+/**
+ * @fileoverview 字符串工具纯函数模块（零依赖）
+ * @module tools/string-utilities-pure
+ * @description 提供 Excel 列号转换、字符串修剪、HTML 转义等纯函数。
+ *
+ * 本模块刻意保持零项目依赖（不引入 core/token-payload、tools/util、UI/handlers 等模块），
+ * 以便单元测试可以直接 import 而不触发 handlers.ts 中的 setTimeout / addEventListener
+ * 等副作用（副作用链：string-utilities → crypto → index → handlers）。
+ *
+ * 注意：escapeHtml 依赖浏览器 DOM API（document.createElement），需要在 jsdom 环境
+ * 下运行；在纯 Node 环境下调用会抛 ReferenceError。columnNumberToLetter 与 trim 无环境依赖。
+ *
+ * 历史背景：原 string-utilities.ts 同时导出 columnNumberToLetter / escapeHtml / trim / calcFingerprint，
+ * 其中 calcFingerprint 依赖 core/token-payload.calcChecksum，而 crypto.ts 又 import 自 index.ts，
+ * 触发整条副作用链。为支持纯函数单元测试，将无依赖的三个函数抽取到本模块。
+ */
+/**
+ * 列号转字母 (A, B, ..., Z, AA, AB, ...)
+ *
+ * @param column - 列号（1-based）
+ * @returns 对应的字母表示；column <= 0 时返回空字符串
+ */
+export declare function columnNumberToLetter(column: number): string;
+/**
+ * HTML 转义（防止 XSS）
+ *
+ * 纯字符串替换实现（`& < > " '` 五个字符）。
+ * 曾经用「创建临时 div 设 textContent 再读 innerHTML」——那需要 DOM，
+ * 使本模块（以及所有 import 它的纯函数模块，如 conditional-format-table）
+ * 在 Node / 单测环境直接抛 `document is not defined`，且每次调用都建一次元素。
+ * 转义语义与 DOM 方案完全一致：5 个字符逐一替换即可覆盖 textNode 与属性值两种上下文。
+ *
+ * 转义字符表：`< > " ' &` 共 5 个字符。
+ *
+ * 非字符串输入按空值处理（返回 ''）而不是抛错：本函数的入参里有相当一部分来自
+ * COM / JSON 等外部来源，类型标注拦不住运行时的意外值；裸值会让 `.replace` 抛
+ * TypeError，把调用方的渲染流程中断在半路（表现为「计数已更新、列表还是旧内容」
+ * 这种自相矛盾的界面）。宁可少显示一个字符，不要中断整段渲染。
+ *
+ * @param text - 待转义的字符串，可为 null/undefined 或任何意外类型
+ * @returns 转义后的 HTML 安全字符串；输入为空值或非字符串时返回空字符串
+ */
+export declare function escapeHtml(text: unknown): string;
+/**
+ * 字符串去除首尾空格
+ *
+ * @param string_ - 待修剪的字符串，可为 null/undefined
+ * @returns 修剪后的字符串；输入为空值时返回空字符串
+ */
+export declare function trim(string_: string | null | undefined): string;
+//# sourceMappingURL=string-utilities-pure.d.ts.map
