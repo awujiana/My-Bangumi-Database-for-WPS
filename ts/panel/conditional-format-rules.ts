@@ -581,6 +581,26 @@ export function toFullColumnRange(range: string): string | null {
   return `$${left}:$${right}`
 }
 
+/**
+ * 把任意范围转成**整行范围**：`J2:J9` → `$2:$9`，`A1:C99` → `$1:$99`
+ *
+ * 与 {@link toFullColumnRange} 对称：整行范围对**列增删**天然免疫（宿主只在
+ * 行被删除时调整它），适合「一行一条记录、列会增删」的表。
+ *
+ * 解析不出行号（空范围、多区域、非法地址）时返回 null，调用方保留原范围。
+ */
+export function toFullRowRange(range: string): string | null {
+  const [startText, endText] = range.trim().split(':', 2)
+  const start = parseCell(startText ?? '')
+  if (start === null) return null
+  const end = endText === undefined ? start : parseCell(endText)
+  if (end === null) return null
+  if (start.row <= 0 || end.row <= 0) return null
+  const top = Math.min(start.row, end.row)
+  const bottom = Math.max(start.row, end.row)
+  return `$${String(top)}:$${String(bottom)}`
+}
+
 /** 把单元格地址规范成绝对引用：`J5` → `$J$5`（固定单元格用） */
 export function toAbsoluteCell(text: string): string | null {
   const cell = parseCell(text)

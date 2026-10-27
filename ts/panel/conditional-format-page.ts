@@ -43,6 +43,7 @@ import {
   serializeAnchors,
   toAbsoluteCell,
   toFullColumnRange,
+  toFullRowRange,
   IMPORTED_RULE_GROUP,
   autoClusterGroups,
   buildDefaultRules,
@@ -680,11 +681,14 @@ function handleExistingTableClick(event: MouseEvent): void {
     return
   }
 
-  // 组标题 📌：把本组规则的应用范围钉住（删除行列后自动恢复）
-  const anchorGroupButton = target.closest<HTMLElement>('[data-action="anchor-existing-group"]')
+  // 组标题「列 / 行」：把本组规则的应用范围钉成整列 / 整行（删除行列后自动恢复）
+  const anchorGroupButton = target.closest<HTMLElement>(
+    '[data-action="anchor-existing-group"], [data-action="anchor-existing-group-rows"]',
+  )
   if (anchorGroupButton) {
     const group = anchorGroupButton.closest<HTMLElement>('[data-group]')?.dataset.group ?? ''
-    if (group !== '') anchorExistingGroup(group)
+    const axis = anchorGroupButton.dataset.action === 'anchor-existing-group-rows' ? 'row' : 'column'
+    if (group !== '') anchorExistingGroup(group, axis)
     return
   }
 
@@ -1131,29 +1135,37 @@ function readAnchors(): Record<string, string> {
   return parseAnchors(getConfig(EXISTING_ANCHORS_STORE_KEY, '', true))
 }
 
+/** 锚定轴向：整列（对增删行免疫）或整行（对增删列免疫） */
+type AnchorAxis = 'column' | 'row'
+
 /**
  * 锚定一个分组的全部规则
  *
  * 锚定的是「应用范围」：把这些规则当前的 range 记下来，之后删行 / 删列导致宿主
  * 收缩或平移范围时，{@link repairAnchors} 会把范围改回锚定值 —— 这就是用户要的
- * 「描定后删除行列不影响条件格式」。
+ * 「锚定后删除行列不影响条件格式」。
+ *
+ * @param axis `column` = 整列（`$J:$J`，增删行免疫）；`row` = 整行（`$5:$5`，增删列免疫）
  */
-function anchorExistingGroup(group: string): void {
+function anchorExistingGroup(group: string, axis: AnchorAxis = 'column'): void {
   const entry = selectedSheet()
   const anchors = readAnchors()
+  const toWholeAxis = axis === 'row' ? toFullRowRange : toFullColumnRange
+  const axisLabel = axis === 'row' ? '整行' : '整列'
+  const immuneLabel = axis === 'row' ? '列' : '行'
   let count = 0
   for (const [index, snapshot] of state.existing.entries()) {
     const isInGroup = state.existingGroups[snapshotGroupKey(snapshot)] === group
-    const columnRange =
+    const wholeAxisRange =
       isInGroup && snapshot.formula !== '' && snapshot.range !== ''
-        ? toFullColumnRange(snapshot.range)
+        ? toWholeAxis(snapshot.range)
         : null
-    if (columnRange !== null) {
-      // 锚定 = 把应用范围改写为整列（$J:$J / $J:$L），公式不动
-      anchors[anchorKeyOf(snapshot)] = columnRange
+    if (wholeAxisRange !== null) {
+      // 锚定 = 把应用范围改写为整列（$J:$J）/ 整行（$5:$5），公式不动
+      anchors[anchorKeyOf(snapshot)] = wholeAxisRange
       count += 1
       // 立刻写回工作表：用户要的是「现在就不受行列增删影响」，不是等下次
-      if (entry !== null) setForeignAppliesTo(entry.worksheet, index + 1, columnRange)
+      if (entry !== null) setForeignAppliesTo(entry.worksheet, index + 1, wholeAxisRange)
     }
   }
   if (count === 0) {
@@ -1164,9 +1176,15 @@ function anchorExistingGroup(group: string): void {
     showToast('锚定保存失败', 'error')
     return
   }
-  bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 已锚定分组「${group}」共 ${String(count)} 条规则（整列）`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[conditionalFormat] 已锚定分组「${group}」共 ${String(count)} 条规则（${axisLabel}）`,
+  )
   loadExistingRules()
-  showToast(`已锚定 ${String(count)} 条规则：应用范围改为整列，行增删不再影响`, 'success')
+  showToast(
+    `已锚定 ${String(count)} 条规则：应用范围改为${axisLabel}，${immuneLabel}增删不再影响`,
+    'success',
+  )
 }
 
 /**
@@ -1829,7 +1847,8 @@ function renderRuleList(): void {
             <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="全选 / 取消本组">☑</button>
             <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="删除本组全部规则">🗑</button>
             <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="导出本组所选规则">📤</button>
-            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组：删除行列后按锚定范围自动恢复">📌</button>
+            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组为整列（$J:$J）：公式不变，增删行不再影响">列</button>
+            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group-rows" data-group="${escapeHtml(group)}" title="锚定本组为整行（$5:$5）：公式不变，增删列不再影响">行</button>
           </span>
         </div>
         ${rows}

@@ -22,7 +22,7 @@ import {
   UPDATE_OWNER,
   UPDATE_REPO,
 } from '../../tools/update-check.js'
-import type { ReleaseInfo } from '../../tools/update-check.js'
+import type { DownloadProgress, ReleaseInfo } from '../../tools/update-check.js'
 
 /** 最近一次检查到的 Release（安装时复用，避免重复请求） */
 let pendingRelease: ReleaseInfo | null = null
@@ -258,21 +258,35 @@ async function installUpdate(): Promise<void> {
   setProgress(0)
   let lastLoggedPercent = -10
 
+  const onProgress = (progress: DownloadProgress): void => {
+    const percent =
+      progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0
+    setProgress(percent)
+    // 每 10% 记一行，避免日志被逐块刷屏
+    if (percent - lastLoggedPercent >= 10) {
+      lastLoggedPercent = percent
+      appendLog(
+        `下载中 ${String(percent)}%（${formatBytes(progress.loaded)} / ${formatBytes(
+          progress.total,
+        )}）`,
+      )
+    }
+  }
+
   try {
-    const bytes = await downloadReleaseAsset(release.asset.downloadUrl, (progress) => {
-      const percent =
-        progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0
-      setProgress(percent)
-      // 每 10% 记一行，避免日志被逐块刷屏
-      if (percent - lastLoggedPercent >= 10) {
-        lastLoggedPercent = percent
-        appendLog(
-          `下载中 ${String(percent)}%（${formatBytes(progress.loaded)} / ${formatBytes(
-            progress.total,
-          )}）`,
-        )
-      }
-    })
+    let bytes: Uint8Array<ArrayBuffer>
+    try {
+      // 主源：仓库内 download/ 的 raw 地址（允许跨域，最稳）
+      bytes = await downloadReleaseAsset(release.asset.downloadUrl, onProgress)
+    } catch (primaryError: unknown) {
+      const fallbackUrl = release.asset.fallbackDownloadUrl
+      if (fallbackUrl === undefined) throw primaryError
+      const primaryMessage =
+        primaryError instanceof Error ? primaryError.message : String(primaryError)
+      appendLog(`主下载源失败：${primaryMessage}`)
+      appendLog('改用 GitHub Release 资产重试…')
+      bytes = await downloadReleaseAsset(fallbackUrl, onProgress)
+    }
 
     appendLog(`下载完成：${formatBytes(bytes.byteLength)}`)
     saveZipViaBrowser(bytes, release.asset.name)
@@ -283,7 +297,7 @@ async function installUpdate(): Promise<void> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     appendLog(`❌ 下载失败：${message}`)
-    appendLog('可能原因：网络中断 / GitHub 被拦截 / 该 Release 资产不可访问')
+    appendLog('可能原因：网络中断 / GitHub 被拦截 / 更新包地址不可访问')
     // fetch 失败最常见的原因是 CORS 或 WebView 限制：交给宿主直接下载作为兜底
     appendLog('已尝试改用浏览器直接下载，请在浏览器的下载目录中查找更新包…')
     openExternalDownload(release.asset.downloadUrl)

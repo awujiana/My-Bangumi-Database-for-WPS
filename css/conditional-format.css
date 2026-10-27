@@ -111,6 +111,15 @@
   font-weight: 500;
 }
 
+/* 组名可收缩：窄窗格（320px）下右侧动作按钮（含「列 / 行」锚定）优先保留，
+   组名过长时省略，而不是把按钮挤出容器 */
+.conditional-format-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .conditional-format-group-count {
   padding: 0 8px;
   border-radius: var(--r-pill);

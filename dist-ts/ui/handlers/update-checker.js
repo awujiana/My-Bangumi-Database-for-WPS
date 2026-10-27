@@ -245,16 +245,30 @@ async function installUpdate() {
     setLog([`开始下载 ${release.asset.name}`, `大小 ${formatBytes(release.asset.size)}`]);
     setProgress(0);
     let lastLoggedPercent = -10;
+    const onProgress = (progress) => {
+        const percent = progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0;
+        setProgress(percent);
+        // 每 10% 记一行，避免日志被逐块刷屏
+        if (percent - lastLoggedPercent >= 10) {
+            lastLoggedPercent = percent;
+            appendLog(`下载中 ${String(percent)}%（${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}）`);
+        }
+    };
     try {
-        const bytes = await downloadReleaseAsset(release.asset.downloadUrl, (progress) => {
-            const percent = progress.total > 0 ? Math.min(100, Math.round((progress.loaded / progress.total) * 100)) : 0;
-            setProgress(percent);
-            // 每 10% 记一行，避免日志被逐块刷屏
-            if (percent - lastLoggedPercent >= 10) {
-                lastLoggedPercent = percent;
-                appendLog(`下载中 ${String(percent)}%（${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}）`);
-            }
-        });
+        let bytes;
+        try {
+            // 主源：仓库内 download/ 的 raw 地址（允许跨域，最稳）
+            bytes = await downloadReleaseAsset(release.asset.downloadUrl, onProgress);
+        }
+        catch (primaryError) {
+            const fallbackUrl = release.asset.fallbackDownloadUrl;
+            if (fallbackUrl === undefined)
+                throw primaryError;
+            const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+            appendLog(`主下载源失败：${primaryMessage}`);
+            appendLog('改用 GitHub Release 资产重试…');
+            bytes = await downloadReleaseAsset(fallbackUrl, onProgress);
+        }
         appendLog(`下载完成：${formatBytes(bytes.byteLength)}`);
         saveZipViaBrowser(bytes, release.asset.name);
         appendLog('✅ 更新包已保存到浏览器下载目录');
@@ -265,7 +279,7 @@ async function installUpdate() {
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         appendLog(`❌ 下载失败：${message}`);
-        appendLog('可能原因：网络中断 / GitHub 被拦截 / 该 Release 资产不可访问');
+        appendLog('可能原因：网络中断 / GitHub 被拦截 / 更新包地址不可访问');
         // fetch 失败最常见的原因是 CORS 或 WebView 限制：交给宿主直接下载作为兜底
         appendLog('已尝试改用浏览器直接下载，请在浏览器的下载目录中查找更新包…');
         openExternalDownload(release.asset.downloadUrl);

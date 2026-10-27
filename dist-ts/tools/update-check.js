@@ -12,41 +12,48 @@
  *   处理（`2.1` == `2.1.0`），预发布后缀（`2.1.0-beta.1`）按数字段继续比较。
  */
 /** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
-export const CURRENT_VERSION = '2.2.0';
+export const CURRENT_VERSION = '2.2.1';
 /** 更新来源仓库 */
 export const UPDATE_OWNER = 'awujiana';
 export const UPDATE_REPO = 'My-Bangumi-Database-for-WPS';
 /** GitHub 最新 Release 接口 */
 const RELEASE_API = `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`;
 /**
- * API 不可用时的兜底版本来源。
+ * 更新包在**仓库内**的托管目录（走 raw.githubusercontent.com）。
  *
- * `api.github.com` 未认证请求按 IP 限流（60 次/小时），超限返回 403；
- * 部分网络环境下还会被拦截。`raw.githubusercontent.com` 允许跨域且不限流，
- * 因此用主分支 package.json 的 version 作为兜底。
- * 注意：主分支版本可能领先于已发布 Release，故兜底只用于「提示有更新」，
- * 资产地址按仓库既有的 `vX.Y.Z` 命名约定拼接。
+ * 为什么不用 Release 资产：`github.com/.../releases/download/...` 会 302 到
+ * `objects.githubusercontent.com`，这两个域都不返回允许跨域的响应头，任务窗格里
+ * `fetch` 直接报 `Failed to fetch`（CORS），与网络是否通畅无关。
+ * `raw.githubusercontent.com` 返回 `Access-Control-Allow-Origin: *`，插件的数据同步
+ * 也走它 —— 把 zip 提交进仓库的 `download/` 目录即可稳定下载。
  */
-const RAW_PACKAGE_JSON = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/package.json`;
+const REPO_ASSET_DIRECTORY = 'download';
+/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../main/download/<repo>-v2.2.1.zip`） */
+export function repoAssetUrl(version) {
+    const tag = version.startsWith('v') ? version : `v${version}`;
+    return `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/${REPO_ASSET_DIRECTORY}/${UPDATE_REPO}-${tag}.zip`;
+}
+/**
+ * API 不可用时的兜底版本来源：仓库内 `download/version.json`（发布脚本自动生成）。
+ *
+ * 不用 `main/package.json`：发布分支刻意不含 package.json（本地工具链不入库）。
+ * raw.githubusercontent.com 允许跨域且不限流。
+ */
+const RAW_VERSION_JSON = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/${REPO_ASSET_DIRECTORY}/version.json`;
 /** 按命名约定构造发布包信息（用于 API 限流时的兜底） */
 function buildReleaseFromVersion(version) {
     const tag = version.startsWith('v') ? version : `v${version}`;
-    const assetName = `${UPDATE_REPO}-${tag}.zip`;
     return {
         version: tag,
         notes: '',
         publishedAt: '',
         htmlUrl: `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tag/${tag}`,
-        asset: {
-            name: assetName,
-            size: 0,
-            downloadUrl: `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/${tag}/${assetName}`,
-        },
+        asset: buildReleaseAsset(tag, null),
     };
 }
-/** 从 raw.githubusercontent.com 读取 package.json 版本（无 API 限流） */
+/** 从 raw.githubusercontent.com 读取 version.json（无 API 限流） */
 async function fetchLatestReleaseFromRaw(fetchFunction) {
-    const response = await fetchFunction(RAW_PACKAGE_JSON, { cache: 'no-store' });
+    const response = await fetchFunction(RAW_VERSION_JSON, { cache: 'no-store' });
     if (!response.ok) {
         throw new Error(`兜底版本源返回 HTTP ${String(response.status)} ${response.statusText}`);
     }
@@ -104,6 +111,23 @@ function pickZipAsset(assets) {
     return null;
 }
 /**
+ * 由版本号 + Release 资产构造下载信息
+ *
+ * 主源固定为仓库内 `download/` 的 raw 地址（跨域可用）；Release 资产只作兜底
+ * （`github.com → objects.githubusercontent.com` 不带跨域头，fetch 会失败）。
+ */
+function buildReleaseAsset(version, releaseAsset) {
+    const tag = version.startsWith('v') ? version : `v${version}`;
+    const asset = {
+        name: `${UPDATE_REPO}-${tag}.zip`,
+        size: releaseAsset?.size ?? 0,
+        downloadUrl: repoAssetUrl(tag),
+    };
+    if (releaseAsset !== null)
+        asset.fallbackDownloadUrl = releaseAsset.downloadUrl;
+    return asset;
+}
+/**
  * 查询最新 Release
  *
  * @param fetchImpl 可注入的 fetch（测试用；默认全局 fetch）
@@ -130,7 +154,7 @@ export async function fetchLatestRelease(fetchFunction = fetch) {
             notes: data.body ?? '',
             publishedAt: data.published_at ?? '',
             htmlUrl: data.html_url ?? '',
-            asset: pickZipAsset(data.assets),
+            asset: buildReleaseAsset(version, pickZipAsset(data.assets)),
         };
     }
     catch (error) {
