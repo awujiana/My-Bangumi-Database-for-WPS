@@ -38,7 +38,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:boot-com": "node scripts/check-boot-com.mjs",
-    "icon": "node scripts/replace-icon.mjs"
+    "icon": "node scripts/replace-icon.mjs",
+    "icon:merge": "node scripts/replace-icon.mjs --merge-dir images --out images/app-icon.ico"
   },
   "description": "WPS Excel 加载项 - 追番标记助手",
   "devDependencies": {

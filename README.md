@@ -414,9 +414,12 @@ zip -r "My-Bangumi-Database-for-WPS-v${VERSION}.zip" dist
 ```bash
 npm run icon                      # 用 images/app-icon.ico 换图标 → release/<版本>.exe
 npm run icon -- --icon D:/x.ico   # 换一个 ico
+npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成 images/app-icon.ico
 ```
 
-脚本走 Resource Hacker 命令行（`-action addoverwrite -mask ICONGROUP,MAINICON,`），换完会校验「除 `.rsrc` 外所有节逐字节相同」+「ico 里每张图都进了 exe」，任一不过就删产物并报错。想换成多尺寸图标，直接把 16/32/48/256 的 ico 覆盖到 `images/app-icon.ico` 即可，不用改代码。
+脚本走 Resource Hacker 命令行（`-action addoverwrite -mask ICONGROUP,MAINICON,`），换完会校验「除 `.rsrc` 外所有节逐字节相同」+「ico 里每张图都进了 exe」，任一不过就删产物并报错。
+
+图标本身想用多尺寸：**已经是一个多尺寸 ico** 就直接覆盖 `images/app-icon.ico`，不用改代码；手里是「16.ico / 32.ico / 48.ico …」一堆**单尺寸文件**时，全丢进 `images/`（或任意目录）再跑 `npm run icon:merge -- --merge-dir <目录>`，脚本按尺寸升序合成、同尺寸只留数据更大的一张、写完回读逐张比对。当前 `images/app-icon.ico` 就是 16/24/32/48/64/128/256 七张合成的（10,977 B）。
 
 **插件品牌图标**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字样），随 `dist/`（或 `wpsjs build` 产物）一并打包进加载项，同时作为 README 标题标识与 Releases 资源使用。
 

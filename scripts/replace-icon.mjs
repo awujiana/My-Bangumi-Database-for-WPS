@@ -10,6 +10,7 @@
  *   node scripts/replace-icon.mjs                    # 默认：wps-addon-build 的 exe → release/<版本>.exe
  *   node scripts/replace-icon.mjs --icon D:/x.ico    # 换一个 ico
  *   node scripts/replace-icon.mjs --exe a.exe --out b.exe
+ *   node scripts/replace-icon.mjs --merge-dir images   # 多个单尺寸 ico → 一个多尺寸 ico
  *
  * 依赖：Resource Hacker 5.x（`--resource-hacker` 或环境变量 `RESOURCE_HACKER`，
  *       默认找 `D:\Software\ToolsSoftware\ResourceHacker\ResourceHacker_v5.2.8.448.exe`）。
@@ -22,9 +23,18 @@
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
@@ -92,6 +102,72 @@ function parseIcon(buffer) {
     images.push({ width, height, bitCount, data: buffer.subarray(offset, offset + size) })
   }
   return images
+}
+
+/**
+ * 把若干图像拼成一个 .ico
+ *
+ * 目录项按尺寸升序写，`planes` 统一写 1 —— PNG 压缩图像其实用不到这两个字段，
+ * 但写成 0 有工具会当成非法图标。
+ */
+function buildIcon(images) {
+  const header = Buffer.alloc(6)
+  header.writeUInt16LE(1, 2) // type=1 图标
+  header.writeUInt16LE(images.length, 4)
+  const entries = Buffer.alloc(images.length * 16)
+  let offset = 6 + images.length * 16
+  for (const [index, image] of images.entries()) {
+    const entry = index * 16
+    entries[entry] = image.width >= 256 ? 0 : image.width // 256 在目录里记为 0
+    entries[entry + 1] = image.height >= 256 ? 0 : image.height
+    entries.writeUInt16LE(1, entry + 4) // planes
+    entries.writeUInt16LE(image.bitCount, entry + 6)
+    entries.writeUInt32LE(image.data.length, entry + 8)
+    entries.writeUInt32LE(offset, entry + 12)
+    offset += image.data.length
+  }
+  return Buffer.concat([header, entries, ...images.map((image) => image.data)])
+}
+
+/**
+ * 把目录里的多个 ico 合并成一个多尺寸 ico
+ *
+ * 用户手里常常是「16.ico / 32.ico / 48.ico …」一堆单尺寸文件，而 Resource Hacker
+ * 只吃一个 ico。同一尺寸重复出现时保留数据更大的那张，输出按尺寸升序。
+ */
+function mergeIcons(inputPaths, outputPath) {
+  const merged = new Map()
+  for (const inputPath of inputPaths) {
+    const images = parseIcon(readFileSync(inputPath))
+    for (const image of images) {
+      const key = `${String(image.width)}x${String(image.height)}@${String(image.bitCount)}`
+      const existing = merged.get(key)
+      if (existing === undefined || image.data.length > existing.data.length) {
+        merged.set(key, { ...image, source: basename(inputPath) })
+      }
+    }
+  }
+  const images = [...merged.values()].sort(
+    (left, right) => left.width - right.width || left.height - right.height,
+  )
+  const buffer = buildIcon(images)
+
+  // 写完立刻读回来比对：拼错了（偏移/长度算错）在这里就该炸，而不是等 exe 校验
+  const reloaded = parseIcon(buffer)
+  if (reloaded.length !== images.length) {
+    throw new Error(
+      `回读图像数不符（写入 ${String(images.length)}，读回 ${String(reloaded.length)}）`,
+    )
+  }
+  for (const [index, image] of images.entries()) {
+    if (!reloaded[index].data.equals(image.data)) {
+      throw new Error(`${String(image.width)}x${String(image.height)} 回读数据与源不一致`)
+    }
+  }
+
+  mkdirSync(dirname(outputPath), { recursive: true })
+  writeFileSync(outputPath, buffer)
+  return { images, size: buffer.length }
 }
 
 /**
@@ -224,6 +300,35 @@ function runResourceHacker(resourceHacker, inputPath, outputPath, iconPath, work
 
 const options = parseArguments(process.argv.slice(2))
 const version = packageVersion()
+
+// ---- 合并模式：只产出一个多尺寸 ico，不碰 exe ----
+if (options['merge-dir'] !== undefined) {
+  const mergeDirectory = toAbsolute(options['merge-dir'])
+  const mergeOutput = toAbsolute(options.out ?? 'images/app-icon.ico')
+  if (!existsSync(mergeDirectory)) fail(`找不到目录：${mergeDirectory}`)
+  const candidates = readdirSync(mergeDirectory)
+    .filter((name) => name.toLowerCase().endsWith('.ico'))
+    .map((name) => join(mergeDirectory, name))
+    .filter((path) => resolve(path) !== resolve(mergeOutput))
+  if (candidates.length === 0) fail(`目录里没有 ico：${mergeDirectory}`)
+
+  let merged
+  try {
+    merged = mergeIcons(candidates, mergeOutput)
+  } catch (error) {
+    fail(`合并图标失败：${error instanceof Error ? error.message : String(error)}`)
+  }
+  console.log(`合并 ${String(candidates.length)} 个 ico → ${mergeOutput}`)
+  for (const image of merged.images) {
+    console.log(
+      `  · ${String(image.width)}x${String(image.height)} / ${String(image.bitCount)}bpp / ${String(image.data.length)} 字节 ← ${image.source}`,
+    )
+  }
+  console.log(
+    `\n✅ 已写入：${mergeOutput}（${String(merged.size)} 字节，${String(merged.images.length)} 张图像）`,
+  )
+  process.exit(0)
+}
 
 const inputPath = toAbsolute(options.exe ?? 'wps-addon-build/my-bangumi-database-for-wps.exe')
 const iconPath = toAbsolute(options.icon ?? process.env.BGM_ICON ?? 'images/app-icon.ico')
