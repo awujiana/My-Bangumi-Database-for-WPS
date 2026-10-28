@@ -22,6 +22,7 @@ import { bgmLog, findHeaderRow, getApp, getColumnMap, getLastRow, markHighlightP
 import { CONFIG_KEYS, getConfig, setConfig } from '../tools/config.js';
 import { currentSeason, formatSeasonKey, formatSeasonLabel, isSeasonFilterMatch, rowsToRangeAddresses, runRangeGroupsWithSplit, selectSeasonRows, splitRangeAddresses, } from './highlight-season.js';
 import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js';
+import { buildPreviewDetailHtml, normalizePreviewView } from './highlight-preview-render.js';
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
@@ -49,6 +50,14 @@ const KEY_NON_ANIME = 'highlight.includeNonAnime';
  * 把「应用到哪张表」这个决定权交回用户，而不是替他猜。
  */
 const KEY_SHEET_LOCK = 'highlight.sheetLock';
+/**
+ * 实时预览的视图（`table` / `card`）。
+ *
+ * 两个视图是同一份命中数据的不同呈现：表格看「行号 / 名称 / 匹配值」对齐比较，
+ * 卡片看长名称（窄窗格里表格列宽会把名称截断）。视图跟着用户走 —— 选了卡片，
+ * 下次打开还是卡片，不用每次重选。
+ */
+const KEY_PREVIEW_VIEW = 'highlight.previewView';
 /** 日期源候选（规范列名，按自动模式的优先级排列） */
 const SOURCE_CANDIDATES = ['开播季度', '开播日期', '完播日'];
 /** 公式列（值已被数据页公式归一到季文本，匹配时直接比、不再归一路） */
@@ -58,8 +67,6 @@ const HIGHLIGHT_COLOR = BGM_COLOR.DARK_GREEN;
 /** 清除填充：xlNone；清除字体色：xlAutomatic */
 const COLOR_INDEX_NONE = -4142;
 const COLOR_INDEX_AUTOMATIC = -4105;
-/** 预览行号切片最多展示几个 */
-const PREVIEW_CHIP_LIMIT = 8;
 const state = {
     worksheet: null,
     headerRow: 1,
@@ -80,6 +87,8 @@ const state = {
     filterSpan: null,
     lastSelect: { matchedRows: [], emptyCount: 0, invalidCount: 0 },
     lastTarget: null,
+    lastMatched: [],
+    previewView: 'table',
     sheets: [],
     selectedKey: '',
     selectionMissing: '',
@@ -408,7 +417,13 @@ function refreshPreview() {
     state.lastTarget = target;
     state.filterSpan = { firstRow, lastRow };
     state.lastSelect = selectVisibleRows(rows, fallbackValues, target);
-    renderPreview(names);
+    // 命中行的「名称 + 匹配值」一并留下：预览的两个视图都要用，重新读表只为了
+    // 渲染一个名字不值得（预览会随选项改动频繁重算，COM 读一次是几百毫秒）
+    const matchedSet = new Set(state.lastSelect.matchedRows);
+    state.lastMatched = rows
+        .filter((item) => matchedSet.has(item.row))
+        .map((item) => ({ row: item.row, name: names.get(item.row) ?? '', value: item.value }));
+    renderPreview();
 }
 /**
  * 非动漫兜底列：勾了「包含非动漫」且当前源是公式列（开播季度）时，
@@ -460,40 +475,53 @@ function selectVisibleRows(rows, fallbackValues, target) {
     });
     return { ...base, matchedRows: filtered };
 }
-function renderPreview(names) {
+/**
+ * 渲染实时预览（摘要行 + 详情区）
+ *
+ * 摘要三行只回答「命中几行 / 按什么口径 / 跳过了什么」；**哪几行、叫什么、凭什么
+ * 命中**交给详情区 —— 原来是「行号 chip + 前三个名称」的两行文字，信息量少又要
+ * 用户自己拼，现在换成表格 / 卡片两种视图（见 highlight-preview-render）。
+ */
+function renderPreview() {
     const { matchedRows, emptyCount, invalidCount } = state.lastSelect;
     const target = state.lastTarget;
     setText('highlightPreviewCount', `命中 ${String(matchedRows.length)} 行`);
     setText('highlightPreviewTarget', target
         ? `目标：${formatSeasonLabel(target)}（${formatSeasonKey(target)}）${isFormulaSource() ? ' · 公式列口径' : ' · 原始日期口径'}`
         : '');
-    const chips = byId('highlightPreviewChips');
-    if (chips) {
-        chips.innerHTML =
-            matchedRows.length === 0
-                ? '<span class="highlight-chip highlight-chip-empty">无匹配行</span>'
-                : matchedRows
-                    .slice(0, PREVIEW_CHIP_LIMIT)
-                    .map((row) => `<span class="highlight-chip">行 ${String(row)}</span>`)
-                    .join('') +
-                    (matchedRows.length > PREVIEW_CHIP_LIMIT
-                        ? `<span class="highlight-chip">…共 ${String(matchedRows.length)} 行</span>`
-                        : '');
-    }
-    const firstNames = matchedRows
-        .slice(0, 3)
-        .map((row) => names.get(row) ?? '')
-        .filter((name) => name.trim() !== '');
-    setText('highlightPreviewNames', firstNames.length > 0 ? `如：${firstNames.join('、')}` : '');
     setText('highlightPreviewSkip', `空 ${String(emptyCount)} 格 · 非日期文本 ${String(invalidCount)} 条（已跳过）`);
+    renderPreviewDetail();
+}
+/** 详情区：按当前视图渲染命中行（无命中时清空，摘要行已经说明「命中 0 行」） */
+function renderPreviewDetail() {
+    const box = byId('highlightPreviewDetail');
+    if (!box)
+        return;
+    const html = buildPreviewDetailHtml(state.lastMatched, state.previewView);
+    if (html === '') {
+        box.replaceChildren();
+        box.className = 'highlight-preview-detail';
+        return;
+    }
+    // 视图类挂在容器上：表格与卡片的间距/边框规则互不干扰，不用在每张卡上写
+    box.className = `highlight-preview-detail is-${state.previewView}`;
+    // 内容全部由本模块拼装（cellText 已转义），不再过一层 sanitize：这里没有用户 HTML
+    box.innerHTML = html;
+}
+/** 同步视图切换按钮的按下态（两个按钮互斥） */
+function syncPreviewViewButtons() {
+    for (const button of document.querySelectorAll('[data-preview-view]')) {
+        const isActive = button.dataset.previewView === state.previewView;
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        button.classList.toggle('is-active', isActive);
+    }
 }
 function renderPreviewEmpty(message) {
+    state.lastMatched = [];
     setText('highlightPreviewCount', '命中 0 行');
     setText('highlightPreviewTarget', message);
-    const chips = byId('highlightPreviewChips');
-    chips?.replaceChildren();
-    setText('highlightPreviewNames', '');
     setText('highlightPreviewSkip', '');
+    renderPreviewDetail();
 }
 // ===== 应用 / 清除 =====
 function isLastApplied(value) {
@@ -889,6 +917,9 @@ function highlightPhaseConfig() {
     renderFilterUi();
     // 高亮模式 / 自动关注从配置应用（设置页统一管理；renderModeUi 同步按钮态与手动框显隐）
     applyFeatureTogglesFromConfig();
+    // 预览视图（表格 / 卡片）：上次选的哪个，进来还是哪个
+    state.previewView = normalizePreviewView(getConfig(KEY_PREVIEW_VIEW, 'table', true));
+    syncPreviewViewButtons();
     // 枚举已打开的工作簿 / 工作表（轻量 COM），默认定位到：
     //   上次选中的表（KEY_SHEET）> 当前活动表 > 第一张表
     state.sheets = collectSheets();
@@ -989,6 +1020,19 @@ function highlightPhaseBind() {
     byId('highlightClearBtn')?.addEventListener('click', () => {
         clearHighlight();
     });
+    // 预览视图切换（表格 / 卡片）：只换渲染方式，不重算命中 —— 切视图不该再读一次表
+    for (const button of document.querySelectorAll('[data-preview-view]')) {
+        button.addEventListener('click', () => {
+            const next = normalizePreviewView(button.dataset.previewView ?? '');
+            if (next === state.previewView)
+                return;
+            state.previewView = next;
+            setConfig(KEY_PREVIEW_VIEW, next);
+            syncPreviewViewButtons();
+            renderPreviewDetail();
+        });
+    }
+    syncPreviewViewButtons();
     // 自动关注已上移设置页「⚙️ 功能开关」统一管理；此处复选框只读反映配置，
     // 勾选态在 init/reloadSheet 的 syncAutoWatch 里按配置对齐。点击仅给指引，
     // 并把勾选态还原成配置值，避免视觉与配置不一致。

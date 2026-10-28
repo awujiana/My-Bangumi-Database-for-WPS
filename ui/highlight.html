@@ -190,8 +190,28 @@
           <div class="highlight-preview-box">
             <div class="highlight-preview-count" id="highlightPreviewCount">命中 0 行</div>
             <div class="highlight-preview-target" id="highlightPreviewTarget"></div>
-            <div class="highlight-preview-chips" id="highlightPreviewChips"></div>
-            <div class="highlight-preview-names" id="highlightPreviewNames"></div>
+            <!-- 预览视图：同一份命中数据的两种呈现。表格看对齐比较，卡片看长名称 -->
+            <div class="highlight-preview-views" role="group" aria-label="预览视图">
+              <button
+                type="button"
+                class="highlight-preview-view-btn is-active"
+                data-preview-view="table"
+                aria-pressed="true"
+                title="表格视图：行号 / 名称 / 匹配值三列对齐，便于逐行比对"
+              >
+                ▦ 表格
+              </button>
+              <button
+                type="button"
+                class="highlight-preview-view-btn"
+                data-preview-view="card"
+                aria-pressed="false"
+                title="卡片视图：一行一张卡，长名称不会被列宽截断"
+              >
+                🗂 卡片
+              </button>
+            </div>
+            <div class="highlight-preview-detail" id="highlightPreviewDetail"></div>
             <div class="highlight-preview-skip" id="highlightPreviewSkip"></div>
           </div>
           <div class="bgm-btn-group bgm-btn-row">

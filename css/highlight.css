@@ -129,27 +129,117 @@
   font-size: var(--fs-sm);
 }
 
-.highlight-preview-chips {
+/* ---- 预览视图切换（表格 / 卡片） ---- */
+.highlight-preview-views {
   display: flex;
-  flex-wrap: wrap;
+  gap: 6px;
   margin-top: var(--sp-3);
 }
 
-.highlight-chip {
-  padding: 1px 10px;
-  margin: 0 6px 6px 0;
+.highlight-preview-view-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
   border-radius: var(--r-pill);
   background: var(--bg-surface);
   color: var(--text-2);
   font-size: var(--fs-sm);
+  line-height: 1.4;
+  cursor: pointer;
 }
 
-.highlight-chip-empty {
-  color: var(--text-3);
+.highlight-preview-view-btn:hover {
+  color: var(--text-1);
+  border-color: var(--border-strong);
 }
 
-.highlight-preview-names {
+.highlight-preview-view-btn.is-active {
+  background: var(--accent-soft, var(--bg-surface-2));
+  border-color: var(--accent, var(--border-strong));
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+/* ---- 详情区：表格视图 ---- */
+.highlight-preview-table {
+  margin-top: var(--sp-2);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.highlight-preview-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.highlight-preview-table th {
+  padding: 6px 10px;
+  background: var(--bg-surface);
   color: var(--text-2);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.highlight-preview-table td {
+  padding: 5px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.highlight-preview-table tr:hover td {
+  background: var(--fill-4);
+}
+
+.highlight-preview-cell-row {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- 详情区：卡片视图 ---- */
+.highlight-preview-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--sp-2);
+}
+
+.highlight-preview-card {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface);
+}
+
+.highlight-preview-card-row {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.highlight-preview-card-name {
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.highlight-preview-card-value {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ---- 超出渲染上限的说明 ---- */
+.highlight-preview-more {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-3);
   font-size: var(--fs-sm);
 }
 
