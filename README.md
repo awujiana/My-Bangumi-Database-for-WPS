@@ -409,6 +409,15 @@ zip -r "My-Bangumi-Database-for-WPS-v${VERSION}.zip" dist
 
 > 若沿用 WPS 标准 `wpsjs` 工程布局，也可直接 `wpsjs build`（生成 `wps-addon-build/` + `wps-addon-publish/publish.html`）后将该产物压缩上传；两种产物在计算机上都是「含 `index.html` 的目录」，安装方式一致。
 
+**Windows 安装器的图标**：`wpsjs build --exe` 产出的是 wpsjs 默认图标。仓库内置了自动化：
+
+```bash
+npm run icon                      # 用 images/app-icon.ico 换图标 → release/<版本>.exe
+npm run icon -- --icon D:/x.ico   # 换一个 ico
+```
+
+脚本走 Resource Hacker 命令行（`-action addoverwrite -mask ICONGROUP,MAINICON,`），换完会校验「除 `.rsrc` 外所有节逐字节相同」+「ico 里每张图都进了 exe」，任一不过就删产物并报错。想换成多尺寸图标，直接把 16/32/48/256 的 ico 覆盖到 `images/app-icon.ico` 即可，不用改代码。
+
 **插件品牌图标**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字样），随 `dist/`（或 `wpsjs build` 产物）一并打包进加载项，同时作为 README 标题标识与 Releases 资源使用。
 
 ### 维护者：两棵工作树 + 发布流程

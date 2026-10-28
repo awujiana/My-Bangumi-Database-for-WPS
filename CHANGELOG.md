@@ -72,6 +72,23 @@ momo：「一定要脚本才能安装吗，会被劫持吗，有没有更安全�
   verified·mismatch·skipped / 清单缺失与版本不一致时不采信哈希）；
   `update-install.test.ts` 重写随机目录、`-WorkDir`/`-Sha256`、脚本不含联网调用等 9 例。
 
+### 安装器换图标自动化（2026-10-28）
+
+以前每版都要手工开 Resource Hacker 点一遍、还容易忘，现在一条命令：
+
+- 新增 `scripts/replace-icon.mjs`（`npm run icon`）：走 Resource Hacker 5.x 命令行
+  `-action addoverwrite -res <ico> -mask ICONGROUP,MAINICON,`，把 `images/app-icon.ico`
+  写进 `wpsjs build --exe` 产出的 exe。
+- **换完必须过三道校验**，任一不过就删产物 + 非 0 退出：① 输出仍是合法 PE
+  （MZ + PE 签名 + 节表可解析）；② **除 `.rsrc` 外所有节逐字节相同**（换图标只该动
+  资源节，动了代码就是坏包）；③ ico 里每个图像的数据块都出现在输出里。
+- `publish.mjs` 接入：同步 exe 到 `release/` 时自动换图标（`--no-icon` 可跳过），
+  失败即中止发布 —— 不会再静默发一份默认图标的安装器。
+- 图标来源改为仓库内 `images/app-icon.ico`（550 B，32×32 PNG 压缩），
+  换多尺寸 ico 不用改代码（按 ico 目录逐张校验）。
+- 实测：1,348,206 → 1,348,718 B（+512），并做了**反向验证**——从换好的 exe 里
+  `-action extract ICONGROUP,MAINICON` 抽回 ico，与源图标的 528 B 图像数据逐字节相同。
+
 ### 应用条件格式不再清除既有规则（2026-10-27）
 
 momo：「放在我的规则组件中，点击后把原来的规则都清除了」「检查应用逻辑不要清除原来的
