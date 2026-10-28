@@ -17,6 +17,16 @@
  *   二进制被编码破坏的问题），脚本再还原成 zip —— 这样「下载进度条」与「实际
  *   安装的包」是同一份字节，不必再下载一遍。
  *
+ *   **抗劫持的三处设计（v2.2.4 起）**：
+ *   1. 脚本与更新包放在**每次新建的随机目录**（`%TEMP%\bgm-update-<16 位随机>`，
+ *      用 `FSO.CreateFolder` 独占创建），不再用可预测的固定文件名 —— 消除
+ *      「先占位/软链接把路径重定向到别处」的 TOCTOU 面；
+ *   2. 脚本**不联网**：删掉了原来的 `Invoke-WebRequest` 兜底分支。更新包只能来自
+ *      插件自己下载并校验过的那份字节，脚本里再按 `-Sha256` 复核一次（防「写完
+ *      到脚本读」之间被替换），并检查 zip 魔数 `PK`；
+ *   3. 校验失败一律放弃安装（由调用方在启动脚本**之前**判定），脚本自身也
+ *      拒绝装非 zip 内容。
+ *
  *   任何一环不可用（不是本地安装、FSO 不可用、宿主不提供 ShellExecute）都
  *   返回 `unsupported` / `failed`，由调用方回落到「下载 zip + 手动覆盖」的老流程。
  */
@@ -159,9 +169,10 @@ export function buildUpdateScript() {
         'param(',
         '  [Parameter(Mandatory=$true)][string]$TargetDir,',
         '  [Parameter(Mandatory=$true)][string]$Base64Path,',
-        "  [string]$ZipUrl = '',",
+        '  [Parameter(Mandatory=$true)][string]$WorkDir,',
         "  [string]$LogPath = '',",
-        "  [string]$NewVersion = ''",
+        "  [string]$NewVersion = '',",
+        "  [string]$Sha256 = ''",
         ')',
         "$ErrorActionPreference = 'Stop'",
         '',
@@ -185,6 +196,12 @@ export function buildUpdateScript() {
         '$rollbackOk = $false',
         'try {',
         "  Write-Log ('开始更新：' + $TargetDir)",
+        '  # 顺手清理 1 天前遗留的更新临时目录（同前缀，属于本插件；失败不影响本次安装）',
+        '  try {',
+        "    Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'bgm-update-*' -ErrorAction SilentlyContinue |",
+        '      Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-1) } |',
+        '      Remove-Item -Recurse -Force -ErrorAction SilentlyContinue',
+        '  } catch { }',
         '  # 1) 先记下 wps.exe 路径（退出后就查不到了），再等它退出',
         '  $process = Get-Process -Name wps -ErrorAction SilentlyContinue | Select-Object -First 1',
         '  if ($null -ne $process) {',
@@ -200,18 +217,29 @@ export function buildUpdateScript() {
         '  # 退出后句柄释放有延迟，给文件锁一点余量',
         '  Start-Sleep -Milliseconds 800',
         '',
-        '  # 2) 还原更新包：优先用插件下载好的字节，缺失时按地址重下',
-        '  if ((Test-Path -LiteralPath $Base64Path)) {',
-        "    Write-Log '正在还原更新包…'",
-        '    $text = Get-Content -LiteralPath $Base64Path -Raw',
-        '    [IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String($text))',
+        '  # 2) 还原更新包：只认插件写好的那份字节（脚本不联网，避免绕过插件的来源约束）',
+        '  if (-not (Test-Path -LiteralPath $Base64Path)) {',
+        "    throw '更新包缺失（临时目录里没有 base64 包），已放弃安装，加载项目录未被改动。'",
         '  }',
-        "  elseif ($ZipUrl -ne '') {",
-        "    Write-Log '本地更新包缺失，改用下载地址…'",
-        '    Invoke-WebRequest -Uri $ZipUrl -OutFile $zipPath -UseBasicParsing',
+        "  Write-Log '正在还原更新包…'",
+        '  $text = Get-Content -LiteralPath $Base64Path -Raw',
+        '  $bytes = [Convert]::FromBase64String($text)',
+        '  # zip 魔数校验：base64 写入不完整、或内容被换成别的东西时，在这里就拦住',
+        '  if (($bytes.Length -lt 4) -or ($bytes[0] -ne 0x50) -or ($bytes[1] -ne 0x4B)) {',
+        "    throw '更新包不是有效的 zip（可能写入不完整或被篡改），已放弃安装。'",
         '  }',
-        "  else { throw '没有可用的更新包。' }",
+        '  [IO.File]::WriteAllBytes($zipPath, $bytes)',
         "  Write-Log ('更新包大小：' + (Get-Item -LiteralPath $zipPath).Length + ' 字节')",
+        '',
+        '  # 2.1) 再复核一次 SHA-256：插件在启动脚本之前已校验过，这里防「写完之后被替换」',
+        "  if ($Sha256 -ne '') {",
+        '    $actual = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash',
+        '    if ($actual -ne $Sha256.ToUpperInvariant()) {',
+        "      throw ('更新包校验失败：期望 ' + $Sha256 + '，实际 ' + $actual + '，已放弃安装。')",
+        '    }',
+        "    Write-Log '更新包 SHA-256 复核通过'",
+        '  }',
+        "  else { Write-Log '发布端未提供 SHA-256，跳过复核（建议手动核对）' }",
         '',
         '  # 3) 备份 → 校验备份 → 覆盖解压（失败回滚，保证插件仍可用）',
         '  $sourceCount = (Get-ChildItem -LiteralPath $TargetDir -Recurse -File -Force | Measure-Object).Count',
@@ -227,7 +255,7 @@ export function buildUpdateScript() {
         '  } catch {',
         "    Write-Log ('解压失败，回滚：' + $_.Exception.Message)",
         '    # 回滚用「覆盖复制」而不是「删目录再改名」：中途失败也不会把加载项目录清空',
-        '    Copy-Item -Path (Join-Path $backupDir \'*\') -Destination $TargetDir -Recurse -Force',
+        "    Copy-Item -Path (Join-Path $backupDir '*') -Destination $TargetDir -Recurse -Force",
         '    $rollbackOk = $true',
         "    Write-Log '已用备份覆盖回旧版本'",
         '    throw',
@@ -242,12 +270,12 @@ export function buildUpdateScript() {
         '      $pattern = \'name="my-bangumi-database-for-wps"[^>]*?version="([^"]*)"\'',
         '      $match = [regex]::Match($original, $pattern)',
         '      if ($match.Success) {',
-        '        $replaced = $match.Value -replace \'version="[^"]*"\', (\'version="\' + $NewVersion + \'"\')',
+        "        $replaced = $match.Value -replace 'version=\"[^\"]*\"', ('version=\"' + $NewVersion + '\"')",
         '        $updated = $original.Replace($match.Value, $replaced)',
         '        # 改写前先确认结果仍是合法结构，且保留一份 .bak（这是 WPS 自己的配置，不能弄坏）',
-        '        if (($updated -ne $original) -and ($updated -like \'*<jsplugin*\')) {',
-        '          Copy-Item -LiteralPath $publishXml -Destination ($publishXml + \'.bak\') -Force',
-        '          $tempXml = $publishXml + \'.tmp\'',
+        "        if (($updated -ne $original) -and ($updated -like '*<jsplugin*')) {",
+        "          Copy-Item -LiteralPath $publishXml -Destination ($publishXml + '.bak') -Force",
+        "          $tempXml = $publishXml + '.tmp'",
         '          [IO.File]::WriteAllText($tempXml, $updated, (New-Object System.Text.UTF8Encoding($true)))',
         '          Move-Item -LiteralPath $tempXml -Destination $publishXml -Force',
         "          Write-Log '已更新 publish.xml 版本号（原件备份为 publish.xml.bak）'",
@@ -274,6 +302,8 @@ export function buildUpdateScript() {
         '  }',
         '  Remove-Item -LiteralPath $Base64Path -Force -ErrorAction SilentlyContinue',
         '  Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue',
+        '  # 清掉本次的随机工作目录（日志在目录外，不受影响；脚本自身删不掉时留一个 .ps1 也无害）',
+        '  Remove-Item -LiteralPath $WorkDir -Recurse -Force -ErrorAction SilentlyContinue',
         '  # 无论成败都要把 WPS 拉起来：失败时至少还能用旧版',
         "  if ($wpsExe -ne '' -and (Test-Path -LiteralPath $wpsExe)) {",
         '    try { Start-Process -FilePath $wpsExe } catch { }',
@@ -296,12 +326,14 @@ export function buildPowerShellCommand(arguments_) {
         quote(arguments_.targetDirectory),
         '-Base64Path',
         quote(arguments_.base64Path),
-        '-ZipUrl',
-        quote(arguments_.zipUrl),
+        '-WorkDir',
+        quote(arguments_.workDirectory),
         '-LogPath',
         quote(arguments_.logPath),
         '-NewVersion',
         quote(arguments_.version),
+        '-Sha256',
+        quote(arguments_.sha256),
     ].join(' ');
 }
 /** 取系统临时目录（FSO 的 2 = TemporaryFolder）；不可用返回 null */
@@ -319,6 +351,52 @@ export function temporaryDirectory() {
         bgmLog(LOG_LEVELS.WARN, `[update-install] 取临时目录失败：${message}`);
         return null;
     }
+}
+/** 生成 16 位十六进制随机后缀（WebCrypto 不可用时退化为 Math.random） */
+export function randomSuffix() {
+    const bytes = new Uint8Array(8);
+    const host = globalThis;
+    const candidate = host.crypto;
+    if (typeof candidate?.getRandomValues === 'function') {
+        candidate.getRandomValues(bytes);
+    }
+    else {
+        for (let index = 0; index < bytes.length; index += 1) {
+            bytes[index] = Math.floor(Math.random() * 256);
+        }
+    }
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+/**
+ * 在临时目录下新建一个**本次专用**的随机工作目录
+ *
+ * 为什么不再用固定文件名（`%TEMP%\bgm-update-<版本>.ps1`）：`%TEMP%` 是用户可写的，
+ * 固定路径意味着任何能写 `%TEMP%` 的进程都可以提前占位（同名文件、目录联接、
+ * 符号链接），把「写脚本」重定向到别处再让 PowerShell 去执行 —— 典型 TOCTOU。
+ * 改成随机目录后，攻击者无法预知路径。
+ *
+ * `FSO.CreateFolder` 在目录已存在时会抛错，正好当作**独占创建**：
+ * 一旦同名目录存在就换一个随机名，绝不复用别人的目录。
+ *
+ * @param parentDirectory 系统临时目录
+ * @returns 新建目录的绝对路径；FSO 不可用 / 创建失败返回 null
+ */
+export function createUpdateWorkDirectory(parentDirectory) {
+    const fso = fileSystemObject();
+    if (fso === null || typeof fso.CreateFolder !== 'function')
+        return null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const candidate = joinPath(parentDirectory, `bgm-update-${randomSuffix()}`);
+        try {
+            fso.CreateFolder(candidate);
+            return candidate;
+        }
+        catch {
+            // 极小概率撞名：换一个再试（3 次都撞说明 FSO 根本写不进去）
+        }
+    }
+    bgmLog(LOG_LEVELS.WARN, '[update-install] 无法在临时目录创建隔离工作目录');
+    return null;
 }
 /**
  * 用宿主 ShellExecute 启动命令行（失败抛错，由调用方降级）
@@ -348,8 +426,8 @@ export function quitWps() {
  *
  * @param options.baseUrl 插件基址（`getUrlPath()` 的返回值）
  * @param options.version 目标版本号（如 `v2.2.3`）
- * @param options.bytes 已下载的更新包字节
- * @param options.downloadUrl 更新包地址（本地文件不可用时的回退）
+ * @param options.bytes 已下载并**校验通过**的更新包字节
+ * @param options.sha256 更新包 SHA-256（空串 = 发布端没提供，脚本内跳过复核）
  */
 export function runAutoInstall(options) {
     const empty = { targetDirectory: '', scriptPath: '', logPath: '' };
@@ -361,9 +439,19 @@ export function runAutoInstall(options) {
     if (temporaryDirectory_ === null) {
         return { status: 'unsupported', detail: '无法获取系统临时目录', ...empty };
     }
+    const workDirectory = createUpdateWorkDirectory(temporaryDirectory_);
+    if (workDirectory === null) {
+        return {
+            status: 'unsupported',
+            detail: '无法在临时目录创建隔离工作目录',
+            ...empty,
+            targetDirectory,
+        };
+    }
     const tag = options.version.replace(/[^\w.-]/gu, '');
-    const scriptPath = joinPath(temporaryDirectory_, `bgm-update-${tag}.ps1`);
-    const base64Path = joinPath(temporaryDirectory_, `bgm-update-${tag}.b64`);
+    // 脚本与更新包都在随机目录里；日志留在临时目录根（名字可预测，便于按提示找到）
+    const scriptPath = joinPath(workDirectory, 'install.ps1');
+    const base64Path = joinPath(workDirectory, 'package.b64');
     const logPath = joinPath(temporaryDirectory_, `bgm-update-${tag}.log`);
     // base64 是纯 ASCII：用 ANSI 文本流写，体积只有 UTF-16 的一半
     if (!canWriteTextFile(base64Path, bytesToBase64(options.bytes), false)) {
@@ -377,15 +465,22 @@ export function runAutoInstall(options) {
     }
     // 脚本含中文提示，必须用 UTF-16（带 BOM）：PowerShell 才不会按本地代码页误读
     if (!canWriteTextFile(scriptPath, buildUpdateScript(), true)) {
-        return { status: 'failed', detail: '无法写入安装脚本', targetDirectory, scriptPath: '', logPath };
+        return {
+            status: 'failed',
+            detail: '无法写入安装脚本',
+            targetDirectory,
+            scriptPath: '',
+            logPath,
+        };
     }
     const commandLine = buildPowerShellCommand({
         scriptPath,
         targetDirectory,
         base64Path,
-        zipUrl: options.downloadUrl,
+        workDirectory,
         logPath,
         version: options.version.replace(/^v/iu, ''),
+        sha256: options.sha256,
     });
     try {
         launchDetachedCommand(commandLine);

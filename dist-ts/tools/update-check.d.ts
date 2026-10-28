@@ -1,23 +1,36 @@
 /**
- * @fileoverview 从 GitHub Release 检查更新 / 下载更新包（纯逻辑 + 网络，零 WPS 依赖）
+ * @fileoverview 从 GitHub Release 检查更新 / 下载更新包 / 校验完整性（纯逻辑 + 网络，零 WPS 依赖）
  * @module tools/update-check
  * @description
- *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）。
+ *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）→ 校验 SHA-256。
  *
- *   本模块只负责「查版本 + 下载字节」；真正的安装（关 WPS → 覆盖 → 重启）在
+ *   本模块只负责「查版本 + 下载字节 + 校验」；真正的安装（关 WPS → 覆盖 → 重启）在
  *   `tools/update-install.ts`：任务窗格运行期覆盖自身文件会因文件锁失败，
  *   必须交给等 WPS 退出的外部进程来做。
+ *
+ *   **完整性校验（v2.2.4 起）**：发布端在 `download/version.json` 里声明 `sha256`
+ *   与 `size`，下载完成后先在 JS 里比对，不一致直接拒绝安装（连辅助脚本都不生成）。
+ *   这一环与「用不用脚本」无关，防的是供应链投毒：GitHub 账号被盗后替换
+ *   `download/*.zip`，插件会静默执行任意 JS（CEF 里有 FSO + ShellExecute，
+ *   等于任意代码执行）。HTTPS 挡不住中间人代理（企业根证书）与仓库被改。
  *
  *   版本号口径：去掉 `v` 前缀，按 `.` / `-` / `+` 切段，逐段比数字；缺失段按 0
  *   处理（`2.1` == `2.1.0`），预发布后缀（`2.1.0-beta.1`）按数字段继续比较。
  */
 /** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
-export declare const CURRENT_VERSION = "2.2.3";
+export declare const CURRENT_VERSION = "2.2.4";
 /** 更新来源仓库 */
 export declare const UPDATE_OWNER = "awujiana";
 export declare const UPDATE_REPO = "My-Bangumi-Database-for-WPS";
 /** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../main/download/<repo>-v2.2.1.zip`） */
 export declare function repoAssetUrl(version: string): string;
+/**
+ * 归一化发布端声明的 SHA-256
+ *
+ * 兼容 `sha256:abc…`（GitHub 的 `digest` 口径）与纯十六进制；不合法一律返回空串
+ * （= 当作「没提供」，跳过校验而不是让更新失败）。
+ */
+export declare function normalizeSha256(text: string): string;
 /** 发布包信息 */
 export interface ReleaseAsset {
     /** 文件名（如 `My-Bangumi-Database-for-WPS-v2.2.0.zip`） */
@@ -28,6 +41,12 @@ export interface ReleaseAsset {
     downloadUrl: string;
     /** 回退下载地址（GitHub Release 资产；CORS 受限，仅作兜底） */
     fallbackDownloadUrl?: string;
+    /**
+     * 发布端声明的 SHA-256（小写十六进制）
+     *
+     * 空串 = 发布端没提供（旧版 `version.json` 只有 `version` 字段）→ 跳过校验。
+     */
+    sha256: string;
 }
 /** 一次「检查更新」的结果 */
 export interface ReleaseInfo {
@@ -77,6 +96,39 @@ export declare function fetchLatestRelease(fetchFunction?: typeof fetch): Promis
  * @param fetchImpl 可注入的 fetch（测试用）
  */
 export declare function downloadReleaseAsset(url: string, onProgress: (progress: DownloadProgress) => void, fetchFunction?: typeof fetch): Promise<Uint8Array<ArrayBuffer>>;
+/**
+ * 计算字节的 SHA-256
+ *
+ * @param bytes 待校验字节
+ * @param subtle 可注入的 WebCrypto（测试用；默认取 `globalThis.crypto.subtle`）
+ * @returns 64 位小写十六进制；环境不提供 WebCrypto 时返回 null
+ */
+export declare function sha256Hex(bytes: Uint8Array<ArrayBuffer>, subtle?: SubtleCrypto | null): Promise<string | null>;
+/** 完整性校验结论 */
+export type IntegrityStatus = 
+/** 算出的哈希与发布端声明一致 */
+'verified'
+/** 算出的哈希与发布端声明不一致 —— 必须拒绝安装 */
+ | 'mismatch'
+/** 无法校验（发布端没给哈希，或环境没有 WebCrypto） */
+ | 'skipped';
+/** 完整性校验结果 */
+export interface IntegrityResult {
+    /** 结论 */
+    status: IntegrityStatus;
+    /** 实际算出的 SHA-256（未算出时为空串） */
+    actual: string;
+    /** 发布端声明的 SHA-256（空串 = 没提供） */
+    expected: string;
+}
+/**
+ * 校验下载到的字节是否与发布端声明一致
+ *
+ * 这是整条更新链路上**唯一**的完整性关卡：HTTPS 只保证「传输没被偷看」，
+ * 挡不住企业代理装根证书做中间人，也挡不住仓库被改（供应链投毒）。
+ * 不一致时调用方必须**放弃安装**，而不是提示「可能有问题，要继续吗」。
+ */
+export declare function verifyAssetIntegrity(bytes: Uint8Array<ArrayBuffer>, expectedSha256: string, subtle?: SubtleCrypto | null): Promise<IntegrityResult>;
 /**
  * 触发浏览器下载（落 CEF 下载目录），二进制安全
  *

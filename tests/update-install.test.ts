@@ -8,8 +8,10 @@
  *    这几段关键命令（少一段就不是「无感安装」而是把插件写坏）；
  * 3. 数据安全：备份要校验完整性、回滚只能覆盖复制（不许清空目录）、
  *    回滚失败要保留备份、有未保存文档时不得启动安装；
- * 4. 编排：FSO 写两个临时文件（base64 走 ANSI、脚本走 UTF-16）、ShellExecute 命令行；
- * 5. 降级：不是本地安装 / 没有 FSO / 没有 ShellExecute 都要返回非 launched。
+ * 4. 抗劫持：脚本与更新包落在**每次新建的随机目录**（独占创建），脚本**不联网**，
+ *    还原后再复核 SHA-256 与 zip 魔数；
+ * 5. 编排：FSO 写两个临时文件（base64 走 ANSI、脚本走 UTF-16）、ShellExecute 命令行；
+ * 6. 降级：不是本地安装 / 没有 FSO / 没有 ShellExecute 都要返回非 launched。
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -19,9 +21,11 @@ import {
   buildUpdateScript,
   bytesToBase64,
   countUnsavedDocuments,
+  createUpdateWorkDirectory,
   fileUrlToWindowsPath,
   launchDetachedCommand,
   quitWps,
+  randomSuffix,
   resolveAddinDirectory,
   runAutoInstall,
   temporaryDirectory,
@@ -29,8 +33,12 @@ import {
 
 /** 假的系统临时目录 */
 const FAKE_TEMPORARY_DIRECTORY = String.raw`C:\Users\me\AppData\Local\Temp`
+/** 同上，`joinPath` 会统一成正斜杠 */
+const FAKE_TEMPORARY_SLASHED = FAKE_TEMPORARY_DIRECTORY.replaceAll('\\', '/')
 /** 假的加载项目录 */
 const ADDIN_ROOT = String.raw`C:\jsaddons\p`
+/** 随机工作目录名的形状（前缀 + 16 位十六进制） */
+const WORK_DIRECTORY_PATTERN = /\/bgm-update-[\da-f]{16}$/u
 
 interface FakeWriteStream {
   Write: ReturnType<typeof vi.fn>
@@ -44,17 +52,22 @@ function clearHost(): void {
 }
 
 /** 装配一个假 FSO + ShellExecute，返回可断言的 spy */
-function stubWps(options: { withFso?: boolean; withShell?: boolean } = {}): {
+function stubWps(
+  options: { withFso?: boolean; withShell?: boolean; withCreateFolder?: boolean } = {},
+): {
   createTextFile: ReturnType<typeof vi.fn>
+  createFolder: ReturnType<typeof vi.fn>
   shell: ReturnType<typeof vi.fn>
   quit: ReturnType<typeof vi.fn>
 } {
   clearHost()
   const createTextFile = vi.fn((): FakeWriteStream => ({ Write: vi.fn(), Close: vi.fn() }))
+  const createFolder = vi.fn()
   const shell = vi.fn()
   const quit = vi.fn()
   const fso = {
     CreateTextFile: createTextFile,
+    CreateFolder: options.withCreateFolder === false ? undefined : createFolder,
     GetSpecialFolder: () => ({ Path: FAKE_TEMPORARY_DIRECTORY }),
   }
   ;(window as unknown as { wps: unknown }).wps = {
@@ -64,7 +77,7 @@ function stubWps(options: { withFso?: boolean; withShell?: boolean } = {}): {
     },
     Quit: quit,
   }
-  return { createTextFile, shell, quit }
+  return { createTextFile, createFolder, shell, quit }
 }
 
 /** 装配一个带 Workbooks 集合的宿主桥 */
@@ -184,9 +197,26 @@ describe('buildUpdateScript', () => {
     expect(script).toContain('Start-Process -FilePath $wpsExe')
   })
 
-  it('优先用插件下载好的字节，缺失才按地址重下', () => {
+  it('优先用插件下载好的字节，缺失时直接放弃（脚本不联网）', () => {
     expect(script).toContain('[Convert]::FromBase64String($text)')
-    expect(script).toContain('Invoke-WebRequest -Uri $ZipUrl')
+    // 抗劫持：脚本里不允许出现任何联网下载 —— 更新包只能来自插件校验过的那份字节
+    expect(script).not.toContain('Invoke-WebRequest')
+    expect(script).not.toContain('Invoke-RestMethod')
+    expect(script).not.toContain('Net.WebClient')
+    expect(script).toContain('更新包缺失')
+  })
+
+  it('还原后复核 SHA-256 与 zip 魔数（防写入后被替换）', () => {
+    expect(script).toContain('Get-FileHash -LiteralPath $zipPath -Algorithm SHA256')
+    expect(script).toContain('$Sha256.ToUpperInvariant()')
+    expect(script).toContain('更新包校验失败')
+    // zip 魔数 PK（0x50 0x4B）
+    expect(script).toContain('$bytes[0] -ne 0x50')
+    expect(script).toContain('$bytes[1] -ne 0x4B')
+  })
+
+  it('结束时清掉本次的随机工作目录', () => {
+    expect(script).toContain('Remove-Item -LiteralPath $WorkDir -Recurse -Force')
   })
 
   it('改 publish.xml 的版本号（失败不影响安装）', () => {
@@ -225,22 +255,26 @@ describe('buildUpdateScript', () => {
 })
 
 describe('buildPowerShellCommand', () => {
-  it('路径全部加引号，参数名齐全', () => {
+  it('路径全部加引号，参数名齐全（不含联网参数）', () => {
     const command = buildPowerShellCommand({
-      scriptPath: 'C:/tmp/bgm-update.ps1',
+      scriptPath: 'C:/tmp/bgm-update/install.ps1',
       targetDirectory: 'C:/jsaddons/my plugin',
-      base64Path: 'C:/tmp/bgm-update.b64',
-      zipUrl: 'https://example.com/a.zip',
+      base64Path: 'C:/tmp/bgm-update/package.b64',
+      workDirectory: 'C:/tmp/bgm-update',
       logPath: 'C:/tmp/bgm-update.log',
       version: '2.2.3',
+      sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
     })
     expect(command.startsWith('powershell -NoProfile -ExecutionPolicy Bypass')).toBe(true)
-    expect(command).toContain('-File "C:/tmp/bgm-update.ps1"')
+    expect(command).toContain('-File "C:/tmp/bgm-update/install.ps1"')
     expect(command).toContain('-TargetDir "C:/jsaddons/my plugin"')
-    expect(command).toContain('-Base64Path "C:/tmp/bgm-update.b64"')
-    expect(command).toContain('-ZipUrl "https://example.com/a.zip"')
+    expect(command).toContain('-Base64Path "C:/tmp/bgm-update/package.b64"')
+    expect(command).toContain('-WorkDir "C:/tmp/bgm-update"')
     expect(command).toContain('-LogPath "C:/tmp/bgm-update.log"')
     expect(command).toContain('-NewVersion "2.2.3"')
+    expect(command).toContain('-Sha256 "ba7816bf')
+    // 不再把下载地址传给脚本
+    expect(command).not.toContain('-ZipUrl')
   })
 })
 
@@ -252,6 +286,50 @@ describe('temporaryDirectory', () => {
 
   it('没有 FSO 时返回 null', () => {
     expect(temporaryDirectory()).toBeNull()
+  })
+})
+
+describe('randomSuffix', () => {
+  it('返回 16 位十六进制', () => {
+    expect(randomSuffix()).toMatch(/^[\da-f]{16}$/u)
+  })
+
+  it('多次调用不重复（随机源可用时）', () => {
+    const values = new Set(Array.from({ length: 32 }, () => randomSuffix()))
+    expect(values.size).toBeGreaterThan(1)
+  })
+})
+
+describe('createUpdateWorkDirectory', () => {
+  it('在临时目录下建随机子目录并返回路径', () => {
+    const { createFolder } = stubWps()
+    const directory = createUpdateWorkDirectory(FAKE_TEMPORARY_DIRECTORY)
+    expect(directory).not.toBeNull()
+    expect(String(directory)).toMatch(WORK_DIRECTORY_PATTERN)
+    expect(createFolder).toHaveBeenCalledTimes(1)
+  })
+
+  it('FSO 不支持 CreateFolder 时返回 null（调用方降级为手动安装）', () => {
+    stubWps({ withCreateFolder: false })
+    expect(createUpdateWorkDirectory(FAKE_TEMPORARY_DIRECTORY)).toBeNull()
+  })
+
+  it('目录已存在（CreateFolder 抛错）时换名重试，最多 3 次', () => {
+    const { createFolder } = stubWps()
+    createFolder.mockImplementation(() => {
+      throw new Error('目录已存在')
+    })
+    expect(createUpdateWorkDirectory(FAKE_TEMPORARY_DIRECTORY)).toBeNull()
+    expect(createFolder).toHaveBeenCalledTimes(3)
+  })
+
+  it('第一次撞名后重试成功', () => {
+    const { createFolder } = stubWps()
+    createFolder.mockImplementationOnce(() => {
+      throw new Error('目录已存在')
+    })
+    expect(createUpdateWorkDirectory(FAKE_TEMPORARY_DIRECTORY)).not.toBeNull()
+    expect(createFolder).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -318,6 +396,7 @@ describe('launchDetachedCommand / quitWps', () => {
 
 describe('runAutoInstall', () => {
   const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04])
+  const sha256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
 
   it('非本地安装（http 基址）→ unsupported', () => {
     stubWps()
@@ -325,7 +404,7 @@ describe('runAutoInstall', () => {
       baseUrl: 'http://localhost:3889',
       version: 'v2.2.3',
       bytes,
-      downloadUrl: 'https://example.com/a.zip',
+      sha256,
     })
     expect(outcome.status).toBe('unsupported')
     expect(outcome.targetDirectory).toBe('')
@@ -336,10 +415,23 @@ describe('runAutoInstall', () => {
       baseUrl: 'file:///C:/jsaddons/p',
       version: 'v2.2.3',
       bytes,
-      downloadUrl: '',
+      sha256,
     })
     expect(outcome.status).toBe('unsupported')
     expect(outcome.detail).toContain('临时目录')
+  })
+
+  it('FSO 不能建隔离目录 → unsupported（不写任何文件）', () => {
+    const { createTextFile } = stubWps({ withCreateFolder: false })
+    const outcome = runAutoInstall({
+      baseUrl: 'file:///C:/jsaddons/p',
+      version: 'v2.2.3',
+      bytes,
+      sha256,
+    })
+    expect(outcome.status).toBe('unsupported')
+    expect(outcome.detail).toContain('隔离工作目录')
+    expect(createTextFile).not.toHaveBeenCalled()
   })
 
   it('没有 ShellExecute → failed', () => {
@@ -348,35 +440,49 @@ describe('runAutoInstall', () => {
       baseUrl: 'file:///C:/jsaddons/p',
       version: 'v2.2.3',
       bytes,
-      downloadUrl: '',
+      sha256,
     })
     expect(outcome.status).toBe('failed')
     expect(outcome.targetDirectory).toBe(ADDIN_ROOT)
   })
 
-  it('正常路径：写 base64（ANSI）+ 脚本（UTF-16），命令行带目标目录与版本', () => {
-    const { createTextFile, shell } = stubWps()
+  it('正常路径：随机目录 + 两个临时文件（ANSI / UTF-16）+ 命令行带 WorkDir 与哈希', () => {
+    const { createTextFile, createFolder, shell } = stubWps()
     const outcome = runAutoInstall({
       baseUrl: 'file:///C:/jsaddons/p',
       version: 'v2.2.3',
       bytes,
-      downloadUrl: 'https://example.com/a.zip',
+      sha256,
     })
 
     expect(outcome.status).toBe('launched')
     expect(outcome.targetDirectory).toBe(ADDIN_ROOT)
-    expect(outcome.scriptPath).toContain('bgm-update-v2.2.3.ps1')
-    expect(outcome.logPath).toContain('bgm-update-v2.2.3.log')
+
+    // 脚本与更新包都在随机目录里
+    const workDirectory = String(createFolder.mock.calls[0]?.[0])
+    expect(workDirectory).toMatch(WORK_DIRECTORY_PATTERN)
+    expect(outcome.scriptPath).toBe(`${workDirectory}/install.ps1`)
+    // 日志留在临时目录根（名字可预测，便于按提示找到）
+    expect(outcome.logPath).toBe(`${FAKE_TEMPORARY_SLASHED}/bgm-update-v2.2.3.log`)
 
     // 两次写入：base64 走 ANSI(false)，脚本走 UTF-16(true)
     expect(createTextFile).toHaveBeenCalledTimes(2)
+    expect(String(createTextFile.mock.calls[0]?.[0])).toBe(`${workDirectory}/package.b64`)
     expect(createTextFile.mock.calls[0]?.[2]).toBe(false)
+    expect(String(createTextFile.mock.calls[1]?.[0])).toBe(`${workDirectory}/install.ps1`)
     expect(createTextFile.mock.calls[1]?.[2]).toBe(true)
-    expect(String(createTextFile.mock.calls[0]?.[0])).toContain('.b64')
 
     const command = String(shell.mock.calls[0]?.[0])
     expect(command).toContain(`-TargetDir "${ADDIN_ROOT}"`)
+    expect(command).toContain(`-WorkDir "${workDirectory}"`)
     expect(command).toContain('-NewVersion "2.2.3"')
-    expect(command).toContain('-ZipUrl "https://example.com/a.zip"')
+    expect(command).toContain(`-Sha256 "${sha256}"`)
+    expect(command).not.toContain('-ZipUrl')
+  })
+
+  it('发布端没给哈希时，命令行传空串（脚本内跳过复核）', () => {
+    const { shell } = stubWps()
+    runAutoInstall({ baseUrl: 'file:///C:/jsaddons/p', version: 'v2.2.3', bytes, sha256: '' })
+    expect(String(shell.mock.calls[0]?.[0])).toContain('-Sha256 ""')
   })
 })

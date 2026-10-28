@@ -1,12 +1,13 @@
 /**
- * @fileoverview 设置页「检查更新」：查 GitHub Release → 弹窗 → 下载更新包（进度 + 日志）
+ * @fileoverview 设置页「检查更新」：查 GitHub Release → 弹窗 → 下载 → 校验 → 安装
  * @module ui/handlers/update-checker
  *
  * 交互（momo）：
  * 1. 点「检查更新」→ 查最新 Release；
- * 2. 有新版 → 弹模态窗，显示新版本号与更新简述；
+ * 2. 有新版 → 弹模态窗，显示新版本号、更新简述，以及**安装方式说明**；
  * 3. 点「下载并安装」→ 进度条 + 日志；
- * 4. 失败 → 弹可复制的日志与失败原因。
+ * 4. 下载完先校验 SHA-256，通过才启动安装；不通过直接拒绝（连脚本都不生成）；
+ * 5. 失败 → 弹可复制的日志与失败原因。
  *
  * 安装策略（v2.2.3 起「一键」）：
  * - 本地安装环境（能定位加载项目录）：下载完成后确认一次 → 交给外部 PowerShell
@@ -20,7 +21,7 @@ import { LOG_LEVELS, bgmLog, showToast } from '../../index.js';
 import { getNotifyApi } from '../../core/ui-bridge.js';
 import { getUrlPath } from '../../tools/util/index.js';
 import { countUnsavedDocuments, quitWps, resolveAddinDirectory, runAutoInstall, } from '../../tools/update-install.js';
-import { CURRENT_VERSION, downloadReleaseAsset, fetchLatestRelease, isNewerVersion, saveZipViaBrowser, UPDATE_OWNER, UPDATE_REPO, } from '../../tools/update-check.js';
+import { CURRENT_VERSION, downloadReleaseAsset, fetchLatestRelease, isNewerVersion, saveZipViaBrowser, UPDATE_OWNER, UPDATE_REPO, verifyAssetIntegrity, } from '../../tools/update-check.js';
 /** 最近一次检查到的 Release（安装时复用，避免重复请求） */
 let pendingRelease = null;
 /** 按 id 取通用元素 */
@@ -82,6 +83,31 @@ function formatBytes(bytes) {
         return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
+/** 取哈希前 12 位用于日志（完整值太长，日志里够定位） */
+function shortHash(hash) {
+    return hash === '' ? '（无）' : `${hash.slice(0, 12)}…`;
+}
+/**
+ * 组装模态框里的「安装方式」说明
+ *
+ * 用户点「检查更新」时最需要知道的不是版本号，而是「点下去会发生什么、
+ * 会不会把我的东西弄丢」。所以这段必须写在按钮上方，而不是藏在 README 里。
+ */
+function buildHowToLines(release) {
+    const lines = [
+        '【安装方式】',
+        '· Windows：点「下载并安装」→ 校验更新包 → 自动关闭 WPS → 备份旧版 → 覆盖安装 → 自动重新打开。',
+        '· 其他系统 / 自动安装不可用：更新包会存到下载目录，关闭 WPS 后解压覆盖到加载项目录即可。',
+        '',
+        '【不会丢的东西】',
+        '· 只替换程序文件。设置、Token、账号、条件格式规则都存在 WPS 的插件存储里，不在安装目录中。',
+        '· 装之前整份备份，失败自动回滚；检测到未保存的文档会直接拒绝安装。',
+    ];
+    if (release.asset?.sha256 === '') {
+        lines.push('', '⚠️ 该版本未在发布清单里提供 SHA-256，本次会跳过完整性校验。');
+    }
+    return lines;
+}
 /** 显示 / 隐藏模态窗，并在显示时锚定遮罩到当前可见区 */
 function setModalVisible(isVisible) {
     const modal = elementById('updateModal');
@@ -99,6 +125,28 @@ function revealCopyButton() {
     const copyButton = buttonById('updateCopyLogBtn');
     if (copyButton)
         copyButton.hidden = false;
+}
+/**
+ * 把完整性校验结论写进日志
+ *
+ * @returns 是否允许继续安装 —— 只有「校验通过」与「无法校验」允许；
+ *   哈希不一致必须停手（这是唯一能挡住「发布端被替换」的一关）。
+ */
+function isAssetTrusted(result) {
+    if (result.status === 'verified') {
+        appendLog(`✅ 完整性校验通过（SHA-256 ${shortHash(result.actual)}）`);
+        return true;
+    }
+    if (result.status === 'skipped') {
+        appendLog(result.expected === ''
+            ? '⚠️ 发布清单未提供 SHA-256，已跳过完整性校验'
+            : '⚠️ 当前环境不支持 SHA-256 计算，已跳过完整性校验');
+        return true;
+    }
+    appendLog('❌ 完整性校验失败');
+    appendLog(`   期望：${result.expected}`);
+    appendLog(`   实际：${result.actual}`);
+    return false;
 }
 /** 复制日志（clipboard 不可用时降级为选中文本） */
 async function copyLog() {
@@ -139,6 +187,11 @@ function fillModal(release) {
     const installButton = buttonById('updateInstallBtn');
     if (installButton)
         installButton.hidden = release.asset === null;
+    const howto = elementById('updateHowto');
+    if (howto) {
+        howto.textContent = buildHowToLines(release).join('\n');
+        howto.hidden = false;
+    }
     const progressWrapper = elementById('updateProgressWrap');
     if (progressWrapper)
         progressWrapper.hidden = true;
@@ -205,6 +258,10 @@ function showFailureModal(message, error) {
     const installButton = buttonById('updateInstallBtn');
     if (installButton)
         installButton.hidden = true;
+    // 失败弹窗不展示「安装方式」：这次压根没装成，只会分散注意力
+    const howto = elementById('updateHowto');
+    if (howto)
+        howto.hidden = true;
     const progressWrapper = elementById('updateProgressWrap');
     if (progressWrapper)
         progressWrapper.hidden = true;
@@ -286,7 +343,7 @@ function confirmThenAutoInstall(release, bytes, baseUrl) {
             baseUrl,
             version: release.version,
             bytes,
-            downloadUrl: release.asset?.downloadUrl ?? '',
+            sha256: release.asset?.sha256 ?? '',
         });
         if (outcome.status !== 'launched') {
             appendLog(`自动安装不可用：${outcome.detail}`);
@@ -346,6 +403,17 @@ async function installUpdate() {
             bytes = await downloadReleaseAsset(fallbackUrl, onProgress);
         }
         appendLog(`下载完成：${formatBytes(bytes.byteLength)}`);
+        // 完整性校验必须在启动安装脚本**之前**：哈希不对就什么都不做，
+        // 连临时文件都不落盘（避免把不可信的字节留在用户机器上）
+        const integrity = await verifyAssetIntegrity(bytes, release.asset.sha256);
+        if (!isAssetTrusted(integrity)) {
+            appendLog('已拒绝安装：更新包与发布清单不一致，可能是下载被篡改或发布端被替换');
+            appendLog('建议：稍后重试；若持续不一致，请到 Release 页面手动下载并核对 SHA-256');
+            revealCopyButton();
+            bgmLog(LOG_LEVELS.ERROR, `[update] 完整性校验失败：expected=${integrity.expected} actual=${integrity.actual}`);
+            showToast('更新包校验失败，已拒绝安装', 'error');
+            return;
+        }
         // 能定位加载项目录 = 本地安装环境，可走一键安装；否则（开发期 HTTP）回落手动
         const baseUrl = getUrlPath();
         if (resolveAddinDirectory(baseUrl) === null) {

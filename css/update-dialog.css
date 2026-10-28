@@ -93,6 +93,30 @@
   word-break: break-word;
 }
 
+/**
+ * 安装方式说明（点「检查更新」后与更新简述一起展示）
+ *
+ * 用虚线边框 + 次级底色和上面的「更新简述」区分开：简述是发布方写的，
+ * 这段是插件自己解释「点下去会发生什么」。
+ */
+.update-modal__howto {
+  max-height: 150px;
+  overflow: auto;
+  padding: var(--sp-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update-modal__howto[hidden] {
+  display: none;
+}
+
 .update-modal__progress {
   display: flex;
   align-items: center;

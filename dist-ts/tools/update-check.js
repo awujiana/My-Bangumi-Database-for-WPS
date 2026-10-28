@@ -1,18 +1,24 @@
 /**
- * @fileoverview 从 GitHub Release 检查更新 / 下载更新包（纯逻辑 + 网络，零 WPS 依赖）
+ * @fileoverview 从 GitHub Release 检查更新 / 下载更新包 / 校验完整性（纯逻辑 + 网络，零 WPS 依赖）
  * @module tools/update-check
  * @description
- *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）。
+ *   流程：查 `releases/latest` → 比对版本 → 下载 zip（带进度回调）→ 校验 SHA-256。
  *
- *   本模块只负责「查版本 + 下载字节」；真正的安装（关 WPS → 覆盖 → 重启）在
+ *   本模块只负责「查版本 + 下载字节 + 校验」；真正的安装（关 WPS → 覆盖 → 重启）在
  *   `tools/update-install.ts`：任务窗格运行期覆盖自身文件会因文件锁失败，
  *   必须交给等 WPS 退出的外部进程来做。
+ *
+ *   **完整性校验（v2.2.4 起）**：发布端在 `download/version.json` 里声明 `sha256`
+ *   与 `size`，下载完成后先在 JS 里比对，不一致直接拒绝安装（连辅助脚本都不生成）。
+ *   这一环与「用不用脚本」无关，防的是供应链投毒：GitHub 账号被盗后替换
+ *   `download/*.zip`，插件会静默执行任意 JS（CEF 里有 FSO + ShellExecute，
+ *   等于任意代码执行）。HTTPS 挡不住中间人代理（企业根证书）与仓库被改。
  *
  *   版本号口径：去掉 `v` 前缀，按 `.` / `-` / `+` 切段，逐段比数字；缺失段按 0
  *   处理（`2.1` == `2.1.0`），预发布后缀（`2.1.0-beta.1`）按数字段继续比较。
  */
 /** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
-export const CURRENT_VERSION = '2.2.3';
+export const CURRENT_VERSION = '2.2.4';
 /** 更新来源仓库 */
 export const UPDATE_OWNER = 'awujiana';
 export const UPDATE_REPO = 'My-Bangumi-Database-for-WPS';
@@ -40,28 +46,67 @@ export function repoAssetUrl(version) {
  * raw.githubusercontent.com 允许跨域且不限流。
  */
 const RAW_VERSION_JSON = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/${REPO_ASSET_DIRECTORY}/version.json`;
-/** 按命名约定构造发布包信息（用于 API 限流时的兜底） */
-function buildReleaseFromVersion(version) {
-    const tag = version.startsWith('v') ? version : `v${version}`;
-    return {
-        version: tag,
-        notes: '',
-        publishedAt: '',
-        htmlUrl: `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tag/${tag}`,
-        asset: buildReleaseAsset(tag, null),
-    };
+/**
+ * 归一化发布端声明的 SHA-256
+ *
+ * 兼容 `sha256:abc…`（GitHub 的 `digest` 口径）与纯十六进制；不合法一律返回空串
+ * （= 当作「没提供」，跳过校验而不是让更新失败）。
+ */
+export function normalizeSha256(text) {
+    const cleaned = text
+        .trim()
+        .toLowerCase()
+        .replace(/^sha256:/u, '');
+    return /^[\da-f]{64}$/u.test(cleaned) ? cleaned : '';
 }
 /** 从 raw.githubusercontent.com 读取 version.json（无 API 限流） */
-async function fetchLatestReleaseFromRaw(fetchFunction) {
+async function readVersionManifest(fetchFunction) {
     const response = await fetchFunction(RAW_VERSION_JSON, { cache: 'no-store' });
     if (!response.ok) {
         throw new Error(`兜底版本源返回 HTTP ${String(response.status)} ${response.statusText}`);
     }
     const data = (await response.json());
-    const version = data.version ?? '';
+    const version = (data.version ?? '').trim();
     if (version === '')
         throw new Error('兜底版本源缺少 version 字段');
-    return buildReleaseFromVersion(version);
+    return {
+        version,
+        sha256: normalizeSha256(data.sha256 ?? ''),
+        size: typeof data.size === 'number' ? data.size : 0,
+    };
+}
+/**
+ * 尽力读取清单里的校验信息（拿不到就返回空值，不阻断更新）
+ *
+ * API 查询成功时不需要清单的版本号，但需要它的 `sha256`。清单缺失、或清单里的
+ * 版本号与 Release 对不上（发布到一半），都只降级为「跳过校验」——
+ * 不能因为拿不到哈希就让整个检查更新失败。
+ */
+async function readIntegrityQuietly(version, fetchFunction) {
+    try {
+        const manifest = await readVersionManifest(fetchFunction);
+        if (compareVersions(manifest.version, version) !== 0)
+            return { sha256: '', size: 0 };
+        return { sha256: manifest.sha256, size: manifest.size };
+    }
+    catch {
+        return { sha256: '', size: 0 };
+    }
+}
+/** 按命名约定构造发布包信息（用于 API 限流时的兜底） */
+function buildReleaseFromManifest(manifest) {
+    const tag = manifest.version.startsWith('v') ? manifest.version : `v${manifest.version}`;
+    return {
+        version: tag,
+        notes: '',
+        publishedAt: '',
+        htmlUrl: `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/tag/${tag}`,
+        asset: buildReleaseAsset(tag, null, { sha256: manifest.sha256, size: manifest.size }),
+    };
+}
+/** 从 raw.githubusercontent.com 读取 version.json（无 API 限流） */
+async function fetchLatestReleaseFromRaw(fetchFunction) {
+    return buildReleaseFromManifest(await readVersionManifest(fetchFunction));
 }
 /**
  * 解析版本号为数字段数组
@@ -111,17 +156,22 @@ function pickZipAsset(assets) {
     return null;
 }
 /**
- * 由版本号 + Release 资产构造下载信息
+ * 由版本号 + Release 资产 + 清单校验信息构造下载信息
  *
  * 主源固定为仓库内 `download/` 的 raw 地址（跨域可用）；Release 资产只作兜底
  * （`github.com → objects.githubusercontent.com` 不带跨域头，fetch 会失败）。
+ *
+ * 校验值只认 `version.json` 里声明的 `sha256`，不认 Release 资产的 `digest`：
+ * 两者虽然通常指向同一个 zip，但 Release 资产是人工上传的，主下载源却是
+ * `download/` 里的文件——用 A 的哈希去校验 B 的字节，对不上就会误报。
  */
-function buildReleaseAsset(version, releaseAsset) {
+function buildReleaseAsset(version, releaseAsset, integrity) {
     const tag = version.startsWith('v') ? version : `v${version}`;
     const asset = {
         name: `${UPDATE_REPO}-${tag}.zip`,
-        size: releaseAsset?.size ?? 0,
+        size: integrity.size > 0 ? integrity.size : (releaseAsset?.size ?? 0),
         downloadUrl: repoAssetUrl(tag),
+        sha256: integrity.sha256,
     };
     if (releaseAsset !== null)
         asset.fallbackDownloadUrl = releaseAsset.downloadUrl;
@@ -149,12 +199,13 @@ export async function fetchLatestRelease(fetchFunction = fetch) {
         const version = data.tag_name ?? data.name ?? '';
         if (version === '')
             throw new Error('Release 缺少版本号（tag_name）');
+        const integrity = await readIntegrityQuietly(version, fetchFunction);
         return {
             version,
             notes: data.body ?? '',
             publishedAt: data.published_at ?? '',
             htmlUrl: data.html_url ?? '',
-            asset: buildReleaseAsset(version, pickZipAsset(data.assets)),
+            asset: buildReleaseAsset(version, pickZipAsset(data.assets), integrity),
         };
     }
     catch (error) {
@@ -217,6 +268,46 @@ export async function downloadReleaseAsset(url, onProgress, fetchFunction = fetc
         }
     }
     return mergeChunks(chunks, loaded);
+}
+/** 取当前环境的 SubtleCrypto（CEF 太旧或非安全上下文时可能没有） */
+function defaultSubtleCrypto() {
+    // 走中间变量而不是直接 `globalThis.crypto.subtle`：旧 CEF 可能整个没有 crypto
+    const host = globalThis;
+    return host.crypto?.subtle ?? null;
+}
+/**
+ * 计算字节的 SHA-256
+ *
+ * @param bytes 待校验字节
+ * @param subtle 可注入的 WebCrypto（测试用；默认取 `globalThis.crypto.subtle`）
+ * @returns 64 位小写十六进制；环境不提供 WebCrypto 时返回 null
+ */
+export async function sha256Hex(bytes, subtle = defaultSubtleCrypto()) {
+    if (subtle === null)
+        return null;
+    try {
+        const digest = await subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * 校验下载到的字节是否与发布端声明一致
+ *
+ * 这是整条更新链路上**唯一**的完整性关卡：HTTPS 只保证「传输没被偷看」，
+ * 挡不住企业代理装根证书做中间人，也挡不住仓库被改（供应链投毒）。
+ * 不一致时调用方必须**放弃安装**，而不是提示「可能有问题，要继续吗」。
+ */
+export async function verifyAssetIntegrity(bytes, expectedSha256, subtle = defaultSubtleCrypto()) {
+    const expected = normalizeSha256(expectedSha256);
+    if (expected === '')
+        return { status: 'skipped', actual: '', expected: '' };
+    const actual = await sha256Hex(bytes, subtle);
+    if (actual === null)
+        return { status: 'skipped', actual: '', expected };
+    return { status: actual === expected ? 'verified' : 'mismatch', actual, expected };
 }
 /**
  * 触发浏览器下载（落 CEF 下载目录），二进制安全

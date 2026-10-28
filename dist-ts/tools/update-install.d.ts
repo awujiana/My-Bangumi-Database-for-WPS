@@ -17,6 +17,16 @@
  *   二进制被编码破坏的问题），脚本再还原成 zip —— 这样「下载进度条」与「实际
  *   安装的包」是同一份字节，不必再下载一遍。
  *
+ *   **抗劫持的三处设计（v2.2.4 起）**：
+ *   1. 脚本与更新包放在**每次新建的随机目录**（`%TEMP%\bgm-update-<16 位随机>`，
+ *      用 `FSO.CreateFolder` 独占创建），不再用可预测的固定文件名 —— 消除
+ *      「先占位/软链接把路径重定向到别处」的 TOCTOU 面；
+ *   2. 脚本**不联网**：删掉了原来的 `Invoke-WebRequest` 兜底分支。更新包只能来自
+ *      插件自己下载并校验过的那份字节，脚本里再按 `-Sha256` 复核一次（防「写完
+ *      到脚本读」之间被替换），并检查 zip 魔数 `PK`；
+ *   3. 校验失败一律放弃安装（由调用方在启动脚本**之前**判定），脚本自身也
+ *      拒绝装非 zip 内容。
+ *
  *   任何一环不可用（不是本地安装、FSO 不可用、宿主不提供 ShellExecute）都
  *   返回 `unsupported` / `failed`，由调用方回落到「下载 zip + 手动覆盖」的老流程。
  */
@@ -37,18 +47,20 @@ export interface AutoInstallOutcome {
 }
 /** 生成命令行所需的参数集合 */
 export interface InstallScriptArguments {
-    /** 辅助脚本路径 */
+    /** 辅助脚本路径（在随机工作目录里） */
     scriptPath: string;
     /** 加载项目录 */
     targetDirectory: string;
-    /** base64 更新包路径 */
+    /** base64 更新包路径（在随机工作目录里） */
     base64Path: string;
-    /** base64 不可用时的回退下载地址 */
-    zipUrl: string;
-    /** 安装日志路径 */
+    /** 本次的随机工作目录（脚本结束时整目录删除） */
+    workDirectory: string;
+    /** 安装日志路径（在临时目录根，固定名字，便于用户按提示找到） */
     logPath: string;
     /** 目标版本号（写回 publish.xml 用） */
     version: string;
+    /** 更新包 SHA-256（空串 = 发布端没提供，脚本内跳过复核） */
+    sha256: string;
 }
 /**
  * 统计未保存的文档数
@@ -93,6 +105,23 @@ export declare function buildUpdateScript(): string;
 export declare function buildPowerShellCommand(arguments_: InstallScriptArguments): string;
 /** 取系统临时目录（FSO 的 2 = TemporaryFolder）；不可用返回 null */
 export declare function temporaryDirectory(): string | null;
+/** 生成 16 位十六进制随机后缀（WebCrypto 不可用时退化为 Math.random） */
+export declare function randomSuffix(): string;
+/**
+ * 在临时目录下新建一个**本次专用**的随机工作目录
+ *
+ * 为什么不再用固定文件名（`%TEMP%\bgm-update-<版本>.ps1`）：`%TEMP%` 是用户可写的，
+ * 固定路径意味着任何能写 `%TEMP%` 的进程都可以提前占位（同名文件、目录联接、
+ * 符号链接），把「写脚本」重定向到别处再让 PowerShell 去执行 —— 典型 TOCTOU。
+ * 改成随机目录后，攻击者无法预知路径。
+ *
+ * `FSO.CreateFolder` 在目录已存在时会抛错，正好当作**独占创建**：
+ * 一旦同名目录存在就换一个随机名，绝不复用别人的目录。
+ *
+ * @param parentDirectory 系统临时目录
+ * @returns 新建目录的绝对路径；FSO 不可用 / 创建失败返回 null
+ */
+export declare function createUpdateWorkDirectory(parentDirectory: string): string | null;
 /**
  * 用宿主 ShellExecute 启动命令行（失败抛错，由调用方降级）
  *
@@ -111,13 +140,13 @@ export declare function quitWps(): void;
  *
  * @param options.baseUrl 插件基址（`getUrlPath()` 的返回值）
  * @param options.version 目标版本号（如 `v2.2.3`）
- * @param options.bytes 已下载的更新包字节
- * @param options.downloadUrl 更新包地址（本地文件不可用时的回退）
+ * @param options.bytes 已下载并**校验通过**的更新包字节
+ * @param options.sha256 更新包 SHA-256（空串 = 发布端没提供，脚本内跳过复核）
  */
 export declare function runAutoInstall(options: {
     baseUrl: string;
     version: string;
-    bytes: Uint8Array;
-    downloadUrl: string;
+    bytes: Uint8Array<ArrayBuffer>;
+    sha256: string;
 }): AutoInstallOutcome;
 //# sourceMappingURL=update-install.d.ts.map
