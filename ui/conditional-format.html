@@ -223,9 +223,12 @@
             隐藏（留在库里不应用）。⧉ 复制会把规则写进系统剪贴板，同时可在本页「粘贴」出副本。
             <strong>📥 导入工作表规则</strong> = 把当前表已有的条件格式挑进来；按钮右侧 ▾
             还有<strong>从文件导入</strong>（项目「导出规则 → 导出到文件」得到的 .json，跨表 /
-            跨电脑迁移走这条）和<strong>从文本导入</strong>（粘贴 JSON）。 这里的
-            <strong>✎ 只改本地库</strong>，不会立刻写表（「工作表规则」里的 ✎ 才直接写表）；
-            改完点「🖌️ 应用与修复 → 应用条件格式」才写进工作表——每次改动后会弹提示再说明一次。
+            跨电脑迁移走这条）。<strong>📋 粘贴</strong> 是「把已有规则粘成副本」的唯一入口：
+            主按钮粘插件内复制过的规则，右侧 ▾ 可选<strong>系统剪贴板</strong>或<strong
+              >手写 / 编辑 JSON</strong
+            >。 这里的 <strong>✎ 只改本地库</strong>，不会立刻写表（「工作表规则」里的 ✎
+            才直接写表）； 改完点「🖌️ 应用与修复 →
+            应用条件格式」才写进工作表——每次改动后会弹提示再说明一次。
           </p>
           <div class="conditional-format-toolbar">
             <input
@@ -242,9 +245,29 @@
             <button class="bgm-btn small primary" id="conditionalFormatNewRuleBtn">
               ➕ 新建规则
             </button>
-            <button class="bgm-btn small" id="conditionalFormatPasteBtn">📋 粘贴</button>
+            <!-- 粘贴：主按钮 = 插件内剪贴板（本次复制过的规则）；▾ 展开其它来源
+                 （系统剪贴板 / 手写或编辑 JSON）。三者都是「把已有规则粘成副本」，
+                 合并成一个下拉 —— 此前「从文本导入」藏在导入 ▾ 里，与粘贴重复。 -->
+            <span class="bgm-btn-split">
+              <button
+                class="bgm-btn small"
+                id="conditionalFormatPasteBtn"
+                title="把插件内复制过的规则粘成副本（进「我的规则」，点「应用条件格式」才写表）"
+              >
+                📋 粘贴
+              </button>
+              <button
+                class="bgm-btn small"
+                id="conditionalFormatPasteMenuBtn"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                title="其它粘贴来源：系统剪贴板 / 手写或编辑 JSON"
+              >
+                ▾
+              </button>
+            </span>
             <!-- 拆分按钮：主按钮直接「导入当前工作表规则」，▾ 展开其它来源
-                 （从文件 / 从文本）——项目导出的 .json 规则文件走文件那条 -->
+                 （从文件）——项目导出的 .json 规则文件走文件那条 -->
             <span class="bgm-btn-split">
               <button
                 class="bgm-btn small"
@@ -258,7 +281,7 @@
                 id="conditionalFormatImportMenuBtn"
                 aria-haspopup="menu"
                 aria-expanded="false"
-                title="其它导入方式：从文件导入（项目导出的规则文件）/ 从文本导入"
+                title="其它导入方式：从文件导入（项目导出的规则文件）"
               >
                 ▾
               </button>
@@ -510,8 +533,9 @@
           </div>
         </div>
 
-        <!-- 从文本导入：把「导出规则 → 复制到剪贴板」得到的内容（或手工整理的
-             同格式 JSON）粘进来。文件选择器在个别宿主里可能被拦，这里是兜底通道。 -->
+        <!-- 粘贴规则 JSON：把「导出规则 → 复制到剪贴板」得到的内容（或手工整理的
+             同格式 JSON）粘进来。入口在「📋 粘贴 ▾」——文件选择器在个别宿主里
+             可能被拦，这里是兜底通道。 -->
         <div
           class="conditional-format-modal-mask"
           id="conditionalFormatTextImportMask"
@@ -524,12 +548,12 @@
             aria-labelledby="conditionalFormatTextImportTitle"
           >
             <h4 id="conditionalFormatTextImportTitle" class="conditional-format-modal-grip">
-              从文本导入规则<button
+              粘贴规则 JSON<button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatTextImportMax"
                 aria-pressed="false"
-                aria-label="最大化 / 还原「从文本导入规则」"
+                aria-label="最大化 / 还原「粘贴规则 JSON」"
                 title="最大化 / 还原"
               >
                 ⛶
@@ -539,13 +563,13 @@
                 class="conditional-format-modal-collapse"
                 id="conditionalFormatTextImportCollapse"
                 aria-expanded="true"
-                aria-label="收起 / 展开「从文本导入规则」"
+                aria-label="收起 / 展开「粘贴规则 JSON」"
                 title="收起 / 展开"
               >
                 ▾
               </button>
             </h4>
-            <p class="conditional-format-import-hint">
+            <p class="conditional-format-import-hint" id="conditionalFormatTextImportHint">
               粘贴「导出规则 → 复制到剪贴板」得到的内容，或任何同格式的规则 JSON （<code
                 >{"format":"bgm-conditional-format-rules",…,"rules":[…]}</code
               >

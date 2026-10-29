@@ -615,6 +615,34 @@ function renderPreviewStats(stats) {
  * 重建 = DOMPurify 清洗一遍 + 整表重排。数据没变时这是纯浪费，故按指纹跳过。
  */
 let lastPreviewHtml = null;
+/**
+ * 上一次渲染进 `#previewBox` 的数据快照（放大预览的唯一数据源）
+ *
+ * 与 {@link lastPreviewHtml} 同步维护：渲染成功时写入，渲染「无数据 / 未选择」
+ * 这类提示时清空。放大预览只读它，所以不会出现「面板里是 A 表、放大后是 B 表」
+ * 这种 DOM 与数据脱节的情况。
+ */
+let lastPreviewSnapshot = null;
+/**
+ * 渲染一条「没有预览」的提示，并让快照失效
+ *
+ * 提示与数据必须同生同灭：留着旧快照会让放大预览在「未选择工作表」之后
+ * 还能放大出上一张表的表格，用户以为是缓存没清。
+ */
+function renderPreviewHint(previewBox, text) {
+    lastPreviewSnapshot = null;
+    lastPreviewHtml = null;
+    // 取别名再写：no-param-reassign 禁的是「给参数的属性赋值」，别名是本地绑定
+    const box = previewBox;
+    if (box)
+        box.innerHTML = sanitizeHtml(`<p class="hint">${escapeHtml(text)}</p>`);
+}
+/**
+ * 预览表格的**唯一**渲染出口
+ *
+ * 面板内预览与放大预览都调它，两条路径的 HTML 必然一致。改表格结构（加列、
+ * 换样式、加 title）只改这里一处，不会出现「放大了才看到 bug」。
+ */
 function renderPreviewTable(rows, sheetIndex, sheetName, headerRow) {
     let html = '<table class="preview-table"><tbody>';
     // 以表头行列数作为统一列数，避免不同行列数不同导致错位
@@ -659,15 +687,13 @@ export function refreshData() {
     const parsedSheetIndex = BGM.sheet.lockedIndex ?? Math.trunc(Number(select?.value ?? ''));
     const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 0;
     if (!sheetIndex) {
-        if (previewBox)
-            previewBox.innerHTML = sanitizeHtml('<p class="hint">请先选择工作表</p>');
+        renderPreviewHint(previewBox, '请先选择工作表');
         updateFilterStatus();
         return;
     }
     const app = getApp();
     if (!app?.ActiveWorkbook) {
-        if (previewBox)
-            previewBox.innerHTML = sanitizeHtml('<p class="hint">未连接到 Excel</p>');
+        renderPreviewHint(previewBox, '未连接到 Excel');
         updateFilterStatus();
         return;
     }
@@ -683,16 +709,14 @@ export function refreshData() {
         worksheet = workbook.Worksheets.Item(sheetIndex);
     }
     catch (error) {
-        if (previewBox)
-            previewBox.innerHTML = sanitizeHtml(`<p class="hint">无法获取工作表: ${String(sheetIndex)}</p>`);
+        renderPreviewHint(previewBox, `无法获取工作表: ${String(sheetIndex)}`);
         BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshData' });
         updateFilterStatus();
         return;
     }
     // 检查工作表可访问性（WPS 桥接层可能返回不可用的代理对象）
     if (typeof worksheet.Activate !== 'function') {
-        if (previewBox)
-            previewBox.innerHTML = sanitizeHtml(`<p class="hint">无法访问工作表 ${String(sheetIndex)}</p>`);
+        renderPreviewHint(previewBox, `无法访问工作表 ${String(sheetIndex)}`);
         BGM.handleError(new Error(`无法访问工作表 ${String(sheetIndex)}`), {
             showAlert: false,
             level: BGM.ErrorLevel.INFO,
@@ -839,8 +863,13 @@ export function refreshData() {
             showToast(`已自动锁定工作表: ${sheetName}`, 'info');
         }
         if (previewBox) {
+            // 快照先落定，再渲染：放大预览读的是快照，所以「面板里是什么，放大就是什么」。
             // 空状态：这一支是唯一可达的「无预览行」路径（renderPreviewTable 恒有表头行，
             // 不需要在里面再兜一层空数组分支）
+            lastPreviewSnapshot =
+                previewRows.length > 0
+                    ? { rows: previewRows, sheetIndex, sheetName, headerRow: meta.headerRow }
+                    : null;
             const html = previewRows.length > 0
                 ? renderPreviewTable(previewRows, sheetIndex, sheetName, meta.headerRow)
                 : `<div class="preview-empty">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据<br><span class="preview-empty-hint">确认数据区非空，或取消筛选后重试</span></div>`;
@@ -897,14 +926,18 @@ export function onSelectModeChange() {
 }
 let _enlargeModal = null;
 let _enlargeEscHandler = null;
-export function enlargePreview() {
-    const previewBox = document.getElementById('previewBox');
-    if (!previewBox) {
-        showToast('没有可放大的预览内容', 'info');
-        return;
-    }
-    const content = previewBox.innerHTML.trim();
-    if (!content.includes('<table')) {
+/**
+ * 放大预览
+ *
+ * 数据源是 {@link lastPreviewSnapshot}，渲染走 {@link renderPreviewTable} ——
+ * 和面板内预览是**同一个出口**。此前是 `previewBox.innerHTML` 直接克隆：
+ * 克隆会把面板的布局约束（300px 高度、窄窗格列宽）一起搬进模态框，等于只放大了
+ * 外框；而且克隆出来的 DOM 绕过了渲染函数，两处结构一旦改动就会静默分叉。
+ *
+ * @param snapshot 仅供测试注入；生产路径用模块内快照
+ */
+export function enlargePreview(snapshot = lastPreviewSnapshot) {
+    if (!snapshot || snapshot.rows.length === 0) {
         showToast('请先刷新数据加载预览', 'info');
         return;
     }
@@ -912,18 +945,20 @@ export function enlargePreview() {
         _enlargeModal.remove();
         _enlargeModal = null;
     }
+    // 与面板内预览同一个渲染函数：改了表格结构，放大视图自动跟着改
+    const content = sanitizeHtml(renderPreviewTable(snapshot.rows, snapshot.sheetIndex, snapshot.sheetName, snapshot.headerRow));
     const modal = document.createElement('div');
     modal.className = 'bgm-modal enlarge-preview-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.innerHTML = sanitizeHtml(`
-    <div class="bgm-modal-content enlarge-preview-modal-content" style="max-width: 96vw; max-height: 96vh; display: flex; flex-direction: column; background: var(--bg-base); border-radius: 12px; width: 96vw;">
-      <div class="bgm-dialog-header" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border-strong);">
-        <span class="bgm-dialog-title" style="color:var(--text-1);font-size:16px;font-weight:600;">🔍 数据预览（放大）</span>
-        <button class="bgm-close-btn enlarge-close-btn" aria-label="关闭放大预览" style="background:none;border:none;color:var(--text-3);font-size:28px;cursor:pointer;padding:0;line-height:1;">×</button>
+    <div class="bgm-modal-content enlarge-preview-modal-content">
+      <div class="bgm-dialog-header enlarge-preview-header">
+        <span class="bgm-dialog-title">🔍 数据预览（放大）</span>
+        <button class="bgm-close-btn enlarge-close-btn" aria-label="关闭放大预览">×</button>
       </div>
-      <div class="enlarged-preview-body" style="flex:1;overflow:auto;padding:18px;">
-        <div class="preview-box enlarged-preview-box" style="max-height:none;overflow:auto;font-size:15px;">${content}</div>
+      <div class="enlarged-preview-body">
+        <div class="preview-box enlarged-preview-box">${content}</div>
       </div>
     </div>
   `);

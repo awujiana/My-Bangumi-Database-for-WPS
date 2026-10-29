@@ -295,12 +295,28 @@ function writtenRuleIds(): string[][] {
     })
 }
 
-/** 打开导入 ▾ 菜单并点某一项 */
-function clickImportMenuItem(menuItemId: string): void {
-  document.getElementById('conditionalFormatImportMenuBtn')!.click()
+/** 点开「📋 粘贴 ▾」并选中其中一项（从文本导入已并入这个下拉） */
+function clickPasteMenuItem(menuItemId: string): void {
+  document.getElementById('conditionalFormatPasteMenuBtn')!.click()
   const item = menuItems().find((entry) => entry.dataset.menuItem === menuItemId)
   expect(item).toBeDefined()
   item!.click()
+}
+
+/** 「粘贴规则 JSON」弹窗的三个观察点（原「从文本导入」，已并入粘贴下拉） */
+const textImportMask = (): HTMLElement =>
+  document.getElementById('conditionalFormatTextImportMask')!
+const textImportInput = (): HTMLTextAreaElement =>
+  document.querySelector<HTMLTextAreaElement>('#conditionalFormatTextImportInput')!
+const textImportHint = (): HTMLElement =>
+  document.getElementById('conditionalFormatTextImportHint')!
+
+/** 把 navigator.clipboard.readText 换成给定的实现（用完要 delete 属性） */
+function stubReadText(read: () => Promise<string>): void {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { readText: read },
+  })
 }
 
 /** 规则文件的包装格式（= 项目「导出规则」写进文件的内容） */
@@ -444,6 +460,115 @@ describe('系统剪贴板（行内 ⧉ 复制）', () => {
   })
 })
 
+// ========== 粘贴下拉（插件剪贴板 / 系统剪贴板 / 文本） ==========
+
+describe('粘贴下拉（三个来源）', () => {
+  /** 一条与库里完全不同的新规则（系统剪贴板里的载荷） */
+  const PASTED_RULE = {
+    id: 'p1',
+    name: '从系统剪贴板来的规则',
+    group: '导入',
+    appliesTo: 'F:F',
+    formula: '=$R3="y"',
+    interior: '#654321',
+  }
+
+  it('▾ 列出三个来源；插件剪贴板为空时禁用并说明原因', async () => {
+    mockConfigWithRules()
+    await openPage()
+
+    document.getElementById('conditionalFormatPasteMenuBtn')!.click()
+    const items = menuItems()
+
+    expect(items).toHaveLength(3)
+    expect(items[0]!.textContent).toContain('粘贴插件剪贴板')
+    expect(items[1]!.textContent).toContain('从系统剪贴板粘贴')
+    expect(items[2]!.textContent).toContain('从文本粘贴')
+    // 空剪贴板不是「隐藏」，是禁用 + 说清为什么（用户要知道有这功能、怎么启用）
+    expect(items[0]!.getAttribute('aria-disabled')).toBe('true')
+    expect(items[0]!.title).toContain('还没有在插件里复制过规则')
+  })
+
+  it('复制过规则后菜单显示条数，点它打开粘贴弹窗', async () => {
+    mockConfigWithRules()
+    await openPage()
+    ruleRows()[0]!.querySelector<HTMLButtonElement>('button[data-action="copy"]')!.click()
+    await flushAsync()
+
+    document.getElementById('conditionalFormatPasteMenuBtn')!.click()
+    const first = menuItems()[0]!
+    expect(first.getAttribute('aria-disabled')).toBeNull()
+    expect(first.textContent).toContain('1 条')
+
+    first.click()
+    expect(document.getElementById('conditionalFormatPasteMask')!.style.display).toBe('flex')
+  })
+
+  it('从系统剪贴板粘贴：读到 JSON → 弹窗预填，说明保持默认', async () => {
+    mockConfigWithRules()
+    await openPage()
+    stubReadText(() => Promise.resolve(payloadOf([PASTED_RULE])))
+
+    clickPasteMenuItem('paste-system')
+    await flushAsync()
+
+    expect(textImportMask().style.display).toBe('flex')
+    expect(textImportInput().value).toContain('从系统剪贴板来的规则')
+    // 默认说明原样保留（没有被降级文案顶掉）
+    expect(textImportHint().textContent).toContain('导出规则')
+
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
+  it('从系统剪贴板粘贴：读不到 → 空弹窗 + 说明按 Ctrl+V', async () => {
+    mockConfigWithRules()
+    await openPage()
+    stubReadText(() => Promise.reject(new Error('denied')))
+
+    clickPasteMenuItem('paste-system')
+    await flushAsync()
+
+    expect(textImportMask().style.display).toBe('flex')
+    expect(textImportInput().value).toBe('')
+    expect(textImportHint().textContent).toContain('Ctrl+V')
+
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
+  it('系统剪贴板只有空白 → 同样降级（不把空白当成有内容）', async () => {
+    mockConfigWithRules()
+    await openPage()
+    stubReadText(() => Promise.resolve('  \r\n '))
+
+    clickPasteMenuItem('paste-system')
+    await flushAsync()
+
+    expect(textImportInput().value).toBe('')
+    expect(textImportHint().textContent).toContain('Ctrl+V')
+
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
+  it('降级提示不会残留：改从「从文本粘贴」进 → 说明恢复默认（含 code 标记）', async () => {
+    mockConfigWithRules()
+    await openPage()
+    stubReadText(() => Promise.reject(new Error('denied')))
+
+    clickPasteMenuItem('paste-system')
+    await flushAsync()
+    expect(textImportHint().textContent).toContain('Ctrl+V')
+
+    document.getElementById('conditionalFormatTextImportCancel')!.click()
+    clickPasteMenuItem('paste-text')
+
+    expect(textImportHint().textContent).toContain('导出规则')
+    // 默认说明里的 <code> 示例必须回来 —— 用 textContent 存默认值会把它抹成纯文本
+    expect(textImportHint().querySelector('code')).not.toBeNull()
+
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+})
+
 describe('「改动未写进工作表」提示', () => {
   it('改规则库后 toast 提醒去点「应用条件格式」', async () => {
     mockConfigWithRules()
@@ -488,22 +613,21 @@ describe('导入通道（工作表规则 / 文件 / 文本）', () => {
     interior: '#123456',
   }
 
-  it('▾ 菜单列出三个来源（工作表规则 / 文件 / 文本）', async () => {
+  it('▾ 菜单只剩两个来源（工作表规则 / 文件），文本已并入粘贴', async () => {
     mockConfigWithRules()
     await openPage()
     document.getElementById('conditionalFormatImportMenuBtn')!.click()
     const labels = menuItems().map((item) => item.textContent.trim())
-    expect(labels).toHaveLength(3)
+    expect(labels).toHaveLength(2)
     expect(labels[0]).toContain('导入工作表规则')
     expect(labels[1]).toContain('从文件导入')
-    expect(labels[2]).toContain('从文本导入')
   })
 
   it('从文本导入：包装格式解析成功 → 追加到库，完全相同的条目跳过', async () => {
     mockConfigWithRules()
     await openPage()
 
-    clickImportMenuItem('import-text')
+    clickPasteMenuItem('paste-text')
     const textarea = document.getElementById(
       'conditionalFormatTextImportInput',
     ) as HTMLTextAreaElement
@@ -528,7 +652,7 @@ describe('导入通道（工作表规则 / 文件 / 文本）', () => {
     mockConfigWithRules()
     await openPage()
 
-    clickImportMenuItem('import-text')
+    clickPasteMenuItem('paste-text')
     document.getElementById('conditionalFormatTextImportOk')!.click()
     expect(m.showToast).toHaveBeenCalledWith(
       expect.stringContaining('先把规则 JSON 粘进来'),

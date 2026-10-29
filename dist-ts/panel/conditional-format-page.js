@@ -1525,7 +1525,7 @@ async function copyRulesToSystemClipboard(rules) {
 }
 function pasteRules() {
     if (state.clipboard.length === 0) {
-        showToast('剪贴板是空的，先点规则的「复制」', 'warn');
+        showToast('插件剪贴板是空的——点「粘贴 ▾」可从系统剪贴板或文本粘', 'warn');
         return;
     }
     const sources = state.rules.filter((rule) => state.clipboard.includes(rule.id));
@@ -1536,6 +1536,80 @@ function pasteRules() {
     // 自有模态框而非通用 showInput：momo 要「可拖动的浮动窗口 + 可收起 +
     // 按钮小一点离输入框远点」。通用弹窗是桥接的实现，不为单个场景改行为。
     openPasteModal(sources);
+}
+/**
+ * 「粘贴 ▾」菜单：三个来源，本质都是「把已有规则粘成副本」
+ *
+ * 2026-10-29 合并前是两套入口：主按钮只认插件内剪贴板（本次复制过的 id 数组），
+ * 「从文本导入」藏在「导入 ▾」里——同一个诉求（把 JSON 变成规则）分裂在两处，
+ * 用户复制了外部 JSON 会去点「粘贴」然后被告知剪贴板是空的。现在按**来源**分：
+ * 插件内 / 系统剪贴板 / 手写文本，都收在粘贴下拉里；导入只留「工作表 / 文件」。
+ */
+function openPasteMenu(button) {
+    const rect = button.getBoundingClientRect();
+    const count = state.clipboard.length;
+    showContextMenu({
+        items: [
+            {
+                id: 'paste-library',
+                label: count > 0 ? `📋 粘贴插件剪贴板（${String(count)} 条）` : '📋 粘贴插件剪贴板',
+                disabled: count === 0,
+                disabledReason: '还没有在插件里复制过规则——用行尾的 ⧉，或从下面两条来源粘贴',
+                onSelect: () => {
+                    pasteRules();
+                },
+            },
+            { id: 'paste-sep', separator: true },
+            {
+                id: 'paste-system',
+                label: '🖥️ 从系统剪贴板粘贴',
+                onSelect: () => {
+                    void pasteFromSystemClipboard();
+                },
+            },
+            {
+                id: 'paste-text',
+                label: '✍️ 从文本粘贴 / 编辑 JSON',
+                onSelect: () => {
+                    openTextImportModal();
+                },
+            },
+        ],
+        x: rect.left,
+        y: rect.bottom + 4,
+        anchor: button,
+    });
+}
+/**
+ * 读系统剪贴板文本
+ *
+ * 只走 `navigator.clipboard.readText()`：`execCommand('paste')` 需要用户手势 +
+ * 可编辑焦点，在任务窗格里拿不到内容。WPS 的 CEF 若禁用剪贴板读权限，这里会
+ * 抛错——调用方据此降级成「打开空弹窗 + 提示 Ctrl+V」，而不是假装剪贴板是空的。
+ */
+async function readTextFromSystemClipboard() {
+    try {
+        return await navigator.clipboard.readText();
+    }
+    catch {
+        return '';
+    }
+}
+/**
+ * 从系统剪贴板粘贴
+ *
+ * 读到了就预填进弹窗（用户可先看一眼、改一改再导入——直接导入剪贴板里的东西
+ * 太冒险，那可能是任意文本）；读不到就开空弹窗并说明为什么，让用户自己 Ctrl+V。
+ */
+async function pasteFromSystemClipboard() {
+    const text = await readTextFromSystemClipboard();
+    if (text.trim() === '') {
+        openTextImportModal({
+            hint: '读不到系统剪贴板（宿主可能禁止网页读取）。按 Ctrl+V 粘到下面再点「导入」即可。',
+        });
+        return;
+    }
+    openTextImportModal({ prefill: text });
 }
 /** 粘贴来源的会话态（弹窗开着期间的数据源；关闭即清） */
 let pasteSources = [];
@@ -2838,11 +2912,15 @@ function importForeign() {
     openImportModal(foreign, entry.sheet);
 }
 /**
- * 「导入」主按钮旁的 ▾ 菜单：三个来源
+ * 「导入」主按钮旁的 ▾ 菜单：两个来源
  *
- * 主按钮仍是「导入工作表规则」（当前表既有规则）；文件 / 文本两条用于
- * 「别的表、别的电脑、备份文件」——「导出规则 → 导出到文件」得到的 .json
- * 就走文件这条，也是跨设备迁移规则的唯一通道。
+ * 主按钮是「导入工作表规则」（当前表既有规则）；文件那条用于「别的表、别的电脑、
+ * 备份文件」——「导出规则 → 导出到文件」得到的 .json 就走它，是跨设备迁移规则的
+ * 唯一通道。
+ *
+ * 「从文本导入」已并入「📋 粘贴 ▾」（2026-10-29）：它和粘贴是同一个动作——
+ * 把一段 JSON 变成规则副本，只是来源不同。按来源分入口，用户不会在「粘贴」里
+ * 碰壁后再去找「导入」。
  */
 function openImportMenu(button) {
     const rect = button.getBoundingClientRect();
@@ -2862,13 +2940,6 @@ function openImportMenu(button) {
                     importRulesFromFile();
                 },
             },
-            {
-                id: 'import-text',
-                label: '📋 从文本导入（粘贴 JSON）',
-                onSelect: () => {
-                    openTextImportModal();
-                },
-            },
         ],
         x: rect.left,
         y: rect.bottom + 4,
@@ -2885,7 +2956,7 @@ function openImportMenu(button) {
 function importRulesFromFile() {
     const input = byId('conditionalFormatImportFile');
     if (!(input instanceof HTMLInputElement)) {
-        showToast('当前宿主不支持文件选择，改用「从文本导入」', 'warn');
+        showToast('当前宿主不支持文件选择，改用「📋 粘贴 ▾ → 从文本粘贴」', 'warn');
         return;
     }
     // 清空 value：连续选同一个文件也要触发 change
@@ -2976,11 +3047,24 @@ function importRulesFromText(text, source) {
     }
     showToast(`已从「${source}」导入 ${String(added)} 条到「我的规则」${suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表`, 'success');
 }
-/** 打开「从文本导入」弹窗（文件选择被宿主拦时的兜底通道） */
-function openTextImportModal() {
+/** 弹窗默认说明的原始 HTML（首次打开时从页面抓，避免文案两处维护） */
+let textImportDefaultHintHtml = null;
+/**
+ * 打开「粘贴规则 JSON」弹窗
+ *
+ * @param options.prefill 预填内容（从系统剪贴板读到的东西）；不传则清空
+ * @param options.hint 覆盖说明文案（如「读不到剪贴板，请 Ctrl+V」）；不传恢复默认
+ */
+function openTextImportModal(options = {}) {
     const textarea = byId('conditionalFormatTextImportInput');
     if (textarea instanceof HTMLTextAreaElement)
-        textarea.value = '';
+        textarea.value = options.prefill ?? '';
+    const hint = byId('conditionalFormatTextImportHint');
+    if (hint) {
+        textImportDefaultHintHtml ??= hint.innerHTML;
+        hint.innerHTML =
+            options.hint === undefined ? textImportDefaultHintHtml : escapeHtml(options.hint);
+    }
     const mask = byId('conditionalFormatTextImportMask');
     const modal = mask?.querySelector('.conditional-format-modal');
     if (mask) {
@@ -2997,7 +3081,7 @@ function openTextImportModal() {
     if (textarea instanceof HTMLTextAreaElement)
         textarea.focus();
 }
-/** 关闭「从文本导入」弹窗（没开时 no-op，别乱解滚动锁） */
+/** 关闭「粘贴规则 JSON」弹窗（没开时 no-op，别乱解滚动锁） */
 function closeTextImportModal() {
     const mask = byId('conditionalFormatTextImportMask');
     if (mask?.style.display === 'none')
@@ -3006,7 +3090,7 @@ function closeTextImportModal() {
         mask.style.display = 'none';
     unlockModalScroll();
 }
-/** 确认从文本导入 */
+/** 确认粘贴的 JSON 并导入 */
 function confirmTextImport() {
     const textarea = byId('conditionalFormatTextImportInput');
     const text = textarea instanceof HTMLTextAreaElement ? textarea.value : '';
@@ -3471,6 +3555,12 @@ export function initializeConditionalFormatPage() {
     });
     byId('conditionalFormatPasteBtn')?.addEventListener('click', () => {
         pasteRules();
+    });
+    // ▾：系统剪贴板 / 手写文本（「从文本导入」已并入这个下拉）
+    byId('conditionalFormatPasteMenuBtn')?.addEventListener('click', (event) => {
+        const button = event.currentTarget;
+        if (button instanceof HTMLElement)
+            openPasteMenu(button);
     });
     byId('conditionalFormatImportBtn')?.addEventListener('click', () => {
         importForeign();

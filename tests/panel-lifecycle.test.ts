@@ -1617,40 +1617,69 @@ describe('panel-lifecycle · onSelectModeChange', () => {
 
 // ========== enlargePreview ==========
 
+/** 一份可直接喂给放大预览的快照（生产路径由 refreshData 生成并缓存） */
+function snapshotOf(): {
+  rows: { row: number; columns: string[]; isHeader: boolean; aligned: boolean }[]
+  sheetIndex: number
+  sheetName: string
+  headerRow: number
+} {
+  return {
+    rows: [
+      { row: 1, columns: ['名称', '日期'], isHeader: true, aligned: true },
+      { row: 2, columns: ['动画A', '2026-10'], isHeader: false, aligned: true },
+    ],
+    sheetIndex: 1,
+    sheetName: '动画',
+    headerRow: 1,
+  }
+}
+
 describe('panel-lifecycle · enlargePreview', () => {
-  it('没有预览框 → 提示无可放大内容', () => {
-    enlargePreview()
-    expect(mocks.showToast).toHaveBeenCalledWith('没有可放大的预览内容', 'info')
-  })
-
-  it('预览里还没有表格 → 提示先刷新数据', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<p class="hint">请先选择工作表</p>'
-
-    enlargePreview()
+  it('还没有预览快照 → 提示先刷新数据', () => {
+    enlargePreview(null)
 
     expect(mocks.showToast).toHaveBeenCalledWith('请先刷新数据加载预览', 'info')
     expect(document.querySelector('.enlarge-preview-modal')).toBeNull()
   })
 
-  it('正常放大 → 生成带对话框语义的模态框并拷贝预览内容', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table class="preview-table"><tbody><tr><td>A</td></tr></tbody></table>'
+  it('正常放大 → 走同一个渲染函数生成表格，并带对话框语义', () => {
+    enlargePreview(snapshotOf())
 
-    enlargePreview()
-
-    const modal = document.querySelector('.enlarge-preview-modal')
+    const modal = document.querySelector<HTMLElement>('.enlarge-preview-modal')
     expect(modal).not.toBeNull()
     expect(modal?.getAttribute('role')).toBe('dialog')
     expect(modal?.getAttribute('aria-modal')).toBe('true')
     expect(modal?.innerHTML).toContain('数据预览（放大）')
-    expect((modal as HTMLElement).style.display).toBe('flex')
+    // 与面板内预览同一个出口：表头行 / 行号列 / 单元格都在
+    expect(modal?.innerHTML).toContain('<table class="preview-table">')
+    expect(modal?.innerHTML).toContain('动画A')
+    expect(modal?.innerHTML).toContain('preview-header')
+    expect(modal?.style.display).toBe('flex')
+  })
+
+  it('面板 DOM 里残留旧表格也不影响 —— 放大读快照，不克隆 innerHTML', () => {
+    const box = mountDiv('previewBox')
+    box.innerHTML = '<table class="preview-table"><tbody><tr><td>旧表残留</td></tr></tbody></table>'
+
+    enlargePreview(snapshotOf())
+
+    const modal = document.querySelector<HTMLElement>('.enlarge-preview-modal')
+    expect(modal?.innerHTML).toContain('动画A')
+    // 克隆实现会把旧表整段搬进来；读快照则一个字节都不沾
+    expect(modal?.innerHTML).not.toContain('旧表残留')
+  })
+
+  it('脚注说明工作表与表头行（与面板内预览同一份文案）', () => {
+    enlargePreview(snapshotOf())
+
+    const modal = document.querySelector<HTMLElement>('.enlarge-preview-modal')
+    expect(modal?.innerHTML).toContain('已选择工作表索引: 1 (动画)')
+    expect(modal?.innerHTML).toContain('表头行: 1')
   })
 
   it('点关闭按钮 → 移除模态框', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table></table>'
-    enlargePreview()
+    enlargePreview(snapshotOf())
 
     const closeButton = document.querySelector('.enlarge-close-btn')
     if (!closeButton) throw new Error('缺少关闭按钮')
@@ -1660,9 +1689,7 @@ describe('panel-lifecycle · enlargePreview', () => {
   })
 
   it('按 Esc → 移除模态框', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table></table>'
-    enlargePreview()
+    enlargePreview(snapshotOf())
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
 
@@ -1670,9 +1697,7 @@ describe('panel-lifecycle · enlargePreview', () => {
   })
 
   it('按其他键不会关闭', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table></table>'
-    enlargePreview()
+    enlargePreview(snapshotOf())
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
 
@@ -1680,9 +1705,7 @@ describe('panel-lifecycle · enlargePreview', () => {
   })
 
   it('点击模态框背景 → 关闭', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table></table>'
-    enlargePreview()
+    enlargePreview(snapshotOf())
 
     const modal = document.querySelector('.enlarge-preview-modal')
     modal?.dispatchEvent(new Event('click'))
@@ -1691,11 +1714,8 @@ describe('panel-lifecycle · enlargePreview', () => {
   })
 
   it('重复放大 → 先移除上一个模态框（不叠加）', () => {
-    const box = mountDiv('previewBox')
-    box.innerHTML = '<table></table>'
-
-    enlargePreview()
-    enlargePreview()
+    enlargePreview(snapshotOf())
+    enlargePreview(snapshotOf())
 
     expect(document.querySelectorAll('.enlarge-preview-modal')).toHaveLength(1)
   })

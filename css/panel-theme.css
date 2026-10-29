@@ -960,7 +960,9 @@ select.input option,
   padding: 3px;
   margin-bottom: 12px;
   border: 1px solid var(--border);
-  overflow-x: auto;
+  /* 不要在这里再套一层 overflow-x：外层先滚会吃掉 .preview-box 的横向滚动条，
+     而外层高度随内容走，滚动条被推到最底下，鼠标根本够不到 */
+  overflow: visible;
 }
 .preview-box {
   background: var(--bg-mantle);
@@ -1005,6 +1007,68 @@ select.input option,
   font-weight: 600;
   color: var(--text-3);
   font-size: 11px;
+}
+
+/* ---- 放大预览（🔍 按钮）----
+   唯一的滚动层是 .enlarged-preview-box。此前 body 与 box 都写了 overflow:auto，
+   两层嵌套 → box 的高度被内容撑开，横向滚动条落到内容最底部，看不见也拖不动。 */
+.enlarge-preview-modal-content {
+  width: 96vw;
+  max-width: 96vw;
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--bg-base);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.enlarge-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.enlarge-preview-header .bgm-dialog-title {
+  font-size: 16px;
+  color: var(--text-1);
+}
+.enlarge-close-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.enlarged-preview-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 18px;
+}
+.enlarged-preview-box {
+  flex: 1;
+  min-width: 0;
+  max-height: none;
+  font-size: 15px;
+  /* 面板里 8px 细条够用，放大视图是「拿来拖的」，细条 + 与底色相近的 thumb
+     会让用户以为「没有滚动条 / 点不到」 */
+  scrollbar-width: auto;
+}
+.enlarged-preview-box::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.enlarged-preview-box::-webkit-scrollbar-thumb {
+  background: var(--text-3);
+  border-radius: 6px;
+}
+.enlarged-preview-box::-webkit-scrollbar-thumb:hover {
+  background: var(--text-2);
 }
 
 /* ============================ 10. 步骤引导 / 格式表 ===================== */
@@ -1323,8 +1387,9 @@ select.input option,
     flex: 1 1 100%;
     min-width: 0;
   }
-  /* 数据表 / 预览表在极窄下横向滚动（局部滚动优于撑破整页） */
-  .preview-table,
+  /* 数据表在极窄下横向滚动（局部滚动优于撑破整页）。
+     预览表**不能**加 display:block：那会让 width:max-content 失效、单元格被压着
+     换行，横向滚动条反而消失。它的滚动交给外层 .preview-box。 */
   .conditional-format-table {
     display: block;
     overflow-x: auto;
