@@ -126,7 +126,7 @@
   background: rgba(74, 158, 255, 0.08);
   border: 1px solid rgba(74, 158, 255, 0.35);
   border-radius: 8px;
-  color: var(--accent-blue);
+  color: var(--text-link);
   font-size: 12px;
   line-height: 1.5;
   word-break: break-all;
@@ -172,7 +172,7 @@
 .mapping-header {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent-blue);
+  color: var(--text-link);
   margin-bottom: 4px;
 }
 
@@ -353,7 +353,7 @@
 
 .preview-table .match-status.status-error,
 .preview-table .status-error {
-  color: var(--red-strong);
+  color: var(--text-danger);
 }
 
 /* ========== 数据预览单元格美化 ========== */
@@ -683,7 +683,7 @@
   color: var(--red);
 }
 .match-detail-value.status-error {
-  color: var(--red-strong);
+  color: var(--text-danger);
 }
 
 .match-detail-aliases {
@@ -876,8 +876,10 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-  color: white;
+  /* 白字压蓝底：--accent-blue 档实测只有 2.75:1（深色）/ 4.01:1（浅色），
+     换深蓝阶后 4.96~7.08:1。序号是纯装饰性文字，但读不出来同样算不可用。 */
+  background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1062,7 +1064,7 @@
 .conflict-title {
   font-size: 15px;
   font-weight: 700;
-  color: var(--accent-blue);
+  color: var(--text-link);
 }
 
 /* 冲突进度：复用通用进度组件的状态机，宿主把渲染结果压缩为 4px 细线 */
@@ -1143,7 +1145,7 @@
 }
 
 .conflict-old {
-  color: var(--red-strong);
+  color: var(--text-danger);
   word-break: break-all;
 }
 
@@ -1242,13 +1244,13 @@
   border-top: 3px solid var(--red-strong);
 }
 .enrich-detail-stat.error .enrich-detail-stat-num {
-  color: var(--red-strong);
+  color: var(--text-danger);
 }
 .enrich-detail-stat.field {
   border-top: 3px solid var(--accent-blue);
 }
 .enrich-detail-stat.field .enrich-detail-stat-num {
-  color: var(--accent-blue);
+  color: var(--text-link);
 }
 
 /* 文件分组 */
@@ -1318,7 +1320,7 @@
 }
 .enrich-detail-entry-badge.new {
   background: color-mix(in srgb, var(--accent-blue) 18%, transparent);
-  color: var(--accent-blue);
+  color: var(--text-link);
 }
 .enrich-detail-entry-badge.unmatched {
   background: color-mix(in srgb, var(--text-3) 18%, transparent);
@@ -1326,10 +1328,15 @@
 }
 .enrich-detail-entry-badge.error {
   background: color-mix(in srgb, var(--red-strong) 18%, transparent);
-  color: var(--red-strong);
+  color: var(--text-danger);
 }
 
 /* 条目内字段明细表 */
+.bgm-check {
+  /* WCAG 2.2 AA 2.5.8：label 即复选框点击区，实测 463x19 → 撑到 24px 高。 */
+  min-height: 24px;
+}
+
 .enrich-detail-fields {
   width: 100%;
   border-collapse: collapse;
@@ -1362,7 +1369,7 @@
   white-space: nowrap;
 }
 .enrich-detail-fields .field-old {
-  color: var(--red-strong);
+  color: var(--text-danger);
   word-break: break-all;
 }
 .enrich-detail-fields .field-arrow {
@@ -1381,7 +1388,7 @@
   color: var(--success);
 }
 .enrich-detail-fields .field-action.append {
-  color: var(--accent-blue);
+  color: var(--text-link);
 }
 .enrich-detail-fields .field-action.skip {
   color: var(--text-3);
@@ -1390,7 +1397,7 @@
 .enrich-detail-entry-error {
   padding: 8px 10px;
   font-size: 12px;
-  color: var(--red-strong);
+  color: var(--text-danger);
   word-break: break-all;
 }
 

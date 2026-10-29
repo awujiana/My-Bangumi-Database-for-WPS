@@ -8,6 +8,60 @@
 
 ## [未发布]
 
+### 按 UX 规范做全量走查并修复：对比度 / 点击目标 / 语义色拆分（2026-10-29）
+
+依据《UX 设计规范》（WCAG 2.2 AA + 尼尔森 H1–H10 + Refactoring UI 七视角）把 7 个页面
+（`panel` / `settings` / `clean` / `enrich` / `highlight` / `conditional-format` / `donate`）
+在真浏览器里按 **深 / 浅双主题 × 320 / 375 / 768 / 1280 四个视口** 全量量了一遍
+（`getComputedStyle` + 有效背景合成，不是看代码猜）。改前改后：
+
+| 检查项               | 改前（最深的一页）                                 | 改后  |
+| -------------------- | -------------------------------------------------- | ----- |
+| 文字对比度不达标     | enrich 15 处 / 浅色 18 处，panel 4 处，donate 3 处 | **0** |
+| 指针目标 < 24×24     | settings 13 处，panel 8 处，enrich 7 处            | **0** |
+| 整页横向溢出         | 0                                                  | 0     |
+| 图标按钮无可访问名称 | 0                                                  | 0     |
+
+- **`--text-3` 全线不达标（P0，WCAG AA 4.5:1）**。深色 `#888888` 在 `--bg-surface`
+  (`#2a2a2a`) 上只有 4.05:1、在悬停底 `#353535` 上 3.46:1；浅色 `#6b7078` 在
+  `#e2e5ea` 上只有 3.95:1。`--text-3` 是 `.hint` / `.radio-desc` / `.stat-label` /
+  `.command-desc` / `.nav-label` / 赞赏页联系方式值的唯一来源，一处改错等于全站失守。
+  → 深色 `#a0a0a0`（四档底色 6.30 / 5.49 / 4.83 / 4.69）、浅色 `#5f646c`（5.96 / 5.51 / 5.22 / 4.72）。
+- **新增「语义文字色」，把填充色和文字色拆开**。原先把 `--danger` / `--success` /
+  `--accent-blue` / `--red-strong` 既当填充又当文字：`#2f7fe0` 在浅色 `#eef0f3` 上
+  3.51:1、`#e74c3c` 在浅色 3.35:1、在深色 `#2a2a2a` 上 3.76:1。
+  → `tokens.css` 新增 `--text-link` / `--text-danger` / `--text-success` / `--text-warn`
+  （深色 `#89b4fa` / `#ff8a80` / `#a6e3a1` / `#f9e2af`，浅色 `#1a5fb4` / `#b3261e` /
+  `#1b6b21` / `#8a4b00`），CSS 里 15 处 `color: var(--accent-blue)`、7 处
+  `color: var(--red-strong)`、2 处内联同款全部改道。`--danger` 等填充色保持不变。
+- **遗留的 Catppuccin 硬编码**：`styles.css` 有 5 处 `color: var(--subtext1, #bac2de)`，
+  这套调色板写死在 `:root`、不随主题切换，浅色主题下 `#bac2de` 在纯白上只有 **1.77:1**
+  （全站最差）。→ 换主题化 `--text-2`。`ui/enrich.html` 与 `ts/panel/enrich-page.ts`
+  另有 2 处内联 `#bac2de` 一并换掉。
+- **`.tip-num` 序号徽标白字压浅蓝**：`#4a9eff` 上白字 2.75:1（浅色 4.01:1）。
+  → 新增 `--accent-blue-deep` / `--accent-blue-deeper`（`#1d6fd0` / `#1857a8`），
+  白字对比度 4.96 / 7.08，深浅主题通用。
+- **浅色 `--success` 差一点点**：`#2e7d32` 在 `#eef0f3` 上 4.49:1，差 0.01 不达标
+  → `#1b6b21`（5.24~6.62:1）。
+- **点击目标补到 24×24（WCAG 2.2 AA 2.5.8）**：`.mod-collapse-btn` / `.mod-solo-btn`
+  实测 24×20（12px 字 × 1.5 行高 + 2px 描边），且两者紧邻、间距例外也不成立
+  → `min-width/min-height: 24px` + `inline-flex` 居中。整行 checkbox label
+  （`.form-row > label:has(...)` 19~20px、`.bgm-check` 19px、`.highlight-watch-row` 22px、
+  `.conditional-format-lock-row` 20px）→ `min-height: 24px`。正文内联链接命中
+  2.5.8 的 Inline 例外，不动。
+- **审计脚本口径本身也修了两处误报**：① 渐变元素的 `backgroundColor` 是透明的，
+  只回溯父级会把「浅灰渐变底 + 深字」的 `.step-num` 算成 1.38:1；改为解析
+  `background-image` 的色标、逐色标算对比度取最差值。② `input` 被 `<label>` 包住时
+  实际可点区域是 label，量 `input` 的 13×13 是假阳性；改为量 label 的矩形。
+- **文档**：README 新增「♿ 无障碍与设计基线」一节（自动走查口径表 + 四条硬约定）、
+  `<h2>` 改成 GitHub 真实仓库名 `My-Bangumi-Database-for-WPS`、底部重排为
+  「致谢 → 赞赏 → 关联仓库 → 作者联系方式 → 协议」并给赞赏补「完全自愿、不影响功能」
+  说明；新增 `AGENTS.md`（五段式，含核心不变量 / 技术禁令 / 提交身份）；
+  `CONTRIBUTING.md` 补全「命名规范（不缩写）」并修正过时的分支说明
+  （`main` 才是完整源码工作区，`publish` 才是纯发布分支）。
+- **门禁**：`npm run gate` 全绿（178 文件 / 5369 测试）。CSS 改动对 jsdom 隐形，
+  布局与对比度结论全部来自真浏览器实测，未用静态推断。
+
 ### 赞赏页：显示不全（空栅格行 + 横向溢出）+ 新增粉丝 QQ 群（2026-10-29）
 
 momo：「赞赏与支持页面，显示不全，邮箱显示不全」「加上作者的粉丝 QQ 群 436212515，

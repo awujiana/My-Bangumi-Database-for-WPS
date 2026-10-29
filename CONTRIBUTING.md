@@ -4,8 +4,14 @@
 本项目是一个运行在 WPS 表格（ET）中的加载项，使用 TypeScript + Vite + Vitest 开发。无论是提 Issue、修 Bug、补测试、改文档，还是适配新的同步源，都欢迎。
 
 > [!IMPORTANT]
-> 本仓库包含**发布产物**（`index.html` / `main.js` / `manifest.xml` / `ribbon.xml` / `assets/` / `css/` / `dist-ts/` / `images/` / `libs/` / `ui/`）、**`ts/` TypeScript 源码**、`README.md`、`LICENSE` 与本文档；**不包含** `tests/`、`scripts/`、构建配置（`package.json` / `tsconfig*` / `vite.config`）与测试环境。  
-> 因此下列「快速开始 / 开发流程 / 质量门禁 / 测试要求 / 发布流程」中涉及安装依赖、构建与测试的命令，是维护者完整源码工作区的操作说明，**无法直接在本仓库克隆执行**。外部贡献者可通过 Issue 提交问题与复现步骤，或直接提交针对 `ts/` 源码的 PR；维护者会在完整工作区验证后同步发布产物。
+> 本仓库有两个长期分支，内容不同，**克隆前先确认你要哪一份**：
+>
+> | 分支           | 内容                                                                                                                                                                                                      | 能做什么                                                |
+> | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+> | `main`（默认） | 完整源码工作区：`ts/` 源码、`ui/` `css/`、`tests/`、`scripts/`、`package.json` 与全部构建配置，外加 `dist-ts/` 等发布产物                                                                                 | `npm install` 后可直接 `npm run gate` / `npm run build` |
+> | `publish`      | 仅发布文件：`index.html` / `main.js` / `manifest.xml` / `ribbon.xml` / `assets/` / `css/` / `dist-ts/` / `images/` / `libs/` / `ui/` / `ts/` / `download/`，**不含** `tests/`、`scripts/`、`package.json` | 只用于分发与「检查更新」拉取，跑不了构建与测试          |
+>
+> 本文档的「快速开始 / 开发流程 / 质量门禁 / 测试要求 / 发布流程」都按 `main` 编写。
 
 ---
 
@@ -195,11 +201,49 @@ npm run audit:layout           # 全部页面布局审计（需本机 Chrome / E
 - 优先使用明确的联合类型 / 判别联合，避免用字符串魔法值散落各处。
 - 公共导出使用 `export { ... } from` 形式；`import type` 放在导入区顶部。
 
-### 命名与结构
+### 命名规范（不缩写）
 
-- 布尔变量使用 `is` 前缀（如 `isLocked`）。
-- 面板页面逻辑文件使用 `Page` 后缀（`ts/panel/*-page.ts`）。
-- 双层循环中的 `break` / `continue` 抽成辅助函数并早返回，降低嵌套。
+> 本节为**硬性规范**，所有改动都必须遵守。完整对照表与反例见技能 `awujiana-readme-style` 的 `references/naming-conventions.md`。
+
+**总则**
+
+- **一律全拼，禁止缩写**：`usr`→`user`、`cfg`→`config`、`btn`→`button`、`img`→`image`、`msg`→`message`、`err`→`error`、`idx`→`index`。`ts/` 与 `tests/` 由 ESLint 的 `naming-convention` 与 `unicorn/name-replacements` 兜底，`npm run lint:check` 会拦。
+- **名称不重复**：项目名全局唯一；同目录文件名唯一（大小写不敏感）；同模块导出名唯一；组件名全局唯一。
+- **名称即语义**：禁止 `utils`、`common`、`misc`、`temp`、`data1`、`file2` 这类泛化名。`ts/tools/` 已按能力分文件（`http` / `wps` / `logger` / `sanitize` / `clipboard` / `theme`），新增能力继续分文件，不要往 `utils.ts` 里堆。
+- **文件名即符号名**：`ts/tools/sanitize.ts` 导出 `sanitizeHtml` / `sanitizeTableRows`；`ts/sync/github-sync.ts` 只导出 GitHub 同步相关符号。
+
+**文件命名**
+
+| 类型        | 规则                                                           | 本仓库示例                                          |
+| ----------- | -------------------------------------------------------------- | --------------------------------------------------- |
+| 页面逻辑    | `kebab-case.ts`，加 `-page` 后缀                               | `ts/panel/conditional-format-page.ts`               |
+| 模块 / 服务 | `kebab-case.ts`，名词                                          | `ts/services/ribbon-service.ts`                     |
+| 工具函数    | `kebab-case.ts`，导出 `camelCase`                              | `ts/tools/sanitize.ts` → `sanitizeHtml`             |
+| 校验脚本    | `check-<对象>.mjs`                                             | `scripts/check-csp.mjs`                             |
+| 测试        | `<被测模块>.test.ts`                                           | `tests/conditional-format-page.test.ts`             |
+| 样式        | 按页面或能力命名                                               | `css/panel-theme.css`、`css/conditional-format.css` |
+| 页面 HTML   | 与面板名一致                                                   | `ui/conditional-format.html`                        |
+| 文档        | `kebab-case.md`，或 `文档/` 内既有的大写形式（**同目录统一**） | `文档/USER_OPERATIONS.md`                           |
+
+- **同一目录内不得出现同名文件**，包括仅大小写不同（`RuleList.ts` 与 `rulelist.ts` 视为冲突）。
+- 不要用 `index.ts` 做唯一出口造成同名歧义；需要桶文件时显式命名（如 `sync-sources.ts`）。
+
+**函数与类型命名**
+
+- **函数**：`camelCase`，**动词开头 + 名词**，全拼：`renderRuleList`、`anchorExistingGroup`、`serializeRules`。
+- **类型 / 接口**：`PascalCase` 名词：`PluginRecord`、`GithubRemoteEntry`。
+- **常量**：`UPPER_SNAKE_CASE`：`STANDARD_HEADERS`、`LOG_LEVEL_MIN`、`REQUIRED_SHARD_ANCHORS`。
+- **布尔变量**：`is` 前缀（`isLocked`、`isInGroup`）。
+- **面板页面逻辑**：文件名用 `-page.ts` 后缀，入口函数 `init<Name>Page`。
+- 同一模块内不得出现同名导出；不同模块同名须加限定词（`fetchUserProfile` / `fetchTeamProfile`）。
+
+**冲突处理**
+
+加**语义限定词**，不要数字后缀。`renderRuleList` 与 `renderRuleList2` ❌；应为 `renderRuleList` 与 `renderForeignRuleGroupsHtml` ✅。
+
+**结构与嵌套**
+
+- 双层循环里的 `break` / `continue` 抽成辅助函数并早返回，降低嵌套。
 - 不要为一次性逻辑造抽象；三行重复代码通常比过早抽象更好维护。
 
 ### 架构约束

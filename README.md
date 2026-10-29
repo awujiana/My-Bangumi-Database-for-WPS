@@ -13,7 +13,7 @@
 [![插件图标：我的 Bangumi 数据库 (WPS版)](images/mbd-logo.svg)](images/mbd-logo.svg)
 <img src="images/ribbon.png" alt="功能栏"  />
 <h1>我的 Bangumi 数据库 (WPS版)</h1>
-<h2>My Bangumi Database for WPS</h2>
+<h2>My-Bangumi-Database-for-WPS</h2>
 
 <strong>在 WPS 表格里管理 Bangumi 番组数据：上传同步、数据同步、收藏下载、新番表富化与数据清洗</strong>
 
@@ -26,6 +26,7 @@
 
 - [项目简介](#sec-1)
 - [核心特色](#sec-2)
+- [无障碍与设计基线](#sec-2a)
 - [界面预览](#sec-2b)
 - [技术栈](#sec-3)
 - [目录结构](#sec-4)
@@ -41,6 +42,8 @@
 - [文档索引](#sec-11)
 - [数据来源](#sec-12)
 - [反馈建议](#sec-13)
+- [参考与致谢](#sec-13b)
+- [赞赏支持](#sec-13c)
 - [开源协议](#sec-14)
 
 <a id="sec-1"></a>
@@ -86,6 +89,32 @@
 
 ---
 
+<a id="sec-2a"></a>
+
+## ♿ 无障碍与设计基线
+
+界面按 [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/) 与「十大可用性原则 + Refactoring UI 七视角」落地。深浅两套主题共用一套 token（`css/tokens.css`），颜色不写死在组件里。
+
+**自动走查口径**（真浏览器 headless Chrome；7 个页面 × 深 / 浅双主题 × 320 / 375 / 768 / 1280 四个视口）：
+
+| 检查项             | 基线                               | 实测       |
+| ------------------ | ---------------------------------- | ---------- |
+| 正文文字对比度     | ≥ 4.5:1（大字 ≥ 3:1）              | 0 处不达标 |
+| 指针目标尺寸       | ≥ 24×24 CSS px（正文内联链接除外） | 0 处不达标 |
+| 整页横向溢出       | 无                                 | 0 处       |
+| 图标按钮可访问名称 | 全部有 `title` / `aria-label`      | 0 处缺失   |
+
+> 这是自动扫描结果，**不等于**合规认证：键盘走查、真实辅助技术（NVDA / 讲述人）与真实用户测试仍需人工进行。
+
+**几条硬约定**（改样式时别踩）：
+
+- **填充色与文字色分开**：`--danger` / `--success` / `--accent-blue` 是**填充色**（铺底、描边、承载白字）；当文字用必须换成 `--text-danger` / `--text-success` / `--text-link`。同一个色值在浅色主题上当文字必然失守（`#2f7fe0` 在 `#eef0f3` 上只有 3.51:1）。
+- **弱化文字 `--text-3` 已按最深 / 最浅底色验算**：深色 `#a0a0a0`（最差 4.69:1）、浅色 `#5f646c`（最差 4.72:1）。再调浅 / 调深就会跌破 4.5。
+- **渐变背景的对比度按每个色标算**，不能只看 `background-color`——渐变元素的 `backgroundColor` 是透明的，只回溯父级会把「浅底深字」误判成「深底深字」。
+- **窄任务窗格（320px）单列**是硬要求，不允许靠缩小字号或点击区塞下桌面布局。
+
+---
+
 <a id="sec-2b"></a>
 
 ## 🖼️ 界面预览
@@ -117,7 +146,7 @@
 
 ## 📂 目录结构
 
-以下为发布包 **`My-Bangumi-Database-for-WPS-v2.1.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
+以下为发布包 **`My-Bangumi-Database-for-WPS-v2.2.5.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
 
 ```
 My-Bangumi-Database-for-WPS-v2.1.0/
@@ -171,7 +200,7 @@ My-Bangumi-Database-for-WPS-v2.1.0/
     └── highlight.html          # 番剧高亮
 ```
 
-> 本仓库包含上述**发布产物**、**`ts/` TypeScript 源码**、`README.md`、`LICENSE` 与 `CONTRIBUTING.md`；**不包含** `tests/`、`scripts/`、构建配置（`package.json` / `tsconfig*` / `vite.config`）与测试环境，因此无法直接在仓库内执行 `npm install` 与构建。下文「开发者环境搭建 / 开发调试 / 质量门禁」描述的是维护者完整源码工作区的流程。
+> 上述结构是 **`publish` 分支 / 发布 zip** 的内容。默认分支 **`main`** 是完整源码工作区，在上面之外还含 `tests/`、`scripts/`、`package.json` 与 `tsconfig*` / `vite.config`，`git clone` 后 `npm install` 即可跑 `npm run gate` / `npm run build`。
 
 <details>
 <summary>📂 ts/ 源码结构（供查阅）</summary>
@@ -209,7 +238,7 @@ ts/
 
 ## 📥 开发者环境搭建（仅开发需要）
 
-> 这是**开发插件本身**的步骤，需在维护者的完整源码工作区执行（本仓库提供 `ts/` 源码，但缺少 `package.json`、`tsconfig*`、`vite.config` 等构建配置，直接克隆后 `npm install` 会失败）。普通使用者安装插件请看下一节 [安装到 WPS 使用环境](#sec-5b)，无需 Node / 构建。
+> 这是**开发插件本身**的步骤，需在默认分支 `main` 上执行（`publish` 分支只有发布文件，缺 `package.json` 与构建配置，在那里 `npm install` 会失败）。普通使用者安装插件请看下一节 [安装到 WPS 使用环境](#sec-5b)，无需 Node / 构建。
 
 ```bash
 # 1. 克隆仓库
@@ -536,7 +565,7 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
 ## 🧪 测试
 
 ```bash
-npm run gate             # 质量门禁（八关，推荐；提交前必跑）
+npm run gate             # 质量门禁（十三关，推荐；提交前必跑）
 npm test                 # 运行全部单元测试（Vitest）
 npm run test:watch       # 监视模式
 npm run test:coverage    # 生成覆盖率报告
@@ -554,7 +583,7 @@ npm run audit:layout           # 全页面布局审计（改了 css/ 或页面�
 **且失败输出里出现预期片段**（脚本崩了退出码同样非 0），最后逐字节还原。
 **新增源码级断言时必须同时在它的 `CASES` 里补一个变异用例**，否则那条断言只是「看起来在守门」。
 
-`npm run check:shard-layout` 同样**不在 `gate` 内**（依赖本机 Chrome / Edge）：八道关都是源码断言或
+`npm run check:shard-layout` 同样**不在 `gate` 内**（依赖本机 Chrome / Edge）：十三道关都是源码断言或
 单元测试，**没有一道能发现样式错位** —— CSS 没有类型系统，jsdom 也不做布局计算。这道门禁用
 headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局宽度下量**真实计算样式**，
 断言「每个分片标签的文字只占 1 行、标签高 ≤ 40px、复选框 ≤ 20px」。
@@ -565,7 +594,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 （详见 [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md) v3.12）。判据 2 是启发式，命中项需人工确认；
 命令支持 `--json` / `--widths 360,500` / 指定单个页面。
 
-当前基线：**5120 条测试 / 169 文件**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
+当前基线：**5369 条测试 / 178 文件**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
 
 > **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
 > 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
@@ -659,12 +688,18 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ---
 
-## 🔗 关联仓库
+<a id="sec-13b"></a>
 
-| 仓库                                                                                   | 说明                                                  |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| [My-Bangumi-Database-for-WPS](https://github.com/awujiana/My-Bangumi-Database-for-WPS) | 本仓库：WPS 加载项（代码）                            |
-| [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) | 数据源仓库：Bangumi 动画存档 JSONL 分片与每周差异摘要 |
+## 🙏 参考与致谢
+
+- [Bangumi 番组计划](https://bgm.tv/)：数据与 API 提供方；本地存档数据来自 [bangumi/Archive](https://github.com/bangumi/Archive) 每周 dump。
+- [WPS Office JS 加载项](https://open.wps.cn/)：宿主与调试工具链（`wpsjs`）。
+- [TypeScript](https://www.typescriptlang.org/) / [Vite](https://vitejs.dev/) / [Vitest](https://vitest.dev/) / [DOMPurify](https://github.com/cure53/DOMPurify)：构建、测试与 HTML 清洗。
+- 界面规范参考 Jakob Nielsen《10 Usability Heuristics》、Adam Wathan & Steve Schoger《Refactoring UI》与 [WCAG 2.2](https://www.w3.org/TR/WCAG22/)。
+
+---
+
+<a id="sec-13c"></a>
 
 ## 💙 赞赏支持
 
@@ -675,6 +710,17 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 </p>
 
 <p align="center">微信扫一扫 · 赞赏作者</p>
+
+> **赞赏完全自愿**，不影响任何功能的使用，也不提供额外或优先的技术支持。不赞赏同样可以用全部功能。
+
+---
+
+## 🔗 关联仓库
+
+| 仓库                                                                                   | 说明                                                  |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [My-Bangumi-Database-for-WPS](https://github.com/awujiana/My-Bangumi-Database-for-WPS) | 本仓库：WPS 加载项（代码）                            |
+| [Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) | 数据源仓库：Bangumi 动画存档 JSONL 分片与每周差异摘要 |
 
 ## 👤 作者联系方式
 

@@ -498,6 +498,12 @@ body {
 .form-row > label:has(> input[type='radio']) {
     flex: 1 1 auto;
     min-width: 0;
+    /* WCAG 2.2 AA 2.5.8：整行 label 就是复选框的实际点击区，
+       实测只有 19~20px 高（13px 复选框被行高决定）→ 撑到 24px。 */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
 }
 
 /* 同一处的第二个成因：这些复选框/单选框会被 panel-theme.css 的
@@ -865,7 +871,7 @@ select.input {
 }
 
 .radio-label input:checked + .radio-text {
-    color: var(--accent-blue);
+    color: var(--text-link);
 }
 
 .radio-label input:checked {
@@ -1698,7 +1704,7 @@ select.input {
 }
 
 .preview-box .preview-header-row .preview-row-num {
-    color: var(--accent-blue);
+    color: var(--text-link);
     font-weight: bold;
 }
 
@@ -1722,7 +1728,7 @@ select.input {
 }
 
 .preview-box .preview-header {
-    color: var(--accent-blue);
+    color: var(--text-link);
     font-weight: 600;
     font-size: 11px;
 }
@@ -1859,7 +1865,7 @@ select.input {
     border: 1px solid #444;
 }
 
-.status-badge.type-1 { background: rgba(74,158,255,0.15); color: var(--accent-blue); border-color: rgba(74,158,255,0.3); }
+.status-badge.type-1 { background: rgba(74,158,255,0.15); color: var(--text-link); border-color: rgba(74,158,255,0.3); }
 .status-badge.type-2 { background: rgba(74,222,128,0.12); color: #4ade80; border-color: rgba(74,222,128,0.25); }
 .status-badge.type-3 { background: rgba(168,85,247,0.15); color: #a855f7; border-color: rgba(168,85,247,0.3); }
 .status-badge.type-4 { background: rgba(255,193,7,0.15); color: #ffc107; border-color: rgba(255,193,7,0.3); }
@@ -1941,7 +1947,7 @@ select.input {
     padding: 1px 6px;
     border-radius: 4px;
     background: rgba(74,158,255,0.15);
-    color: var(--accent-blue);
+    color: var(--text-link);
     font-size: 10px;
     font-weight: 600;
     flex-shrink: 0;
@@ -2038,7 +2044,7 @@ select.input {
 }
 
 .detail-value.url {
-    color: var(--accent-blue);
+    color: var(--text-link);
     font-size: 12px;
 }
 
@@ -2074,7 +2080,7 @@ select.input {
     border-radius: 6px;
     font-size: 10px;
     background: rgba(74,158,255,0.1);
-    color: var(--accent-blue);
+    color: var(--text-link);
     border: 1px solid rgba(74,158,255,0.2);
 }
 
@@ -2454,7 +2460,7 @@ select.input {
 
 .bgm-progress__log-label {
     font-size: 12px;
-    color: var(--subtext1, #bac2de);
+    color: var(--text-2);
     margin-bottom: 4px;
 }
 
@@ -3604,7 +3610,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-preview-notice.notice-info {
     background: rgba(74, 158, 255, 0.1);
     border: 1px solid rgba(74, 158, 255, 0.3);
-    color: var(--accent-blue);
+    color: var(--text-link);
 }
 
 .bgm-preview-notice .notice-icon {
@@ -3696,7 +3702,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-preview-suggestions p {
     margin: 0 0 6px 0;
     font-size: 12px;
-    color: var(--subtext1, #bac2de);
+    color: var(--text-2);
     line-height: 1.6;
 }
 
@@ -3785,7 +3791,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     gap: 4px 10px;
     justify-content: center;
     font-size: 11px;
-    color: var(--subtext1, #bac2de);
+    color: var(--text-2);
     max-width: 160px;
 }
 
@@ -3819,7 +3825,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 }
 
 .bgm-bar-label {
-    color: var(--subtext1, #bac2de);
+    color: var(--text-2);
     white-space: nowrap;
 }
 
@@ -4053,7 +4059,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     padding: 3px 10px;
     background: var(--surface1, #45475a);
     border-radius: 12px;
-    color: var(--subtext1, #bac2de);
+    color: var(--text-2);
     white-space: nowrap;
 }
 
@@ -4113,6 +4119,13 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .mod-collapse-btn {
     /* 模块 <h3> 是 flex 容器：float 会被忽略，靠 auto 外边距把它送到最右（标题右上角） */
     margin-left: auto;
+    /* WCAG 2.2 AA 2.5.8：实测 24x20（12px 字 × 1.5 行高 + 2px 描边），
+       高度差 4px；且右侧紧邻 .mod-solo-btn，间距例外也不成立 → 撑到 24x24。 */
+    min-width: 24px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0 6px;
     font-size: 12px;
     line-height: 1.5;
@@ -4137,6 +4150,12 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 /* 与折叠按钮同规格同位置（紧跟其后），不另起一套视觉：两个按钮是一组操作。
    注入而非写进 HTML 的理由见 module-state.ts 的 injectSoloButtons 注释。 */
 .mod-solo-btn {
+    /* 与 .mod-collapse-btn 同规格同位置，尺寸要求同源（WCAG 2.2 AA 2.5.8）。 */
+    min-width: 24px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0 6px;
     font-size: 12px;
     line-height: 1.5;
@@ -4159,7 +4178,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 
 /* 正处于专注模式的模块：按钮高亮，让用户知道「现在只剩它」 */
 .mod-solo-btn.is-active {
-    color: var(--accent-blue);
+    color: var(--text-link);
     border-color: var(--accent-blue);
 }
 

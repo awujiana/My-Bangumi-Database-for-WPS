@@ -67,6 +67,8 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  /* WCAG 2.2 AA 2.5.8：整行 label 就是复选框点击区，实测只有 22px 高 → 撑到 24px。 */
+  min-height: 24px;
   margin-top: var(--sp-4);
   color: var(--text-1);
   font-size: var(--fs-body);

@@ -1333,7 +1333,7 @@ function renderBatchSummary() {
       <span style="color:#a6e3a1;">✅ ${String(successCount)} 成功</span>
       ${failCount > 0 ? `<span style="color:#f38ba8;">❌ ${String(failCount)} 失败</span>` : ''}
     </div>
-    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:#bac2de;">
+    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--text-2);">
       <span>匹配总数 <b style="color:#a6e3a1;">${String(totalMatched)}</b></span>
       <span>已更新 <b style="color:#89b4fa;">${String(totalUpdated)}</b></span>
       <span>未匹配 <b style="color:#f9e2af;">${String(totalUnmatched)}</b></span>
