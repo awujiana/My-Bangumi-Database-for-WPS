@@ -26,7 +26,7 @@
 | `wps-addon-build/`                                                 | `wpsjs build --exe` 产物（exe）                                                                            | ❌ 由发布流程上传 Release |
 | `tests/`                                                           | Vitest 单元测试                                                                                            | ✅                        |
 | `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）                                  | ✅                        |
-| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档                                                                       | ✅                        |
+| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（**只在维护者本地工作区，未跟踪、不分发**）                           | ❌                        |
 | `node_modules/`、`release/`、`.workbuddy-ai/`                      | 依赖、发布暂存、内部工作数据                                                                               | ❌                        |
 
 > 上级目录 `Excel加载项/BGM/` 还放着 `publish.mjs`、`release-notes-v*.md`、`发布流程.md`，**不属于本仓库**。

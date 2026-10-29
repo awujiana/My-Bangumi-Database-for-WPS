@@ -308,7 +308,7 @@ npm run debug
    3. 可选：编辑同目录的 `publish.xml`，删掉指向该目录的 `<jsplugin .../>` 那一行（只删这一行）。
 
    > ⚠️ 不要删除整个 `jsaddons` 文件夹，也不要删掉 `publish.xml` 本身 —— 里面可能还有其它加载项的注册信息，删了会一起失效。
-   > 卸载只移除插件文件，**表格里的数据与 `%APPDATA%` 下其它 WPS 配置不受影响**；插件配置（Token、偏好）随 `PluginStorage` 保存在文档/宿主侧，重装后通常仍在。
+   > 卸载只移除插件文件，**表格里的数据与 `%APPDATA%` 下其它 WPS 配置不受影响**；插件配置（Token、偏好）随 `PluginStorage` 保存在文档与宿主侧，重装后通常仍在。
 
 4. **启用**：关闭并重新打开 WPS 表格。首次出现「Bangumi同步」选项卡时会请求允许，允许后约半分钟加载完成（可在 WPS「应用中心 / 加载项」里管理启用 / 禁用）。
 
@@ -533,7 +533,7 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
 3. 点击 **立即同步**（或功能区 **数据同步**）。插件下载 JSONL → 哈希比对缓存 → 按 SID 增量写入 Excel。
 4. 可用 **撤销同步** 回滚上一次操作；**清缓存** 强制重新下载。
 
-> 数据源格式、缓存机制与 5 种策略详见 [`文档/github-data-distribution.md`](文档/github-data-distribution.md)。
+> 数据源格式、清单字段与选片规则见[数据仓库 README](https://github.com/awujiana/Bangumi-Archive-Anime-Excel)。
 
 ### 4. 新番表富化
 
@@ -591,13 +591,13 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 `npm run audit:layout` 把同一套思路推广到**全部 5 个页面**：按「原生 checkbox/radio 渲染尺寸 > 20px」
 「短文本（≤ 24 字）却占多行」「内容横向溢出」三条客观判据找错位，一次就抓到 3 处与分片**同源**的 bug
-（详见 [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md) v3.12）。判据 2 是启发式，命中项需人工确认；
+（详见 [`CHANGELOG.md`](CHANGELOG.md) 里对应的修复记录）。判据 2 是启发式，命中项需人工确认；
 命令支持 `--json` / `--widths 360,500` / 指定单个页面。
 
-当前基线：**5369 条测试 / 178 文件**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
+当前基线：**5369 条测试 / 178 文件**。
 
 > **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
-> 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
+> 这部分只能真机逐项过：装上 WPS 后按「使用示例」一节把六条主流程走一遍，重点看长表格滚动、网络中断重试、多账号切换与更新安装。
 
 ---
 
@@ -633,7 +633,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 - **模块解耦 / 循环依赖治理**：避免 `ts/` 模块间的循环依赖（参见提交「循环依赖治理与模块解耦完成」）。
 - **面板命名**：统一 `taskpane` → `panel` 命名，页面逻辑文件使用 `Page` 后缀（`ts/panel/`）。
-- **事件分发**：UI 通过 `data-action` 属性 + 统一 `handleActionClick(action, event)` 路由（见 `ts/ui/handlers/` 与 [`文档/ui-and-interaction.md`](文档/ui-and-interaction.md)）。
+- **事件分发**：UI 通过 `data-action` 属性 + 统一 `handleActionClick(action, event)` 路由（见 `ts/ui/handlers/`）。
 - **持久化**：配置经 `PluginStorage` 存储（`bgm_token` / `github_config` / `bgm_incremental_sync` / `bgm_theme` / `bgm_list_type` / `bgm_time_filter` / `bgm_refresh_interval` / `bgm_nav_icons_only` 等键）。
 - **数据校验**：外部数据经 `ts/schemas/` 下的 zod schema 校验，再写入 Excel。
 
@@ -648,9 +648,17 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ## 📚 文档索引
 
-- [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)：项目操作文档 —— 每个按钮 / 面板 / 模态框的操作流程与边界。
+仓库内可直接读的文档：
 
-> 测试与质量：运行 `npm run gate`（详见「测试」一节）；测试文件位于 `tests/`，不在此逐条列出。
+| 文档                                 | 内容                                                               |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| [`README.md`](README.md)             | 安装 / 更新 / 使用示例 / 构建打包 / 配置备份（本文）               |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 开发流程、提交规范、质量门禁、**命名规范（不缩写）**               |
+| [`AGENTS.md`](AGENTS.md)             | 给 AI agent 的项目约定与禁忌（核心不变量 / 技术禁令 / 改动前检查） |
+| [`CHANGELOG.md`](CHANGELOG.md)       | 按版本累积的变更记录（含每处修复的成因与实测数据）                 |
+
+> 测试与质量：运行 `npm run gate`（详见「测试」一节）；测试文件位于 `tests/`，不逐条索引。
+> 架构说明与逐按钮的用户手册**不随仓库分发**，相关内容分散在本 README 的「目录结构」「使用示例」「配置备份与更新安全」三节。
 
 ---
 
@@ -673,7 +681,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/anime.manifest.json`（分片清单），再按表头选择需要的分片（`anime.base.jsonlines.gz` 等）下载。数据来自 Bangumi 官方 Archive 每周 dump，经处理后按字段分片、gzip 压缩下发，插件端免 Token 即可同步。
 
-> 分片格式、清单字段与选片规则见数据仓库 README 与 [`文档/github-data-distribution.md`](文档/github-data-distribution.md)。
+> 分片格式、清单字段与选片规则见[数据仓库 README](https://github.com/awujiana/Bangumi-Archive-Anime-Excel)。
 
 ---
 

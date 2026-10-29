@@ -289,9 +289,11 @@ npm run test:coverage
 ## 文档与截图
 
 - 行为/交互变更需同步更新：
-  - `README.md`（用户可见能力、安装与网络说明）
-  - `文档/USER_OPERATIONS.md`（按钮、面板、弹窗的操作流程与边界）
-  - 涉及架构调整时更新 `文档/ARCHITECTURE.md`
+  - `README.md`（用户可见能力、安装与网络说明）—— **随仓库分发**
+  - `AGENTS.md`（AI 协作约定与核心不变量）—— **随仓库分发**
+  - `CHANGELOG.md`（每处修复的成因与实测数据）—— **随仓库分发**
+  - `文档/USER_OPERATIONS.md`、`文档/ARCHITECTURE.md` —— 只在**维护者本地工作区**，
+    不随仓库分发（README 因此不链它们）；改这两个文件不必进发布分支。
 - README 截图存放于 `images/`，使用 `screenshot-*.png` 命名；新增截图请同时更新「界面预览」小节。
 - 文档中的相对链接必须能在 GitHub 上直接打开。
 
