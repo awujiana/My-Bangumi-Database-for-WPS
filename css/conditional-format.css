@@ -1223,9 +1223,10 @@
   min-width: 72px;
 }
 
-/* 组标题批量三件套（规则管理器：组内全选 / 导出 / 删除）——与 edit/remove 同款尺寸 */
+/* 组标题批量按钮（规则管理器：组内全选 / 导出 / 锚定列 / 锚定行 / 删除）——与 edit/remove 同款尺寸 */
 .conditional-format-group-pick,
 .conditional-format-group-export,
+.conditional-format-group-anchor,
 .conditional-format-group-delete {
   flex: 0 0 auto;
   width: 20px;
@@ -1242,6 +1243,7 @@
 
 .conditional-format-group-pick:hover,
 .conditional-format-group-export:hover,
+.conditional-format-group-anchor:hover,
 .conditional-format-group-delete:hover {
   background: var(--bg-surface-2);
   color: var(--text-1);

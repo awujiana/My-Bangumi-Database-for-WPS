@@ -298,6 +298,12 @@ export function buildForeignRuleHeadHtml(isAllSelected = false) {
  * ✕ 解散（映射清除，规则回「未分组」）——只靠「先勾行再找批量条」的归组
  * 入口不符合「看到组标题就能改组名」的心智（2026-10-24 用户实测反馈）。
  *
+ * 「列 / 行」是**锚定**：把本组规则的应用范围钉成整列 `$J:$J` / 整行 `$5:$5`，
+ * 之后增删行列时由 `repairAnchors` 改回来。它只对**工作表上的既有规则**有意义
+ * （锚定表按「公式@范围」索引快照，且锚定后立刻写回工作表），所以必须长在这里 ——
+ * 2026-10-29 之前这两个按钮错挂在「我的规则」分组标题上，而点击委托绑在既有规则
+ * 面板，结果「我的规则」里点了没反应、既有规则里反而找不到入口。
+ *
  * @param groups snapshotGroupKey → 组名（页面层从 PluginStorage 读出）
  * @param collapsed 被收起的分组名集合（会话态）
  */
@@ -332,6 +338,8 @@ export function buildForeignRuleGroupsHtml(rows, groups, collapsed) {
           <button type="button" class="conditional-format-group-remove" data-action="dissolve-existing-group" title="解散分组（规则回「未分组」，不从工作表删除）">✕</button>
           <button type="button" class="conditional-format-group-pick" data-action="pick-existing-group" title="全选 / 取消本组">☑</button>
           <button type="button" class="conditional-format-group-export" data-action="export-existing-group" title="导出本组规则为 JSON（选保存位置）">📤</button>
+          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组为整列（$J:$J）：公式不变，增删行不再影响">列</button>
+          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group-rows" data-group="${escapeHtml(group)}" title="锚定本组为整行（$5:$5）：公式不变，增删列不再影响">行</button>
           <button type="button" class="conditional-format-group-delete" data-action="delete-existing-group" title="从工作表删除本组全部规则">🗑</button>
         </div>
         ${groupRows.map((row) => buildForeignRuleRowHtml(row)).join('')}

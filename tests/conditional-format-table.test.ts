@@ -428,6 +428,18 @@ describe('buildForeignRuleGroupsHtml', () => {
     expect(html).toContain('<span class="conditional-format-group-count">1</span>')
   })
 
+  it('组标题带「列 / 行」锚定按钮，data-group 与组名一致（事件委托按它找组）', () => {
+    const { rows, groups } = groupFixtures()
+    const html = buildForeignRuleGroupsHtml(rows, groups, new Set())
+
+    // 两个轴各一个，且都挂在有 data-group 的容器里
+    expect(html.match(/data-action="anchor-existing-group"/gu)).toHaveLength(2)
+    expect(html).toContain('data-action="anchor-existing-group-rows"')
+    // 委托里用 closest('[data-group]').dataset.group 取组名 → 按钮自己也得带，
+    // 否则只会拿到外层容器的值（这里两层一致，但独立带更抗重构）
+    expect(html).toContain('data-action="anchor-existing-group" data-group="=$J2=&quot;*&quot;"')
+  })
+
   it('收起契约：collapsed 里的组输出 is-collapsed + ▸ + aria-expanded=false', () => {
     const { rows, groups } = groupFixtures()
     const html = buildForeignRuleGroupsHtml(rows, groups, new Set(['=$J2="*"']))
@@ -456,8 +468,10 @@ describe('buildForeignRuleGroupsHtml', () => {
     ])
     const html = buildForeignRuleGroupsHtml(rows, {}, new Set())
     expect(html.indexOf('未分组')).toBeGreaterThan(-1)
-    // 两条都没归组 → 只有一个「未分组」组，且在文档中唯一
-    expect(html.match(/data-group="未分组"/g)).toHaveLength(1)
+    // 两条都没归组 → 只有一个「未分组」组，且在文档中唯一。
+    // 只数**组容器**（`data-group="…">`）：组标题里的「列 / 行」按钮也带
+    // data-group，按 data-group 裸数会把按钮算进去（3 个）
+    expect(html.match(/data-group="未分组">/gu)).toHaveLength(1)
   })
 
   it('组名转义：公式模式串含引号也不破 attribute', () => {

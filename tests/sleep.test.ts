@@ -146,7 +146,9 @@ describe('delay', () => {
     const start = Date.now()
     await delay(0)
     const elapsed = Date.now() - start
-    // 0ms 可能几乎立即完成，但 setTimeout 最小约 4ms
-    expect(elapsed).toBeLessThanOrEqual(50)
+    // 0ms 可能几乎立即完成，但 setTimeout 最小约 4ms。
+    // 上界只用来防「把 0 当成 1000 用」：并行全量下 177 个 worker 抢事件循环，
+    // 实测能到 52ms，卡 50 会假失败（单跑该文件必过）。
+    expect(elapsed).toBeLessThan(250)
   })
 })

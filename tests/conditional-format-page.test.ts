@@ -37,7 +37,8 @@ const m = vi.hoisted(() => ({
   showInput: vi.fn<(...arguments_: unknown[]) => void>(),
   // tools/config.js
   getConfig: vi.fn<(key: string, fallback?: string, isGlobal?: boolean) => string>(),
-  setConfig: vi.fn<(key: string, value: string, isGlobal?: boolean) => void>(),
+  // 真实签名是 (key, value) => boolean（锚定靠返回值判「保存失败」）
+  setConfig: vi.fn<(key: string, value: string) => boolean>(),
   // 默认导出位置（save-file 流程用；测试不关心位置，返回空 = 用对话框默认目录）
   getExportPath: vi.fn<() => string>(),
   setExportPath: vi.fn<(path: string) => boolean>(),
@@ -251,7 +252,7 @@ beforeEach(() => {
   loadPageSkeleton()
   // 默认 mock：空工作表列表 + 空规则库（各用例按需覆盖）
   m.getConfig.mockReturnValue('')
-  m.setConfig.mockReturnValue(undefined)
+  m.setConfig.mockReturnValue(true)
   m.collectSheets.mockReturnValue([])
   m.activeWorksheet.mockReturnValue(null)
   m.checkFormatConditionsReadable.mockReturnValue(null)
@@ -678,9 +679,9 @@ describe('导入通道（工作表规则 / 文件 / 文本）', () => {
     // input.files 是只读的（jsdom 也一样）→ 只能重定义属性
     Object.defineProperty(input, 'files', { configurable: true, value: [file] })
     input.dispatchEvent(new Event('change', { bubbles: true }))
-    // FileReader 是异步的：等它 load
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 20)
+    // FileReader 是异步的。固定 sleep 20ms 在并行全量下会被挤到之后（实测写出 0 条）→ 等它真写库
+    await vi.waitFor(() => {
+      expect(writtenRuleIds().at(-1) ?? []).toHaveLength(4)
     })
 
     const ids = writtenRuleIds().at(-1) ?? []
@@ -1707,5 +1708,119 @@ describe('应用条件格式：默认增量、不清除既有规则', () => {
       expect.stringContaining('2 条规则没写进工作表：当前季 / 春季'),
       'error',
     )
+  })
+})
+
+// ========== 工作表规则分组锚定（列 / 行）==========
+
+/** 工作表规则表里某组的锚定按钮（组名 / action 都走 CSS.escape） */
+const anchorButton = (group: string, action: string): HTMLButtonElement =>
+  document.querySelector<HTMLButtonElement>(
+    `#conditionalFormatExistingList [data-group="${CSS.escape(group)}"] [data-action="${CSS.escape(action)}"]`,
+  )!
+
+describe('工作表规则分组锚定', () => {
+  /** 前两条归「甲组」，第三条留「未分组」 */
+  const ANCHOR_SNAPSHOTS = [
+    {
+      range: 'B2:B9',
+      formula: '=$B2="x"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#00B050',
+    },
+    {
+      range: 'C2:C9',
+      formula: '=$C2="y"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#FF0000',
+    },
+    {
+      range: 'D2:D9',
+      formula: '=$D2="z"',
+      kind: 'expression' as const,
+      type: 2,
+      interior: '#0000FF',
+    },
+  ]
+
+  function mockAnchorable(): void {
+    // 规则库也要非空（RULES 有两条分组）：否则「我的规则」表没有分组标题，
+    // 「锚定按钮不该长在这里」那条断言就是空转的（永远为 null 也通过）
+    m.getConfig.mockImplementation((key: string) => {
+      if (key === 'conditionalFormat.rules.v1') return serializeRules(RULES)
+      if (key === 'conditionalFormat.sheet.v1') return SHEET_ENTRY.key
+      if (key === 'conditionalFormat.existingGroups.v1') {
+        return JSON.stringify({
+          [importGroupKey('=$B2="x"', 'B2:B9')]: '甲组',
+          [importGroupKey('=$C2="y"', 'C2:C9')]: '甲组',
+        })
+      }
+      return ''
+    })
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    m.readForeignRules.mockReturnValue(ANCHOR_SNAPSHOTS)
+  }
+
+  it('「列 / 行」长在工作表规则的分组标题里，「我的规则」里不再有', async () => {
+    mockAnchorable()
+    await openPage()
+
+    const existing = document.getElementById('conditionalFormatExistingList')!
+    expect(existing.querySelector('[data-action="anchor-existing-group"]')).not.toBeNull()
+    expect(existing.querySelector('[data-action="anchor-existing-group-rows"]')).not.toBeNull()
+
+    // 2026-10-29 之前这两个按钮错挂在「我的规则」分组标题上，而点击委托绑在
+    // 既有规则面板 → 「我的规则」里点了没反应。这条锁死「只长在既有规则里」。
+    const library = document.getElementById('conditionalFormatRuleList')!
+    expect(library.querySelector('[data-action="anchor-existing-group"]')).toBeNull()
+    expect(library.querySelector('[data-action="anchor-existing-group-rows"]')).toBeNull()
+  })
+
+  it('点「列」→ 只改本组范围成整列，立刻写回工作表并落盘', async () => {
+    mockAnchorable()
+    await openPage()
+    m.setForeignAppliesTo.mockClear()
+
+    anchorButton('甲组', 'anchor-existing-group').click()
+
+    // 甲组两条（1 基索引 1、2）；未分组的第 3 条不被动
+    expect(m.setForeignAppliesTo.mock.calls).toEqual([
+      [SHEET_ENTRY.worksheet, 1, '$B:$B'],
+      [SHEET_ENTRY.worksheet, 2, '$C:$C'],
+    ])
+    const anchorsCall = m.setConfig.mock.calls.find(
+      ([key]) => key === 'conditionalFormat.anchors.v1',
+    )
+    expect(anchorsCall).toBeDefined()
+    expect(String(anchorsCall?.[1])).toContain('$B:$B')
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已锚定 2 条规则'), 'success')
+  })
+
+  it('点「行」→ 本组范围改成整行（公式不变）', async () => {
+    mockAnchorable()
+    await openPage()
+    m.setForeignAppliesTo.mockClear()
+
+    anchorButton('甲组', 'anchor-existing-group-rows').click()
+
+    expect(m.setForeignAppliesTo.mock.calls).toEqual([
+      [SHEET_ENTRY.worksheet, 1, '$2:$9'],
+      [SHEET_ENTRY.worksheet, 2, '$2:$9'],
+    ])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('应用范围改为整行'), 'success')
+  })
+
+  it('「未分组」组的锚定也生效（映射缺失按未分组算，不能静默 0 条）', async () => {
+    mockAnchorable()
+    await openPage()
+    m.setForeignAppliesTo.mockClear()
+
+    anchorButton('未分组', 'anchor-existing-group').click()
+
+    // 用映射原值直接比「未分组」永远不相等 → 这里必须仍然命中第 3 条
+    expect(m.setForeignAppliesTo.mock.calls).toEqual([[SHEET_ENTRY.worksheet, 3, '$D:$D']])
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已锚定 1 条规则'), 'success')
   })
 })

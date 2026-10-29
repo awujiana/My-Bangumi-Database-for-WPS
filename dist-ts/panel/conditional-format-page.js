@@ -939,7 +939,10 @@ function anchorExistingGroup(group, axis = 'column') {
     const immuneLabel = axis === 'row' ? '列' : '行';
     let count = 0;
     for (const [index, snapshot] of state.existing.entries()) {
-        const isInGroup = state.existingGroups[snapshotGroupKey(snapshot)] === group;
+        // 与渲染同口径（映射缺失 = 未分组）：直接拿映射值比「未分组」永远不相等，
+        // 未分组那一组的锚定按钮会静默失效（count 恒 0，只弹「没有可锚定的规则」）
+        const ruleGroup = state.existingGroups[snapshotGroupKey(snapshot)] ?? UNGROUPED_LABEL;
+        const isInGroup = ruleGroup === group;
         const wholeAxisRange = isInGroup && snapshot.formula !== '' && snapshot.range !== ''
             ? toWholeAxis(snapshot.range)
             : null;
@@ -2224,8 +2227,6 @@ function renderRuleList() {
             <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="全选 / 取消本组">☑</button>
             <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="删除本组全部规则">🗑</button>
             <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="导出本组所选规则">📤</button>
-            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组为整列（$J:$J）：公式不变，增删行不再影响">列</button>
-            <button type="button" class="conditional-format-group-action" data-action="anchor-existing-group-rows" data-group="${escapeHtml(group)}" title="锚定本组为整行（$5:$5）：公式不变，增删列不再影响">行</button>
           </span>
         </div>
         ${rows}
