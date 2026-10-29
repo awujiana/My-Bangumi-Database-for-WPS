@@ -4,13 +4,45 @@
  * 设计要点：
  * 1. 二维码必须带**纯白静区（quiet zone）**，否则在深色页面上扫码识别率会下降；
  * 2. 卡片宽度收窄到 520px，窄任务窗格（320px）下自动堆叠；
- * 3. 颜色全部走 tokens.css 变量，深浅主题自动适配。
+ * 3. 颜色全部走 tokens.css 变量，深浅主题自动适配；
+ * 4. 联系方式一律**单列 + 值不省略**：邮箱 / QQ 群号这类长串没有空格，
+ *    两列布局下 1fr 的 min-content 会把网格顶宽、右侧被裁（2026-10-29 修复）。
  */
 
-.donate-main {
+/* ---------- 页面外壳 ---------- */
+/* 赞赏页**没有侧栏**，而 panel-theme.css 的窄屏栅格是
+ *   grid-template-areas: 'topbar' 'sidebar' 'main'
+ * 三行、中间那行是 `1fr`（见 .global 的 grid-template-rows: auto 1fr）。
+ * 页面里没有 .sidebar 元素，这一行照样占位 —— 它把剩余高度全吃掉，主内容被顶到
+ * 页面最底部：上面一大片空白，卡片从中间才开始，窗格矮一点就整块看不见
+ * （momo 2026-10-29：「赞赏与支持页面，显示不全」）。实测 500×1400 窗格：
+ * 空行 482px、main 的 y=537。
+ *
+ * 这里直接把外壳收成「顶栏 + 主区」两行、单列 —— 卡片自己 max-width:520px 居中，
+ * 宽窗格里也不会再留一条空的侧栏列。
+ * 选择器权重 (0,2,1) 高于 panel-theme 里的 `.global`（0,1,0），且本文件最后加载，
+ * 所以各断点下的三条栅格声明都能盖住。 */
+body[data-page='donate'] .global {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'topbar'
+    'main';
+}
+
+/* ⚠️ 选择器必须带 `body[data-page='donate']`（权重 0,2,1）：panel-theme 在
+   `@media (min-width: 960px)` 里用 `.main:not(.main-grid)`（0,2,0）把主区切成
+   两列栅格，单靠 `.donate-main`（0,1,0）盖不住 —— 实测 1400px 窗格里卡片被塞进
+   第一列、贴左边。 */
+body[data-page='donate'] .donate-main {
+  /* `.main`（panel-theme）是 **flex column**：justify-content 管垂直、align-items
+     管水平，与 row 方向正好相反。原来写的 `justify-content: center` +
+     `align-items: flex-start` 在 column 下等于「垂直居中 + 靠左」—— 短内容时卡片
+     会浮在中间、宽窗格里贴在左边。这里显式声明 column 语义：水平居中、垂直贴顶。 */
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   padding: clamp(16px, 2vw, 28px);
 }
 
@@ -82,7 +114,9 @@
 .donate-qr img {
   display: block;
   width: 240px;
-  max-width: 100%;
+  /* 静区用 padding 撑开（content-box），所以 100% 会再多出 12×2 + 1×2 = 26px
+     → 窄窗格里图片右侧被裁。留出这 26px 才能保证整张码都在卡片内。 */
+  max-width: calc(100% - 26px);
   height: auto;
   /* 静区：二维码四周留白，扫码器需要 */
   padding: 12px;
@@ -100,17 +134,14 @@
 }
 
 /* ---------- 联系方式 ---------- */
+/* 单列常驻：三项（GitHub / 邮箱 / QQ 群）挤两列时，`1fr` 的 min-content 会被
+   不换行的邮箱撑开 → 整块横向溢出、右侧被裁掉（momo：「邮箱显示不全」）。
+   单列后每项独占一行，窄到 300px 的窗格也不会截断。 */
 .donate-links {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
-}
-
-@media (min-width: 460px) {
-  .donate-links {
-    grid-template-columns: 1fr 1fr;
-  }
+  margin-bottom: var(--sp-2);
 }
 
 .donate-link {
@@ -118,6 +149,7 @@
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
+  min-width: 0;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md);
   background: var(--bg-surface);
@@ -152,6 +184,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -160,12 +193,20 @@
   font-weight: 600;
 }
 
+/* 值这一行**绝不省略**：邮箱 / 群号被省略号吃掉就等于没给。
+   宽度不够时按 `anywhere` 断行（长串没有空格，`break-word` 断不开）。 */
 .donate-link-text span {
   font-size: var(--fs-sm);
   color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 「点击复制」从三项里抽出来说一次，避免每行都拖一条尾巴把宽度吃掉 */
+.donate-hint {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
 }
 
 /* ---------- 结尾 ---------- */
