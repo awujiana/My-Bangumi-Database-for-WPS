@@ -34,10 +34,13 @@
   （深色 `#89b4fa` / `#ff8a80` / `#a6e3a1` / `#f9e2af`，浅色 `#1a5fb4` / `#b3261e` /
   `#1b6b21` / `#8a4b00`），CSS 里 15 处 `color: var(--accent-blue)`、7 处
   `color: var(--red-strong)`、2 处内联同款全部改道。`--danger` 等填充色保持不变。
-- **遗留的 Catppuccin 硬编码**：`styles.css` 有 5 处 `color: var(--subtext1, #bac2de)`，
-  这套调色板写死在 `:root`、不随主题切换，浅色主题下 `#bac2de` 在纯白上只有 **1.77:1**
-  （全站最差）。→ 换主题化 `--text-2`。`ui/enrich.html` 与 `ts/panel/enrich-page.ts`
-  另有 2 处内联 `#bac2de` 一并换掉。
+- **两处内联硬编码 `#bac2de`**：`ui/enrich.html` 与 `ts/panel/enrich-page.ts` 把
+  Catppuccin Mocha 的浅灰直接写进 `style="color:#bac2de"`，不跟主题走 —— 浅色主题下压在
+  纯白上只有 **1.77:1**（全站最差）。→ 换 `var(--text-2)`。
+  顺带把 `styles.css` 里 5 处 `color: var(--subtext1, #bac2de)` 也统一到 `--text-2`：
+  `--subtext1` 本身另有 Latte 映射（浅色 `#5c5f77`）、对比度是达标的，问题在于它属于
+  第二套 token 体系（Catppuccin Mocha/Latte），与 `tokens.css` 的 `--text-1/2/3` 并行存在，
+  同一个语义挂两套变量迟早漂移。
 - **`.tip-num` 序号徽标白字压浅蓝**：`#4a9eff` 上白字 2.75:1（浅色 4.01:1）。
   → 新增 `--accent-blue-deep` / `--accent-blue-deeper`（`#1d6fd0` / `#1857a8`），
   白字对比度 4.96 / 7.08，深浅主题通用。
