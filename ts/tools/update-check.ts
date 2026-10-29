@@ -19,7 +19,7 @@
  */
 
 /** 当前插件版本（与 package.json / manifest.xml 的展示版本保持一致） */
-export const CURRENT_VERSION = '2.2.4'
+export const CURRENT_VERSION = '2.2.5'
 
 /** 更新来源仓库 */
 export const UPDATE_OWNER = 'awujiana'
