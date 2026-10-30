@@ -146,10 +146,10 @@
 
 ## 📂 目录结构
 
-以下为发布包 **`My-Bangumi-Database-for-WPS-v2.2.5.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
+以下为发布包 **`My-Bangumi-Database-for-WPS-v2.3.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
 
 ```
-My-Bangumi-Database-for-WPS-v2.1.0/
+My-Bangumi-Database-for-WPS-v2.3.0/
 ├── index.html                  # 加载项入口（WPS 启动时加载）
 ├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
 ├── manifest.xml                # 加载项清单（ApiVersion / Name）
