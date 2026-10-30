@@ -828,6 +828,12 @@ export function createDetachablePanel(section, options = {}) {
 /**
  * 在区块标题里注入「拖出」按钮
  *
+ * 选择器与 {@link readSectionTitle} 保持一致（`h3, h2, .command-title`）：
+ * 「开始同步」（sec-command）的标题是 `div.command-title` 而不是 `h3`，只认
+ * `h3/h2` 会走 `section.prepend` 分支 —— 按钮变成卡片栅格的**独立一行**，
+ * 浮在标题上方右端，与「开始同步」不在同一水平线（momo 反馈不美观）。
+ * 插进标题元素里才能和标题同一行、靠右对齐。
+ *
  * 没有标题元素时退化为插到区块最前面 —— 有按钮总比没有入口强。
  */
 function injectTrigger(section, title) {
@@ -837,7 +843,7 @@ function injectTrigger(section, title) {
     button.textContent = '⧉';
     button.title = `把「${title}」拖出为浮动窗口（可拖动 / 缩放 / 最大化）`;
     button.setAttribute('aria-label', button.title);
-    const heading = section.querySelector('h3, h2');
+    const heading = section.querySelector('h3, h2, .command-title');
     if (heading)
         heading.append(button);
     else

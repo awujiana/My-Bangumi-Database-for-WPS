@@ -179,6 +179,14 @@
             <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
               🔄 重新读取
             </button>
+            <button
+              type="button"
+              class="bgm-btn small"
+              id="conditionalFormatFitExistingBtn"
+              title="按内容自动分配列宽、行高改为按内容（拖列分隔线可再手调，双击分隔线回到自动）"
+            >
+              📐 自适行列
+            </button>
             <!-- 进入专注模式的入口 = 模块标题的「⛶ 只显示此模块」按钮（module-state
                  运行时注入）；原先这里的「🔍 规则管理器」按钮与之功能重复，已删（该模块现名「工作表规则」）
                  （2026-10-25 momo 反馈）。 -->
@@ -308,6 +316,13 @@
               title="全选 / 取消全部规则（配合删除所选 / 导出所选使用）"
             >
               ☑ 全选
+            </button>
+            <button
+              class="bgm-btn small"
+              id="conditionalFormatFitLibraryBtn"
+              title="按内容自动分配列宽、行高改为按内容（拖列分隔线可再手调，双击分隔线回到自动）"
+            >
+              📐 自适行列
             </button>
           </div>
           <!-- 批量操作条：勾选 N 条时才出现（删除所选 / 导出所选 / 取消选择） -->
@@ -526,6 +541,74 @@
             </div>
             <div
               class="conditional-format-modal-resize"
+              role="separator"
+              aria-label="拖动缩放窗口"
+              title="拖动缩放"
+            ></div>
+          </div>
+        </div>
+
+        <!-- 规则体检：导入前 / 应用前 / 应用后没落地，都走这一个弹窗。
+             列出每条问题规则（含宿主给的真实失败原因），可一键自动修复，
+             也可直接改范围 / 公式，改完点「修复并应用 / 修复并导入」继续。 -->
+        <div
+          class="conditional-format-modal-mask"
+          id="conditionalFormatDoctorMask"
+          style="display: none"
+        >
+          <div
+            class="conditional-format-modal conditional-format-modal--doctor"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="conditionalFormatDoctorTitle"
+          >
+            <h4 id="conditionalFormatDoctorTitle" class="conditional-format-modal-grip">
+              🩺 规则体检<button
+                type="button"
+                class="conditional-format-modal-max"
+                id="conditionalFormatDoctorMax"
+                aria-pressed="false"
+                aria-label="最大化 / 还原「规则体检」"
+                title="最大化 / 还原"
+              >
+                ⛶
+              </button>
+              <button
+                type="button"
+                class="conditional-format-modal-collapse"
+                id="conditionalFormatDoctorCollapse"
+                aria-expanded="true"
+                aria-label="收起 / 展开「规则体检」"
+                title="收起 / 展开"
+              >
+                ▾
+              </button>
+            </h4>
+            <p class="conditional-format-import-hint" id="conditionalFormatDoctorHint"></p>
+            <div id="conditionalFormatDoctorList" class="conditional-format-doctor-list"></div>
+            <div class="conditional-format-modal-actions">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatDoctorFixAll"
+                title="把能自动修的问题一次性修掉（范围去表名前缀、越界收敛、补齐引号、非法颜色兜底）"
+              >
+                🩺 全部自动修复
+              </button>
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatDoctorConfirm"
+              >
+                修复并继续
+              </button>
+              <button type="button" class="bgm-btn small" id="conditionalFormatDoctorCancel">
+                取消
+              </button>
+            </div>
+            <div
+              class="conditional-format-modal-resize"
+              id="conditionalFormatDoctorResize"
               role="separator"
               aria-label="拖动缩放窗口"
               title="拖动缩放"

@@ -657,6 +657,11 @@ function indexOfRule(located, rule) {
     return (located.byFingerprint.get(ruleFingerprintOfRule(rule)) ??
         located.byFormula.get(ruleFormulaKey(rule.formula)));
 }
+/** 记一条写入失败（日志 + 结果里各留一份：日志给用户发我们，结果给用户当场看） */
+function recordFailure(failures, rule, reason) {
+    failures.push({ name: rule.name, range: rule.appliesTo, formula: rule.formula, reason });
+    bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）: ${reason}`);
+}
 /**
  * 执行应用计划
  *
@@ -685,6 +690,12 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             failed: plan.entries.length,
             verified: -1,
             missing: plan.entries.map((entry) => entry.rule.name),
+            failures: plan.entries.map((entry) => ({
+                name: entry.rule.name,
+                range: entry.rule.appliesTo,
+                formula: entry.rule.formula,
+                reason: '当前宿主不支持条件格式 API（FormatConditions.Add 不可用）',
+            })),
         };
     }
     // 1. 仅显式「清空整表」才清空——默认路径一条别人的规则都不碰
@@ -726,6 +737,7 @@ export function applyConditionalFormatPlan(worksheet, plan) {
     // 5. 逐条新增
     let added = 0;
     let failed = 0;
+    const failures = [];
     const created = [];
     for (const entry of plan.entries) {
         const { rule } = entry;
@@ -742,12 +754,12 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             }
             else {
                 failed += 1;
-                bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）：宿主未返回规则对象`);
+                recordFailure(failures, rule, '宿主未返回规则对象（范围或公式可能被拒绝）');
             }
         }
         catch (error) {
             failed += 1;
-            bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）: ${error.message}`);
+            recordFailure(failures, rule, error.message);
         }
     }
     // 6. 优先级：entries[0] 最高 → 反序逐个置顶（只影响新加的，既有规则相对序不变）
@@ -772,5 +784,5 @@ export function applyConditionalFormatPlan(worksheet, plan) {
     if (missing.length > 0) {
         bgmLog(LOG_LEVELS.WARN, `[conditionalFormatApply] ${String(missing.length)} 条规则写后回读不到: ${missing.join(' / ')}`);
     }
-    return { added, refreshed, deleted, failed, verified, missing };
+    return { added, refreshed, deleted, failed, verified, missing, failures };
 }

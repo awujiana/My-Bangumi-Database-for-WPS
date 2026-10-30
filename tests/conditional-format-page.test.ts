@@ -272,6 +272,7 @@ beforeEach(() => {
     failed: 0,
     verified: 0,
     missing: [],
+    failures: [],
   })
   m.updateForeignRule.mockReturnValue({ ok: true, changed: ['公式'], warnings: [] })
   m.duplicateForeignRule.mockReturnValue({ ok: true, range: 'B2:B9' })
@@ -284,6 +285,11 @@ function mockConfigWithRules(rules: ConditionalFormatRule[] = RULES, sheetKey = 
     if (key === 'conditionalFormat.sheet.v1') return sheetKey
     return ''
   })
+}
+
+/** 取体检弹窗里的问题规则卡片（一条问题规则一张卡） */
+function doctorCards(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('.conditional-format-doctor-card')]
 }
 
 /** 取某次 setConfig 写入的规则序（解析回 id 列表） */
@@ -1700,6 +1706,7 @@ describe('应用条件格式：默认增量、不清除既有规则', () => {
       failed: 0,
       verified: 2,
       missing: ['当前季', '春季'],
+      failures: [],
     })
 
     document.getElementById('conditionalFormatApplyBtn')!.click()
@@ -1822,5 +1829,76 @@ describe('工作表规则分组锚定', () => {
     // 用映射原值直接比「未分组」永远不相等 → 这里必须仍然命中第 3 条
     expect(m.setForeignAppliesTo.mock.calls).toEqual([[SHEET_ENTRY.worksheet, 3, '$D:$D']])
     expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已锚定 1 条规则'), 'success')
+  })
+})
+
+describe('规则体检弹窗（导入前 / 应用前 / 应用后没落地，共用一个弹窗）', () => {
+  it('应用后没落地：弹体检弹窗并带上宿主原因，改完范围点「修复并应用」重跑', async () => {
+    mockWorksheetRules()
+    await openPage()
+    m.applyConditionalFormatPlan.mockClear()
+    m.applyConditionalFormatPlan.mockImplementationOnce(() => ({
+      added: 0,
+      refreshed: 0,
+      deleted: 0,
+      failed: 1,
+      verified: 0,
+      missing: ['当前季'],
+      failures: [
+        { name: '当前季', range: 'B:B', formula: '=1', reason: '无效的区域引用（Range 参数）' },
+      ],
+    }))
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    const mask = document.getElementById('conditionalFormatDoctorMask')!
+    expect(mask.style.display).toBe('flex')
+    const cards = doctorCards()
+    expect(cards).toHaveLength(1)
+    // 宿主给的真实原因必须出现在卡片上：用户改的是「宿主嫌什么」，不用猜
+    expect(cards[0]!.textContent).toContain('无效的区域引用（Range 参数）')
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已打开「规则体检」'), 'error')
+
+    // 手改范围 → 点「修复并应用」：只重跑应用，规则库里的值同步被改写
+    const rangeInput = cards[0]!.querySelector<HTMLInputElement>(
+      '.conditional-format-doctor-range',
+    )!
+    rangeInput.value = 'B2:B5000'
+    document.getElementById('conditionalFormatDoctorConfirm')!.click()
+
+    expect(m.applyConditionalFormatPlan).toHaveBeenCalledTimes(2)
+    const entries = lastPlan().entries as { rule: ConditionalFormatRule }[]
+    expect(entries.map((entry) => entry.rule.appliesTo)).toContain('B2:B5000')
+    // 改完就关窗，不再占着屏幕
+    expect(mask.style.display).toBe('none')
+  })
+
+  it('应用前预检：库里的规则范围带了表名前缀 → 先弹体检，不直接写表', async () => {
+    m.collectSheets.mockReturnValue([SHEET_ENTRY])
+    mockConfigWithRules(
+      [{ ...RULES[0]!, appliesTo: 'Sheet1!B:B' }, RULES[1]!, RULES[2]!],
+      SHEET_ENTRY.key,
+    )
+    await openPage()
+    m.applyConditionalFormatPlan.mockClear()
+
+    document.getElementById('conditionalFormatApplyBtn')!.click()
+
+    // 一条都没写：脏规则不该进宿主，先在弹窗里改完
+    expect(m.applyConditionalFormatPlan).not.toHaveBeenCalled()
+    const mask = document.getElementById('conditionalFormatDoctorMask')!
+    expect(mask.style.display).toBe('flex')
+
+    // 「全部自动修复」：剥掉表名前缀
+    document.getElementById('conditionalFormatDoctorFixAll')!.click()
+    const rangeInput = doctorCards()[0]!.querySelector<HTMLInputElement>(
+      '.conditional-format-doctor-range',
+    )!
+    expect(rangeInput.value).toBe('B:B')
+
+    document.getElementById('conditionalFormatDoctorConfirm')!.click()
+    expect(m.applyConditionalFormatPlan).toHaveBeenCalledTimes(1)
+    const entries = lastPlan().entries as { rule: ConditionalFormatRule }[]
+    expect(entries.map((entry) => entry.rule.appliesTo)).toEqual(['B:B', 'C:C', 'D:D'])
   })
 })

@@ -228,7 +228,9 @@ export function formatSwatchHtml(row) {
     const title = row.fillColor
         ? `填充 ${escapeHtml(row.fillColor)}${row.fontColor ? ` · 字体 ${escapeHtml(row.fontColor)}` : ''}`
         : '未读到格式（宿主未暴露 Interior / Font）';
-    return `<span class="conditional-format-swatch" style="${fill}" title="${title}">${fontBar}</span>`;
+    // 色块是**按钮**（momo：点样式直接改）：打开同一条规则的编辑弹窗（范围 / 公式 / 颜色），
+    // 与行尾 ✎ 是同一个弹窗，只是入口更贴近「用户看到的东西」——格式不对就点格式。
+    return `<button type="button" class="conditional-format-swatch" data-action="edit-format" style="${fill}" title="${title} · 点击编辑格式" aria-label="编辑第 ${String(row.index)} 条规则的格式">${fontBar}</button>`;
 }
 /**
  * 生成单行 HTML

@@ -43,10 +43,29 @@ export interface TableResizeOptions {
     /** 行最小高度（px），默认 22 */
     minRowHeight?: number;
 }
+/** {@link TableResizeController.autoFit} 的入参 */
+export interface AutoFitOptions {
+    /** 单列宽度上限（px），默认 420 */
+    maxColumnWidth?: number;
+}
 /** {@link bindTableResize} 的返回值 */
 export interface TableResizeController {
     /** 每次重渲染表格后调用：重新应用变量 + 补把手（幂等） */
     decorate: () => void;
+    /**
+     * 按内容自动分配列宽，行高回到「按内容」（momo 反馈：表要能自己分配）
+     *
+     * 做法：把每一列临时设成 `max-content`（**一次写入**），此时整列宽度 = 该列
+     * 最长内容的宽度，再一次性读回表头各格的实际宽度（**一次读取**），夹到
+     * [min, max] 后写成固定 px。写读各一次，避免逐列「写一次读一次」把 8 列
+     * 变成 8 次强制重排。
+     *
+     * 行高不写死：写死会把换行的长公式裁掉，而 `min-height: var(--table-row-h, auto)`
+     * 的 auto 本来就是「按内容」—— 这正是要的效果。
+     *
+     * @returns 量到的列数（0 = 表没渲染 / 不可见 → 调用方据此不提示、也不落存储）
+     */
+    autoFit: (options?: AutoFitOptions) => number;
     /** 全部恢复自动 */
     reset: () => void;
     /** 当前状态（持久化用；返回副本） */

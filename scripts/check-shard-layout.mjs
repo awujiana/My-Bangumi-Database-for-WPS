@@ -107,14 +107,17 @@ function readFixtureFromPanel() {
   }
 
   // 祖先容器：布局宽度与内边距由它们决定，缺了会让测量失真
-  for (const marker of [
-    '<div class="global">',
-    '<main class="main main-grid">',
-    '<section class="section" id="sec-remote">',
-  ]) {
+  for (const marker of ['<div class="global">', '<main class="main main-grid">']) {
     if (!panelHtml.includes(marker)) {
       throw new Error(`ui/panel.html 中找不到 ${marker}（页面结构已变，请更新本脚本的 fixture）`)
     }
+  }
+  // sec-remote：开头标签**允许带属性**（历史上写成整串字面量，加上 `data-detachable`
+  // 之后就匹配不上、整条门禁恒红），这里只锚 id 与标签名。
+  if (!/<section\b[^>]*\bid="sec-remote"/u.test(panelHtml)) {
+    throw new Error(
+      'ui/panel.html 中找不到 id="sec-remote" 的 section（页面结构已变，请更新本脚本的 fixture）',
+    )
   }
 
   return { links, formRow }
@@ -142,8 +145,11 @@ function readShardOptions() {
   )?.[1]
   if (optionsBlock === undefined) throw new Error('github-settings.ts 未解析出 SHARD_OPTIONS')
 
+  // 只锚 `name` + `label` 两段，**不要求紧接着 `}`** —— 加上 `detail`（分片字段说明）
+  // 之后对象不再是「name/label 两项即闭合」，旧规则的 `\s*\}` 直接匹配不上，
+  // 整条门禁恒红。
   const shards = [
-    ...optionsBlock.matchAll(/\{\s*name:\s*'([^']+)',\s*label:\s*'([^']+)'\s*\}/gu),
+    ...optionsBlock.matchAll(/\{\s*name:\s*'([^']+)',\s*label:\s*'([^']+)'/gu),
   ].map((matched) => ({ name: matched[1] ?? '', label: matched[2] ?? '' }))
   if (shards.length === 0) throw new Error('SHARD_OPTIONS 解析结果为空（解析规则可能已失效）')
 

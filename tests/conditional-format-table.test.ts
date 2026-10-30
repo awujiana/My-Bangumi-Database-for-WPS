@@ -174,6 +174,23 @@ describe('formatSwatchHtml', () => {
     expect(html).toContain('background:#FFFFFF')
   })
 
+  it('色块是可点按钮（点样式直接编辑该规则），且带可访问名称', () => {
+    const html = formatSwatchHtml({
+      index: 7,
+      groupKey: '\u{0}A1',
+      typeLabel: '公式',
+      rebuildable: true,
+      selected: false,
+      range: 'I2:I50001',
+      formula: '=$I2="x"',
+      fillColor: '#00B050',
+    })
+    // 走 button[data-action] 的按钮分支（dispatch 里 edit-format → 打开编辑弹窗）
+    expect(html).toContain('<button')
+    expect(html).toContain('data-action="edit-format"')
+    expect(html).toContain('aria-label="编辑第 7 条规则的格式"')
+  })
+
   it('读不到颜色时用斜纹占位（不是空白，用户看得出「没读到」）', () => {
     const html = formatSwatchHtml({
       index: 1,

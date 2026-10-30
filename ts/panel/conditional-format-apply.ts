@@ -55,6 +55,27 @@ export interface ConditionalFormatApplyResult {
    * 把这种局部失败说成「已写入 N 条」，用户去表上找不到却无从定位。
    */
   missing: string[]
+  /**
+   * 逐条写入失败的原因（**宿主原话**，来自 `Range()` / `Add()` 的异常）
+   *
+   * 之前只把失败写进日志：用户看到的 toast 是「N 条没写进工作表」，既不知道
+   * 哪条、也不知道为什么（是范围非法？公式语法错？还是宿主不支持？）。
+   * 「规则体检」弹窗要靠这条把**真实原因**摆在用户眼前 —— 没有它，用户只能
+   * 靠猜，改对了也是蒙的。
+   */
+  failures: ApplyFailure[]
+}
+
+/** 一条写入失败（进「规则体检」弹窗，与体检问题并排显示） */
+export interface ApplyFailure {
+  /** 规则名 */
+  name: string
+  /** 应用范围（宿主多半就是嫌它非法） */
+  range: string
+  /** 公式 */
+  formula: string
+  /** 宿主返回的异常信息 */
+  reason: string
 }
 
 /**
@@ -787,6 +808,19 @@ function indexOfRule(located: LocatedConditions, rule: ConditionalFormatRule): n
   )
 }
 
+/** 记一条写入失败（日志 + 结果里各留一份：日志给用户发我们，结果给用户当场看） */
+function recordFailure(
+  failures: ApplyFailure[],
+  rule: ConditionalFormatRule,
+  reason: string,
+): void {
+  failures.push({ name: rule.name, range: rule.appliesTo, formula: rule.formula, reason })
+  bgmLog(
+    LOG_LEVELS.WARN,
+    `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）: ${reason}`,
+  )
+}
+
 /**
  * 执行应用计划
  *
@@ -818,6 +852,12 @@ export function applyConditionalFormatPlan(
       failed: plan.entries.length,
       verified: -1,
       missing: plan.entries.map((entry) => entry.rule.name),
+      failures: plan.entries.map((entry) => ({
+        name: entry.rule.name,
+        range: entry.rule.appliesTo,
+        formula: entry.rule.formula,
+        reason: '当前宿主不支持条件格式 API（FormatConditions.Add 不可用）',
+      })),
     }
   }
 
@@ -867,6 +907,7 @@ export function applyConditionalFormatPlan(
   // 5. 逐条新增
   let added = 0
   let failed = 0
+  const failures: ApplyFailure[] = []
   const created: WpsFormatCondition[] = []
   for (const entry of plan.entries) {
     const { rule } = entry
@@ -882,17 +923,11 @@ export function applyConditionalFormatPlan(
         added += 1
       } else {
         failed += 1
-        bgmLog(
-          LOG_LEVELS.WARN,
-          `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）：宿主未返回规则对象`,
-        )
+        recordFailure(failures, rule, '宿主未返回规则对象（范围或公式可能被拒绝）')
       }
     } catch (error: unknown) {
       failed += 1
-      bgmLog(
-        LOG_LEVELS.WARN,
-        `[conditionalFormatApply] 新增规则失败（${rule.name} · ${rule.appliesTo}）: ${(error as Error).message}`,
-      )
+      recordFailure(failures, rule, (error as Error).message)
     }
   }
 
@@ -922,5 +957,5 @@ export function applyConditionalFormatPlan(
     )
   }
 
-  return { added, refreshed, deleted, failed, verified, missing }
+  return { added, refreshed, deleted, failed, verified, missing, failures }
 }

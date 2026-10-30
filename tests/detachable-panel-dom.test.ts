@@ -21,6 +21,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   PANEL_CLASS,
   PLACEHOLDER_CLASS,
+  TRIGGER_BUTTON_CLASS,
   WINDOW_MENU_CLASS,
   closeAllDetachedPanels,
   createDetachablePanel,
@@ -380,5 +381,31 @@ describe('窗口标题读取', () => {
     handle!.detach()
 
     expect(one(`.${PANEL_CLASS}-title`).textContent).toBe('开始同步')
+  })
+})
+
+describe('拖出按钮落位', () => {
+  it('标题是 div.command-title 时按钮注入标题内（与标题同行，不再单独占一行）', () => {
+    document.body.replaceChildren()
+    const main = document.createElement('main')
+    document.body.append(main)
+    const section = document.createElement('section')
+    section.id = 'sec-command'
+    section.dataset.detachable = 'true'
+    // sec-command（开始同步）的标题是 div，不是 h3/h2
+    const title = document.createElement('div')
+    title.className = 'command-title'
+    title.textContent = '开始同步'
+    section.append(title)
+    main.append(section)
+    const handle = createDetachablePanel(section)
+
+    // 落在标题元素里 → 标题行 flex 布局下与「开始同步」同一水平线、右端对齐；
+    // 落在 section 上（旧行为）会被栅格当成独立一行，浮在标题上方。
+    const trigger = section.querySelector<HTMLElement>(`.${TRIGGER_BUTTON_CLASS}`)
+    expect(trigger).not.toBeNull()
+    expect(trigger!.parentElement).toBe(title)
+
+    handle!.destroy()
   })
 })

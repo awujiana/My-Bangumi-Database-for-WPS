@@ -77,6 +77,7 @@ import {
   refreshGithubConfigInputs,
 } from './github-settings.js'
 import { renderLogEntries } from './log-panel.js'
+import { copyTemplateLink, downloadTemplateFile, openTemplateReleasePage } from './template-file.js'
 import { selectDefaultFolder, updatePathDisplay } from './path-controls.js'
 // 「数据同步」动作主体（284 行，占原分发表近 1/5）
 import { runRemoteSyncAction } from './remote-sync-action.js'
@@ -795,6 +796,23 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
+  },
+
+  // 模板文件：数据仓库 Latest Release 的 *-template.xlsx（下载 / 复制链接 / 打开页面）
+  // 三个入口共一份已解析好的信息，见 ui/handlers/template-file.ts
+  downloadTemplateFile: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 下载模板文件')
+    downloadTemplateFile()
+  },
+
+  copyTemplateLink: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 复制模板下载链接')
+    copyTemplateLink()
+  },
+
+  openTemplateRelease: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开模板 Release 页')
+    openTemplateReleasePage()
   },
 
   // 使用引导：显示/隐藏详细操作说明

@@ -101,6 +101,8 @@ import { attachDelegatedContextMenu, showContextMenu } from '../ui/components/co
 import { createSortable } from '../ui/components/sortable-list.js'
 import type { SortableHandle } from '../ui/components/sortable-list.js'
 import { bindTableResize } from '../ui/components/table-resize.js'
+import { fixRule, hasBlockingIssue, inspectRule, inspectRules } from './conditional-format-check.js'
+import type { RuleIssue } from './conditional-format-check.js'
 import type { TableResizeController, TableSizeState } from '../ui/components/table-resize.js'
 import { renderOptionPicker } from '../ui/components/option-picker.js'
 import {
@@ -116,7 +118,7 @@ import {
   setForeignStopIfTrue,
   updateForeignRule,
 } from './conditional-format-apply.js'
-import type { ForeignRulePatch } from './conditional-format-apply.js'
+import type { ConditionalFormatApplyResult, ForeignRulePatch } from './conditional-format-apply.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
@@ -260,6 +262,13 @@ interface PageState {
   existingSortable: SortableHandle | null
   /** 四张表的列宽/行高拖拽句柄（容器节点常驻，只建一次；渲染后调 decorate） */
   tableResize: Record<TableResizeId, TableResizeController | null>
+  /**
+   * 已做过「智能分配」的表（含「已有手动尺寸所以不用自动」的）
+   *
+   * 自动分配只在**首次渲染出内容**时做一次：之后用户拖过列宽就是他的意图，
+   * 每次重渲染都重新量会把手动调整冲掉（momo：手动拖完要记得住）。
+   */
+  tableAutoFitDone: Set<TableResizeId>
 }
 
 const state: PageState = {
@@ -291,6 +300,7 @@ const state: PageState = {
   groupSortable: null,
   existingSortable: null,
   tableResize: { existing: null, library: null, importDialog: null, paste: null },
+  tableAutoFitDone: new Set<TableResizeId>(),
 }
 
 // ===== DOM 辅助 =====
@@ -609,6 +619,7 @@ function renderExistingRulesInner(container: HTMLElement): void {
   state.existingSortable?.refresh()
   // 列宽/行高把手：表头是新节点，每次渲染都要重插（decorate 幂等）
   state.tableResize.existing?.decorate()
+  maybeAutoFitTable('existing')
 }
 
 /** 浮动窗口顶栏按钮的可用性（选中数为 0 时 ↑↓ / 删除禁用） */
@@ -796,6 +807,11 @@ function handleExistingTableClick(event: MouseEvent): void {
       break
     }
     case 'edit': {
+      openExistingRuleEditor(index)
+      break
+    }
+    // 点格式预览色块：与 ✎ 同一个弹窗（「看到样式不对就点样式」）
+    case 'edit-format': {
       openExistingRuleEditor(index)
       break
     }
@@ -2057,6 +2073,7 @@ function renderPasteTable(): void {
   container.innerHTML = head + rows
   // 表头是新节点，重插列宽/行高把手（decorate 幂等）
   state.tableResize.paste?.decorate()
+  maybeAutoFitTable('paste')
 }
 
 /** 表格里逐条改范围：把输入框的值写回模型（不重渲染，免得打断输入） */
@@ -2606,7 +2623,7 @@ function renderRuleList(): void {
           <label class="conditional-format-rule-pick" title="勾选以批量删除 / 导出">
             <input type="checkbox" data-action="pick" ${state.ruleSelection.has(rule.id) ? 'checked' : ''} aria-label="勾选 ${escapeHtml(rule.name)}" />
           </label>
-          <span class="conditional-format-swatch" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)}"></span>
+          <button type="button" class="conditional-format-swatch" data-action="edit-format" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)} · 点击编辑这条规则" aria-label="编辑规则「${escapeHtml(rule.name)}」"></button>
           <div class="conditional-format-rule-main">
             <div class="conditional-format-rule-name">${escapeHtml(rule.name)}</div>
             <div class="conditional-format-rule-meta">${escapeHtml(rule.appliesTo)} · <code title="${escapeHtml(rule.formula)}">${escapeHtml(
@@ -2729,6 +2746,11 @@ function renderRuleList(): void {
             openEditor(id, false)
             break
           }
+          // 点色块 = 点样式：与 ✎ 同一个编辑弹窗（momo：看到样式不对就直接点样式）
+          case 'edit-format': {
+            openEditor(id, false)
+            break
+          }
           case 'delete': {
             deleteRule(id)
             break
@@ -2745,6 +2767,7 @@ function renderRuleList(): void {
   state.groupSortable?.refresh()
   // 表头是新节点，重插列宽/行高把手（decorate 幂等）
   state.tableResize.library?.decorate()
+  maybeAutoFitTable('library')
   // 顶部批量条跟随勾选数显隐
   renderRuleBatchBar()
 }
@@ -3172,6 +3195,83 @@ function generateDefaults(): void {
 
 // ===== 应用流程（merge 增量 / replace 整表重来）=====
 
+/**
+ * 把体检弹窗改好的规则写回规则库
+ *
+ * 按下标定位：`visible` 是 `state.rules` 去掉隐藏项后的同序子集，
+ * 弹窗条目的 `key` 就是它在这个子集里的下标。
+ */
+function writeBackDoctorFixes(
+  visible: readonly ConditionalFormatRule[],
+  fixed: readonly DoctorEntry[],
+): void {
+  const patched = patchRulesByKey(visible, fixed)
+  const patchedById = new Map(patched.map((rule) => [rule.id, rule]))
+  // 隐藏的规则不参与应用，也不该被这次修改波及
+  state.rules = state.rules.map((rule) => patchedById.get(rule.id) ?? rule)
+  persistRules(false)
+  renderRuleList()
+}
+
+/**
+ * 应用后「没落地 / 写入失败」的规则进体检弹窗
+ *
+ * 与导入前预检不同：这里的规则**已经试过一次了**，所以要带上宿主给的真实原因
+ * （`result.failures[].reason`）—— 用户改的是「宿主嫌什么」，不用猜。
+ */
+function openFailureDoctor(
+  result: ConditionalFormatApplyResult,
+  strategy: ApplyStrategy,
+  visible: readonly ConditionalFormatRule[],
+): void {
+  const entries: DoctorEntry[] = []
+  const taken = new Set<number>()
+  // 逐条失败原因（宿主不支持条件格式时也有：`failures` 与 `missing` 二选一或都有）
+  const { failures } = result
+  for (const failure of failures) {
+    const index = state.rules.findIndex((rule) => rule.name === failure.name)
+    if (index !== -1) taken.add(index)
+    const found = index === -1 ? undefined : state.rules[index]
+    entries.push({
+      key: String(index),
+      rule: found ?? {
+        id: '',
+        name: failure.name,
+        group: IMPORTED_GROUP,
+        appliesTo: failure.range,
+        formula: failure.formula,
+        interior: '#CCCCCC',
+      },
+      issues: found === undefined ? [] : inspectRule(found),
+      reason: failure.reason,
+    })
+  }
+  for (const name of result.missing) {
+    const index = state.rules.findIndex((rule) => rule.name === name)
+    // 失败原因里列过的不重复；库里没有的（不该发生）也不硬造卡片
+    const found = index === -1 ? undefined : state.rules[index]
+    if (found !== undefined && !taken.has(index)) {
+      taken.add(index)
+      entries.push({
+        key: String(index),
+        rule: found,
+        issues: inspectRule(found),
+        reason: '写入后回读不到：宿主可能丢掉了这条，或把范围改写成了别的写法',
+      })
+    }
+  }
+  if (entries.length === 0) return
+  openRuleDoctor({
+    mode: 'apply',
+    entries,
+    hint: `这 ${String(entries.length)} 条没写进工作表。带「宿主原因」的是 WPS 返回的真实报错；改完点「修复并应用」重跑。`,
+    onConfirm: (fixed) => {
+      writeBackDoctorFixes(visible, fixed)
+      runApply(strategy)
+    },
+  })
+}
+
 /** 读「插件写过哪些规则」的账本（按工作表名分桶） */
 function readAppliedBuckets(): Record<string, AppliedRuleRecord[]> {
   return parseAppliedRules(getConfig(APPLIED_RULES_STORE_KEY, '', true))
@@ -3215,6 +3315,21 @@ function runApply(strategy: ApplyStrategy): void {
     showToast('没有可应用的规则（全部隐藏了？）', 'warn')
     return
   }
+  // 应用前体检：库里的规则可能被手改成脏的（范围带表名、公式引号没配对…），
+  // 与其写一半被宿主拒、只留一句 toast，不如先摆在弹窗里让用户改完再写。
+  const blocked = blockingEntriesOf(visible)
+  if (blocked.length > 0) {
+    openRuleDoctor({
+      mode: 'apply',
+      entries: blocked,
+      hint: `这 ${String(blocked.length)} 条的范围 / 公式不合法，宿主会直接拒绝。改完点「修复并应用」继续，其余 ${String(visible.length - blocked.length)} 条不受影响。`,
+      onConfirm: (fixed) => {
+        writeBackDoctorFixes(visible, fixed)
+        runApply(strategy)
+      },
+    })
+    return
+  }
 
   const foreign = readForeignRules(entry.worksheet)
   const previous = readAppliedBuckets()[entry.sheet] ?? []
@@ -3236,10 +3351,12 @@ function runApply(strategy: ApplyStrategy): void {
   if (result.missing.length > 0) {
     const shown = result.missing.slice(0, 3).join(' / ')
     const more = result.missing.length > 3 ? ` 等 ${String(result.missing.length)} 条` : ''
+    // 弹窗里能改、能自动修、能直接重来 —— toast 只负责报「有几条」，不再让用户去翻日志
     showToast(
-      `${String(result.missing.length)} 条规则没写进工作表：${shown}${more}（详见日志，可先检查范围与公式是否合法）`,
+      `${String(result.missing.length)} 条规则没写进工作表：${shown}${more}（已打开「规则体检」，可就地改完重应用）`,
       'error',
     )
+    openFailureDoctor(result, strategy, visible)
   } else if (result.failed > 0) {
     showToast(
       `新增 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`,
@@ -3503,6 +3620,27 @@ function importRulesFromText(text: string, source: string): void {
     )
     return
   }
+  const blocked = blockingEntriesOf(rules)
+  if (blocked.length > 0) {
+    openRuleDoctor({
+      mode: 'import',
+      entries: blocked,
+      hint: `「${source}」里有 ${String(blocked.length)} 条范围 / 公式不合法，宿主会拒绝写入。改完点「修复并导入」继续（其余条目不受影响）。`,
+      onConfirm: (fixed) => {
+        finishImportFromText(patchRulesByKey(rules, fixed), source, dropped)
+      },
+    })
+    return
+  }
+  finishImportFromText(rules, source, dropped)
+}
+
+/** 文本 / 文件导入的终点（体检通过后） */
+function finishImportFromText(
+  rules: readonly ConditionalFormatRule[],
+  source: string,
+  dropped: number,
+): void {
   const { added, skipped } = mergeRulesIntoLibrary(rules)
   const details: string[] = []
   if (skipped > 0) details.push(`跳过 ${String(skipped)} 条重复`)
@@ -3714,6 +3852,7 @@ function renderImportList(): void {
   setText('conditionalFormatImportConfirm', `导入所选（${String(selection.size)}）`)
   // 表头是新节点，重插列宽/行高把手（decorate 幂等）
   state.tableResize.importDialog?.decorate()
+  maybeAutoFitTable('importDialog')
 }
 
 /**
@@ -3778,6 +3917,47 @@ function importSnapshots(
     showToast('所选规则里没有可导入的公式类规则', 'warn')
     return
   }
+  // 导入前体检：脏规则不该进库（进了只在「应用」时才炸，且只留一句 toast）
+  const blocked = blockingEntriesOf(imported)
+  if (blocked.length > 0) {
+    openRuleDoctor({
+      mode: 'import',
+      entries: blocked,
+      hint: `这 ${String(blocked.length)} 条的范围 / 公式不合法，宿主一定会拒绝写入。修好再导入，免得进库后「应用」时才报错。`,
+      onConfirm: (fixed) => {
+        commitImportedSnapshots(patchRulesByKey(imported, fixed), skipped)
+      },
+    })
+    return
+  }
+  commitImportedSnapshots(imported, skipped)
+}
+
+/**
+ * 把体检弹窗改好的规则按 key（来源数组下标）填回原位
+ *
+ * @param source 原数组（不改）
+ * @param fixed 弹窗回传的条目（只含被挑出来的那几条）
+ */
+function patchRulesByKey(
+  source: readonly ConditionalFormatRule[],
+  fixed: readonly DoctorEntry[],
+): ConditionalFormatRule[] {
+  const patched = [...source]
+  for (const entry of fixed) {
+    const index = Number(entry.key)
+    if (Number.isSafeInteger(index) && index >= 0 && index < patched.length) {
+      patched[index] = entry.rule
+    }
+  }
+  return patched
+}
+
+/** 真正落库 + 提示（导入流的终点，体检通过后才走到这） */
+function commitImportedSnapshots(
+  imported: readonly ConditionalFormatRule[],
+  skipped: number,
+): void {
   state.rules = [...state.rules, ...imported]
   persistRules()
   renderRuleList()
@@ -3785,6 +3965,185 @@ function importSnapshots(
     `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条类型不支持，已跳过）` : ''}`,
     skipped > 0 ? 'info' : 'success',
   )
+}
+
+// ===== 规则体检（导入前 / 应用前 / 应用后没落地，同一个弹窗）=====
+
+/**
+ * 体检弹窗的用途（只影响确认按钮的文案与回调动作）
+ *
+ * - `apply`：修完继续「应用条件格式」；
+ * - `import`：修完继续「导入规则库」。
+ */
+type DoctorMode = 'apply' | 'import'
+
+/** 弹窗里的一条问题规则（卡片） */
+interface DoctorEntry {
+  /**
+   * 在**来源数组**里的下标（字符串形式）
+   *
+   * 用于把修好的规则放回原位：导入流要合并「修好的」与「没问题的」，
+   * 用下标比用 id 稳（待导入的规则可能还没有 id）。
+   */
+  key: string
+  rule: ConditionalFormatRule
+  issues: RuleIssue[]
+  /** 宿主返回的真实失败原因（只有「应用后没落地」才有） */
+  reason?: string
+}
+
+let doctorEntries: DoctorEntry[] = []
+let doctorOnConfirm: ((entries: readonly DoctorEntry[]) => void) | null = null
+
+/**
+ * 打开「规则体检」弹窗
+ *
+ * 三个时机共用一个弹窗（导入前 / 应用前 / 应用后没落地）—— 用户心智只有一件事：
+ * 「这几条有问题，改完继续」，而不是三种不同的报错。
+ */
+function openRuleDoctor(options: {
+  mode: DoctorMode
+  entries: readonly DoctorEntry[]
+  hint: string
+  onConfirm: (entries: readonly DoctorEntry[]) => void
+}): void {
+  doctorEntries = [...options.entries]
+  doctorOnConfirm = options.onConfirm
+  setText('conditionalFormatDoctorHint', options.hint)
+  setText('conditionalFormatDoctorConfirm', options.mode === 'import' ? '修复并导入' : '修复并应用')
+  renderDoctorList()
+  const mask = byId('conditionalFormatDoctorMask')
+  const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
+  if (mask) {
+    if (modal) {
+      resetModalPosition(modal)
+      applyModalButtonsPosition(modal)
+    }
+    anchorModalMask(mask)
+    mask.style.display = 'flex'
+    if (modal) bringModalIntoView(mask, modal)
+  }
+  lockModalScroll()
+}
+
+function closeRuleDoctor(): void {
+  const mask = byId('conditionalFormatDoctorMask')
+  if (mask?.style.display === 'none') return
+  if (mask) mask.style.display = 'none'
+  unlockModalScroll()
+  doctorOnConfirm = null
+}
+
+/** 渲染卡片列表（一条问题规则一张卡：问题 + 可改的范围 / 公式） */
+function renderDoctorList(): void {
+  const list = byId('conditionalFormatDoctorList')
+  if (!list) return
+  list.innerHTML = doctorEntries
+    .map((entry) => {
+      const isBlocking = hasBlockingIssue(entry.issues)
+      const flag = isBlocking
+        ? '<span class="conditional-format-doctor-flag">必须修</span>'
+        : '<span class="conditional-format-doctor-flag conditional-format-doctor-flag--warn">可能不生效</span>'
+      const issueLines = entry.issues
+        .map((issue) => {
+          const fix =
+            issue.fixed === undefined
+              ? ''
+              : ` <em>→ 可自动改成 <code>${escapeHtml(issue.fixed)}</code></em>`
+          return `<li class="conditional-format-doctor-issue">${escapeHtml(issue.message)}${fix}</li>`
+        })
+        .join('')
+      const reasonLine =
+        entry.reason === undefined
+          ? ''
+          : `<li class="conditional-format-doctor-issue"><em>宿主原因：</em><code>${escapeHtml(entry.reason)}</code></li>`
+      return `
+      <div class="conditional-format-doctor-card">
+        <div class="conditional-format-doctor-name">
+          <span>${escapeHtml(entry.rule.name)}</span>${flag}
+        </div>
+        <ul class="conditional-format-doctor-issues">${issueLines}${reasonLine}</ul>
+        <div class="conditional-format-doctor-fields">
+          <label>应用于<input type="text" class="conditional-format-doctor-range" value="${escapeHtml(entry.rule.appliesTo)}" aria-label="${escapeHtml(entry.rule.name)} 的应用范围" /></label>
+          <label>公式<input type="text" class="conditional-format-doctor-formula" value="${escapeHtml(entry.rule.formula)}" aria-label="${escapeHtml(entry.rule.name)} 的公式" /></label>
+        </div>
+      </div>`
+    })
+    .join('')
+}
+
+/**
+ * 把用户在输入框里的改动读回条目（DOM 是真值来源：卡片可能被手改过）
+ *
+ * 按**卡片顺序**取（不用 data-key 查 DOM：`CSS.escape` 在部分宿主里不存在，
+ * 而卡片的渲染顺序恒等于 `doctorEntries` 的顺序）。
+ */
+function collectDoctorEntries(): DoctorEntry[] {
+  const list = byId('conditionalFormatDoctorList')
+  if (!list) return doctorEntries
+  return doctorEntries.map((entry, position) => {
+    const card = list.children[position]
+    if (!(card instanceof HTMLElement)) return entry
+    const rangeInput = card.querySelector<HTMLInputElement>('.conditional-format-doctor-range')
+    const formulaInput = card.querySelector<HTMLInputElement>('.conditional-format-doctor-formula')
+    return {
+      ...entry,
+      rule: {
+        ...entry.rule,
+        appliesTo: rangeInput?.value.trim() ?? entry.rule.appliesTo,
+        formula: formulaInput?.value.trim() ?? entry.rule.formula,
+      },
+    }
+  })
+}
+
+/** 「🩺 全部自动修复」：把能安全修的一次性修掉，修不了的仍在卡片上标红 */
+function fixAllDoctor(): void {
+  const collected = collectDoctorEntries()
+  doctorEntries = collected.map((entry) => {
+    const { rule } = fixRule(entry.rule)
+    return { ...entry, rule, issues: inspectRule(rule) }
+  })
+  renderDoctorList()
+  const remaining = doctorEntries.filter((entry) => hasBlockingIssue(entry.issues)).length
+  showToast(
+    remaining === 0
+      ? '已自动修复（仍标黄的条目只是「可能不生效」，不影响写入）'
+      : `已自动修复一部分，还剩 ${String(remaining)} 条必须手工改（看红色标记）`,
+    remaining === 0 ? 'success' : 'warn',
+  )
+}
+
+/** 「修复并继续」：再体检一次，还有阻断项就留在这，不把脏规则带进下一步 */
+function confirmDoctor(): void {
+  const collected = collectDoctorEntries()
+  const refreshed = collected.map((entry) => ({ ...entry, issues: inspectRule(entry.rule) }))
+  const stillBlocked = refreshed.filter((entry) => hasBlockingIssue(entry.issues))
+  if (stillBlocked.length > 0) {
+    doctorEntries = refreshed
+    renderDoctorList()
+    showToast(
+      `还有 ${String(stillBlocked.length)} 条改完仍不合法（卡片上带红色「必须修」），修好再继续`,
+      'error',
+    )
+    return
+  }
+  const callback = doctorOnConfirm
+  closeRuleDoctor()
+  callback?.(refreshed)
+}
+
+/**
+ * 体检一批规则：把「宿主一定会拒」的挑出来，交给体检弹窗
+ *
+ * 只筛阻断项：非阻断项（如「范围在 B 列、公式判 I 列」）在导入 39 条时会
+ * 一次性糊满屏幕，反而淹没真正写不进去的那条 —— 它们仍会在**应用后**的
+ * 弹窗里出现（那时只剩一两条，看得清）。
+ */
+function blockingEntriesOf(rules: readonly ConditionalFormatRule[]): DoctorEntry[] {
+  return inspectRules(rules, (rule) => rule.name)
+    .filter((entry) => hasBlockingIssue(entry.issues))
+    .map((entry) => ({ key: String(entry.index), rule: entry.rule, issues: entry.issues }))
 }
 
 // ===== 导出规则 =====
@@ -3953,6 +4312,44 @@ function saveTableSizes(): void {
     if (controller !== null) payload[id] = controller.getState()
   }
   setConfig(TABLE_RESIZE_STORE_KEY, JSON.stringify(payload))
+}
+
+/**
+ * 点「📐 自适行列」：按内容重新分配该表列宽，行高回到按内容
+ *
+ * 手动拖动过的表也允许再点 —— 用户点的就是「重新分配」，此时覆盖旧值是预期行为，
+ * 不是冲掉记忆。
+ */
+function smartFitTable(id: TableResizeId): void {
+  const controller = state.tableResize[id]
+  if (!controller) return
+  if (controller.autoFit() === 0) {
+    showToast('表格还没内容或正藏着，先读取规则再点「📐 自适行列」', 'warn')
+    return
+  }
+  state.tableAutoFitDone.add(id)
+  saveTableSizes()
+  showToast('已按内容分配列宽，行高改为按内容（拖列线可手调，双击列线回到自动）', 'success')
+}
+
+/**
+ * 首次渲染出内容时按内容自动分配一次
+ *
+ * 尊重手动值：存储里已有固定列宽 / 行高（用户拖过或上次智能分配过）就跳过 ——
+ * 否则每次重渲染都重新量，用户刚拖好的列宽会被冲掉。
+ */
+function maybeAutoFitTable(id: TableResizeId): void {
+  if (state.tableAutoFitDone.has(id)) return
+  const controller = state.tableResize[id]
+  if (!controller) return
+  const stored = controller.getState()
+  if (stored.cols.some((width) => width !== null) || stored.rowHeight !== null) {
+    state.tableAutoFitDone.add(id)
+    return
+  }
+  if (controller.autoFit() === 0) return
+  state.tableAutoFitDone.add(id)
+  saveTableSizes()
 }
 
 /**
@@ -4239,6 +4636,13 @@ export function initializeConditionalFormatPage(): void {
       'conditionalFormatBatchMax',
       'conditionalFormatBatchResize',
     ],
+    [
+      'conditionalFormatDoctorMask',
+      'conditionalFormatDoctorTitle',
+      'conditionalFormatDoctorCollapse',
+      'conditionalFormatDoctorMax',
+      'conditionalFormatDoctorResize',
+    ],
   ]
   for (const [maskId, titleId, collapseId, maximizeId, resizeId] of MODAL_SPECS) {
     const mask = byId(maskId)
@@ -4279,6 +4683,7 @@ export function initializeConditionalFormatPage(): void {
   })
   byId('conditionalFormatBatchCancel')?.addEventListener('click', () => {
     closeBatchEdit()
+    closeRuleDoctor()
   })
   byId('conditionalFormatBatchMask')?.addEventListener('click', (event) => {
     if (event.target === byId('conditionalFormatBatchMask')) closeBatchEdit()
@@ -4295,6 +4700,14 @@ export function initializeConditionalFormatPage(): void {
   })
   byId('conditionalFormatMergeBtn')?.addEventListener('click', () => {
     mergeExistingDuplicates()
+  })
+  // 两张主表的「📐 自适行列」：各管各的表（点哪个就量哪个，不做「一键全量」——
+  // 导入弹框 / 粘贴表格只在打开时自动量一次，工具栏上再塞两个按钮反而找不到）
+  byId('conditionalFormatFitExistingBtn')?.addEventListener('click', () => {
+    smartFitTable('existing')
+  })
+  byId('conditionalFormatFitLibraryBtn')?.addEventListener('click', () => {
+    smartFitTable('library')
   })
   byId('conditionalFormatRepairAnchorBtn')?.addEventListener('click', () => {
     repairAnchors(false)
@@ -4323,6 +4736,19 @@ export function initializeConditionalFormatPage(): void {
   })
   byId('conditionalFormatImportCancel')?.addEventListener('click', () => {
     closeImportModal()
+  })
+  // 规则体检：全部自动修复 / 修复并继续 / 取消 / 点遮罩关闭
+  byId('conditionalFormatDoctorFixAll')?.addEventListener('click', () => {
+    fixAllDoctor()
+  })
+  byId('conditionalFormatDoctorConfirm')?.addEventListener('click', () => {
+    confirmDoctor()
+  })
+  byId('conditionalFormatDoctorCancel')?.addEventListener('click', () => {
+    closeRuleDoctor()
+  })
+  byId('conditionalFormatDoctorMask')?.addEventListener('click', (event) => {
+    if (event.target === byId('conditionalFormatDoctorMask')) closeRuleDoctor()
   })
   byId('conditionalFormatImportMask')?.addEventListener('click', (event) => {
     if (event.target === byId('conditionalFormatImportMask')) closeImportModal()
@@ -4378,6 +4804,7 @@ export function initializeConditionalFormatPage(): void {
     closePasteModal()
     closeTextImportModal()
     closeBatchEdit()
+    closeRuleDoctor()
   })
 
   // ---- 宿主读取放在全部绑定之后：抛错也只损失首屏数据，不损失交互 ----

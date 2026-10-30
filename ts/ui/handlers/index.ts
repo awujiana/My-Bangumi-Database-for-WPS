@@ -38,6 +38,7 @@ import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js'
 import { loadHighlightSettingsIntoForm } from './highlight-settings.js'
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js'
 import { setupEventListeners, setupMessageListener } from './panel-events.js'
+import { loadTemplateFileInfo } from './template-file.js'
 import {
   handleClusterModeClick,
   handleMergeModeClick,
@@ -231,6 +232,9 @@ export function setupButtonListeners(): void {
     trackedAddEventListener(button, 'click', handleMergeModeClick)
   }
   updateMergeModeButtons(getMergeMode(true))
+
+  // 面板「帮助与格式 → 模板文件」：回填 Latest Release 的版本 / 文件名 / 大小
+  void loadTemplateFileInfo()
 
   // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
   loadEnrichPreviewSettingsIntoForm()

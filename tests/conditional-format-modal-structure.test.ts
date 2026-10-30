@@ -54,7 +54,7 @@ describe('模态框收起态的结构前提', () => {
     expect(findModalsWithoutDirectGrip(pageHtml)).toEqual([])
   })
 
-  it('生产 HTML：七个弹窗都在（编辑器 / 导入 / 从文本导入 / 批量修改 / 归组 / 粘贴 / 应用确认）', () => {
+  it('生产 HTML：八个弹窗都在（编辑器 / 导入 / 规则体检 / 从文本导入 / 批量修改 / 归组 / 粘贴 / 应用确认）', () => {
     const parsed = new DOMParser().parseFromString(pageHtml, 'text/html')
     const ids = [...parsed.querySelectorAll<HTMLElement>('.conditional-format-modal-grip')].map(
       (grip) => grip.id,
@@ -62,6 +62,7 @@ describe('模态框收起态的结构前提', () => {
     expect(ids).toEqual([
       'conditionalFormatEditorTitle',
       'conditionalFormatImportTitle',
+      'conditionalFormatDoctorTitle',
       'conditionalFormatTextImportTitle',
       'conditionalFormatBatchTitle',
       'conditionalFormatGroupTitle',

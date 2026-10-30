@@ -34,6 +34,26 @@ export interface ConditionalFormatApplyResult {
      * 把这种局部失败说成「已写入 N 条」，用户去表上找不到却无从定位。
      */
     missing: string[];
+    /**
+     * 逐条写入失败的原因（**宿主原话**，来自 `Range()` / `Add()` 的异常）
+     *
+     * 之前只把失败写进日志：用户看到的 toast 是「N 条没写进工作表」，既不知道
+     * 哪条、也不知道为什么（是范围非法？公式语法错？还是宿主不支持？）。
+     * 「规则体检」弹窗要靠这条把**真实原因**摆在用户眼前 —— 没有它，用户只能
+     * 靠猜，改对了也是蒙的。
+     */
+    failures: ApplyFailure[];
+}
+/** 一条写入失败（进「规则体检」弹窗，与体检问题并排显示） */
+export interface ApplyFailure {
+    /** 规则名 */
+    name: string;
+    /** 应用范围（宿主多半就是嫌它非法） */
+    range: string;
+    /** 公式 */
+    formula: string;
+    /** 宿主返回的异常信息 */
+    reason: string;
 }
 /**
  * 探测宿主是否支持条件格式 API

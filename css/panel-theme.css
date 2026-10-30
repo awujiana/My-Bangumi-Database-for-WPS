@@ -427,6 +427,11 @@ body.nav-icons-only .nav a:hover::after {
   min-width: 0;
 }
 .command-title {
+  /* flex：让 JS 注入的「拖出浮动窗」按钮（.detachable-trigger，自带 margin-left:auto）
+     与标题同一行、右端对齐 —— div 块级时按钮会被挤到下一行（momo 反馈不对齐）。 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--fs-h2);
   font-weight: 700;
   color: var(--text-1);
@@ -904,6 +909,15 @@ select.input option,
 }
 .hint a:hover {
   text-decoration: underline;
+}
+
+/* 「帮助与格式 → 模板文件」：版本 / 文件名 / 大小一行说明（JS 回填，见
+   ui/handlers/template-file.ts）。用文本色 2 级，与下方 .hint 拉开层次。 */
+.template-file__meta {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  word-break: break-all;
 }
 
 .range-info {

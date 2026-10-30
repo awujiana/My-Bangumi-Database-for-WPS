@@ -36,6 +36,14 @@ const COLUMN_PROPERTY_PREFIX = '--table-col-'
 const ROW_HEIGHT_PROPERTY = '--table-row-h'
 /** 拖动中给容器加的类（禁选中，避免拖出蓝色选区） */
 const RESIZING_CLASS = 'is-resizing'
+/**
+ * 「智能分配」的单列宽度上限（px）
+ *
+ * 长公式（`=AND($I2="x",$J2>0,…)`）按内容量能到几百 px，不封顶会把表格撑出
+ * 横向滚动条 —— 那比截断更难用（用户要横向拖着看公式，其余列全在视野外）。
+ * 420px 够放下约 55 个半角字符，剩下的仍靠 title 悬浮看全量。
+ */
+const DEFAULT_AUTO_FIT_MAX_WIDTH = 420
 
 /** 表格尺寸状态（持久化用） */
 export interface TableSizeState {
@@ -59,10 +67,30 @@ export interface TableResizeOptions {
   minRowHeight?: number
 }
 
+/** {@link TableResizeController.autoFit} 的入参 */
+export interface AutoFitOptions {
+  /** 单列宽度上限（px），默认 420 */
+  maxColumnWidth?: number
+}
+
 /** {@link bindTableResize} 的返回值 */
 export interface TableResizeController {
   /** 每次重渲染表格后调用：重新应用变量 + 补把手（幂等） */
   decorate: () => void
+  /**
+   * 按内容自动分配列宽，行高回到「按内容」（momo 反馈：表要能自己分配）
+   *
+   * 做法：把每一列临时设成 `max-content`（**一次写入**），此时整列宽度 = 该列
+   * 最长内容的宽度，再一次性读回表头各格的实际宽度（**一次读取**），夹到
+   * [min, max] 后写成固定 px。写读各一次，避免逐列「写一次读一次」把 8 列
+   * 变成 8 次强制重排。
+   *
+   * 行高不写死：写死会把换行的长公式裁掉，而 `min-height: var(--table-row-h, auto)`
+   * 的 auto 本来就是「按内容」—— 这正是要的效果。
+   *
+   * @returns 量到的列数（0 = 表没渲染 / 不可见 → 调用方据此不提示、也不落存储）
+   */
+  autoFit: (options?: AutoFitOptions) => number
   /** 全部恢复自动 */
   reset: () => void
   /** 当前状态（持久化用；返回副本） */
@@ -253,6 +281,43 @@ export function bindTableResize(options: TableResizeOptions): TableResizeControl
     }
   }
 
+  /**
+   * 按内容自动分配列宽 + 行高回自动（见 {@link TableResizeController.autoFit}）
+   *
+   * 表头格数 = 列数（把手已被过滤），逐列量的是「这一列最长的内容」——
+   * 表头自己的文字也在其中，所以「#」「操作」这类短列不会被撑宽。
+   *
+   * @returns 量到的列数（0 = 表没渲染 / 不可见，调用方据此不提示、也不落存储）
+   */
+  const measureContentWidths = (fitOptions: AutoFitOptions = {}): number => {
+    const maxColumnWidth = fitOptions.maxColumnWidth ?? DEFAULT_AUTO_FIT_MAX_WIDTH
+    const head = container.querySelector<HTMLElement>(`.${HEAD_CLASS}`)
+    if (head === null) return 0
+    // 容器不可见（模块折叠 / 窗格未显示）：量到的全是 0，写下去就成了「全部最小宽」
+    if (head.getBoundingClientRect().width === 0) return 0
+    const cells = [...head.children].filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement &&
+        !child.classList.contains(COLUMN_HANDLE_CLASS) &&
+        !child.classList.contains(ROW_HANDLE_CLASS),
+    )
+    if (cells.length === 0) return 0
+
+    for (const index of cells.keys()) {
+      container.style.setProperty(`${COLUMN_PROPERTY_PREFIX}${String(index)}`, 'max-content')
+    }
+    const measured = cells.map((cell) => cell.getBoundingClientRect().width)
+    for (const [index, width] of measured.entries()) {
+      const rounded = Math.round(width)
+      const clamped = Math.min(Math.max(rounded, minColumnWidth), maxColumnWidth)
+      setColumnWidth(index, clamped)
+    }
+    state.rowHeight = null
+    apply()
+    notify()
+    return cells.length
+  }
+
   const reset = (): void => {
     state.cols = state.cols.map(() => null)
     state.rowHeight = null
@@ -284,5 +349,5 @@ export function bindTableResize(options: TableResizeOptions): TableResizeControl
   container.addEventListener('dblclick', onDoubleClick)
   apply()
 
-  return { decorate, reset, getState, destroy }
+  return { decorate, autoFit: measureContentWidths, reset, getState, destroy }
 }

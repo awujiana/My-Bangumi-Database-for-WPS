@@ -868,6 +868,43 @@
           </h3>
 
           <div class="form-group">
+            <label>模板文件</label>
+            <div class="template-file">
+              <div class="template-file__meta" id="templateFileMeta">正在获取最新版本…</div>
+              <div class="bgm-btn-group" style="margin-top: 8px">
+                <button
+                  class="bgm-btn small"
+                  id="templateDownloadBtn"
+                  data-action="downloadTemplateFile"
+                  title="打开数据仓库 Latest Release 的模板文件下载链接（42 列精简表，已带表头）"
+                >
+                  📥 下载模板
+                </button>
+                <button
+                  class="bgm-btn small"
+                  id="templateCopyLinkBtn"
+                  data-action="copyTemplateLink"
+                  title="复制下载链接，粘到浏览器里下载（宿主拦截导航时用这条）"
+                >
+                  🔗 复制链接
+                </button>
+                <button
+                  class="bgm-btn small"
+                  id="templateOpenReleaseBtn"
+                  data-action="openTemplateRelease"
+                  title="打开数据仓库 Releases 页，可挑历史版本"
+                >
+                  🌐 打开 Release 页
+                </button>
+              </div>
+              <div class="hint" style="margin-top: 6px">
+                默认取数据仓库每周三推送的 Latest Release（<code>*-template.xlsx</code>，42
+                列精简表）。任务窗格无法直连 GitHub 资产域（跨域限制），下载交给浏览器。
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label>使用引导</label>
             <div class="guide">
               <div class="step">

@@ -36,6 +36,14 @@ const ROW_HEIGHT_PROPERTY = '--table-row-h';
 /** 拖动中给容器加的类（禁选中，避免拖出蓝色选区） */
 const RESIZING_CLASS = 'is-resizing';
 /**
+ * 「智能分配」的单列宽度上限（px）
+ *
+ * 长公式（`=AND($I2="x",$J2>0,…)`）按内容量能到几百 px，不封顶会把表格撑出
+ * 横向滚动条 —— 那比截断更难用（用户要横向拖着看公式，其余列全在视野外）。
+ * 420px 够放下约 55 个半角字符，剩下的仍靠 title 悬浮看全量。
+ */
+const DEFAULT_AUTO_FIT_MAX_WIDTH = 420;
+/**
  * 给一个表头行补把手（幂等：已存在的跳过）
  *
  * 把手是纯标记，不绑监听器——监听统一挂在容器上（见 `onPointerDown`）。
@@ -201,6 +209,41 @@ export function bindTableResize(options) {
             decorateHead(head);
         }
     };
+    /**
+     * 按内容自动分配列宽 + 行高回自动（见 {@link TableResizeController.autoFit}）
+     *
+     * 表头格数 = 列数（把手已被过滤），逐列量的是「这一列最长的内容」——
+     * 表头自己的文字也在其中，所以「#」「操作」这类短列不会被撑宽。
+     *
+     * @returns 量到的列数（0 = 表没渲染 / 不可见，调用方据此不提示、也不落存储）
+     */
+    const measureContentWidths = (fitOptions = {}) => {
+        const maxColumnWidth = fitOptions.maxColumnWidth ?? DEFAULT_AUTO_FIT_MAX_WIDTH;
+        const head = container.querySelector(`.${HEAD_CLASS}`);
+        if (head === null)
+            return 0;
+        // 容器不可见（模块折叠 / 窗格未显示）：量到的全是 0，写下去就成了「全部最小宽」
+        if (head.getBoundingClientRect().width === 0)
+            return 0;
+        const cells = [...head.children].filter((child) => child instanceof HTMLElement &&
+            !child.classList.contains(COLUMN_HANDLE_CLASS) &&
+            !child.classList.contains(ROW_HANDLE_CLASS));
+        if (cells.length === 0)
+            return 0;
+        for (const index of cells.keys()) {
+            container.style.setProperty(`${COLUMN_PROPERTY_PREFIX}${String(index)}`, 'max-content');
+        }
+        const measured = cells.map((cell) => cell.getBoundingClientRect().width);
+        for (const [index, width] of measured.entries()) {
+            const rounded = Math.round(width);
+            const clamped = Math.min(Math.max(rounded, minColumnWidth), maxColumnWidth);
+            setColumnWidth(index, clamped);
+        }
+        state.rowHeight = null;
+        apply();
+        notify();
+        return cells.length;
+    };
     const reset = () => {
         state.cols = state.cols.map(() => null);
         state.rowHeight = null;
@@ -227,5 +270,5 @@ export function bindTableResize(options) {
     container.addEventListener('pointerdown', onPointerDown);
     container.addEventListener('dblclick', onDoubleClick);
     apply();
-    return { decorate, reset, getState, destroy };
+    return { decorate, autoFit: measureContentWidths, reset, getState, destroy };
 }

@@ -352,3 +352,59 @@ describe('回调语义', () => {
     }).not.toThrow()
   })
 })
+
+/** 给表头每格打桩一个「按内容量出来的宽度」 */
+function stubHeadWidths(head: HTMLElement, widths: readonly number[]): void {
+  const cells = [...head.children].filter(
+    (child): child is HTMLElement => child instanceof HTMLElement,
+  )
+  for (const [index, cell] of cells.entries()) {
+    stubSize(cell, widths[index] ?? 0, 24)
+  }
+  stubSize(
+    head,
+    widths.reduce((sum, width) => sum + width, 0),
+    24,
+  )
+}
+
+describe('智能分配（autoFit）', () => {
+  it('按内容给每列写固定宽度（夹在 min / max 之间）', () => {
+    const { container, head } = buildTable()
+    const controller = bindTableResize({ container, minColumnWidth: 40 })
+    controller.decorate()
+    stubHeadWidths(head, [30, 120, 900])
+
+    const fitted = controller.autoFit()
+
+    expect(fitted).toBe(3)
+    // 30 → 抬到 min 40；120 原样；900 → 压到上限 420
+    expect(container.style.getPropertyValue('--table-col-0')).toBe('40px')
+    expect(container.style.getPropertyValue('--table-col-1')).toBe('120px')
+    expect(container.style.getPropertyValue('--table-col-2')).toBe('420px')
+    expect(controller.getState().rowHeight).toBeNull()
+  })
+
+  it('表不可见（宽度 0）时不改任何列，返回 0（调用方据此不提示）', () => {
+    const { container, head } = buildTable()
+    const controller = bindTableResize({ container })
+    controller.decorate()
+    stubHeadWidths(head, [0, 0, 0])
+
+    expect(controller.autoFit()).toBe(0)
+    expect(container.style.getPropertyValue('--table-col-0')).toBe('')
+  })
+
+  it('分配后回调 onChange（页面据此落存储，刷新后仍记得）', () => {
+    const { container, head } = buildTable()
+    const onChange = vi.fn<(state: TableSizeState) => void>()
+    const controller = bindTableResize({ container, onChange })
+    controller.decorate()
+    stubHeadWidths(head, [60, 60, 60])
+
+    controller.autoFit()
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange.mock.calls[0]?.[0]?.cols).toEqual([60, 60, 60])
+  })
+})
