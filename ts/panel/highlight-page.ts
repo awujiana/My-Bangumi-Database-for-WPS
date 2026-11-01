@@ -46,12 +46,13 @@ import type {
   SeasonSelectResult,
   YearMonth,
 } from './highlight-season.js'
-import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js'
+import { registerSheetChangeAutoRefresh } from './sync-panel-auto-refresh.js'
 import { buildPreviewDetailHtml, normalizePreviewView } from './highlight-preview-render.js'
 import type { PreviewRowDetail, PreviewView } from './highlight-preview-render.js'
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
+import { initializeI18n } from '../i18n/index.js'
 import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
@@ -1104,6 +1105,7 @@ function reloadSheet(): void {
 function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
   initializeTheme()
+  initializeI18n()
   startThemeSync()
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('highlight')

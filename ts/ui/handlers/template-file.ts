@@ -27,7 +27,7 @@ let latest: TemplateReleaseInfo = TEMPLATE_FALLBACK
 /** 是否已经查过（只查一次，避免反复开关面板打接口） */
 let hasLoaded = false
 
-/** 元素 id（与 ui/panel.html 保持一致） */
+/** 元素 id（与 ui/sync-panel.html 保持一致） */
 const META_ELEMENT_ID = 'templateFileMeta'
 
 /** 取元素（找不到返回 null：设置页等没有这个区块的页面静默跳过） */

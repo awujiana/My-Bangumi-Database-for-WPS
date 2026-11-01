@@ -27,16 +27,26 @@ import {
   setThemeSchedule,
 } from '../../tools/config.js'
 import type { ThemeMode } from '../../tools/config.js'
+import {
+  SOURCE_LOCALE,
+  getLocale,
+  getLocaleCoverage,
+  getLocaleLabel,
+  isLocaleCode,
+  setLocale,
+  t,
+} from '../../i18n/index.js'
+import type { LocaleCode } from '../../i18n/index.js'
 import { renderLogEntries } from './log-panel.js'
 
 // ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 
 export const handleEnableSyncRecordChange = (): void => {
-  const chkEnableSyncRecord = document.getElementById(
-    'chkEnableSyncRecord',
+  const checkboxEnableSyncRecord = document.getElementById(
+    'checkboxEnableSyncRecord',
   ) as HTMLInputElement | null
-  if (!chkEnableSyncRecord) return
-  const { checked } = chkEnableSyncRecord
+  if (!checkboxEnableSyncRecord) return
+  const { checked } = checkboxEnableSyncRecord
   bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`)
   setSyncRecordEnabled(checked)
   showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info')
@@ -374,9 +384,9 @@ export const handleRefreshIntervalChange = (): void => {
  * - 选择「预告/未来动漫」时隐藏年份/季度/月份，显示提示
  */
 export function setupTimeFilterControls(): void {
-  const chkTimeFilter = document.getElementById('chkTimeFilter') as HTMLInputElement | null
+  const checkboxTimeFilter = document.getElementById('checkboxTimeFilter') as HTMLInputElement | null
   const timeFilterControls = document.getElementById('timeFilterControls')
-  if (!chkTimeFilter || !timeFilterControls) return
+  if (!checkboxTimeFilter || !timeFilterControls) return
 
   // 仅在通过校验后声明后续变量（符合 unicorn/no-declarations-before-early-exit）
   const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
@@ -386,8 +396,8 @@ export function setupTimeFilterControls(): void {
   const futureHintRow = document.getElementById('futureHintRow')
 
   // 复选框切换：显示/隐藏筛选控件
-  chkTimeFilter.addEventListener('change', () => {
-    timeFilterControls.style.display = chkTimeFilter.checked ? 'block' : 'none'
+  checkboxTimeFilter.addEventListener('change', () => {
+    timeFilterControls.style.display = checkboxTimeFilter.checked ? 'block' : 'none'
   })
 
   // 筛选范围切换：显示/隐藏年份/季度/月份/提示行
@@ -402,4 +412,64 @@ export function setupTimeFilterControls(): void {
       }
     })
   }
+}
+
+// ========== 设置页：界面语言（i18n） ==========
+
+/**
+ * 同步语言分段按钮的 active / aria 状态，并刷新覆盖率提示
+ *
+ * 覆盖率只对**非源语言**显示：简体是基准，显示「已翻译 100%」没有信息量，
+ * 反而会让人以为「还有 0% 没翻」。
+ */
+export function updateLanguageButtons(code: LocaleCode): void {
+  document.querySelectorAll<HTMLElement>('[data-locale]').forEach((button) => {
+    const isActive = button.dataset.locale === code
+    button.classList.toggle('active', isActive)
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false')
+  })
+
+  const hint = document.getElementById('localeCoverage')
+  if (!hint) return
+  if (code === SOURCE_LOCALE) {
+    hint.hidden = true
+    hint.textContent = ''
+    return
+  }
+  const coverage = getLocaleCoverage(code)
+  hint.hidden = false
+  hint.textContent = `${getLocaleLabel(code)} · ${t('settings.appearance.languageCoverage', {
+    percent: coverage.percent,
+  })}（${t('settings.appearance.languageFallback')}）`
+}
+
+/**
+ * 语言切换
+ *
+ * 乐观更新按钮态（点下去立刻有反馈），`setLocale` 失败再回滚——语言包缺失是
+ * 真实可能（用户手动删过 `locales/<code>/`），不能假装切成功。
+ *
+ * 成功后的 toast 用**新语言**渲染：`setLocale` 内部已经 `applyI18n()` 过，
+ * 此时 `t()` 取到的就是新文案，用户能立刻看到切换生效。
+ */
+export const handleLanguageClick = (event: Event): void => {
+  const button = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-locale]')
+  const raw = button?.dataset.locale
+  if (raw === undefined || !isLocaleCode(raw)) return
+
+  const previous = getLocale()
+  if (raw === previous) return
+
+  updateLanguageButtons(raw)
+  void (async (): Promise<void> => {
+    const isOk = await setLocale(raw)
+    if (isOk) {
+      updateLanguageButtons(raw)
+      showToast(t('settings.appearance.languageApplied', { name: getLocaleLabel(raw) }), 'success')
+      bgmLog(LOG_LEVELS.INFO, `[settings] 界面语言已切换: ${raw}`)
+      return
+    }
+    updateLanguageButtons(previous)
+    showToast(t('settings.appearance.languageFailed'), 'error')
+  })()
 }

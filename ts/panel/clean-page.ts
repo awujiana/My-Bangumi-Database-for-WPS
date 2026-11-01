@@ -31,6 +31,7 @@ import { renderStatCards } from '../ui/stat-cards.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 import { initializeShellNav } from './shell-nav.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
+import { initializeI18n } from '../i18n/index.js'
 import { mountDataContextNotice } from '../tools/data-context.js'
 import { createProgress } from '../ui/components/progress.js'
 import type { ProgressController } from '../ui/components/progress.js'
@@ -947,6 +948,7 @@ export function initializeCleanPage(): void {
   // 记录页面已成功加载，供 showCleanPanel 判断缓存的面板 ID 是否有效
   markCleanPaneLoaded()
   initializeTheme()
+  initializeI18n()
   startThemeSync()
   initializeShellNav()
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）

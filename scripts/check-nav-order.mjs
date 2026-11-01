@@ -68,11 +68,11 @@ function readPageModules(source) {
   }
 
   const result = new Map()
-  // 逐页面块解析：`panel: [ { id: '...' }, ... ],`
+  // 逐页面块解析：`'sync-panel': [ { id: '...' }, ... ],`
   // 页面键可能是带连字符的字符串字面量（'conditional-format':）——页面键即
   // ui/<page>.html 的文件名，只能 kebab-case，故 key 同时接受 'xxx' 与裸标识符。
   // 必须整段用 String.raw：拼进模板字面量时 `\s` 会被当转笔画掉，正则直接失效
-  // 只认**恰好 2 空格缩进**的页面条目：PAGE_MODULES 的页面块都是 `  panel: [`。
+  // 只认**恰好 2 空格缩进**的页面条目：PAGE_MODULES 的页面块都是 `  'sync-panel': [`。
   // 不限定缩进时，文件后段任何 `xxx: [`（如 subscribeConfigPoll 的 `keys: [...]`）
   // 都会被误当成页面键——2026-10-24 实测：配置轮询重构后本门禁误报「keys 页不存在」。
   const pageBlocks = new RegExp(
@@ -255,7 +255,7 @@ function checkCollapseButtons(htmlPath, html, ids) {
  * 一个页面可能有多个入口（panel 的排序在 bootstrap、导航模式在 entry），全部列出。
  */
 const PAGE_ENTRIES = {
-  panel: ['ts/panel/panel-bootstrap.ts', 'ts/entry/panel-entry.ts'],
+  'sync-panel': ['ts/panel/sync-panel-bootstrap.ts', 'ts/entry/sync-panel-entry.ts'],
   enrich: ['ts/panel/enrich-bootstrap.ts'],
   clean: ['ts/panel/clean-bootstrap.ts'],
   settings: ['ts/panel/settings-bootstrap.ts', 'ts/entry/settings-entry.ts'],

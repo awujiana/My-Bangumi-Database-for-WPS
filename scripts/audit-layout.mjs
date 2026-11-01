@@ -8,7 +8,7 @@
  * → 由加载顺序决定胜负 → 覆盖失效、控件被挤窄或撑大。2026-10-09 一次就抓到 3 处：
  *
  *   ① `.shard-select-list` 的 6 个分片标签被钉成 96px，中文竖排（已有专项门禁）；
- *   ② `#chkSyncSelectedOnly` 的 label 被钉成 96px + 复选框被 `width: 100%` 撑到 96px；
+ *   ② `#checkboxSyncSelectedOnly` 的 label 被钉成 96px + 复选框被 `width: 100%` 撑到 96px；
  *   ③ `.time-filter-box` 的 `display: block` 被 `.form-row { display: flex }` 盖掉
  *      → label 与 `p.hint` 挤在一行争宽，label 只剩 111px、文字竖排 4 行。
  *
@@ -29,7 +29,7 @@
  *
  * 用法：
  *   node scripts/audit-layout.mjs                 # 审计 ui/*.html 全部页面
- *   node scripts/audit-layout.mjs panel.html      # 只审计指定页面
+ *   node scripts/audit-layout.mjs sync-panel.html      # 只审计指定页面
  *   node scripts/audit-layout.mjs --json          # 输出 JSON
  *   node scripts/audit-layout.mjs --widths 400,500
  *   CHROME_PATH=<chrome.exe> node scripts/audit-layout.mjs

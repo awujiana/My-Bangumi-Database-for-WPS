@@ -14,19 +14,19 @@ import {
   setIncrementalSync,
   setSkipConflicts,
 } from '../../index.js'
-import { isPanelContext } from './panel-context.js'
+import { isPanelContext } from './sync-panel-context.js'
 import { trackedAddEventListener, trackedSetTimeout } from './resource-tracking.js'
 
 export function tryUpdateIncrementalCheckbox(isChecked: boolean): void {
   if (!isPanelContext()) return
 
-  // 增量同步开关已统一收拢到设置页（#chkIncrementalSync），主面板不再有该复选框。
+  // 增量同步开关已统一收拢到设置页（#checkboxIncrementalSync），主面板不再有该复选框。
   // 元素不存在时为正常情况，静默跳过，避免每帧重试刷 ERROR 日志。
-  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
-  if (!chkIncremental) return
+  const checkboxIncremental = document.getElementById('checkboxIncremental') as HTMLInputElement | null
+  if (!checkboxIncremental) return
 
-  bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`)
-  chkIncremental.checked = isChecked
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${checkboxIncremental.checked ? '开启' : '关闭'}`)
+  checkboxIncremental.checked = isChecked
   bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`)
 }
 
@@ -83,9 +83,9 @@ export function tryUpdateSkipConflictsUI(shouldSkipConflicts: boolean, attempts 
   }
 
   // 备用：如果是 checkbox
-  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-  if (chkSkipConflicts) {
-    chkSkipConflicts.checked = shouldSkipConflicts
+  const checkboxSkipConflicts = document.getElementById('checkboxSkipConflicts') as HTMLInputElement | null
+  if (checkboxSkipConflicts) {
+    checkboxSkipConflicts.checked = shouldSkipConflicts
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`)
   }
 }
@@ -94,26 +94,26 @@ export function tryUpdateSkipConflictsUI(shouldSkipConflicts: boolean, attempts 
 export function tryUpdateEnableSyncRecordUI(isEnabled: boolean): void {
   if (!isPanelContext()) return
 
-  // 同步记录开关已统一收拢到设置页（#chkEnableSyncRecord），主面板不再有该复选框。
+  // 同步记录开关已统一收拢到设置页（#checkboxEnableSyncRecord），主面板不再有该复选框。
   // 元素不存在时为正常情况，静默跳过。
-  const chkEnableSyncRecord = document.getElementById(
-    'chkEnableSyncRecord',
+  const checkboxEnableSyncRecord = document.getElementById(
+    'checkboxEnableSyncRecord',
   ) as HTMLInputElement | null
 
-  if (!chkEnableSyncRecord) return
+  if (!checkboxEnableSyncRecord) return
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${isEnabled ? '开启' : '关闭'}`,
+    `[handlers] 当前状态: ${checkboxEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${isEnabled ? '开启' : '关闭'}`,
   )
-  chkEnableSyncRecord.checked = isEnabled
+  checkboxEnableSyncRecord.checked = isEnabled
   bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${isEnabled ? '开启' : '关闭'}`)
 }
 
 export const handleIncrementalChange = (): void => {
-  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
-  if (!chkIncremental) return
-  const { checked } = chkIncremental
+  const checkboxIncremental = document.getElementById('checkboxIncremental') as HTMLInputElement | null
+  if (!checkboxIncremental) return
+  const { checked } = checkboxIncremental
 
   bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 增量同步状态变更 ==========`)
   bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`)
@@ -176,9 +176,9 @@ export const handleOverwriteRadioChange = (): void => {
 }
 
 export const handleChkSkipConflictsChange = (): void => {
-  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-  if (!chkSkipConflicts) return
-  const { checked } = chkSkipConflicts
+  const checkboxSkipConflicts = document.getElementById('checkboxSkipConflicts') as HTMLInputElement | null
+  if (!checkboxSkipConflicts) return
+  const { checked } = checkboxSkipConflicts
   try {
     setSkipConflicts(checked)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`)
@@ -192,24 +192,24 @@ export function initializeIncrementalSyncFromRibbon(): void {
   if (!isPanelContext()) return
 
   // 冲突策略与增量同步开关是**两个独立功能**，必须先于下面的早退初始化：
-  // 主面板 panel.html 只有 #conflictStrategy、没有 #chkIncremental（后者只在设置页的
-  // #chkIncrementalSync），若放在函数尾部，增量复选框不存在时就会早退，
+  // 主面板 sync-panel.html 只有 #conflictStrategy、没有 #checkboxIncremental（后者只在设置页的
+  // #checkboxIncrementalSync），若放在函数尾部，增量复选框不存在时就会早退，
   // 导致冲突策略下拉的 change 监听永不注册 —— 用户改了下拉却不落 bgm_skip_conflicts 配置。
   initializeSkipConflictsFromRibbon()
 
-  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
-  if (!chkIncremental) return
+  const checkboxIncremental = document.getElementById('checkboxIncremental') as HTMLInputElement | null
+  if (!checkboxIncremental) return
 
   try {
     const isIncremental = isIncrementalSyncEnabled()
-    chkIncremental.checked = isIncremental
+    checkboxIncremental.checked = isIncremental
     bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`)
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${(error as Error).message}`)
   }
 
   // 监听 checkbox 变化，同步到配置
-  trackedAddEventListener(chkIncremental, 'change', handleIncrementalChange)
+  trackedAddEventListener(checkboxIncremental, 'change', handleIncrementalChange)
 }
 
 // 从配置读取跳过冲突状态并初始化 UI
@@ -257,8 +257,8 @@ export function initializeSkipConflictsFromRibbon(): void {
   }
 
   // 备用：如果是 checkbox
-  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-  if (chkSkipConflicts) {
-    trackedAddEventListener(chkSkipConflicts, 'change', handleChkSkipConflictsChange)
+  const checkboxSkipConflicts = document.getElementById('checkboxSkipConflicts') as HTMLInputElement | null
+  if (checkboxSkipConflicts) {
+    trackedAddEventListener(checkboxSkipConflicts, 'change', handleChkSkipConflictsChange)
   }
 }

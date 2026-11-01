@@ -10,7 +10,7 @@
  *   - util/sheet.ts：工作表读取/缓存（readRangeValues、cacheGet、findHeaderRow、getColumnMap、clearSheetCache、getLastRow、isEmptyValue、getDataSheet、safeActivate）
  *   - util/field-getter.ts：批量字段访问器（矩形读 + 逐格回退）与同步行指纹
  *   - util/sleep.ts：延时（sleep、delay）
- *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
+ *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showSyncPanel）
  */
 // 直接从源模块导入，打破 utility.ts ↔ index.ts 的循环依赖
 import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM } from '../../core/constants.js'
@@ -1321,7 +1321,7 @@ export function showDonatePanel(): void {
 /**
  * 构造任务窗格页面 URL
  *
- * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录
+ * 背景：getUrlPath() 在面板页面内（如 .../ui/sync-panel.html）执行时返回的是页面所在目录
  * `.../ui`，此时若直接拼接 `/ui/settings.html` 会得到错误的 `.../ui/ui/settings.html`。
  * 这里统一把末尾的 `/ui` 归一化掉后再拼接，保证任何调用上下文都得到 `.../ui/<page>`。
  *
@@ -1336,7 +1336,7 @@ export function buildTaskPaneUrl(page: string): string {
 /**
  * 显示同步面板
  */
-export function showBangumiPanel(): void {
+export function showSyncPanel(): void {
   const app = getApp() as {
     PluginStorage?: {
       getItem: (k: string) => string | null
@@ -1364,7 +1364,7 @@ export function showBangumiPanel(): void {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
       // 拿到窗格对象 ≠ 页面内容活着（黑屏窗格的根因，详见 showCleanPanel 同款注释）
-      if (isPanePageAlive('panel')) {
+      if (isPanePageAlive('sync-panel')) {
         // 切换可见性：从隐藏→显示时才触发刷新信号
         if (!tskpane.Visible) {
           isBecameVisible = true
@@ -1376,18 +1376,18 @@ export function showBangumiPanel(): void {
         app.PluginStorage?.setItem('panel_id', '')
         bgmLog(
           LOG_LEVELS.WARN,
-          '[showBangumiPanel] 主窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
+          '[showSyncPanel] 主窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建',
         )
       }
     } else {
       // 面板 ID 失效（用户手动关闭）→ 清除存储，落到下方重建
       app.PluginStorage?.setItem('panel_id', '')
-      bgmLog(LOG_LEVELS.WARN, '[showBangumiPanel] 主面板ID失效，已清除存储')
+      bgmLog(LOG_LEVELS.WARN, '[showSyncPanel] 主面板ID失效，已清除存储')
     }
   }
   if (!app.PluginStorage?.getItem('panel_id')) {
     // 没有可复用的活窗格（无 ID / ID 失效 / 心跳停被清）→ 重建
-    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
+    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/sync-panel.html`)
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('panel_id', id)
@@ -1399,11 +1399,11 @@ export function showBangumiPanel(): void {
   if (isBecameVisible) {
     try {
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
-      bgmLog(LOG_LEVELS.INFO, `[showBangumiPanel] 面板已显示，已写入刷新信号`)
+      bgmLog(LOG_LEVELS.INFO, `[showSyncPanel] 面板已显示，已写入刷新信号`)
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[showBangumiPanel] 写入面板显示信号失败: ${(error as Error).message}`,
+        `[showSyncPanel] 写入面板显示信号失败: ${(error as Error).message}`,
       )
     }
   }

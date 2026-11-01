@@ -109,7 +109,7 @@ describe('fileUrlToWindowsPath', () => {
   })
 
   it('非 file 协议返回 null（开发期是 http）', () => {
-    expect(fileUrlToWindowsPath('http://localhost:3889/ui/panel.html')).toBeNull()
+    expect(fileUrlToWindowsPath('http://localhost:3889/ui/sync-panel.html')).toBeNull()
     expect(fileUrlToWindowsPath('')).toBeNull()
   })
 

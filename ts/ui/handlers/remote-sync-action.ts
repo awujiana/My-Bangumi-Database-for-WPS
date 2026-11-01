@@ -85,12 +85,12 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
   const currentSourceType: SyncSourceType =
     (sourceTypeSelect?.value as SyncSourceType | undefined) ?? getSyncSourceType()
   // 读取「仅同步选中行」开关
-  const chkSelectedOnly = document.getElementById('chkSyncSelectedOnly') as HTMLInputElement | null
-  const isSelectedRowsOnly = chkSelectedOnly?.checked === true
+  const checkboxSelectedOnly = document.getElementById('checkboxSyncSelectedOnly') as HTMLInputElement | null
+  const isSelectedRowsOnly = checkboxSelectedOnly?.checked === true
 
   // 读取时间筛选配置
-  const chkTimeFilter = document.getElementById('chkTimeFilter') as HTMLInputElement | null
-  const isTimeFilterEnabled = chkTimeFilter?.checked === true
+  const checkboxTimeFilter = document.getElementById('checkboxTimeFilter') as HTMLInputElement | null
+  const isTimeFilterEnabled = checkboxTimeFilter?.checked === true
   let timeFilter: SyncTimeFilter | undefined
   if (isTimeFilterEnabled) {
     const yearSelect = document.getElementById('timeFilterYear') as HTMLSelectElement | null

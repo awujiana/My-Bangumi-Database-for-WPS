@@ -735,10 +735,10 @@ describe('setupButtonListeners', () => {
     expect(mockState.syncFromPanel).toHaveBeenCalledTimes(1)
   })
 
-  it('应为 chkEnableSyncRecord checkbox 注册 change 监听器（不抛错）', () => {
+  it('应为 checkboxEnableSyncRecord checkbox 注册 change 监听器（不抛错）', () => {
     const checkbox = document.createElement('input')
     checkbox.type = 'checkbox'
-    checkbox.id = 'chkEnableSyncRecord'
+    checkbox.id = 'checkboxEnableSyncRecord'
     document.body.appendChild(checkbox)
 
     expect(() => setupButtonListeners()).not.toThrow()
@@ -868,7 +868,7 @@ function mountSelectWithOption(id: string, value: string): HTMLSelectElement {
 describe('setupButtonListeners · 设置页控件回填与异常兜底', () => {
   // 对话框 DOM 未初始化时，showConfirm 会走 `window.confirm` 原生兜底
   // （见 ts/ui/dialog.ts 的 _showDialog）。用它来驱动「用户确认/取消」两条分支。
-  // refreshData 是真实实现（ts/panel/panel-lifecycle.ts），无工作表时立即早退，
+  // refreshData 是真实实现（ts/panel/sync-panel-lifecycle.ts），无工作表时立即早退，
   // 因此用它的首行日志作为「确实被调用」的观测点。
 
   it('clear 用户确认后应调用 refreshData（原生 confirm 兜底路径）', () => {
@@ -910,7 +910,7 @@ describe('setupButtonListeners · 设置页控件回填与异常兜底', () => {
     })
     const checkbox = document.createElement('input')
     checkbox.type = 'checkbox'
-    checkbox.id = 'chkEnableSyncRecord'
+    checkbox.id = 'checkboxEnableSyncRecord'
     document.body.appendChild(checkbox)
 
     expect(() => setupButtonListeners()).not.toThrow()

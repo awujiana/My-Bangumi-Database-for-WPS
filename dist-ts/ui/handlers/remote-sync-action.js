@@ -33,11 +33,11 @@ export function runRemoteSyncAction(context) {
     const sourceTypeSelect = document.getElementById('syncSourceType');
     const currentSourceType = sourceTypeSelect?.value ?? getSyncSourceType();
     // 读取「仅同步选中行」开关
-    const chkSelectedOnly = document.getElementById('chkSyncSelectedOnly');
-    const isSelectedRowsOnly = chkSelectedOnly?.checked === true;
+    const checkboxSelectedOnly = document.getElementById('checkboxSyncSelectedOnly');
+    const isSelectedRowsOnly = checkboxSelectedOnly?.checked === true;
     // 读取时间筛选配置
-    const chkTimeFilter = document.getElementById('chkTimeFilter');
-    const isTimeFilterEnabled = chkTimeFilter?.checked === true;
+    const checkboxTimeFilter = document.getElementById('checkboxTimeFilter');
+    const isTimeFilterEnabled = checkboxTimeFilter?.checked === true;
     let timeFilter;
     if (isTimeFilterEnabled) {
         const yearSelect = document.getElementById('timeFilterYear');

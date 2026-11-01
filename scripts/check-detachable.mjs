@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url'
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** 参与校验的页面（与 ui/*.html 一一对应） */
-const PAGES = ['clean', 'conditional-format', 'enrich', 'highlight', 'panel', 'settings']
+const PAGES = ['clean', 'conditional-format', 'enrich', 'highlight', 'sync-panel', 'settings']
 
 /** 组件样式表（每个页面都必须引入） */
 const COMPONENT_CSS = 'css/detachable-panel.css'

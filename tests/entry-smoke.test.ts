@@ -8,7 +8,7 @@
  * 而在**装配契约**：
  *
  *  1. **装配顺序 / 遗漏**：`startPanel()` 里 5 个调用谁先谁后、少一个都没别的东西会发现。
- *  2. **自动启动守卫**：`window.location.pathname.includes('panel.html')` 这类判断写错，
+ *  2. **自动启动守卫**：`window.location.pathname.includes('sync-panel.html')` 这类判断写错，
  *     会导致「在 settings.html 上跑面板初始化」或「该启动时不启动」。
  *  3. **`bgm:modulesReady` 必须异步派发** —— `settings-entry.ts` 里有一大段注释解释：
  *     同步派发时 `settingsBootstrap` 的监听器还没挂上，按钮会一直禁用直到 5s 兜底超时。
@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 /** 装配调用流水（`vi.hoisted` 保证 mock 工厂能引用到；`vi.resetModules()` 不会清它） */
 const calls = vi.hoisted(() => [] as string[])
 
-vi.mock('../ts/panel/panel-page.js', () => ({
+vi.mock('../ts/panel/sync-panel-page.js', () => ({
   initializePanel: (): void => {
     calls.push('initializePanel')
   },
@@ -40,6 +40,13 @@ vi.mock('../ts/tools/theme.js', () => ({
   },
   startThemeSync: (): void => {
     calls.push('startThemeSync')
+  },
+}))
+
+// i18n 只取装配时机：真正的翻译行为在 tests/i18n.test.ts
+vi.mock('../ts/i18n/index.js', () => ({
+  initializeI18n: (): void => {
+    calls.push('initializeI18n')
   },
 }))
 
@@ -152,7 +159,7 @@ async function flushDynamicImports(): Promise<void> {
   })
 }
 
-type PanelEntry = typeof import('../ts/entry/panel-entry.js')
+type PanelEntry = typeof import('../ts/entry/sync-panel-entry.js')
 type RibbonEntry = typeof import('../ts/entry/ribbon-entry.js')
 type SettingsEntry = typeof import('../ts/entry/settings-entry.js')
 
@@ -163,21 +170,22 @@ beforeEach(() => {
   document.body.replaceChildren()
 })
 
-describe('entry/panel-entry 装配冒烟', () => {
-  it('当前页不是 panel.html 时**不自动启动**（导入即无副作用）', async () => {
-    await loadEntry<PanelEntry>('../ts/entry/panel-entry.js')
+describe('entry/sync-panel-entry 装配冒烟', () => {
+  it('当前页不是 sync-panel.html 时**不自动启动**（导入即无副作用）', async () => {
+    await loadEntry<PanelEntry>('../ts/entry/sync-panel-entry.js')
 
     expect(calls).toEqual([])
   })
 
-  it('当前页是 panel.html 时自动启动，且装配顺序固定', async () => {
-    gotoPage('/panel.html')
+  it('当前页是 sync-panel.html 时自动启动，且装配顺序固定', async () => {
+    gotoPage('/sync-panel.html')
 
-    await loadEntry<PanelEntry>('../ts/entry/panel-entry.js')
+    await loadEntry<PanelEntry>('../ts/entry/sync-panel-entry.js')
 
-    // 顺序即契约：主题 → 跨页主题同步 → 跨页导航模式同步 → 面板初始化 → 事件处理注册
+    // 顺序即契约：主题 → 语言 → 跨页主题同步 → 跨页导航模式同步 → 面板初始化 → 事件处理注册
     expect(calls).toEqual([
       'initializeTheme',
+      'initializeI18n',
       'startThemeSync',
       'startNavModeSync',
       'initializePanel',
@@ -185,13 +193,14 @@ describe('entry/panel-entry 装配冒烟', () => {
     ])
   })
 
-  it('导出的 startPanel() 可显式调用（非 panel.html 页面手动拉起）', async () => {
-    const entry = await loadEntry<PanelEntry>('../ts/entry/panel-entry.js')
+  it('导出的 startPanel() 可显式调用（非 sync-panel.html 页面手动拉起）', async () => {
+    const entry = await loadEntry<PanelEntry>('../ts/entry/sync-panel-entry.js')
 
     entry.startPanel()
 
     expect(calls).toEqual([
       'initializeTheme',
+      'initializeI18n',
       'startThemeSync',
       'startNavModeSync',
       'initializePanel',
@@ -251,6 +260,7 @@ describe('entry/settings-entry 装配冒烟', () => {
     // 缓存的面板 ID 是否有效
     expect(calls).toEqual([
       'initializeTheme',
+      'initializeI18n',
       'startThemeSync',
       'startNavModeSync',
       'startNavOrderSync:settings',
@@ -294,21 +304,21 @@ describe('entry/settings-entry 装配冒烟', () => {
     const entry = await loadEntry<SettingsEntry>('../ts/entry/settings-entry.js')
 
     // 先反向预置：这样「值变成期望值」才证明代码真的写了，而不是恰好等于默认值
-    const chkIncremental = mountCheckbox('chkIncrementalSync', false)
-    const chkSkip = mountCheckbox('chkSkipConflicts', true)
-    const chkSyncRecord = mountCheckbox('chkEnableSyncRecord', false)
-    const chkNavIcons = mountCheckbox('chkNavIconsOnly', true)
+    const checkboxIncremental = mountCheckbox('checkboxIncrementalSync', false)
+    const checkboxSkip = mountCheckbox('checkboxSkipConflicts', true)
+    const checkboxSyncRecord = mountCheckbox('checkboxEnableSyncRecord', false)
+    const checkboxNavIcons = mountCheckbox('checkboxNavIconsOnly', true)
     const logLevel = mountSelect('logLevelSelect', '9', '2')
 
     entry.startSettings()
 
     // initializeSettingsPage() 内部是 `void (async () => …)()`，回填发生在动态 import 之后
     await vi.waitFor(() => {
-      expect(chkIncremental.checked).toBe(true)
+      expect(checkboxIncremental.checked).toBe(true)
     })
-    expect(chkSkip.checked).toBe(false)
-    expect(chkSyncRecord.checked).toBe(true)
-    expect(chkNavIcons.checked).toBe(false)
+    expect(checkboxSkip.checked).toBe(false)
+    expect(checkboxSyncRecord.checked).toBe(true)
+    expect(checkboxNavIcons.checked).toBe(false)
     expect(logLevel.value).toBe('2')
     expect(calls).toContain('applyLogLevel')
   })

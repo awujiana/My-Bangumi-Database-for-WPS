@@ -83,7 +83,7 @@ describe('debug-panel-render / 常量', () => {
   it('RIBBON_BUTTONS 每项含 id/label/icon', () => {
     expect(RIBBON_BUTTONS.length).toBeGreaterThan(0)
     for (const b of RIBBON_BUTTONS) {
-      expect(b.id).toMatch(/^btn/)
+      expect(b.id).toMatch(/^button/)
       expect(b.label.length).toBeGreaterThan(0)
       expect(b.icon.length).toBeGreaterThan(0)
     }

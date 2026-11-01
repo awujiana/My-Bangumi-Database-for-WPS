@@ -27,6 +27,7 @@ import { applyConditionalFormatPlan, checkFormatConditionsReadable, deleteForeig
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
+import { initializeI18n } from '../i18n/index.js';
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js';
 import { mountDataContextNotice, registerTargetSheetApplier } from '../tools/data-context.js';
 // ===== 常量 =====
@@ -3821,6 +3822,7 @@ export function initializeConditionalFormatPage() {
     markConditionalFormatPaneLoaded();
     initializeShellNav();
     initializeTheme();
+    initializeI18n();
     startThemeSync();
     // ⚠️ 宿主读取（loadRules / reloadSheets 等 COM）**不在这里做**，挪到本函数
     // 末尾的 populateFromHost()——2026-10-24 真机缺陷：桥未就绪时 collectSheets

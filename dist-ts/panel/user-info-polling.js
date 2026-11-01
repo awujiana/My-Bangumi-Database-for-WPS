@@ -6,7 +6,7 @@
  */
 import { LOG_LEVELS, getApp, bgmLog, BGM, loadBgToken, findWorkbookByName, _getBgmUserId, _getBgmUsername, updateTokenStatus, updateUserIdStatus, isSkipConflictsEnabled, isSyncRecordEnabled, } from '../index.js';
 import { eventBus, BGM_EVENTS } from '../tools/events.js';
-import { refreshSheets, refreshWorkbooks, refreshData, autoDetectAndLockSheet, } from './panel-lifecycle.js';
+import { refreshSheets, refreshWorkbooks, refreshData, autoDetectAndLockSheet, } from './sync-panel-lifecycle.js';
 /**
  * 从 PluginStorage 恢复用户信息到内存缓存
  * Ribbon 设置的用户信息通过 PluginStorage 在 Ribbon 和 Panel 之间共享
@@ -156,8 +156,8 @@ export function startUserInfoPolling() {
             updateUserIdStatus();
         }
         // 同步 Ribbon 的配置变更到 Panel UI（跳过冲突，静默读取避免日志刷屏）
-        // 增量同步没有这一步：panel.html 的「仅同步变更」复选框已收拢到「设置」页
-        // （见 panel.html 的说明文案），主面板不再有 #chkIncremental 控件，
+        // 增量同步没有这一步：sync-panel.html 的「仅同步变更」复选框已收拢到「设置」页
+        // （见 sync-panel.html 的说明文案），主面板不再有 #checkboxIncremental 控件，
         // 保留该分支只会永久走进「元素不存在」的空转。
         const isCurrentSkipConflicts = isSkipConflictsEnabled(true);
         if (isCurrentSkipConflicts !== lastSkipConflicts) {
@@ -173,9 +173,9 @@ export function startUserInfoPolling() {
         if (isCurrentEnableSyncRecord !== lastEnableSyncRecord) {
             bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到同步记录开关变更: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}`);
             lastEnableSyncRecord = isCurrentEnableSyncRecord;
-            const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
-            if (chkEnableSyncRecord) {
-                chkEnableSyncRecord.checked = isCurrentEnableSyncRecord;
+            const checkboxEnableSyncRecord = document.getElementById('checkboxEnableSyncRecord');
+            if (checkboxEnableSyncRecord) {
+                checkboxEnableSyncRecord.checked = isCurrentEnableSyncRecord;
                 bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 启用同步记录 checkbox 已同步: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}`);
             }
         }
@@ -189,7 +189,7 @@ export function startUserInfoPolling() {
             refreshSheets({ autoSelectActive: true });
             refreshData();
         }
-        // 检测数据同步请求信号：Ribbon 点击"btnSyncFromGithub"时写入 bgm_request_github_sync 时间戳
+        // 检测数据同步请求信号：Ribbon 点击"buttonSyncFromGithub"时写入 bgm_request_github_sync 时间戳
         // panel 检测到后通过内部 eventBus 触发 syncFromGithub handler（显示模块化进度弹窗）
         const currentRequestGithubSync = app?.PluginStorage?.getItem('bgm_request_github_sync') ?? null;
         if (currentRequestGithubSync && currentRequestGithubSync !== lastRequestGithubSync) {
@@ -199,7 +199,7 @@ export function startUserInfoPolling() {
             // handlers 监听器会调用 ACTION_HANDLERS['syncFromGithub'] 显示进度弹窗
             eventBus.emit(BGM_EVENTS.REQUEST_GITHUB_SYNC, undefined);
         }
-        // 检测撤销同步请求信号：Ribbon 点击"btnUndoLastSync"时写入 bgm_request_undo_sync 时间戳
+        // 检测撤销同步请求信号：Ribbon 点击"buttonUndoLastSync"时写入 bgm_request_undo_sync 时间戳
         // panel 检测到后通过内部 eventBus 触发 undoLastSync handler（包含确认对话框和恢复操作）
         const currentRequestUndoSync = app?.PluginStorage?.getItem('bgm_request_undo_sync') ?? null;
         if (currentRequestUndoSync && currentRequestUndoSync !== lastRequestUndoSync) {

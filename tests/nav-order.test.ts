@@ -73,12 +73,27 @@ beforeEach(() => {
   resetConfigPollForTest()
   configStore.clear()
   document.body.replaceChildren()
-  document.body.dataset.page = 'panel'
+  document.body.dataset.page = 'sync-panel'
 })
 
 describe('nav-order 读取与自愈', () => {
   it('未设置时返回注册表默认顺序', () => {
-    expect(getNavOrder('panel')).toEqual((PAGE_MODULES.panel ?? []).map((m) => m.id))
+    expect(getNavOrder('sync-panel')).toEqual((PAGE_MODULES['sync-panel'] ?? []).map((m) => m.id))
+  })
+
+  it('2.3.0 的旧页面键 panel 会迁到 sync-panel（升级用户的自定义顺序不丢）', () => {
+    const defaults = (PAGE_MODULES['sync-panel'] ?? []).map((module) => module.id)
+    const reversed = [...defaults].reverse()
+    writeRaw(JSON.stringify({ panel: reversed }))
+    expect(getNavOrder('sync-panel')).toEqual(reversed)
+  })
+
+  it('迁完再重置，旧键不会被下一次读补回来', () => {
+    const defaults = (PAGE_MODULES['sync-panel'] ?? []).map((module) => module.id)
+    writeRaw(JSON.stringify({ panel: [...defaults].reverse() }))
+    expect(resetNavOrder('sync-panel')).toBe(true)
+    expect(getNavOrder('sync-panel')).toEqual(defaults)
+    expect(JSON.parse(configStore.get(CONFIG_KEYS.NAV_ORDER) ?? '{}')).not.toHaveProperty('panel')
   })
 
   it('未知页面返回空数组', () => {
@@ -86,49 +101,49 @@ describe('nav-order 读取与自愈', () => {
   })
 
   it('存储中的已知项按存储顺序返回', () => {
-    writeRaw(JSON.stringify({ panel: ['sec-preview', 'sec-command'] }))
-    const order = getNavOrder('panel')
+    writeRaw(JSON.stringify({ 'sync-panel': ['sec-preview', 'sec-command'] }))
+    const order = getNavOrder('sync-panel')
     expect(order.slice(0, 2)).toEqual(['sec-preview', 'sec-command'])
   })
 
   it('自愈：丢弃已下线模块，并把注册表新增模块补到末尾', () => {
-    writeRaw(JSON.stringify({ panel: ['sec-gone', 'sec-preview'] }))
-    const order = getNavOrder('panel')
+    writeRaw(JSON.stringify({ 'sync-panel': ['sec-gone', 'sec-preview'] }))
+    const order = getNavOrder('sync-panel')
     expect(order).not.toContain('sec-gone')
     expect(order[0]).toBe('sec-preview')
     // 结果始终是注册表的完整集合（无重复、无缺失）
-    const expected = sorted((PAGE_MODULES.panel ?? []).map((module) => module.id))
+    const expected = sorted((PAGE_MODULES['sync-panel'] ?? []).map((module) => module.id))
     expect(sorted(order)).toEqual(expected)
   })
 
   it('损坏的 JSON 回落到默认顺序且不抛错', () => {
     writeRaw('{不是 JSON')
-    expect(getNavOrder('panel')).toEqual((PAGE_MODULES.panel ?? []).map((m) => m.id))
+    expect(getNavOrder('sync-panel')).toEqual((PAGE_MODULES['sync-panel'] ?? []).map((m) => m.id))
   })
 
   it('存储为数组（非对象）时回落到默认顺序', () => {
     writeRaw(JSON.stringify(['a', 'b']))
-    expect(getNavOrder('panel')).toEqual((PAGE_MODULES.panel ?? []).map((m) => m.id))
+    expect(getNavOrder('sync-panel')).toEqual((PAGE_MODULES['sync-panel'] ?? []).map((m) => m.id))
   })
 
   it('去重：存储中重复的 id 只保留一次', () => {
-    writeRaw(JSON.stringify({ panel: ['sec-preview', 'sec-preview'] }))
-    const order = getNavOrder('panel')
+    writeRaw(JSON.stringify({ 'sync-panel': ['sec-preview', 'sec-preview'] }))
+    const order = getNavOrder('sync-panel')
     expect(order.filter((id) => id === 'sec-preview')).toHaveLength(1)
   })
 })
 
 describe('nav-order 写入', () => {
   it('setNavOrder 自动补全缺失模块', () => {
-    expect(setNavOrder('panel', ['sec-help'])).toBe(true)
-    const order = getNavOrder('panel')
+    expect(setNavOrder('sync-panel', ['sec-help'])).toBe(true)
+    const order = getNavOrder('sync-panel')
     expect(order[0]).toBe('sec-help')
-    expect(order).toHaveLength((PAGE_MODULES.panel ?? []).length)
+    expect(order).toHaveLength((PAGE_MODULES['sync-panel'] ?? []).length)
   })
 
   it('setNavOrder 拒绝未知模块 id', () => {
-    setNavOrder('panel', ['sec-nope', 'sec-preview'])
-    const order = getNavOrder('panel')
+    setNavOrder('sync-panel', ['sec-nope', 'sec-preview'])
+    const order = getNavOrder('sync-panel')
     expect(order).not.toContain('sec-nope')
     expect(order[0]).toBe('sec-preview')
   })
@@ -138,70 +153,70 @@ describe('nav-order 写入', () => {
   })
 
   it('resetNavOrder 删除该页存储项后回到默认顺序', () => {
-    setNavOrder('panel', ['sec-help'])
-    expect(getNavOrder('panel')[0]).toBe('sec-help')
-    expect(resetNavOrder('panel')).toBe(true)
-    expect(getNavOrder('panel')).toEqual((PAGE_MODULES.panel ?? []).map((m) => m.id))
+    setNavOrder('sync-panel', ['sec-help'])
+    expect(getNavOrder('sync-panel')[0]).toBe('sec-help')
+    expect(resetNavOrder('sync-panel')).toBe(true)
+    expect(getNavOrder('sync-panel')).toEqual((PAGE_MODULES['sync-panel'] ?? []).map((m) => m.id))
   })
 
   it('resetNavOrder 对未设置过的页面是幂等成功', () => {
-    expect(resetNavOrder('panel')).toBe(true)
+    expect(resetNavOrder('sync-panel')).toBe(true)
   })
 
   it('重置一页不影响另一页', () => {
-    setNavOrder('panel', ['sec-help'])
+    setNavOrder('sync-panel', ['sec-help'])
     setNavOrder('enrich', ['sec-tips'])
-    resetNavOrder('panel')
+    resetNavOrder('sync-panel')
     expect(getNavOrder('enrich')[0]).toBe('sec-tips')
   })
 })
 
 describe('nav-order 移动', () => {
   it('moveModuleBy 上移一位', () => {
-    const before = getNavOrder('panel')
+    const before = getNavOrder('sync-panel')
     const target = before[2] ?? ''
-    moveModuleBy('panel', target, -1)
-    expect(getNavOrder('panel')[1]).toBe(target)
+    moveModuleBy('sync-panel', target, -1)
+    expect(getNavOrder('sync-panel')[1]).toBe(target)
   })
 
   it('moveModuleBy 首项上移无变化但返回 true', () => {
-    const first = getNavOrder('panel')[0] ?? ''
-    expect(moveModuleBy('panel', first, -1)).toBe(true)
-    expect(getNavOrder('panel')[0]).toBe(first)
+    const first = getNavOrder('sync-panel')[0] ?? ''
+    expect(moveModuleBy('sync-panel', first, -1)).toBe(true)
+    expect(getNavOrder('sync-panel')[0]).toBe(first)
   })
 
   it('moveModuleBy 未找到模块返回 false', () => {
-    expect(moveModuleBy('panel', 'sec-nope', 1)).toBe(false)
+    expect(moveModuleBy('sync-panel', 'sec-nope', 1)).toBe(false)
   })
 
   it('moveModuleTo 目标下标超界时夹取到末尾', () => {
-    const before = getNavOrder('panel')
+    const before = getNavOrder('sync-panel')
     const target = before[0] ?? ''
-    moveModuleTo('panel', target, 999)
-    expect(getNavOrder('panel').at(-1)).toBe(target)
+    moveModuleTo('sync-panel', target, 999)
+    expect(getNavOrder('sync-panel').at(-1)).toBe(target)
   })
 
   it('moveModuleTo 负下标夹取到首位', () => {
-    const before = getNavOrder('panel')
+    const before = getNavOrder('sync-panel')
     const target = before.at(-1) ?? ''
-    moveModuleTo('panel', target, -5)
-    expect(getNavOrder('panel')[0]).toBe(target)
+    moveModuleTo('sync-panel', target, -5)
+    expect(getNavOrder('sync-panel')[0]).toBe(target)
   })
 })
 
 describe('applyNavOrder 就地重排 DOM', () => {
   it('按配置重排主区子元素顺序', () => {
     buildPanelDom()
-    setNavOrder('panel', ['sec-scope', 'sec-command', 'sec-account'])
-    applyNavOrder('panel')
+    setNavOrder('sync-panel', ['sec-scope', 'sec-command', 'sec-account'])
+    applyNavOrder('sync-panel')
     const ids = mainChildIds()
     expect(ids.indexOf('sec-scope')).toBeLessThan(ids.indexOf('sec-account'))
   })
 
   it('侧栏锚点顺序同步重排，与主区一致', () => {
     buildPanelDom()
-    setNavOrder('panel', ['sec-scope', 'sec-account', 'sec-command'])
-    applyNavOrder('panel')
+    setNavOrder('sync-panel', ['sec-scope', 'sec-account', 'sec-command'])
+    applyNavOrder('sync-panel')
     const hrefs = [...document.querySelectorAll('.nav a')].map((anchor) =>
       (anchor.getAttribute('href') ?? '').slice(1),
     )
@@ -211,8 +226,8 @@ describe('applyNavOrder 就地重排 DOM', () => {
   it('回归：通栏 command-center 被排到中段时仍须置首行（style.order 最小）', () => {
     buildPanelDom()
     // 故意把通栏项排到中间 —— 修复前它会被排到中段并挤掉上方自动项
-    setNavOrder('panel', ['sec-account', 'sec-command', 'sec-scope'])
-    applyNavOrder('panel')
+    setNavOrder('sync-panel', ['sec-account', 'sec-command', 'sec-scope'])
+    applyNavOrder('sync-panel')
     const commandElement = document.getElementById('sec-command')!
     // 通栏项 order 必须小于所有非通栏项，否则栅格会把自动项挤到它下方形成空洞
     const others = [...document.querySelectorAll<HTMLElement>('main.main > *')]
@@ -244,14 +259,14 @@ describe('applyNavOrder 就地重排 DOM', () => {
 })
 
 describe('nav-order 页面注册表', () => {
-  it('六个页面全部登记：panel / enrich / clean / highlight / conditional-format / settings', () => {
+  it('六个页面全部登记：sync-panel / enrich / clean / highlight / conditional-format / settings', () => {
     expect([...ORDERABLE_PAGES].sort((a, b) => a.localeCompare(b))).toEqual([
       'clean',
       'conditional-format',
       'enrich',
       'highlight',
-      'panel',
       'settings',
+      'sync-panel',
     ])
   })
 
@@ -322,7 +337,7 @@ describe('startNavOrderSync 跨页同步', () => {
 
   it('容错：轮询读取异常不抛出', () => {
     vi.useFakeTimers()
-    startNavOrderSync('panel')
+    startNavOrderSync('sync-panel')
     const original = configStore.get.bind(configStore)
     const spy = vi.spyOn(configStore, 'get').mockImplementationOnce(() => {
       throw new Error('read fail')

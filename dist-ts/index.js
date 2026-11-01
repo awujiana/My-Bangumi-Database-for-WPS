@@ -229,7 +229,7 @@ _fetchBgmUserInfo,
 // 请求 Bangumi 当前登录用户资料（Promise + 带 HTTP status 的判别联合）
 fetchBgmMe, 
 // 显示主面板
-showBangumiPanel, 
+showSyncPanel, 
 // 显示设置面板（带动态停靠位置）
 showSettingsPanel, 
 // 显示新番表富化面板
@@ -325,13 +325,13 @@ autoFillUrls,
 // 显示确认对话框后执行
 showAutoFillUrlDialog, } from './tools/auto-fill-url.js';
 // ============================================================================
-// 15. 页面逻辑（来自 panel/panel-page.js）
+// 15. 页面逻辑（来自 panel/sync-panel-page.js）
 // ============================================================================
 export { refreshSheets, refreshWorkbooks, toggleSheetLock, 
 // 刷新数据预览
 refreshData, 
 // 放大预览表格
-enlargePreview, } from './panel/panel-page.js';
+enlargePreview, } from './panel/sync-panel-page.js';
 // 预览函数
 export { 
 // 显示预览内容

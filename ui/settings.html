@@ -29,12 +29,16 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-text">
-            <span class="brand-title">⚙️ BGM 设置</span>
-            <span class="brand-sub">插件配置管理 · 外观与导航 · 同步偏好 · 模块排序</span>
+            <span data-i18n="settings.app.title" class="brand-title">⚙️ BGM 设置</span>
+            <span data-i18n="settings.app.subtitle" class="brand-sub"
+              >插件配置管理 · 外观与导航 · 同步偏好 · 模块排序</span
+            >
           </div>
         </div>
         <div class="topbar-actions">
           <button
+            data-i18n-title="settings.header.exportAria"
+            data-i18n-aria-label="settings.header.exportAria"
             class="header-icon-btn"
             data-action="exportConfig"
             title="导出所有配置"
@@ -56,6 +60,8 @@
             </svg>
           </button>
           <button
+            data-i18n-title="settings.header.importAria"
+            data-i18n-aria-label="settings.header.importAria"
             class="header-icon-btn"
             data-action="importConfig"
             title="导入配置"
@@ -81,84 +87,116 @@
 
       <!-- ===================== 侧栏（功能导航） ===================== -->
       <aside class="sidebar">
-        <nav class="nav" aria-label="功能导航">
-          <div class="nav-label">功能导航</div>
-          <a href="#sec-appearance" title="外观与导航"
-            ><span class="nav-ico">🎨</span><span class="nav-text">外观与导航</span></a
+        <nav data-i18n-aria-label="settings.nav.label" class="nav" aria-label="功能导航">
+          <div data-i18n="settings.nav.label" class="nav-label">功能导航</div>
+          <a data-i18n-title="settings.nav.appearance" href="#sec-appearance" title="外观与导航"
+            ><span class="nav-ico">🎨</span
+            ><span data-i18n="settings.nav.appearance" class="nav-text">外观与导航</span></a
           >
-          <a href="#sec-modules" title="模块排序"
-            ><span class="nav-ico">🧩</span><span class="nav-text">模块排序</span></a
+          <a data-i18n-title="settings.nav.modules" href="#sec-modules" title="模块排序"
+            ><span class="nav-ico">🧩</span
+            ><span data-i18n="settings.nav.modules" class="nav-text">模块排序</span></a
           >
-          <a href="#sec-shortcuts" title="快捷键"
-            ><span class="nav-ico">⌨️</span><span class="nav-text">快捷键</span></a
+          <a data-i18n-title="settings.nav.shortcuts" href="#sec-shortcuts" title="快捷键"
+            ><span class="nav-ico">⌨️</span
+            ><span data-i18n="settings.nav.shortcuts" class="nav-text">快捷键</span></a
           >
-          <a href="#sec-accounts" title="账号"
-            ><span class="nav-ico">👤</span><span class="nav-text">账号</span></a
+          <a data-i18n-title="settings.nav.accounts" href="#sec-accounts" title="账号"
+            ><span class="nav-ico">👤</span
+            ><span data-i18n="settings.nav.accounts" class="nav-text">账号</span></a
           >
-          <a href="#sec-sync-pref" title="同步偏好"
-            ><span class="nav-ico">🔄</span><span class="nav-text">同步偏好</span></a
+          <a data-i18n-title="settings.nav.syncPref" href="#sec-sync-pref" title="同步偏好"
+            ><span class="nav-ico">🔄</span
+            ><span data-i18n="settings.nav.syncPref" class="nav-text">同步偏好</span></a
           >
-          <a href="#sec-enrich-preview" title="富化预览"
-            ><span class="nav-ico">✨</span><span class="nav-text">富化预览</span></a
+          <a
+            data-i18n-title="settings.nav.enrichPreview"
+            href="#sec-enrich-preview"
+            title="富化预览"
+            ><span class="nav-ico">✨</span
+            ><span data-i18n="settings.nav.enrichPreview" class="nav-text">富化预览</span></a
           >
-          <a href="#sec-feature-toggles" title="功能开关"
-            ><span class="nav-ico">⚙️</span><span class="nav-text">功能开关</span></a
+          <a
+            data-i18n-title="settings.nav.featureToggles"
+            href="#sec-feature-toggles"
+            title="功能开关"
+            ><span class="nav-ico">⚙️</span
+            ><span data-i18n="settings.nav.featureToggles" class="nav-text">功能开关</span></a
           >
-          <a href="#sec-cf-pref" title="条件格式"
-            ><span class="nav-ico">🎨</span><span class="nav-text">条件格式</span></a
+          <a data-i18n-title="settings.nav.cfPref" href="#sec-cf-pref" title="条件格式"
+            ><span class="nav-ico">🎨</span
+            ><span data-i18n="settings.nav.cfPref" class="nav-text">条件格式</span></a
           >
-          <a href="#sec-paths" title="默认路径"
-            ><span class="nav-ico">📁</span><span class="nav-text">默认路径</span></a
+          <a data-i18n-title="settings.nav.paths" href="#sec-paths" title="默认路径"
+            ><span class="nav-ico">📁</span
+            ><span data-i18n="settings.nav.paths" class="nav-text">默认路径</span></a
           >
-          <a href="#sec-log-pref" title="日志偏好"
-            ><span class="nav-ico">📜</span><span class="nav-text">日志偏好</span></a
+          <a data-i18n-title="settings.nav.logPref" href="#sec-log-pref" title="日志偏好"
+            ><span class="nav-ico">📜</span
+            ><span data-i18n="settings.nav.logPref" class="nav-text">日志偏好</span></a
           >
-          <a href="#sec-data" title="配置管理"
-            ><span class="nav-ico">📦</span><span class="nav-text">配置管理</span></a
+          <a data-i18n-title="settings.nav.data" href="#sec-data" title="配置管理"
+            ><span class="nav-ico">📦</span
+            ><span data-i18n="settings.nav.data" class="nav-text">配置管理</span></a
           >
-          <a href="#sec-export" title="数据导出"
-            ><span class="nav-ico">📤</span><span class="nav-text">数据导出</span></a
+          <a data-i18n-title="settings.nav.export" href="#sec-export" title="数据导出"
+            ><span class="nav-ico">📤</span
+            ><span data-i18n="settings.nav.export" class="nav-text">数据导出</span></a
           >
-          <a href="#sec-about" title="关于"
-            ><span class="nav-ico">ℹ️</span><span class="nav-text">关于</span></a
+          <a data-i18n-title="settings.nav.about" href="#sec-about" title="关于"
+            ><span class="nav-ico">ℹ️</span
+            ><span data-i18n="settings.nav.about" class="nav-text">关于</span></a
           >
         </nav>
       </aside>
 
       <!-- ===================== 主区 ===================== -->
       <main class="main">
-        <!-- 外观与导航（主题模式 + 导航显示模式） -->
+        <!-- 外观与导航（主题模式 + 界面语言 + 导航显示模式） -->
         <section class="section" id="sec-appearance" data-detachable>
           <h3>
-            🎨 外观与导航<button
+            <span data-i18n="settings.appearance.title">🎨 外观与导航</span
+            ><button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-appearance"
               aria-expanded="true"
               aria-label="折叠 / 展开「外观与导航」"
+              data-i18n-aria-label="settings.appearance.collapseAria"
             >
               ▾
             </button>
           </h3>
           <div class="form-group">
-            <label>主题模式</label>
+            <label data-i18n="settings.appearance.themeLabel">主题模式</label>
             <!-- 按钮式分段控件（替代原下拉栏，momo：用 CodePen 那种按钮形式）。
-                 点击深色 / 浅色时带「从按钮中心向外扩散」的过渡动画。 -->
-            <div class="theme-mode-group" role="group" aria-label="主题模式">
+                 点击深色 / 浅色时带「从按钮中心向外扩散」的过渡动画。
+                 文字单独包一层 span：data-i18n 会整段替换 textContent，
+                 挂在按钮上会把里面的图标 span 一起抹掉。 -->
+            <div
+              class="theme-mode-group"
+              role="group"
+              aria-label="主题模式"
+              data-i18n-aria-label="settings.appearance.themeLabel"
+            >
               <button type="button" class="theme-mode-btn" data-theme-mode="dark">
-                <span class="theme-mode-icon" aria-hidden="true">🌙</span>深色
+                <span class="theme-mode-icon" aria-hidden="true">🌙</span
+                ><span data-i18n="settings.appearance.themeDark">深色</span>
               </button>
               <button type="button" class="theme-mode-btn" data-theme-mode="light">
-                <span class="theme-mode-icon" aria-hidden="true">☀️</span>浅色
+                <span class="theme-mode-icon" aria-hidden="true">☀️</span
+                ><span data-i18n="settings.appearance.themeLight">浅色</span>
               </button>
               <button type="button" class="theme-mode-btn" data-theme-mode="system">
-                <span class="theme-mode-icon" aria-hidden="true">🖥️</span>跟随系统
+                <span class="theme-mode-icon" aria-hidden="true">🖥️</span
+                ><span data-i18n="settings.appearance.themeSystem">跟随系统</span>
               </button>
               <button type="button" class="theme-mode-btn" data-theme-mode="schedule">
-                <span class="theme-mode-icon" aria-hidden="true">⏰</span>定时
+                <span class="theme-mode-icon" aria-hidden="true">⏰</span
+                ><span data-i18n="settings.appearance.themeSchedule">定时</span>
               </button>
             </div>
-            <p class="hint">
+            <p class="hint" data-i18n="settings.appearance.themeHint">
               深色 / 浅色点一下就以按钮为中心扩散切换；「跟随系统」自动匹配操作系统外观；
               「定时」按下面两个时刻每天自动切换。
             </p>
@@ -166,7 +204,7 @@
           <!-- 定时切换的开始时刻（仅「定时」模式显示） -->
           <div class="theme-schedule-box" id="themeScheduleBox" hidden>
             <div class="theme-schedule-row">
-              <label for="themeDarkStart">深色开始</label>
+              <label for="themeDarkStart" data-i18n="settings.appearance.darkStart">深色开始</label>
               <input
                 type="time"
                 id="themeDarkStart"
@@ -175,7 +213,9 @@
               />
             </div>
             <div class="theme-schedule-row">
-              <label for="themeLightStart">浅色开始</label>
+              <label for="themeLightStart" data-i18n="settings.appearance.lightStart"
+                >浅色开始</label
+              >
               <input
                 type="time"
                 id="themeLightStart"
@@ -183,7 +223,7 @@
                 value="07:00"
               />
             </div>
-            <p class="hint">
+            <p class="hint" data-i18n="settings.appearance.scheduleHint">
               两个时刻之间是浅色，其余时间深色（例：07:00 浅 → 19:00 深）。支持跨零点 （深色
               02:00、浅色 08:00 表示夜间深色）。
             </p>
@@ -192,6 +232,8 @@
                点一下 = 在深色 / 浅色之间切换，太阳 / 月亮滑块滑动 + 全应用扩散动画。 -->
           <div class="theme-toggle-row">
             <button
+              data-i18n-title="settings.appearance.themeToggleTitle"
+              data-i18n-aria-label="settings.appearance.themeToggleAria"
               type="button"
               class="theme-toggle"
               id="themeToggleBtn"
@@ -236,34 +278,77 @@
             <span class="theme-toggle-state" id="themeToggleState">当前：深色</span>
           </div>
           <label class="check-row">
-            <input type="checkbox" id="chkNavIconsOnly" data-action="toggleNavIconsOnly" />
-            <span>导航仅显示图标（鼠标悬停显示名称）</span>
+            <input type="checkbox" id="checkboxNavIconsOnly" data-action="toggleNavIconsOnly" />
+            <span data-i18n="settings.appearance.navIconsOnly"
+              >导航仅显示图标（鼠标悬停显示名称）</span
+            >
           </label>
-          <p class="hint">勾选后侧栏导航仅显示图标，鼠标悬停时显示名称；在三个页面中同时生效。</p>
+          <p data-i18n="settings.appearance.navIconsOnlyHint" class="hint">
+            勾选后侧栏导航仅显示图标，鼠标悬停时显示名称；在三个页面中同时生效。
+          </p>
 
           <!-- 模态框按钮位置（momo：确定/取消可放到模态框之外） -->
           <div class="form-group">
-            <label>模态框按钮位置</label>
-            <div class="theme-mode-group" role="group" aria-label="模态框按钮位置">
-              <button type="button" class="theme-mode-btn" data-modal-buttons-position="inside">
+            <label data-i18n="settings.appearance.modalButtonsLabel">模态框按钮位置</label>
+            <div
+              data-i18n-aria-label="settings.appearance.modalButtonsLabel"
+              class="theme-mode-group"
+              role="group"
+              aria-label="模态框按钮位置"
+            >
+              <button
+                data-i18n="settings.appearance.modalButtonsInside"
+                type="button"
+                class="theme-mode-btn"
+                data-modal-buttons-position="inside"
+              >
                 模态框内（底部）
               </button>
-              <button type="button" class="theme-mode-btn" data-modal-buttons-position="outside">
+              <button
+                data-i18n="settings.appearance.modalButtonsOutside"
+                type="button"
+                class="theme-mode-btn"
+                data-modal-buttons-position="outside"
+              >
                 模态框外（标题栏右上角）
               </button>
             </div>
-            <p class="hint">
+            <p data-i18n="settings.appearance.modalButtonsHint" class="hint">
               「模态框外」把确定 / 取消挪到标题栏那一行（与 ⛶ 最大化 / ▾ 收起同排），
               输入框下方不再被按钮占位——短弹窗（粘贴规则、归组命名）更紧凑。
               改动对下次打开的弹框生效。
             </p>
+          </div>
+
+          <!-- 界面语言（第一批：简体 / 繁體 / English）
+               切完立即生效，任务窗格靠 PluginStorage 轮询同步；
+               Ribbon 只有 tab 名能运行时刷新，按钮文案要重启（见 文档/待办-多语言支持.md §3） -->
+          <div class="form-group">
+            <label data-i18n="settings.appearance.languageLabel">界面语言</label>
+            <div
+              class="theme-mode-group"
+              role="group"
+              aria-label="界面语言"
+              data-i18n-aria-label="settings.appearance.languageGroupAria"
+            >
+              <button type="button" class="theme-mode-btn" data-locale="zh-CN">简体中文</button>
+              <button type="button" class="theme-mode-btn" data-locale="zh-TW">繁體中文</button>
+              <button type="button" class="theme-mode-btn" data-locale="en">English</button>
+            </div>
+            <p class="hint" data-i18n="settings.appearance.languageHint">
+              点一下就换，不用重启 WPS。任务窗格立即生效；Ribbon 上的按钮文案要等下次启动 WPS
+              才换（WPS 只允许 tab 名在运行时刷新）。
+            </p>
+            <p class="hint" id="localeCoverage" hidden></p>
           </div>
         </section>
 
         <!-- 模块排序（设置其他页面功能模块的显示顺序） -->
         <section class="section" id="sec-modules" data-detachable>
           <h3>
-            🧩 模块排序<button
+            <span data-i18n="settings.modules.title">🧩 模块排序</span
+            ><button
+              data-i18n-aria-label="settings.modules.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-modules"
@@ -273,11 +358,11 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.modules.hint" class="hint">
             调整各页面功能模块的显示顺序。侧栏导航与主区模块会同步重排，调整后立即保存并同步到对应页面。支持
             ↑↓ 按钮（键盘可达）与鼠标拖拽两种方式。
           </p>
-          <p class="hint">
+          <p data-i18n="settings.modules.sidebarHint" class="hint">
             每组顶部的「🧭 功能导航（侧栏）」也能点 👁️ 隐藏——把整条侧栏收掉、主区铺满宽度，
             适合窄任务窗格；隐藏后回到这里点 🚫 即可恢复（每页独立记录）。
           </p>
@@ -287,7 +372,9 @@
         <!-- 快捷键（键盘组合 + 侧栏导航上的鼠标手势） -->
         <section class="section" id="sec-shortcuts" data-detachable>
           <h3>
-            ⌨️ 快捷键<button
+            <span data-i18n="settings.shortcuts.title">⌨️ 快捷键</span
+            ><button
+              data-i18n-aria-label="settings.shortcuts.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-shortcuts"
@@ -299,10 +386,12 @@
           </h3>
           <div id="shortcutPanel">
             <label class="check-row">
-              <input type="checkbox" id="chkShortcutsEnabled" />
-              <span>启用全局快捷键（键盘组合 + 侧栏鼠标手势）</span>
+              <input type="checkbox" id="checkboxShortcutsEnabled" />
+              <span data-i18n="settings.shortcuts.enableLabel"
+                >启用全局快捷键（键盘组合 + 侧栏鼠标手势）</span
+              >
             </label>
-            <p class="hint">
+            <p data-i18n="settings.shortcuts.hint" class="hint">
               键盘快捷键在所有页面生效；焦点在输入框 /
               下拉框里时不抢键。点右侧组合按钮后按下新按键即可改绑，Esc
               取消；与其它动作重复的组合不会保存，并在下方提示占用者。
@@ -311,7 +400,12 @@
             <p class="shortcut-conflicts" id="shortcutConflicts" hidden></p>
             <div id="shortcutMouseRows"></div>
             <div class="bgm-btn-group bgm-btn-row">
-              <button class="bgm-btn small" type="button" data-shortcut-reset-all="1">
+              <button
+                data-i18n="settings.shortcuts.resetAll"
+                class="bgm-btn small"
+                type="button"
+                data-shortcut-reset-all="1"
+              >
                 ↩️ 全部恢复默认
               </button>
             </div>
@@ -321,7 +415,9 @@
         <!-- 账号（多账号切换：记录多个 Token，长按头像切换） -->
         <section class="section" id="sec-accounts" data-detachable>
           <h3>
-            👤 账号<button
+            <span data-i18n="settings.accounts.title">👤 账号</span
+            ><button
+              data-i18n-aria-label="settings.accounts.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-accounts"
@@ -331,18 +427,23 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.accounts.hint" class="hint">
             记录多个 Bangumi 账号的 Token，之后可**长按右上角头像**一键切换。切换只改写当前生效的
             Token / 用户 ID，表格数据与已同步内容不受影响。
           </p>
           <div id="accountPanel">
             <div class="account-list" id="accountList"></div>
             <div class="bgm-btn-group bgm-btn-row">
-              <button class="bgm-btn small primary" type="button" data-account-add="1">
+              <button
+                data-i18n="settings.accounts.recordCurrent"
+                class="bgm-btn small primary"
+                type="button"
+                data-account-add="1"
+              >
                 ➕ 记录当前账号
               </button>
             </div>
-            <p class="hint">
+            <p data-i18n="settings.accounts.recordHint" class="hint">
               「记录当前账号」把现在生效的 Token 与识别到的用户 ID
               存成一条档案（同一账号重复记录只更新，不重复）。最多保留 8 个。
             </p>
@@ -352,7 +453,9 @@
         <!-- 同步偏好（跨会话生效的同步相关默认值） -->
         <section class="section" id="sec-sync-pref" data-detachable>
           <h3>
-            🔄 同步偏好<button
+            <span data-i18n="settings.syncPref.title">🔄 同步偏好</span
+            ><button
+              data-i18n-aria-label="settings.syncPref.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-sync-pref"
@@ -363,45 +466,64 @@
             </button>
           </h3>
           <label class="check-row">
-            <input type="checkbox" id="chkIncrementalSync" data-action="toggleIncrementalSync" />
-            <span>仅同步变更（增量同步）</span>
+            <input
+              type="checkbox"
+              id="checkboxIncrementalSync"
+              data-action="toggleIncrementalSync"
+            />
+            <span data-i18n="settings.syncPref.incremental">仅同步变更（增量同步）</span>
           </label>
           <label class="check-row">
-            <input type="checkbox" id="chkSkipConflicts" data-action="toggleSkipConflicts" />
-            <span>跳过冲突（保留 Bangumi 数据）</span>
+            <input type="checkbox" id="checkboxSkipConflicts" data-action="toggleSkipConflicts" />
+            <span data-i18n="settings.syncPref.skipConflicts">跳过冲突（保留 Bangumi 数据）</span>
           </label>
           <label class="check-row">
-            <input type="checkbox" id="chkEnableSyncRecord" data-action="toggleEnableSyncRecord" />
-            <span>启用同步记录</span>
+            <input
+              type="checkbox"
+              id="checkboxEnableSyncRecord"
+              data-action="toggleEnableSyncRecord"
+            />
+            <span data-i18n="settings.syncPref.enableRecord">启用同步记录</span>
           </label>
 
           <div class="form-group" style="margin-top: 16px">
-            <label for="listTypeSelect">默认收藏列表类型</label>
+            <label data-i18n="settings.syncPref.collectionTypeLabel" for="listTypeSelect"
+              >默认收藏列表类型</label
+            >
             <select id="listTypeSelect" class="input">
-              <option value="all">全部收藏</option>
-              <option value="collect">已看</option>
-              <option value="wish">想看</option>
-              <option value="do">在看</option>
+              <option data-i18n="settings.syncPref.collectionAll" value="all">全部收藏</option>
+              <option data-i18n="settings.syncPref.collectionWatched" value="collect">已看</option>
+              <option data-i18n="settings.syncPref.collectionWish" value="wish">想看</option>
+              <option data-i18n="settings.syncPref.collectionWatching" value="do">在看</option>
             </select>
-            <p class="hint">执行「收藏下载」时默认使用的列表类型。</p>
+            <p data-i18n="settings.syncPref.collectionTypeHint" class="hint">
+              执行「收藏下载」时默认使用的列表类型。
+            </p>
           </div>
 
           <div class="form-group">
-            <label for="timeFilterSelect">默认时间筛选范围</label>
+            <label data-i18n="settings.syncPref.timeFilterLabel" for="timeFilterSelect"
+              >默认时间筛选范围</label
+            >
             <select id="timeFilterSelect" class="input">
-              <option value="all">全部时间</option>
-              <option value="year">全年</option>
-              <option value="quarter">季度新番</option>
-              <option value="month">月份</option>
-              <option value="future">预告 / 未来</option>
+              <option data-i18n="settings.syncPref.timeAll" value="all">全部时间</option>
+              <option data-i18n="settings.syncPref.timeYear" value="year">全年</option>
+              <option data-i18n="settings.syncPref.timeSeason" value="quarter">季度新番</option>
+              <option data-i18n="settings.syncPref.timeMonth" value="month">月份</option>
+              <option data-i18n="settings.syncPref.timeUpcoming" value="future">预告 / 未来</option>
             </select>
-            <p class="hint">远程数据同步时默认应用的时间筛选范围。</p>
+            <p data-i18n="settings.syncPref.timeFilterHint" class="hint">
+              远程数据同步时默认应用的时间筛选范围。
+            </p>
           </div>
 
           <div class="form-group">
-            <label for="refreshIntervalInput">自动刷新间隔（分钟）</label>
+            <label data-i18n="settings.syncPref.refreshIntervalLabel" for="refreshIntervalInput"
+              >自动刷新间隔（分钟）</label
+            >
             <div class="input-with-unit">
               <input
+                data-i18n-placeholder="settings.syncPref.refreshIntervalPlaceholder"
                 type="number"
                 id="refreshIntervalInput"
                 class="input"
@@ -412,12 +534,14 @@
                 autocomplete="off"
                 spellcheck="false"
               />
-              <span class="input-unit">分钟</span>
+              <span data-i18n="settings.syncPref.minutes" class="input-unit">分钟</span>
             </div>
-            <p class="hint">0 表示关闭自动刷新；有效范围 1–1440 分钟。</p>
+            <p data-i18n="settings.syncPref.refreshIntervalHint" class="hint">
+              0 表示关闭自动刷新；有效范围 1–1440 分钟。
+            </p>
           </div>
 
-          <p class="hint">
+          <p data-i18n="settings.syncPref.operationParamsHint" class="hint">
             冲突处理方式、远程仓库地址、Token
             等「本次操作参数」保留在各操作页面，便于同步时就地确认与修改。
           </p>
@@ -426,7 +550,9 @@
         <!-- 富化预览 -->
         <section class="section" id="sec-enrich-preview" data-detachable>
           <h3>
-            ✨ 富化预览<button
+            <span data-i18n="settings.enrichPreview.title">✨ 富化预览</span
+            ><button
+              data-i18n-aria-label="settings.enrichPreview.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-enrich-preview"
@@ -436,27 +562,37 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.enrichPreview.hint" class="hint">
             控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色、标签/首播/平台着色，以及需要过滤的噪声关键词。
           </p>
           <label class="check-row">
             <input type="checkbox" id="enrichTagsColor" checked />
-            <span>TAGS 标签彩色化（每个标签独立颜色，相同标签同色，不显示 / 分隔符）</span>
+            <span data-i18n="settings.enrichPreview.tagsColored"
+              >TAGS 标签彩色化（每个标签独立颜色，相同标签同色，不显示 / 分隔符）</span
+            >
           </label>
           <label class="check-row">
             <input type="checkbox" id="enrichPremiereColor" checked />
-            <span>首播日期着色（相同日期同色）</span>
+            <span data-i18n="settings.enrichPreview.airDateColored"
+              >首播日期着色（相同日期同色）</span
+            >
           </label>
           <label class="check-row">
             <input type="checkbox" id="enrichPlatformColor" checked />
-            <span>播放平台着色（相同平台同色）</span>
+            <span data-i18n="settings.enrichPreview.platformColored"
+              >播放平台着色（相同平台同色）</span
+            >
           </label>
           <label class="check-row">
             <input type="checkbox" id="enrichAutoClean" checked />
-            <span>富化完成后自动执行合并去重（按名称保留含 URL 行、合并标签、删除重复行）</span>
+            <span data-i18n="settings.enrichPreview.autoDedupe"
+              >富化完成后自动执行合并去重（按名称保留含 URL 行、合并标签、删除重复行）</span
+            >
           </label>
           <div class="form-group">
-            <label for="enrichEpSingle">「单集」阈值</label>
+            <label data-i18n="settings.enrichPreview.singleThresholdLabel" for="enrichEpSingle"
+              >「单集」阈值</label
+            >
             <input
               type="number"
               id="enrichEpSingle"
@@ -466,10 +602,14 @@
               step="1"
               style="width: 100px"
             />
-            <p class="hint">集数等于此值时显示橙色徽章。默认 1。</p>
+            <p data-i18n="settings.enrichPreview.singleThresholdHint" class="hint">
+              集数等于此值时显示橙色徽章。默认 1。
+            </p>
           </div>
           <div class="form-group">
-            <label for="enrichEpFull">「完结」阈值</label>
+            <label data-i18n="settings.enrichPreview.finishedThresholdLabel" for="enrichEpFull"
+              >「完结」阈值</label
+            >
             <input
               type="number"
               id="enrichEpFull"
@@ -479,14 +619,17 @@
               step="1"
               style="width: 100px"
             />
-            <p class="hint">
+            <p data-i18n-html="settings.enrichPreview.finishedThresholdHint" class="hint">
               集数等于此值时<b>不显示颜色</b>；大于此值显示绿色徽章；小于此值（且不等于单集阈值）显示黄色徽章。默认
               12。
             </p>
           </div>
           <div class="form-group">
-            <label for="enrichFilterKeywords">过滤噪声关键词</label>
+            <label data-i18n="settings.enrichPreview.noiseLabel" for="enrichFilterKeywords"
+              >过滤噪声关键词</label
+            >
             <textarea
+              data-i18n-placeholder="settings.enrichPreview.noisePlaceholder"
               id="enrichFilterKeywords"
               class="input"
               rows="3"
@@ -498,16 +641,24 @@
                 font-size: 12px;
               "
             ></textarea>
-            <p class="hint">
+            <p data-i18n="settings.enrichPreview.noiseHint" class="hint">
               包含任一关键词（子串匹配）的播放平台/标签将被过滤掉。多个关键词用换行或逗号分隔。已默认过滤「示例」「新番表
               by Hazx」「版权平台标注示例」等噪声。
             </p>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" data-action="saveEnrichPreviewSettings">
+            <button
+              data-i18n="settings.common.save"
+              class="bgm-btn small primary"
+              data-action="saveEnrichPreviewSettings"
+            >
               💾 保存
             </button>
-            <button class="bgm-btn small" data-action="reloadEnrichPreviewSettings">
+            <button
+              data-i18n="settings.common.discard"
+              class="bgm-btn small"
+              data-action="reloadEnrichPreviewSettings"
+            >
               ↩️ 放弃修改
             </button>
           </div>
@@ -516,7 +667,9 @@
         <!-- 功能开关（原散在「番剧高亮」等页内的全局开关，集中到此管理） -->
         <section class="section" id="sec-feature-toggles" data-detachable>
           <h3>
-            ⚙️ 功能开关<button
+            <span data-i18n="settings.featureToggles.title">⚙️ 功能开关</span
+            ><button
+              data-i18n-aria-label="settings.featureToggles.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-feature-toggles"
@@ -526,33 +679,55 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.featureToggles.hint" class="hint">
             原先散在各工具页面内的全局开关集中到此统一管理。各页面每次加载工作表前会重读此处配置，保存后切到对应页面操作即生效。
           </p>
           <label class="check-row">
             <input type="checkbox" id="highlightAutoWatch" />
-            <span>高亮 · 自动关注（工作表变动时自动重算并跟随高亮；默认关闭）</span>
+            <span data-i18n="settings.featureToggles.highlightAutoFollow"
+              >高亮 · 自动关注（工作表变动时自动重算并跟随高亮；默认关闭）</span
+            >
           </label>
           <div class="form-group">
-            <label for="highlightMode">高亮 · 高亮模式</label>
+            <label data-i18n="settings.featureToggles.highlightModeLabel" for="highlightMode"
+              >高亮 · 高亮模式</label
+            >
             <select id="highlightMode" class="input">
-              <option value="auto">自动（按所选日期列识别最新一季）</option>
-              <option value="manual">手动（在页面内指定年月）</option>
+              <option data-i18n="settings.featureToggles.highlightModeAuto" value="auto">
+                自动（按所选日期列识别最新一季）
+              </option>
+              <option data-i18n="settings.featureToggles.highlightModeManual" value="manual">
+                手动（在页面内指定年月）
+              </option>
             </select>
-            <p class="hint">自动模式按日期源识别最新季度；手动模式切到高亮页后指定年月。</p>
+            <p data-i18n="settings.featureToggles.highlightModeHint" class="hint">
+              自动模式按日期源识别最新季度；手动模式切到高亮页后指定年月。
+            </p>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" data-action="saveHighlightSettings">
+            <button
+              data-i18n="settings.common.save"
+              class="bgm-btn small primary"
+              data-action="saveHighlightSettings"
+            >
               💾 保存
             </button>
-            <button class="bgm-btn small" data-action="reloadHighlightSettings">↩️ 放弃修改</button>
+            <button
+              data-i18n="settings.common.discard"
+              class="bgm-btn small"
+              data-action="reloadHighlightSettings"
+            >
+              ↩️ 放弃修改
+            </button>
           </div>
         </section>
 
         <!-- 条件格式（自动聚类的分组口径） -->
         <section class="section" id="sec-cf-pref" data-detachable>
           <h3>
-            🎨 条件格式<button
+            <span data-i18n="settings.cfPref.title">🎨 条件格式</span
+            ><button
+              data-i18n-aria-label="settings.cfPref.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-cf-pref"
@@ -562,38 +737,82 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.cfPref.hint" class="hint">
             条件格式页「工作表规则 →
             自动聚类」按这里的口径分组。改完口径回到条件格式页再点一次「自动聚类」即按新口径重排（聚类只改本地视图分组，不动工作表上的规则）。
           </p>
           <div class="form-group">
-            <label>自动聚类口径</label>
-            <div class="theme-mode-group" role="group" aria-label="自动聚类口径">
-              <button type="button" class="theme-mode-btn" data-cluster-mode="formula">
+            <label data-i18n="settings.cfPref.clusterModeLabel">自动聚类口径</label>
+            <div
+              data-i18n-aria-label="settings.cfPref.clusterModeLabel"
+              class="theme-mode-group"
+              role="group"
+              aria-label="自动聚类口径"
+            >
+              <button
+                data-i18n="settings.cfPref.clusterByFormula"
+                type="button"
+                class="theme-mode-btn"
+                data-cluster-mode="formula"
+              >
                 按公式
               </button>
-              <button type="button" class="theme-mode-btn" data-cluster-mode="range-formula">
+              <button
+                data-i18n="settings.cfPref.clusterByRangeFormula"
+                type="button"
+                class="theme-mode-btn"
+                data-cluster-mode="range-formula"
+              >
                 按范围 + 公式
               </button>
-              <button type="button" class="theme-mode-btn" data-cluster-mode="column">按列</button>
-              <button type="button" class="theme-mode-btn" data-cluster-mode="row">按行</button>
+              <button
+                data-i18n="settings.cfPref.clusterByColumn"
+                type="button"
+                class="theme-mode-btn"
+                data-cluster-mode="column"
+              >
+                按列
+              </button>
+              <button
+                data-i18n="settings.cfPref.clusterByRow"
+                type="button"
+                class="theme-mode-btn"
+                data-cluster-mode="row"
+              >
+                按行
+              </button>
             </div>
-            <p class="hint">
+            <p data-i18n="settings.cfPref.clusterModeHint" class="hint">
               「按列」取应用范围的起始列（如「列 J」），「按行」取起始行（如「行
               2」）；范围解析不出列 / 行时该条规则留在「未分组」。
             </p>
           </div>
           <div class="form-group">
-            <label>合并重复项口径</label>
-            <div class="theme-mode-group" role="group" aria-label="合并重复项口径">
-              <button type="button" class="theme-mode-btn" data-merge-mode="adjacent">
+            <label data-i18n="settings.cfPref.mergeModeLabel">合并重复项口径</label>
+            <div
+              data-i18n-aria-label="settings.cfPref.mergeModeLabel"
+              class="theme-mode-group"
+              role="group"
+              aria-label="合并重复项口径"
+            >
+              <button
+                data-i18n="settings.cfPref.mergeContiguous"
+                type="button"
+                class="theme-mode-btn"
+                data-merge-mode="adjacent"
+              >
                 仅连续行（安全）
               </button>
-              <button type="button" class="theme-mode-btn" data-merge-mode="union">
+              <button
+                data-i18n="settings.cfPref.mergeForce"
+                type="button"
+                class="theme-mode-btn"
+                data-merge-mode="union"
+              >
                 强行并成一块
               </button>
             </div>
-            <p class="hint">
+            <p data-i18n="settings.cfPref.mergeModeHint" class="hint">
               条件格式页「工作表规则 → 🔗
               合并重复项」按这里的口径合并：同公式、同列的多条**单行**规则并成一条。
               「仅连续行」只合并行号连续的一段（2,3,4 →
@@ -606,7 +825,9 @@
         <!-- 默认路径（导出位置 / 导入文件夹记忆） -->
         <section class="section" id="sec-paths" data-detachable>
           <h3>
-            📁 默认路径<button
+            <span data-i18n="settings.paths.title">📁 默认路径</span
+            ><button
+              data-i18n-aria-label="settings.paths.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-paths"
@@ -616,15 +837,18 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.paths.hint" class="hint">
             这两个路径只作记忆与提示：导出配置时会在提示里告知保存位置，导入配置时会显示在文件选择框的标题上。
             WPS
             任务窗格走浏览器下载通道、文件选择框也不支持指定初始目录，因此两者都不会自动写入或跳转到该路径。
           </p>
           <div class="form-group">
-            <label for="exportPathDisplay">默认导出位置</label>
+            <label data-i18n="settings.paths.exportLabel" for="exportPathDisplay"
+              >默认导出位置</label
+            >
             <div class="bgm-btn-group bgm-btn-row">
               <input
+                data-i18n-placeholder="settings.paths.exportPlaceholder"
                 type="text"
                 id="exportPathDisplay"
                 class="input"
@@ -632,14 +856,29 @@
                 readonly
                 placeholder="未设置（导出配置时仅作提示）"
               />
-              <button class="bgm-btn small" data-action="selectExportPath">选择…</button>
-              <button class="bgm-btn small" data-action="clearExportPath">清除</button>
+              <button
+                data-i18n="settings.common.choose"
+                class="bgm-btn small"
+                data-action="selectExportPath"
+              >
+                选择…
+              </button>
+              <button
+                data-i18n="settings.common.clear"
+                class="bgm-btn small"
+                data-action="clearExportPath"
+              >
+                清除
+              </button>
             </div>
           </div>
           <div class="form-group">
-            <label for="importPathDisplay">默认导入文件夹</label>
+            <label data-i18n="settings.paths.importLabel" for="importPathDisplay"
+              >默认导入文件夹</label
+            >
             <div class="bgm-btn-group bgm-btn-row">
               <input
+                data-i18n-placeholder="settings.paths.importPlaceholder"
                 type="text"
                 id="importPathDisplay"
                 class="input"
@@ -647,8 +886,20 @@
                 readonly
                 placeholder="未设置（导入配置时不显示位置）"
               />
-              <button class="bgm-btn small" data-action="selectImportPath">选择…</button>
-              <button class="bgm-btn small" data-action="clearImportPath">清除</button>
+              <button
+                data-i18n="settings.common.choose"
+                class="bgm-btn small"
+                data-action="selectImportPath"
+              >
+                选择…
+              </button>
+              <button
+                data-i18n="settings.common.clear"
+                class="bgm-btn small"
+                data-action="clearImportPath"
+              >
+                清除
+              </button>
             </div>
           </div>
         </section>
@@ -656,7 +907,9 @@
         <!-- 日志偏好（记录级别；日志查看在操作页） -->
         <section class="section" id="sec-log-pref" data-detachable>
           <h3>
-            📜 日志偏好<button
+            <span data-i18n="settings.logPref.title">📜 日志偏好</span
+            ><button
+              data-i18n-aria-label="settings.logPref.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-log-pref"
@@ -667,26 +920,38 @@
             </button>
           </h3>
           <div class="form-group">
-            <label for="logLevelSelect">日志记录级别</label>
+            <label data-i18n="settings.logPref.levelLabel" for="logLevelSelect">日志记录级别</label>
             <select id="logLevelSelect" class="input">
-              <option value="0">DEBUG · 全部日志（排查问题时使用）</option>
-              <option value="1">INFO · 常规信息（默认）</option>
-              <option value="2">WARN · 仅警告与错误</option>
-              <option value="3">ERROR · 仅错误</option>
+              <option data-i18n="settings.logPref.levelDebug" value="0">
+                DEBUG · 全部日志（排查问题时使用）
+              </option>
+              <option data-i18n="settings.logPref.levelInfo" value="1">
+                INFO · 常规信息（默认）
+              </option>
+              <option data-i18n="settings.logPref.levelWarn" value="2">WARN · 仅警告与错误</option>
+              <option data-i18n="settings.logPref.levelError" value="3">ERROR · 仅错误</option>
             </select>
-            <p class="hint">
+            <p data-i18n="settings.logPref.hint" class="hint">
               低于所选级别的日志不会被记录，可减少运行噪音。此项控制「记录什么」；查看与筛选已记录日志请到主面板的「记录与日志」模块。
             </p>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空已记录日志</button>
+            <button
+              data-i18n="settings.logPref.clearLogs"
+              class="bgm-btn small"
+              data-action="clearLogs"
+            >
+              🗑️ 清空已记录日志
+            </button>
           </div>
         </section>
 
         <!-- 配置管理 -->
         <section class="section" id="sec-data" data-detachable>
           <h3>
-            📦 配置管理<button
+            <span data-i18n="settings.data.title">📦 配置管理</span
+            ><button
+              data-i18n-aria-label="settings.data.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-data"
@@ -697,20 +962,40 @@
             </button>
           </h3>
           <div class="settings-toolbar">
-            <button class="bgm-btn small primary" data-action="saveAllConfig">
+            <button
+              data-i18n="settings.data.saveAll"
+              class="bgm-btn small primary"
+              data-action="saveAllConfig"
+            >
               💾 保存所有配置
             </button>
-            <button class="bgm-btn small" data-action="exportConfig">📤 导出配置</button>
-            <button class="bgm-btn small" data-action="importConfig">📥 导入配置</button>
-            <button class="bgm-btn small danger" data-action="resetAllConfig">
+            <button
+              data-i18n="settings.data.export"
+              class="bgm-btn small"
+              data-action="exportConfig"
+            >
+              📤 导出配置
+            </button>
+            <button
+              data-i18n="settings.data.import"
+              class="bgm-btn small"
+              data-action="importConfig"
+            >
+              📥 导入配置
+            </button>
+            <button
+              data-i18n="settings.data.resetAll"
+              class="bgm-btn small danger"
+              data-action="resetAllConfig"
+            >
               ♻️ 重置全部配置
             </button>
           </div>
-          <p class="hint">
+          <p data-i18n-html="settings.data.exportHint" class="hint">
             一键导出：下载 <code>bgm-config-日期.json</code> 并复制到剪贴板；一键导入：粘贴该文件
             JSON 即可恢复。重置会清空所有已保存配置，请谨慎操作。
           </p>
-          <p class="hint">
+          <p data-i18n-html="settings.data.scopeHint" class="hint">
             <strong>导出范围</strong>：Bangumi Token 与多账号列表（含用户资料与过期时间）、GitHub
             仓库配置（含同步源类型、Gist ID、分片选择、同步策略）、外观（主题 / 定时切换 /
             模态框按钮位置）、导航（图标模式 / 分块排序 /
@@ -719,7 +1004,7 @@
             非动漫）、<strong>条件格式</strong>（规则库 / 应用策略 / 目标工作表 / 聚类与合并口径 /
             分组命名 / <strong>锚定与固定记录</strong>）、数据清理的规则开关。
           </p>
-          <p class="hint">
+          <p data-i18n-html="settings.data.excludedHint" class="hint">
             <strong>不在导出范围</strong>（刻意的，非遗漏）：会话态与缓存 —— 各页锁定的工作表实例
             <code>bgm_locked_sheet_*</code>、面板显示信号 <code>bgm_panel_shown_at</code>、COM
             卡顿观测 <code>bgm_com_stall_*</code>、数据上下文
@@ -728,7 +1013,7 @@
             <code>bgm_clean_sheets:</code
             >（键里是本机文件绝对路径，换机器对不上，到新机器重新勾选即可）。
           </p>
-          <p class="hint">
+          <p data-i18n-html="settings.data.updateHint" class="hint">
             <strong>更新会不会丢配置</strong>：所有配置存在 WPS 的 PluginStorage（按加载项 ID
             存放），<strong>更新插件（替换加载项目录 / 覆盖 dist）不会清除</strong
             >，规则库、锚定与固定记录、 账号与偏好都会原样保留；只有卸载加载项、清理 WPS
@@ -740,7 +1025,9 @@
         <!-- 数据导出 -->
         <section class="section" id="sec-export" data-detachable>
           <h3>
-            📤 数据导出<button
+            <span data-i18n="settings.export.title">📤 数据导出</span
+            ><button
+              data-i18n-aria-label="settings.export.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-export"
@@ -750,13 +1037,15 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p data-i18n="settings.export.hint" class="hint">
             把各工具的日志与记录导出为文件：CSV 可直接用 Excel 打开（带 BOM，中文不乱码）， TXT
             适合在记事本里快速查看。三个工具页面各自也有就近的导出按钮。
           </p>
           <div class="export-source-list">
             <div class="export-source-row">
-              <span class="export-source-label">同步记录</span>
+              <span data-i18n="settings.export.syncRecords" class="export-source-label"
+                >同步记录</span
+              >
               <button
                 class="bgm-btn small"
                 data-action="exportData"
@@ -773,7 +1062,9 @@
               </button>
             </div>
             <div class="export-source-row">
-              <span class="export-source-label">系统日志</span>
+              <span data-i18n="settings.export.systemLogs" class="export-source-label"
+                >系统日志</span
+              >
               <button
                 class="bgm-btn small"
                 data-action="exportData"
@@ -790,7 +1081,9 @@
               </button>
             </div>
             <div class="export-source-row">
-              <span class="export-source-label">富化记录</span>
+              <span data-i18n="settings.export.enrichRecords" class="export-source-label"
+                >富化记录</span
+              >
               <button
                 class="bgm-btn small"
                 data-action="exportData"
@@ -807,7 +1100,9 @@
               </button>
             </div>
             <div class="export-source-row">
-              <span class="export-source-label">清理日志</span>
+              <span data-i18n="settings.export.cleanLogs" class="export-source-label"
+                >清理日志</span
+              >
               <button
                 class="bgm-btn small"
                 data-action="exportData"
@@ -824,13 +1119,17 @@
               </button>
             </div>
           </div>
-          <p class="hint">清理日志仅记录本次打开清理页之后的操作，切换页面不会保留。</p>
+          <p data-i18n="settings.export.cleanLogsHint" class="hint">
+            清理日志仅记录本次打开清理页之后的操作，切换页面不会保留。
+          </p>
         </section>
 
         <!-- 关于 -->
         <section class="section" id="sec-about" data-detachable>
           <h3>
-            ℹ️ 关于<button
+            <span data-i18n="settings.about.title">ℹ️ 关于</span
+            ><button
+              data-i18n-aria-label="settings.about.collapseAria"
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-about"
@@ -843,20 +1142,29 @@
           <p class="hint">
             <strong>My Bangumi Database for WPS</strong>
             <span id="aboutVersion">v2.1.0</span><br />
-            用于在 WPS 表格中管理 Bangumi 番组数据，支持：<br />
-            • 上传同步（WPS 表格 → Bangumi）<br />
-            • 数据同步（远程仓库 → WPS 表格）<br />
-            • 收藏下载（Bangumi → WPS 表格）<br />
-            • 新番表富化 / 数据清洗 / 番剧高亮 / 条件格式管理<br />
-            <br />
-            本页只保留「跨会话生效的长期偏好」；Token、远程仓库、冲突策略等本次操作参数位于各操作页面。
+            <span data-i18n-html="settings.about.description"
+              >用于在 WPS 表格中管理 Bangumi 番组数据，支持：<br />
+              • 上传同步（WPS 表格 → Bangumi）<br />
+              • 数据同步（远程仓库 → WPS 表格）<br />
+              • 收藏下载（Bangumi → WPS 表格）<br />
+              • 新番表富化 / 数据清洗 / 番剧高亮 / 条件格式管理<br />
+              <br />
+              本页只保留「跨会话生效的长期偏好」；Token、远程仓库、冲突策略等本次操作参数位于各操作页面。</span
+            >
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button type="button" class="bgm-btn small primary" id="checkUpdateBtn">
+            <button
+              data-i18n="settings.about.checkUpdate"
+              type="button"
+              class="bgm-btn small primary"
+              id="checkUpdateBtn"
+            >
               🔄 检查更新
             </button>
           </div>
-          <p class="hint">从 GitHub Release 检查新版本；下载更新包后按日志提示覆盖安装。</p>
+          <p data-i18n="settings.about.checkUpdateHint" class="hint">
+            从 GitHub Release 检查新版本；下载更新包后按日志提示覆盖安装。
+          </p>
         </section>
       </main>
     </div>
@@ -871,8 +1179,16 @@
           aria-labelledby="updateModalTitle"
         >
           <div class="update-modal__head">
-            <h2 id="updateModalTitle" class="update-modal__title">发现新版本</h2>
-            <button type="button" class="update-modal__close" data-update-close aria-label="关闭">
+            <h2 data-i18n="settings.update.title" id="updateModalTitle" class="update-modal__title">
+              发现新版本
+            </h2>
+            <button
+              data-i18n-aria-label="settings.update.close"
+              type="button"
+              class="update-modal__close"
+              data-update-close
+              aria-label="关闭"
+            >
               ✕
             </button>
           </div>
@@ -885,13 +1201,31 @@
           </div>
           <pre class="update-modal__log" id="updateLog" aria-live="polite"></pre>
           <div class="update-modal__actions">
-            <button type="button" class="bgm-btn small primary" id="updateInstallBtn">
+            <button
+              data-i18n="settings.update.install"
+              type="button"
+              class="bgm-btn small primary"
+              id="updateInstallBtn"
+            >
               ⬇️ 下载并安装
             </button>
-            <button type="button" class="bgm-btn small" id="updateCopyLogBtn" hidden>
+            <button
+              data-i18n="settings.update.copyLog"
+              type="button"
+              class="bgm-btn small"
+              id="updateCopyLogBtn"
+              hidden
+            >
               📋 复制日志
             </button>
-            <button type="button" class="bgm-btn small" data-update-close>稍后</button>
+            <button
+              data-i18n="settings.update.later"
+              type="button"
+              class="bgm-btn small"
+              data-update-close
+            >
+              稍后
+            </button>
           </div>
         </div>
       </div>

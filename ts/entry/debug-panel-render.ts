@@ -44,15 +44,15 @@ export function getDebugGlobals(): DebugGlobals {
 
 /** ribbon.xml 中定义的所有按钮（与 ribbon.ts icons map 同步） */
 export const RIBBON_BUTTONS: readonly RibbonButtonInfo[] = [
-  { id: 'btnShowPanel', label: '打开同步面板', icon: '📋' },
-  { id: 'btnSyncBangumi', label: '上传同步', icon: '🔄' },
-  { id: 'btnSetToken', label: '设置 Token', icon: '🔑' },
-  { id: 'btnTestToken', label: '测试 Token', icon: '🧪' },
-  { id: 'btnCopyToken', label: '复制 Token', icon: '📋' },
-  { id: 'btnSetUserId', label: '设置用户 ID', icon: '👤' },
-  { id: 'btnOpenCollection', label: '打开收藏页', icon: '🔗' },
-  { id: 'btnSyncFromGithub', label: '数据同步', icon: '📥' },
-  { id: 'btnUndoLastSync', label: '撤销同步', icon: '↩️' },
+  { id: 'buttonOpenSyncPanel', label: '打开同步面板', icon: '📋' },
+  { id: 'buttonSyncBangumi', label: '上传同步', icon: '🔄' },
+  { id: 'buttonSetToken', label: '设置 Token', icon: '🔑' },
+  { id: 'buttonTestToken', label: '测试 Token', icon: '🧪' },
+  { id: 'buttonCopyToken', label: '复制 Token', icon: '📋' },
+  { id: 'buttonSetUserId', label: '设置用户 ID', icon: '👤' },
+  { id: 'buttonOpenCollection', label: '打开收藏页', icon: '🔗' },
+  { id: 'buttonSyncFromGithub', label: '数据同步', icon: '📥' },
+  { id: 'buttonUndoLastSync', label: '撤销同步', icon: '↩️' },
 ] as const
 
 /** 日志级别筛选选项 */

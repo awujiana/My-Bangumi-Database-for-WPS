@@ -71,7 +71,7 @@ export interface WpsApp {
   Calculation?: number
   /**
    * 工作表内容变更事件（单元格编辑触发）。
-   * 面板用它做「预览随编辑自动刷新」（见 `panel/panel-auto-refresh.ts`）；
+   * 面板用它做「预览随编辑自动刷新」（见 `panel/sync-panel-auto-refresh.ts`）；
    * 部分宿主版本不提供该事件，此时为 `undefined`。
    */
   SheetChange?: ((sheet?: WpsWorksheet, target?: unknown) => void) | undefined
@@ -283,7 +283,15 @@ export interface WpsFormatCondition {
   SetFirstPriority?: () => void
   SetLastPriority?: () => void
   ModifyAppliesToRange?: (range: string) => void
-  /** 一次性设置格式（WPS WebOffice 对象形式入参） */
+  /**
+   * 一次性设置格式（WebOffice 的对象形式入参）
+   *
+   * ⚠️ **WPS 桌面版没有这个方法**：真机实测（12.1.0.29158）`fc.With` 是 `undefined`，
+   * 调用即 `fc.With is not a function`。桌面版只能走 `Interior.Color` / `Font.Color`
+   * （BGR 整数）。留着这个可选声明是为了 WebOffice 侧兜底；调用方必须
+   * **先判 `Interior` 存在再考虑 `With`**，且 `With?.(...)` 的 `?.` 会把「方法不存在」
+   * 变成静默空操作——曾经因此让「规则写进去了但没颜色」藏了很久。
+   */
   With?: (options: {
     Interior?: { Color?: string | number }
     Font?: { Color?: string | number; Bold?: boolean }
@@ -300,6 +308,14 @@ export interface WpsFormatConditions {
    * undefined 而非抛错，调用方必须判空（见 conditional-format-apply 的 getForeignCondition）。
    */
   Item?: (index: number) => WpsFormatCondition | undefined
+  /**
+   * 新增一条规则。
+   *
+   * ⚠️ **WPS 会把 `Formula1` 里的相对行引用 +1**：真机实测（12.1.0.29158）传
+   * `=$B2>8` 回读 `=$B3>8`，传 `=$B$2>8` 不偏移；换成位置参数 `Add(2, 0, ...)`
+   * 也一样。写完**必须回读比对**，不一致按 {@link shiftRelativeRows} 折算后重写，
+   * 否则规则每行都在用下一行的值判断（肉眼表现为「规则没生效」）。
+   */
   Add?: (options: WpsFormatConditionAddOptions) => WpsFormatCondition
   /** 清空该区域全部规则（含手工建的——调用前必须读过并确认） */
   Delete?: () => void

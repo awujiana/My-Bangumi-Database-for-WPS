@@ -25,6 +25,7 @@ import '../sync/sync-record.js';
 import '../sync/scraping.js';
 import '../sync/exceltobangumi/index.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
+import { initializeI18n } from '../i18n/index.js';
 import { initializeShellNav } from './shell-nav.js';
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js';
 import { startModuleStateSync } from '../tools/module-state.js';
@@ -55,6 +56,7 @@ if (typeof document !== 'undefined') {
             name: '主题与导航',
             run: () => {
                 initializeTheme();
+                initializeI18n();
                 startThemeSync();
             },
         },

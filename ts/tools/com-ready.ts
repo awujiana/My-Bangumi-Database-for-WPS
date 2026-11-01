@@ -11,7 +11,7 @@
  *   - 只 import highlight-page 不调函数      → 秒开（静态 import 148 模块无罪）
  *   - 调 initializeHighlightPage（3 次轻 COM）→ 卡 10 秒
  *   - 原版（3 轻 COM + 一次大 Range 读）      → 卡 70 秒
- *   - panel.html                              → 秒开（首帧后 COM 更晚更少）
+ *   - sync-panel.html                              → 秒开（首帧后 COM 更晚更少）
  *
  * 结论：**卡多久取决于「首次 COM 落在窗口内多久」，而不是代码本身**。靠固定
  * `setTimeout(0)` 挪不动窗口（离 load 只有几毫秒，宿主还在等 attach），所以本模块

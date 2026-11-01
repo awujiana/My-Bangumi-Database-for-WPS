@@ -140,7 +140,7 @@ describe('snapshotFromWorksheet', () => {
     ;(globalThis as { Application?: unknown }).Application = {
       ActiveWorkbook: { Name: 'active.xlsx' },
     }
-    const snap = snapshotFromWorksheet({ Name: 'Sheet1' } as never, 1, 'panel')
+    const snap = snapshotFromWorksheet({ Name: 'Sheet1' } as never, 1, 'sync-panel')
     expect(snap.workbook).toBe('active.xlsx')
     expect(snap.sheet).toBe('Sheet1')
   })
@@ -263,11 +263,11 @@ describe('一键套用（registerTargetSheetApplier / applyDataContextToPage）'
   })
 
   it('applier 抛错不外溢：按钮显示失败，不抛到调用方', () => {
-    registerTargetSheetApplier('panel', () => {
+    registerTargetSheetApplier('sync-panel', () => {
       throw new Error('host gone')
     })
     saveDataContext(snapshot)
-    mountDataContextNotice('panel')
+    mountDataContextNotice('sync-panel')
 
     const applyButton = document.querySelector<HTMLButtonElement>(
       '#bgmDataContextNotice button.bgm-btn',
@@ -277,11 +277,11 @@ describe('一键套用（registerTargetSheetApplier / applyDataContextToPage）'
   })
 
   it('同一页重复注册以最后一次为准；resetTargetSheetAppliers 清空后不再支持', () => {
-    registerTargetSheetApplier('panel', () => true)
-    registerTargetSheetApplier('panel', () => false)
-    expect(applyDataContextToPage('panel')).toBe(false)
+    registerTargetSheetApplier('sync-panel', () => true)
+    registerTargetSheetApplier('sync-panel', () => false)
+    expect(applyDataContextToPage('sync-panel')).toBe(false)
 
     resetTargetSheetAppliers()
-    expect(hasTargetSheetApplier('panel')).toBe(false)
+    expect(hasTargetSheetApplier('sync-panel')).toBe(false)
   })
 })

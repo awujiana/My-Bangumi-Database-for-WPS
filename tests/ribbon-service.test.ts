@@ -49,7 +49,7 @@ const m = vi.hoisted(() => ({
   fetchBgmMe: vi.fn(),
   fetchAllUserCollections: vi.fn(),
   isGithubConfigComplete: vi.fn(),
-  showBangumiPanel: vi.fn(),
+  showSyncPanel: vi.fn(),
   getApp: vi.fn((): unknown => null),
 }))
 
@@ -85,7 +85,7 @@ vi.mock('../ts/tools/util/index.js', async (importOriginal) => {
     _getBgmUserId: m.getBgmUserId,
     _setBgmUserId: m.setBgmUserId,
     _setBgmUsername: m.setBgmUsername,
-    showBangumiPanel: m.showBangumiPanel,
+    showSyncPanel: m.showSyncPanel,
   }
 })
 
@@ -1228,7 +1228,7 @@ describe('ribbon-service · syncFromGithubForRibbon', () => {
     expect(setItem).toHaveBeenCalledWith('bgm_request_github_sync', expect.any(String))
   })
 
-  it('面板尚未创建 → 走 showBangumiPanel 创建（异步触发）', async () => {
+  it('面板尚未创建 → 走 showSyncPanel 创建（异步触发）', async () => {
     m.getApp.mockReturnValue({ PluginStorage: { getItem: vi.fn(() => null), setItem: vi.fn() } })
 
     await syncFromGithubForRibbon()
@@ -1236,7 +1236,7 @@ describe('ribbon-service · syncFromGithubForRibbon', () => {
     // ensurePanelVisible 里是 `void (async () => { await import('../index.js') ... })()`，
     // 动态导入需要多等几个 microtask 才可观察
     await vi.waitFor(() => {
-      expect(m.showBangumiPanel).toHaveBeenCalled()
+      expect(m.showSyncPanel).toHaveBeenCalled()
     })
   })
 

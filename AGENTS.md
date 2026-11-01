@@ -13,21 +13,21 @@
 
 ## 仓库结构
 
-| 路径                                                               | 用途                                                                                                       | 是否发布                  |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `ts/`                                                              | TypeScript 源码（`core` / `entry` / `panel` / `schemas` / `services` / `sync` / `tools` / `ui`）           | ✅                        |
-| `ui/`                                                              | 7 个页面 HTML（`panel` / `settings` / `clean` / `enrich` / `highlight` / `conditional-format` / `donate`） | ✅                        |
-| `css/`                                                             | 样式（`tokens` 为唯一色彩来源，`panel-theme` 为面板基线，其余按页面）                                      | ✅                        |
-| `dist-ts/`                                                         | `tsc` 编译产物（`npm run build:ts`）。**新增模块必须三件产物齐全并 `git add -f`**（该目录被 `.gitignore`） | ✅                        |
-| `dist/`                                                            | Vite 打包产物（`npm run build`），发布包内容                                                               | ✅                        |
-| `index.html` / `main.js` / `manifest.xml` / `ribbon.xml` / `libs/` | 加载项清单与宿主入口                                                                                       | ✅                        |
-| `images/`                                                          | README 截图、品牌图标、赞赏码                                                                              | ✅                        |
-| `download/`                                                        | 各版本发布 zip 与 `version.json`（更新链路数据源）                                                         | ✅                        |
-| `wps-addon-build/`                                                 | `wpsjs build --exe` 产物（exe）                                                                            | ❌ 由发布流程上传 Release |
-| `tests/`                                                           | Vitest 单元测试                                                                                            | ✅                        |
-| `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）                                  | ✅                        |
-| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（**只在维护者本地工作区，未跟踪、不分发**）                           | ❌                        |
-| `node_modules/`、`release/`、`.workbuddy-ai/`                      | 依赖、发布暂存、内部工作数据                                                                               | ❌                        |
+| 路径                                                               | 用途                                                                                                            | 是否发布                  |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `ts/`                                                              | TypeScript 源码（`core` / `entry` / `panel` / `schemas` / `services` / `sync` / `tools` / `ui`）                | ✅                        |
+| `ui/`                                                              | 7 个页面 HTML（`sync-panel` / `settings` / `clean` / `enrich` / `highlight` / `conditional-format` / `donate`） | ✅                        |
+| `css/`                                                             | 样式（`tokens` 为唯一色彩来源，`panel-theme` 为面板基线，其余按页面）                                           | ✅                        |
+| `dist-ts/`                                                         | `tsc` 编译产物（`npm run build:ts`）。**新增模块必须三件产物齐全并 `git add -f`**（该目录被 `.gitignore`）      | ✅                        |
+| `dist/`                                                            | Vite 打包产物（`npm run build`），发布包内容                                                                    | ✅                        |
+| `index.html` / `main.js` / `manifest.xml` / `ribbon.xml` / `libs/` | 加载项清单与宿主入口                                                                                            | ✅                        |
+| `images/`                                                          | README 截图、品牌图标、赞赏码                                                                                   | ✅                        |
+| `download/`                                                        | 各版本发布 zip 与 `version.json`（更新链路数据源）                                                              | ✅                        |
+| `wps-addon-build/`                                                 | `wpsjs build --exe` 产物（exe）                                                                                 | ❌ 由发布流程上传 Release |
+| `tests/`                                                           | Vitest 单元测试                                                                                                 | ✅                        |
+| `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）                                       | ✅                        |
+| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（**只在维护者本地工作区，未跟踪、不分发**）                                | ❌                        |
+| `node_modules/`、`release/`、`.workbuddy-ai/`                      | 依赖、发布暂存、内部工作数据                                                                                    | ❌                        |
 
 > 上级目录 `Excel加载项/BGM/` 还放着 `publish.mjs`、`release-notes-v*.md`、`发布流程.md`，**不属于本仓库**。
 

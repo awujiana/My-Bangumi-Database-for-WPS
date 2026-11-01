@@ -4298,8 +4298,8 @@ body.solo-mode .main > .command-center:not([hidden]) {
 
 /* ============================ 同步预览：详情列表 / 滚动按钮 ============================ */
 /* 2026-10-17：f499c955 删除孤儿页面 panel-preview.html 时 css/preview.css 一并删除，
-   但下列规则未并入本文件 → 详情列表间距、滚动按钮（panel.html 的
-   #scrollToTopBtn / #scrollToBottomBtn）与窄窗格响应式全部失效；panel.html 仍
+   但下列规则未并入本文件 → 详情列表间距、滚动按钮（sync-panel.html 的
+   #scrollToTopBtn / #scrollToBottomBtn）与窄窗格响应式全部失效；sync-panel.html 仍
    <link> 该文件 → 404（wpsjs 回退 index.html，控制台报 MIME 错误）。
    此处按原文件逐字恢复。
    2026-10-18：同步预览的统计卡改入上方「共用统计条」（.stat-grid / .stat-card，

@@ -10,6 +10,7 @@
  */
 
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
+import { initializeI18n } from '../i18n/index.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
@@ -43,7 +44,7 @@ function isSettingsContext(): boolean {
  */
 function initializeSettingsPage(): void {
   // 1. 加载 Token 和用户信息状态
-  // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 panel.html 相同的 ID
+  // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 sync-panel.html 相同的 ID
   void (async () => {
     try {
       const { updateTokenStatus, updateUserIdStatus } = await import('../ui/handlers/token.js')
@@ -66,21 +67,21 @@ function initializeSettingsPage(): void {
         getLogLevel,
       } = await import('../tools/config.js')
       // 设置复选框
-      const chkIncremental = document.getElementById(
-        'chkIncrementalSync',
+      const checkboxIncremental = document.getElementById(
+        'checkboxIncrementalSync',
       ) as HTMLInputElement | null
-      if (chkIncremental) chkIncremental.checked = isIncrementalSyncEnabled(true)
+      if (checkboxIncremental) checkboxIncremental.checked = isIncrementalSyncEnabled(true)
 
-      const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-      if (chkSkip) chkSkip.checked = isSkipConflictsEnabled(true)
+      const checkboxSkip = document.getElementById('checkboxSkipConflicts') as HTMLInputElement | null
+      if (checkboxSkip) checkboxSkip.checked = isSkipConflictsEnabled(true)
 
-      const chkSyncRecord = document.getElementById(
-        'chkEnableSyncRecord',
+      const checkboxSyncRecord = document.getElementById(
+        'checkboxEnableSyncRecord',
       ) as HTMLInputElement | null
-      if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
+      if (checkboxSyncRecord) checkboxSyncRecord.checked = isSyncRecordEnabled(true)
 
-      const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-      if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
+      const checkboxNavIcons = document.getElementById('checkboxNavIconsOnly') as HTMLInputElement | null
+      if (checkboxNavIcons) checkboxNavIcons.checked = areNavIconsOnly(true)
 
       // 应用全局日志级别到内存（bgmLog 依赖 BGM.LOG_LEVEL 过滤），并预填下拉
       applyLogLevel()
@@ -100,7 +101,8 @@ function applyAppearance(): void {
   if (typeof document === 'undefined') return
   // 主题：从配置读取并应用（含跟随系统监听）
   initializeTheme()
-  // 跨页主题同步：监听其他页面（panel / enrich）的主题变更并重应用
+  initializeI18n()
+  // 跨页主题同步：监听其他页面（sync-panel / enrich）的主题变更并重应用
   startThemeSync()
   // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
   startNavModeSync()

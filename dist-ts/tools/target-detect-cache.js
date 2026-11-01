@@ -79,7 +79,7 @@ function readStore(storage) {
         // 逐键取用：只接受已知用途，忽略旧版本/手工写入的多余键
         const record = parsed;
         const store = {};
-        for (const purpose of ['panel', 'enrich']) {
+        for (const purpose of ['sync-panel', 'enrich']) {
             const entry = record[purpose];
             if (entry !== null && typeof entry === 'object') {
                 store[purpose] = entry;

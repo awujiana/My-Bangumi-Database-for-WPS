@@ -7,7 +7,7 @@
  *     `await import('core/constants.js')` 取真实 `LOG_LEVELS`。
  *     **绝不能**换成 `importOriginal()`：barrel 与 `ribbon-service` / `handlers/sync`
  *     互相 re-export，会死锁并让 vitest 静默回退真实现（见 `REF-testing.md`）。
- *   - `./panel-lifecycle.js` → 4 个刷新函数，单点 mock，用来断言「何时触发了刷新」。
+ *   - `./sync-panel-lifecycle.js` → 4 个刷新函数，单点 mock，用来断言「何时触发了刷新」。
  *   - `tools/events.js` → **不 mock**：它是自洽叶子，直接用真实 `eventBus` 的 spy，
  *     从而对**真实** `BGM_EVENTS` 常量断言，而不是对自造字符串断言。
  *
@@ -73,7 +73,7 @@ vi.mock('../ts/index.js', async () => {
   }
 })
 
-vi.mock('../ts/panel/panel-lifecycle.js', () => ({
+vi.mock('../ts/panel/sync-panel-lifecycle.js', () => ({
   refreshWorkbooks: lifecycle.refreshWorkbooks,
   refreshSheets: lifecycle.refreshSheets,
   refreshData: lifecycle.refreshData,
@@ -493,9 +493,9 @@ describe('startUserInfoPolling · 用户信息与 Token', () => {
 // ========== startUserInfoPolling · 配置同步 ==========
 
 describe('startUserInfoPolling · Ribbon 配置同步', () => {
-  // 「增量同步复选框同步」用例已随死分支删除：panel.html 的「仅同步变更」
-  // 复选框已收拢到「设置」页（panel.html 说明文案），主面板没有
-  // #chkIncremental，user-info-polling 里的同步分支是空转死代码。
+  // 「增量同步复选框同步」用例已随死分支删除：sync-panel.html 的「仅同步变更」
+  // 复选框已收拢到「设置」页（sync-panel.html 说明文案），主面板没有
+  // #checkboxIncremental，user-info-polling 里的同步分支是空转死代码。
   it('跳过冲突变更 + select 存在 → 同步下拉值', () => {
     mountApp()
     m.isSkipConflictsEnabled.mockReturnValue(true)
@@ -536,7 +536,7 @@ describe('startUserInfoPolling · Ribbon 配置同步', () => {
   it('同步记录开关变更 + 复选框存在 → 同步勾选状态', () => {
     mountApp()
     m.isSyncRecordEnabled.mockReturnValue(true)
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
 
     startUserInfoPolling()
     tick()
@@ -548,7 +548,7 @@ describe('startUserInfoPolling · Ribbon 配置同步', () => {
 
   it('同步记录保持关闭 + 复选框存在 → 同步为未勾选', () => {
     mountApp()
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
     checkbox.checked = true
 
     startUserInfoPolling()

@@ -294,8 +294,8 @@ function setupScanMocks(): void {
   })
 }
 
-/** panel 页默认键（各页独立键：bgm_locked_sheet_panel） */
-const KEY = lockedSheetKey('panel')
+/** 同步面板默认键（各页独立键：bgm_locked_sheet_sync-panel） */
+const KEY = lockedSheetKey('sync-panel')
 const ENRICH_KEY = lockedSheetKey('enrich')
 
 // ============ 场景 1: saveLockedSheet / clearLockedSheet ============
@@ -317,10 +317,10 @@ describe('saveLockedSheet / clearLockedSheet', () => {
     const storage = createMockPluginStorage()
     setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
 
-    saveLockedSheet({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }, 'panel')
+    saveLockedSheet({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }, 'sync-panel')
     saveLockedSheet({ index: 2, name: 'Sheet1', workbookName: 'wb1.xlsx' }, 'enrich')
 
-    expect(storage._store[lockedSheetKey('panel')]).toBe(
+    expect(storage._store[lockedSheetKey('sync-panel')]).toBe(
       JSON.stringify({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }),
     )
     expect(storage._store[lockedSheetKey('enrich')]).toBe(
@@ -396,6 +396,32 @@ describe('restoreLockedSheet', () => {
 
     expect(isRestored).toBe(false)
     expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+
+  it('只剩 2.3.0 的旧键 bgm_locked_sheet_panel 时也能恢复（升级用户不丢锁定的表）', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
+    const storage = createMockPluginStorage({
+      bgm_locked_sheet_panel: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    expect(restoreLockedSheet()).toBe(true)
+    expect(sharedBGM.sheet.lockedName).toBe('Target')
+    // 回退只读不写：旧键原样留着，等下一次 saveLockedSheet 落到新键上
+    expect(storage._store[KEY]).toBeUndefined()
+    expect(storage._store.bgm_locked_sheet_panel).toBeTruthy()
+  })
+
+  it('新旧键都有时以新键为准（旧键残留不能盖掉升级后锁的表）', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
+    const storage = createMockPluginStorage({
+      bgm_locked_sheet_panel: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
+      [KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    expect(restoreLockedSheet()).toBe(true)
+    expect(sharedBGM.sheet.lockedName).toBe('Target')
   })
 
   it('锁定的工作簿不存在时清除状态', () => {

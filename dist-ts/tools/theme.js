@@ -134,11 +134,11 @@ export function saveTheme(mode) {
 }
 /**
  * 初始化主题：从配置读取并应用；若为「跟随系统」则监听系统外观变化。
- * 各页面入口（panel / settings / enrich）在启动时调用一次。
+ * 各页面入口（sync-panel / settings / enrich）在启动时调用一次。
  */
 /**
  * 初始化主题：从配置读取并应用；system 监听系统外观，schedule 起定时轮询。
- * 各页面入口（panel / settings / enrich）在启动时调用一次。
+ * 各页面入口（sync-panel / settings / enrich）在启动时调用一次。
  */
 export function initializeTheme() {
     const mode = getTheme(true);
@@ -190,9 +190,9 @@ export function startThemeScheduleWatch() {
  * 跨页主题同步：订阅共享配置轮询，主题变化时重新应用。
  *
  * WPS 中每个任务窗格是独立 WebView，postMessage 无法跨上下文广播，
- * 因此在 settings 页切换主题后，panel / enrich 页需定期从 PluginStorage
+ * 因此在 settings 页切换主题后，sync-panel / enrich 页需定期从 PluginStorage
  * 读取最新主题并 `applyTheme`，实现「所有页面同时变色」。
- * 各页面入口（panel / settings / enrich）在启动时调用一次。
+ * 各页面入口（sync-panel / settings / enrich）在启动时调用一次。
  *
  * 轮询本体在 `tools/config-poll.ts`（单定时器 + 键去重 + 隐藏跳过 + 原生下拉
  * 交互让路）——此前这里自带 2s `setInterval`，与另外三个同步模块叠加成

@@ -1,12 +1,12 @@
 /**
  * @fileoverview 功能模块排序（跨页同步）
  * @module tools/navOrder
- * @description 让用户在设置页调整 panel / enrich / clean / settings 四个页面的
+ * @description 让用户在设置页调整 sync-panel / enrich / clean / settings 四个页面的
  *              「侧栏导航项 + 主区模块」显示顺序。
  *
  * 设计要点：
  *   1. 顺序持久化在 PluginStorage 的 `bgm_nav_order`（JSON 对象，形如
- *      `{ "panel": ["sec-command", ...] }`）；未设置的页面回落到注册表默认顺序。
+ *      `{ "sync-panel": ["sec-command", ...] }`）；未设置的页面回落到注册表默认顺序。
  *   2. 自愈：读取时过滤掉存储中已不存在的模块 id，并把注册表里新增但存储中缺失的
  *      模块追加到末尾 —— 因此新增/删除模块无需写迁移逻辑，旧配置也不会失效。
  *   3. 跨页同步分两条路径：
@@ -39,7 +39,7 @@ export declare const ORDERABLE_PAGES: readonly string[];
  * 读取指定页面的模块顺序。
  * 结果始终包含该页注册表中的**全部**模块 id：存储里缺失的按注册表顺序补到末尾，
  * 存储里多余的（已下线模块）被丢弃。
- * @param page - 页面键（panel / enrich / clean）
+ * @param page - 页面键（sync-panel / enrich / clean）
  * @param isSilent - 静默模式，不打印日志（轮询用）
  */
 export declare function getNavOrder(page: string, isSilent?: boolean): string[];

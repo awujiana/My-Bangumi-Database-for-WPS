@@ -1,12 +1,12 @@
 /**
  * @fileoverview 功能模块排序（跨页同步）
  * @module tools/navOrder
- * @description 让用户在设置页调整 panel / enrich / clean / settings 四个页面的
+ * @description 让用户在设置页调整 sync-panel / enrich / clean / settings 四个页面的
  *              「侧栏导航项 + 主区模块」显示顺序。
  *
  * 设计要点：
  *   1. 顺序持久化在 PluginStorage 的 `bgm_nav_order`（JSON 对象，形如
- *      `{ "panel": ["sec-command", ...] }`）；未设置的页面回落到注册表默认顺序。
+ *      `{ "sync-panel": ["sec-command", ...] }`）；未设置的页面回落到注册表默认顺序。
  *   2. 自愈：读取时过滤掉存储中已不存在的模块 id，并把注册表里新增但存储中缺失的
  *      模块追加到末尾 —— 因此新增/删除模块无需写迁移逻辑，旧配置也不会失效。
  *   3. 跨页同步分两条路径：
@@ -23,10 +23,11 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js';
 import { subscribeConfigPoll } from './config-poll.js';
+import { applyPageKeyAliases } from './page-key.js';
 import { bgmLog } from './util/index.js';
 /** 页面键 → 该页可排序模块的默认顺序 */
 export const PAGE_MODULES = {
-    panel: [
+    'sync-panel': [
         { id: 'sec-command', label: '同步操作', icon: '🚀' },
         { id: 'sec-account', label: '账户与凭证', icon: '🔑' },
         { id: 'sec-scope', label: '同步范围与选择', icon: '🎯' },
@@ -82,7 +83,7 @@ export const PAGE_MODULES = {
 };
 /** 页面键 → 页面中文名（供设置页展示） */
 export const PAGE_LABELS = {
-    panel: '主面板',
+    'sync-panel': '同步面板',
     enrich: '富化面板',
     clean: '清理面板',
     highlight: '高亮面板',
@@ -91,7 +92,7 @@ export const PAGE_LABELS = {
 };
 /** 设置页中可配置排序的页面键（顺序即展示顺序） */
 export const ORDERABLE_PAGES = [
-    'panel',
+    'sync-panel',
     'enrich',
     'clean',
     'highlight',
@@ -111,7 +112,8 @@ function readOrderMap(isSilent = true) {
     try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            return parsed;
+            // 2.3.0 的排序键是 `panel`，改名后要迁到 `sync-panel`（见 tools/page-key）
+            return applyPageKeyAliases(parsed);
         }
     }
     catch (error) {
@@ -127,7 +129,7 @@ function saveOrderMap(map) {
  * 读取指定页面的模块顺序。
  * 结果始终包含该页注册表中的**全部**模块 id：存储里缺失的按注册表顺序补到末尾，
  * 存储里多余的（已下线模块）被丢弃。
- * @param page - 页面键（panel / enrich / clean）
+ * @param page - 页面键（sync-panel / enrich / clean）
  * @param isSilent - 静默模式，不打印日志（轮询用）
  */
 export function getNavOrder(page, isSilent = false) {
@@ -315,7 +317,7 @@ export function notifyNavOrderChanged(page) {
 }
 /**
  * 跨页排序同步：轮询 PluginStorage 中的排序配置，变化时就地重排当前页面。
- * 各页面入口（panel / enrich / clean / settings）在启动时调用一次。
+ * 各页面入口（sync-panel / enrich / clean / settings）在启动时调用一次。
  *
  * **为什么是轮询而不是事件推送**：WPS 每个任务窗格是独立 WebView，
  * `window.postMessage` 只在同源同进程的 iframe 树内有效，跨任务窗格不会送达，

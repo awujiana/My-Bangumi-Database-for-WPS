@@ -6,7 +6,8 @@
 import { syncWithConfirmation, setTokenForRibbon, testTokenForRibbon, copyTokenForRibbon, setUserIdForRibbon, openCollectionForRibbon, syncFromGithubForRibbon, undoLastSyncForRibbon, } from './services/ribbon-service.js';
 // 对话框走依赖反转桥：ribbon 属上层入口，不得直接 runtime-import UI 层
 import { getNotifyApi } from './core/ui-bridge.js';
-import { WPS_ENUM, showBangumiPanel, showEnrichPanel, showSettingsPanel, showCleanPanel, showHighlightPanel, showConditionalFormatPanel, showDonatePanel, closeAllPanels, BGM, isIncrementalSyncEnabled, isSkipConflictsEnabled, setIncrementalSync, setSkipConflicts, isSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, } from './index.js';
+import { WPS_ENUM, showSyncPanel, showEnrichPanel, showSettingsPanel, showCleanPanel, showHighlightPanel, showConditionalFormatPanel, showDonatePanel, closeAllPanels, BGM, isIncrementalSyncEnabled, isSkipConflictsEnabled, setIncrementalSync, setSkipConflicts, isSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, CONFIG_KEYS, getConfig, } from './index.js';
+import { canApplyI18n, initializeI18n, onLocaleChange, t } from './i18n/index.js';
 import { initializeWorkbookAutoDetection } from './sync/workbook-auto-detect.js';
 // 在 Ribbon 启动时通过 initializeRibbon() 显式注册（不在模块加载时自动执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
@@ -29,9 +30,9 @@ function initializeRibbonMessageListener() {
         if (data?.type === 'BGM:configUpdated') {
             const key = data.data?.key;
             const controlIdMap = {
-                bgm_incremental_sync: 'chkIncrementalSync',
-                bgm_skip_conflicts: 'chkSkipConflicts',
-                bgm_enable_sync_record: 'chkEnableSyncRecord',
+                bgm_incremental_sync: 'checkboxIncrementalSync',
+                bgm_skip_conflicts: 'checkboxSkipConflicts',
+                bgm_enable_sync_record: 'checkboxEnableSyncRecord',
             };
             const controlId = key === undefined ? undefined : controlIdMap[key];
             if (controlId) {
@@ -65,6 +66,10 @@ function startRibbonConfigPolling() {
     let lastIncrementalSync = null;
     let lastSkipConflicts = null;
     let lastEnableSyncRecord = null;
+    // 语言用「配置原值」而不是解析后的 LocaleCode 做基线：空串（没配过）也要算一次初值，
+    // 否则第一次 tick 会被当成「变化」而白白 Invalidate 一次（那会在语言包还没加载完时
+    // 重画 tab，把标题画成 key 或简体兜底）
+    let lastLanguage = getConfig(CONFIG_KEYS.LANGUAGE, '', true);
     _configPollingTimer = setInterval(() => {
         try {
             const isCurrentIncrementalSync = isIncrementalSyncEnabled(true);
@@ -74,20 +79,28 @@ function startRibbonConfigPolling() {
             const ribbonUI = app?.ribbonUI;
             if (!ribbonUI)
                 return;
+            const currentLanguage = getConfig(CONFIG_KEYS.LANGUAGE, '', true);
+            if (currentLanguage !== lastLanguage) {
+                lastLanguage = currentLanguage;
+                // 全量 Invalidate：getLabel 只对 <tab> 生效，但 InvalidateControl 实测
+                // 不会触发它（P0 结论），只有 Invalidate() 会让宿主重新回调 getLabel
+                ribbonUI.Invalidate();
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 界面语言变更: ${currentLanguage || '(未设置)'}，已 Invalidate() 刷新 tab 文案`);
+            }
             if (isCurrentIncrementalSync !== lastIncrementalSync) {
                 lastIncrementalSync = isCurrentIncrementalSync;
-                ribbonUI.InvalidateControl('chkIncrementalSync');
-                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 增量同步配置变更: ${isCurrentIncrementalSync ? '开启' : '关闭'}，已 InvalidateControl chkIncrementalSync`);
+                ribbonUI.InvalidateControl('checkboxIncrementalSync');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 增量同步配置变更: ${isCurrentIncrementalSync ? '开启' : '关闭'}，已 InvalidateControl checkboxIncrementalSync`);
             }
             if (isCurrentSkipConflicts !== lastSkipConflicts) {
                 lastSkipConflicts = isCurrentSkipConflicts;
-                ribbonUI.InvalidateControl('chkSkipConflicts');
-                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 跳过冲突配置变更: ${isCurrentSkipConflicts ? '跳过' : 'Excel覆盖'}，已 InvalidateControl chkSkipConflicts`);
+                ribbonUI.InvalidateControl('checkboxSkipConflicts');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 跳过冲突配置变更: ${isCurrentSkipConflicts ? '跳过' : 'Excel覆盖'}，已 InvalidateControl checkboxSkipConflicts`);
             }
             if (isCurrentEnableSyncRecord !== lastEnableSyncRecord) {
                 lastEnableSyncRecord = isCurrentEnableSyncRecord;
-                ribbonUI.InvalidateControl('chkEnableSyncRecord');
-                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 同步记录开关变更: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}，已 InvalidateControl chkEnableSyncRecord`);
+                ribbonUI.InvalidateControl('checkboxEnableSyncRecord');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 同步记录开关变更: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}，已 InvalidateControl checkboxEnableSyncRecord`);
             }
         }
         catch {
@@ -105,6 +118,8 @@ function stopRibbonConfigPolling() {
     clearInterval(_configPollingTimer);
     _configPollingTimer = null;
 }
+/** 语言变更监听是否已绑定（initializeRibbon 可能被重复调用） */
+let _isLocaleListenerBound = false;
 /**
  * 初始化 Ribbon 模块：注册消息监听器 + 启动配置轮询。
  *
@@ -117,6 +132,17 @@ function stopRibbonConfigPolling() {
 export function initializeRibbon() {
     initializeRibbonMessageListener();
     startRibbonConfigPolling();
+    // 语言包加载完成 → 刷新 tab 文案。跨窗格切换由 startRibbonConfigPolling 兜底，
+    // 这里管的是「本上下文刚加载完语言包」这一次（轮询要等 2 秒，会先看到旧标题）
+    if (!_isLocaleListenerBound) {
+        _isLocaleListenerBound = true;
+        onLocaleChange(() => {
+            const ribbonUI = getApp()?.ribbonUI;
+            ribbonUI?.Invalidate();
+        });
+    }
+    if (typeof document !== 'undefined')
+        initializeI18n();
 }
 /**
  * 移除 Ribbon 消息监听器 + 停止配置轮询，防止内存泄漏
@@ -236,17 +262,17 @@ export function OnAddinLoad(ribbonUI) {
  * 与 ribbon.xml 的一致性由 tests/ribbon.test.ts 的 XML 对照用例守护。
  */
 const SYNC_ACTIONS = {
-    btnShowPanel: showBangumiPanel,
-    btnOpenSettings: showSettingsPanel,
-    btnOpenEnrichPanel: showEnrichPanel,
-    btnOpenCleanPanel: showCleanPanel,
-    btnOpenHighlightPanel: showHighlightPanel,
-    btnOpenConditionalFormatPanel: showConditionalFormatPanel,
-    btnCloseAllPanels: closeAllPanelsForRibbon,
-    btnSetToken: setTokenForRibbon,
-    btnSetUserId: setUserIdForRibbon,
-    btnOpenCollection: openCollectionForRibbon,
-    btnDonate: showDonateForRibbon,
+    buttonOpenSyncPanel: showSyncPanel,
+    buttonOpenSettingsPanel: showSettingsPanel,
+    buttonOpenEnrichPanel: showEnrichPanel,
+    buttonOpenCleanPanel: showCleanPanel,
+    buttonOpenHighlightPanel: showHighlightPanel,
+    buttonOpenConditionalFormatPanel: showConditionalFormatPanel,
+    buttonCloseAllPanels: closeAllPanelsForRibbon,
+    buttonSetToken: setTokenForRibbon,
+    buttonSetUserId: setUserIdForRibbon,
+    buttonOpenCollection: openCollectionForRibbon,
+    buttonOpenDonatePanel: showDonateForRibbon,
 };
 /**
  * 「赞赏」按钮：打开赞赏页面（作者 GitHub / 邮箱 / 微信赞赏码）
@@ -278,11 +304,11 @@ function closeAllPanelsForRibbon() {
  * （连同步抛错一并捕获），避免每个按钮重复抄一段 try/catch。
  */
 const ASYNC_ACTIONS = {
-    btnSyncBangumi: syncWithConfirmation,
-    btnTestToken: testTokenForRibbon,
-    btnCopyToken: copyTokenForRibbon,
-    btnSyncFromGithub: syncFromGithubForRibbon,
-    btnUndoLastSync: undoLastSyncForRibbon,
+    buttonSyncBangumi: syncWithConfirmation,
+    buttonTestToken: testTokenForRibbon,
+    buttonCopyToken: copyTokenForRibbon,
+    buttonSyncFromGithub: syncFromGithubForRibbon,
+    buttonUndoLastSync: undoLastSyncForRibbon,
 };
 /**
  * 消费异步按钮处理器：async IIFE + 全量 try/catch
@@ -338,29 +364,60 @@ export function OnAction(control) {
  * WPS 会从加载项所在目录解析该路径并加载图片（与成功案例一致）。
  */
 const ICON_PATHS = {
-    btnShowPanel: 'images/panel.svg',
-    btnSyncBangumi: 'images/sync.svg',
-    btnSetToken: 'images/token.svg',
-    btnTestToken: 'images/TestToken.svg',
-    btnCopyToken: 'images/CopyToken.svg',
-    btnSetUserId: 'images/user.svg',
-    btnOpenCollection: 'images/link.svg',
-    btnSyncFromGithub: 'images/github.svg',
-    btnUndoLastSync: 'images/undo.svg',
-    btnOpenSettings: 'images/settings.svg',
-    btnCloseAllPanels: 'images/closeAllPanels.svg',
-    btnOpenEnrichPanel: 'images/enrichPage.svg',
-    btnOpenCleanPanel: 'images/cleanPage.svg',
-    btnOpenHighlightPanel: 'images/highlightPage.svg',
-    btnOpenConditionalFormatPanel: 'images/conditionalFormatPage.svg',
-    btnDonate: 'images/donate.svg',
+    buttonOpenSyncPanel: 'images/panel.svg',
+    buttonSyncBangumi: 'images/sync.svg',
+    buttonSetToken: 'images/token.svg',
+    buttonTestToken: 'images/TestToken.svg',
+    buttonCopyToken: 'images/CopyToken.svg',
+    buttonSetUserId: 'images/user.svg',
+    buttonOpenCollection: 'images/link.svg',
+    buttonSyncFromGithub: 'images/github.svg',
+    buttonUndoLastSync: 'images/undo.svg',
+    buttonOpenSettingsPanel: 'images/settings.svg',
+    buttonCloseAllPanels: 'images/closeAllPanels.svg',
+    buttonOpenEnrichPanel: 'images/enrichPage.svg',
+    buttonOpenCleanPanel: 'images/cleanPage.svg',
+    buttonOpenHighlightPanel: 'images/highlightPage.svg',
+    buttonOpenConditionalFormatPanel: 'images/conditionalFormatPage.svg',
+    buttonOpenDonatePanel: 'images/donate.svg',
 };
 export function GetBangumiImage(control) {
     return ICON_PATHS[control.Id] ?? 'images/newFromTemp.svg';
 }
+/**
+ * tab 标题的兜底文案
+ *
+ * `getLabel` 会在**语言包加载完成之前**就被宿主调用（ribbon 渲染早于 fetch），
+ * 这时 `t()` 只会返回 key。所以必须兜一个真实文案，且要与 ribbon.xml 里的静态
+ * `label` 一致——否则用户会先看到 `ribbon.tab` 再变成中文，闪一下更难看。
+ */
+const DEFAULT_TAB_LABEL = 'Bangumi同步';
+/**
+ * 控件 ID → 文案 key
+ *
+ * key 一律 `ribbon.<控件 id>`，与 `ribbon.xml` 的 id 一一对应——这样
+ * `tests/i18n.test.ts` 能拿 XML 里的 label 逐个比对，改 XML 忘改语言包会直接红。
+ *
+ * **只登记 tab**：实测 group / button / checkBox 的 `getLabel` 从不被调用
+ * （见 `文档/真机验证手册.md` §7.1），登记了也是死代码。
+ */
+const RIBBON_LABEL_KEYS = {
+    wpsAddinTab: 'ribbon.wpsAddinTab',
+};
+/**
+ * Ribbon 动态文案回调（`getLabel`）
+ *
+ * 只有 `<tab>` 会走到这里。切语言后由 `ribbonUI.Invalidate()` 触发重调。
+ */
+export function GetRibbonLabel(control) {
+    const key = RIBBON_LABEL_KEYS[control.Id];
+    if (key === undefined)
+        return '';
+    return canApplyI18n() ? t(key) : DEFAULT_TAB_LABEL;
+}
 // 通知 index.html 早期占位：真实实现已就绪
 const ribbonWindow = window;
-ribbonWindow._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
+ribbonWindow._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage, GetRibbonLabel);
 // 挂载 Ribbon 复选框回调到全局（WPS Ribbon XML 只能调用 window 上的函数）
 ribbonWindow.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
 ribbonWindow.GetSkipConflictsPressed = GetSkipConflictsPressed;
@@ -368,3 +425,4 @@ ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
 ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;
 ribbonWindow.GetEnableSyncRecordPressed = GetEnableSyncRecordPressed;
 ribbonWindow.OnEnableSyncRecordChange = OnEnableSyncRecordChange;
+ribbonWindow.GetRibbonLabel = GetRibbonLabel;

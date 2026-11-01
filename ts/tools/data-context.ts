@@ -19,7 +19,7 @@ const DATA_CONTEXT_KEY = 'bgm_data_context'
 
 /** 页面标识 → 展示名 */
 const PAGE_LABELS: Record<string, string> = {
-  panel: '主面板',
+  'sync-panel': '同步面板',
   enrich: '富化',
   highlight: '高亮',
   clean: '清理',
@@ -33,7 +33,7 @@ export interface DataContextSnapshot {
   columns: string[]
   /** 数据行数（不含表头；拿不到时 0） */
   rowCount: number
-  /** 获取数据的页面标识（panel / enrich / …） */
+  /** 获取数据的页面标识（sync-panel / enrich / …） */
   fromPage: string
   /** 写入时间（Date.now()） */
   savedAt: number

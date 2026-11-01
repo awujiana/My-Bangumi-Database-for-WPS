@@ -70,6 +70,38 @@ export declare function isFormatConditionsSupported(worksheet: WpsWorksheet | nu
  */
 export declare function checkFormatConditionsReadable(worksheet: WpsWorksheet | null | undefined): string | null;
 /**
+ * 把公式里的**相对行引用**整体平移 `delta` 行（绝对行 `$B$2` 原样不动）
+ *
+ * 起因：WPS 的 `FormatConditions.Add({ Formula1 })` 会把相对行引用再 +1。
+ * 真机实测（12.1.0.29158）：传 `=$B2>8` 回读 `=$B3>8`，传 `=$B$2>8` 回读不偏移，
+ * 传 `=$B1>8` 正好回读 `=$B2>8`。写入前先 -1 抵消，回读才等于规则库里的公式。
+ *
+ * 处理细节：
+ * - 字符串字面量（`"B2"`）由**同一个正则的另一个分支**整体吃掉，里面的字母数字
+ *   不会被当成引用（用「先挖掉再塞回」的写法要引入 `\u0001` 这类控制字符当哨兵，
+ *   既触发 `no-control-regex`，也怕公式本身含哨兵）；
+ * - 函数名（`LOG10(`）不当引用（后面紧跟 `(`）；
+ * - 平移后行号 < 1 的原样保留，不生成 `B0` 这种非法引用。
+ */
+export declare function shiftRelativeRows(formula: string, delta: number): string;
+/**
+ * `'#RRGGBB'`（规则库里的写法）→ WPS/VBA 的 BGR 整数
+ *
+ * WPS 的 `Interior.Color` 与项目里的 `BGM_COLOR` 一样是 **BGR** 排列
+ * （`0x0000FF` = 纯红）。规则库里存的是人类可读的 `'#FF0000'`，
+ * 直接塞给 `Interior.Color` 会被宿主当成非法值丢掉。
+ *
+ * @example rgbHexToBgr('#FF0000') === 255
+ */
+export declare function rgbHexToBgr(hex: string): number;
+/**
+ * BGR 整数 → `'#RRGGBB'`
+ *
+ * 与 {@link rgbHexToBgr} 互为逆运算。回读时**必须**走它：直接把 BGR 数字
+ * 当 RGB 打印，红色（`255`）会显示成 `#0000FF` 蓝。
+ */
+export declare function bgrToRgbHex(value: number): string;
+/**
  * 取第 index 条（1 基，与 FormatConditions.Item 一致）规则对象
  *
  * 统一入口：调用方拿不到对象时（Item 不存在 / 越界 / 宿主抛错）返回 null，

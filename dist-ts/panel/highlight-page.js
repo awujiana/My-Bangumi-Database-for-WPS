@@ -21,11 +21,12 @@ import { escapeHtml } from '../tools/string-utilities.js';
 import { bgmLog, findHeaderRow, getApp, getColumnMap, getLastRow, markHighlightPaneLoaded, readRangeValues, } from '../tools/util/index.js';
 import { CONFIG_KEYS, getConfig, setConfig } from '../tools/config.js';
 import { currentSeason, formatSeasonKey, formatSeasonLabel, isSeasonFilterMatch, rowsToRangeAddresses, runRangeGroupsWithSplit, selectSeasonRows, splitRangeAddresses, } from './highlight-season.js';
-import { registerSheetChangeAutoRefresh } from './panel-auto-refresh.js';
+import { registerSheetChangeAutoRefresh } from './sync-panel-auto-refresh.js';
 import { buildPreviewDetailHtml, normalizePreviewView } from './highlight-preview-render.js';
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
+import { initializeI18n } from '../i18n/index.js';
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js';
 import { mountDataContextNotice, registerTargetSheetApplier, saveDataContext, snapshotFromWorksheet, } from '../tools/data-context.js';
 import { renderOptionPicker } from '../ui/components/option-picker.js';
@@ -902,6 +903,7 @@ function reloadSheet() {
 function highlightPhaseConfig() {
     markHighlightPaneLoaded();
     initializeTheme();
+    initializeI18n();
     startThemeSync();
     // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
     mountDataContextNotice('highlight');

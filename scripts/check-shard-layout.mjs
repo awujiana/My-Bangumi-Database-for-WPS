@@ -17,7 +17,7 @@
  *   唯一的判据是「真浏览器里的计算样式」，所以本脚本用 headless Chrome 量。
  *
  * 怎么保证脚本本身不空转（本项目被「永远为真」的断言坑过）：
- *   · fixture 不是手抄的：**样式表 `<link>` 与分片 form-row 片段都从 `ui/panel.html` 抽取**，
+ *   · fixture 不是手抄的：**样式表 `<link>` 与分片 form-row 片段都从 `ui/sync-panel.html` 抽取**，
  *     分片清单从 `ts/ui/handlers/github-settings.ts` 读 —— 加载顺序或文案变了，脚本自动跟上；
  *   · 渲染结构另有**契约自检**：若 `github-settings.ts` 不再用
  *     `label.append(input, document.createTextNode(option.label))` 这个结构，直接报错退出；
@@ -82,17 +82,17 @@ function findBrowser() {
 }
 
 /**
- * 从 `ui/panel.html` 抽取样式表加载顺序与分片区块
+ * 从 `ui/sync-panel.html` 抽取样式表加载顺序与分片区块
  * @returns {{ links: string[], formRow: string }}
  */
 function readFixtureFromPanel() {
-  const panelHtml = readFileSync(join(projectRoot, 'ui/panel.html'), 'utf8')
+  const panelHtml = readFileSync(join(projectRoot, 'ui/sync-panel.html'), 'utf8')
 
   const links = [...panelHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"/gu)].map(
     (matched) => matched[1] ?? '',
   )
   if (links.length === 0)
-    throw new Error('ui/panel.html 未解析出任何样式表 <link>（fixture 抽取失效）')
+    throw new Error('ui/sync-panel.html 未解析出任何样式表 <link>（fixture 抽取失效）')
 
   // 分片区块：包含 id="shardSelectList" 的那个 .form-row
   const formRow =
@@ -100,7 +100,7 @@ function readFixtureFromPanel() {
       panelHtml,
     )?.[0]
   if (formRow === undefined) {
-    throw new Error('ui/panel.html 未解析出含 shardSelectList 的 .form-row（fixture 抽取失效）')
+    throw new Error('ui/sync-panel.html 未解析出含 shardSelectList 的 .form-row（fixture 抽取失效）')
   }
   if (!formRow.includes('id="shardSelectList"')) {
     throw new Error('抽取到的片段不含 shardSelectList（抽取规则已失效）')
@@ -109,14 +109,14 @@ function readFixtureFromPanel() {
   // 祖先容器：布局宽度与内边距由它们决定，缺了会让测量失真
   for (const marker of ['<div class="global">', '<main class="main main-grid">']) {
     if (!panelHtml.includes(marker)) {
-      throw new Error(`ui/panel.html 中找不到 ${marker}（页面结构已变，请更新本脚本的 fixture）`)
+      throw new Error(`ui/sync-panel.html 中找不到 ${marker}（页面结构已变，请更新本脚本的 fixture）`)
     }
   }
   // sec-remote：开头标签**允许带属性**（历史上写成整串字面量，加上 `data-detachable`
   // 之后就匹配不上、整条门禁恒红），这里只锚 id 与标签名。
   if (!/<section\b[^>]*\bid="sec-remote"/u.test(panelHtml)) {
     throw new Error(
-      'ui/panel.html 中找不到 id="sec-remote" 的 section（页面结构已变，请更新本脚本的 fixture）',
+      'ui/sync-panel.html 中找不到 id="sec-remote" 的 section（页面结构已变，请更新本脚本的 fixture）',
     )
   }
 
@@ -207,7 +207,7 @@ function buildProbePage(links, formRow, shards, required, layoutWidth) {
     </style>
 ${cssLinks}
   </head>
-  <body data-page="panel">
+  <body data-page="sync-panel">
     <div class="global">
       <main class="main main-grid">
         <section class="section" id="sec-remote">
@@ -295,7 +295,7 @@ function main() {
 
   console.log(`浏览器：${browser}`)
   console.log(
-    `fixture：${String(links.length)} 个样式表（顺序取自 panel.html）+ ${String(shards.length)} 个分片\n`,
+    `fixture：${String(links.length)} 个样式表（顺序取自 sync-panel.html）+ ${String(shards.length)} 个分片\n`,
   )
 
   const probeDir = mkdtempSync(join(tmpdir(), 'bgm-shard-layout-'))

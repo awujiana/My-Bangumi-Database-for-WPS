@@ -45,7 +45,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: (): void => {
     /* 不参与断言 */
   },
-  showBangumiPanel: (): void => undefined,
+  showSyncPanel: (): void => undefined,
   showEnrichPanel: (): void => undefined,
   showCleanPanel: (): void => undefined,
   showHighlightPanel: (): void => undefined,
@@ -68,7 +68,7 @@ import { getShortcutBindings, SHORTCUT_ACTIONS } from '../ts/tools/shortcuts.js'
 function buildDom(): void {
   document.body.innerHTML = `
     <div id="shortcutPanel">
-      <input type="checkbox" id="chkShortcutsEnabled" />
+      <input type="checkbox" id="checkboxShortcutsEnabled" />
       <div id="shortcutList"></div>
       <p id="shortcutConflicts" hidden></p>
       <div id="shortcutMouseRows"></div>
@@ -114,7 +114,7 @@ describe('渲染', () => {
   })
 
   it('总开关按配置回填（默认开）', () => {
-    const checkbox = document.getElementById('chkShortcutsEnabled')
+    const checkbox = document.getElementById('checkboxShortcutsEnabled')
     expect((checkbox as HTMLInputElement).checked).toBe(true)
   })
 })

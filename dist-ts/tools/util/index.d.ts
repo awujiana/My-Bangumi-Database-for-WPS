@@ -10,7 +10,7 @@
  *   - util/sheet.ts：工作表读取/缓存（readRangeValues、cacheGet、findHeaderRow、getColumnMap、clearSheetCache、getLastRow、isEmptyValue、getDataSheet、safeActivate）
  *   - util/field-getter.ts：批量字段访问器（矩形读 + 逐格回退）与同步行指纹
  *   - util/sleep.ts：延时（sleep、delay）
- *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
+ *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showSyncPanel）
  */
 import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel } from '../../core/constants.js';
 import type { ErrorOptions } from '../../core/constants.js';
@@ -290,7 +290,7 @@ export declare function showDonatePanel(): void;
 /**
  * 构造任务窗格页面 URL
  *
- * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录
+ * 背景：getUrlPath() 在面板页面内（如 .../ui/sync-panel.html）执行时返回的是页面所在目录
  * `.../ui`，此时若直接拼接 `/ui/settings.html` 会得到错误的 `.../ui/ui/settings.html`。
  * 这里统一把末尾的 `/ui` 归一化掉后再拼接，保证任何调用上下文都得到 `.../ui/<page>`。
  *
@@ -301,7 +301,7 @@ export declare function buildTaskPaneUrl(page: string): string;
 /**
  * 显示同步面板
  */
-export declare function showBangumiPanel(): void;
+export declare function showSyncPanel(): void;
 /**
  * 显示新番表富化面板
  * 独立面板，与主同步面板分离

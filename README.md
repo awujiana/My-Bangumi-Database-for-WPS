@@ -191,7 +191,7 @@ My-Bangumi-Database-for-WPS-v2.3.0/
 │   ├── purify.min.js.map
 │   └── wps-sdk-loader.js
 └── ui/                         # 面板 HTML
-    ├── panel.html              # 主面板
+    ├── sync-panel.html         # 同步面板
     ├── settings.html           # 设置面板
     ├── clean.html              # 数据清洗
     ├── conditional-format.html # 条件格式管理
@@ -419,7 +419,7 @@ npm run build:ts
 
 **构建产物**：
 
-- `dist-ts/`：`tsc` 编译后的 JS（被 `main.js` / `panel.html` 运行时依赖）。
+- `dist-ts/`：`tsc` 编译后的 JS（被 `main.js` / `sync-panel.html` 运行时依赖）。
 - `dist/`：`vite build` 输出，含 `manifest.xml`、`ribbon.xml`、`images/`、`ui/`、`main.js`、`dist-ts/**`、`css/` 与经哈希的 `assets/`。将此目录作为加载项发布包部署到 WPS。
 
 #### 打包发布到 Releases（离线分发）
@@ -587,7 +587,7 @@ npm run audit:layout           # 全页面布局审计（改了 css/ 或页面�
 单元测试，**没有一道能发现样式错位** —— CSS 没有类型系统，jsdom 也不做布局计算。这道门禁用
 headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局宽度下量**真实计算样式**，
 断言「每个分片标签的文字只占 1 行、标签高 ≤ 40px、复选框 ≤ 20px」。
-改了 `css/**`、`panel.html` 的分片区块或分片文案之后跑一次。
+改了 `css/**`、`sync-panel.html` 的分片区块或分片文案之后跑一次。
 
 `npm run audit:layout` 把同一套思路推广到**全部 5 个页面**：按「原生 checkbox/radio 渲染尺寸 > 20px」
 「短文本（≤ 24 字）却占多行」「内容横向溢出」三条客观判据找错位，一次就抓到 3 处与分片**同源**的 bug

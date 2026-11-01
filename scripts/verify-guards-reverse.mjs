@@ -71,11 +71,11 @@ const CASES = [
       {
         file: 'ribbon.xml',
         mode: 'literal',
-        from: 'id="btnSetToken"',
-        to: 'id="btnSetTokenProbe"',
+        from: 'id="buttonSetToken"',
+        to: 'id="buttonSetTokenProbe"',
       },
     ],
-    expectInOutput: ['btnSetTokenProbe'],
+    expectInOutput: ['buttonSetTokenProbe'],
   },
   {
     id: 'dompurify-version',
@@ -116,7 +116,7 @@ const CASES = [
     check: 'scripts/check-nav-order.mjs',
     mutations: [
       {
-        file: 'ui/panel.html',
+        file: 'ui/sync-panel.html',
         mode: 'literal',
         from: 'id="sec-remote"',
         to: 'id="sec-probeGhost"',

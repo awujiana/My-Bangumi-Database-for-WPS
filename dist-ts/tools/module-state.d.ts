@@ -7,7 +7,7 @@
  *   1. **两种状态互相独立**：
  *      - 折叠（collapsed）：模块标题保留、内容收起，用户随时可点开；
  *      - 隐藏（hidden）：模块在主区与侧栏锚点中彻底消失，只能在设置页恢复。
- *   2. **按页面分别记录**：`sec-preview` 在 panel / enrich / clean 三页都存在，
+ *   2. **按页面分别记录**：`sec-preview` 在 sync-panel / enrich / clean 三页都存在，
  *      折叠 panel 的不影响 enrich —— 与排序配置（`nav-order`）的按页存储口径一致。
  *   3. **都持久化进 PluginStorage**（`bgm_module_collapsed` / `bgm_module_hidden`），
  *      即用户说的「计入缓存配置」：刷新 / 重开任务窗格后仍在。

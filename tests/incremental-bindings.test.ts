@@ -7,7 +7,7 @@
  *     取真实 `LOG_LEVELS`（**绝不能**改成 `importOriginal()`：barrel 与
  *     `ribbon-service` / `handlers/sync` 互相 re-export，会死锁并让 vitest 静默
  *     回退真实现 —— 见 `.workbuddy/memory/REF-testing.md`）；
- *   - `./panel-context.js` → 1 行谓词，mock 一个可翻转开关来控制「是否任务窗格上下文」；
+ *   - `./sync-panel-context.js` → 1 行谓词，mock 一个可翻转开关来控制「是否任务窗格上下文」；
  *   - `./resource-tracking.js` → **用真实模块**：它只是 `addEventListener` 的薄包装，
  *     用真的才能「挂载 DOM → 派发 change 事件 → 断言 handler 真被执行」，
  *     而不是断言「某个 mock 被调用过」这种假覆盖。
@@ -47,7 +47,7 @@ vi.mock('../ts/index.js', async () => {
   }
 })
 
-vi.mock('../ts/ui/handlers/panel-context.js', () => ({
+vi.mock('../ts/ui/handlers/sync-panel-context.js', () => ({
   isPanelContext: () => flags.isPanel,
 }))
 
@@ -156,7 +156,7 @@ afterEach(() => {
 describe('tryUpdateIncrementalCheckbox', () => {
   it('非任务窗格上下文 → 直接返回且不碰 DOM', () => {
     flags.isPanel = false
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
 
     tryUpdateIncrementalCheckbox(true)
 
@@ -171,7 +171,7 @@ describe('tryUpdateIncrementalCheckbox', () => {
   })
 
   it('元素存在 → 回写 checked 并打两条状态日志', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
 
     tryUpdateIncrementalCheckbox(true)
 
@@ -181,7 +181,7 @@ describe('tryUpdateIncrementalCheckbox', () => {
   })
 
   it('目标为关闭 → 日志显示「关闭」并回写 false', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     checkbox.checked = true
 
     tryUpdateIncrementalCheckbox(false)
@@ -261,8 +261,8 @@ describe('tryUpdateSkipConflictsUI · 重试链路', () => {
     expect(hasLog('冲突策略 radio 已更新')).toBe(true)
   })
 
-  it('重试 3 次后无 radio → 落到 #chkSkipConflicts 复选框', () => {
-    const checkbox = mountInput('chkSkipConflicts')
+  it('重试 3 次后无 radio → 落到 #checkboxSkipConflicts 复选框', () => {
+    const checkbox = mountInput('checkboxSkipConflicts')
 
     tryUpdateSkipConflictsUI(true, 3)
 
@@ -284,7 +284,7 @@ describe('tryUpdateSkipConflictsUI · 重试链路', () => {
     const skipOnly = mountElement('input')
     skipOnly.name = 'conflictStrategy'
     skipOnly.value = 'skip'
-    const checkbox = mountInput('chkSkipConflicts')
+    const checkbox = mountInput('checkboxSkipConflicts')
 
     tryUpdateSkipConflictsUI(true, 3)
 
@@ -298,7 +298,7 @@ describe('tryUpdateSkipConflictsUI · 重试链路', () => {
 describe('tryUpdateEnableSyncRecordUI', () => {
   it('非任务窗格上下文 → 直接返回', () => {
     flags.isPanel = false
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
 
     tryUpdateEnableSyncRecordUI(true)
 
@@ -313,7 +313,7 @@ describe('tryUpdateEnableSyncRecordUI', () => {
   })
 
   it('元素存在 → 回写 checked 并同时打印当前 / 目标状态', () => {
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
 
     tryUpdateEnableSyncRecordUI(true)
 
@@ -323,7 +323,7 @@ describe('tryUpdateEnableSyncRecordUI', () => {
   })
 
   it('目标为关闭 → 回写 false', () => {
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
     checkbox.checked = true
 
     tryUpdateEnableSyncRecordUI(false)
@@ -343,7 +343,7 @@ describe('handleIncrementalChange', () => {
   })
 
   it('勾选中 → setIncrementalSync(true) 成功路径', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     checkbox.checked = true
 
     handleIncrementalChange()
@@ -353,7 +353,7 @@ describe('handleIncrementalChange', () => {
   })
 
   it('取消勾选 → setIncrementalSync(false)，写入失败落 WARN', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     checkbox.checked = false
     m.setIncrementalSync.mockReturnValue(false)
 
@@ -364,7 +364,7 @@ describe('handleIncrementalChange', () => {
   })
 
   it('写入抛错 → 落 WARN 且不向上抛', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     checkbox.checked = true
     m.setIncrementalSync.mockImplementation(() => {
       throw new Error('Ribbon 不可用')
@@ -468,7 +468,7 @@ describe('handleChkSkipConflictsChange', () => {
   })
 
   it('勾选中 → setSkipConflicts(true)', () => {
-    const checkbox = mountInput('chkSkipConflicts')
+    const checkbox = mountInput('checkboxSkipConflicts')
     checkbox.checked = true
 
     handleChkSkipConflictsChange()
@@ -478,7 +478,7 @@ describe('handleChkSkipConflictsChange', () => {
   })
 
   it('取消勾选 → setSkipConflicts(false)', () => {
-    mountInput('chkSkipConflicts')
+    mountInput('checkboxSkipConflicts')
 
     handleChkSkipConflictsChange()
 
@@ -487,7 +487,7 @@ describe('handleChkSkipConflictsChange', () => {
   })
 
   it('写入抛错 → 落 WARN 且不向上抛', () => {
-    const checkbox = mountInput('chkSkipConflicts')
+    const checkbox = mountInput('checkboxSkipConflicts')
     checkbox.checked = true
     m.setSkipConflicts.mockImplementation(() => {
       throw new Error('配置只读')
@@ -506,7 +506,7 @@ describe('handleChkSkipConflictsChange', () => {
 describe('initializeIncrementalSyncFromRibbon', () => {
   it('非任务窗格上下文 → 直接返回', () => {
     flags.isPanel = false
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     m.isIncrementalSyncEnabled.mockReturnValue(true)
 
     initializeIncrementalSyncFromRibbon()
@@ -516,7 +516,7 @@ describe('initializeIncrementalSyncFromRibbon', () => {
   })
 
   it('复选框不存在 → 增量部分直接返回，但冲突策略仍要初始化', () => {
-    // 主面板 panel.html 只有 #conflictStrategy、没有 #chkIncremental。
+    // 主面板 sync-panel.html 只有 #conflictStrategy、没有 #checkboxIncremental。
     // 旧实现把 initializeSkipConflictsFromRibbon 放在函数尾部，被早退挡住 →
     // 冲突策略下拉的 change 监听永不注册，用户改了下拉却不落配置。
     const select = mountSelect('conflictStrategy')
@@ -534,7 +534,7 @@ describe('initializeIncrementalSyncFromRibbon', () => {
   })
 
   it('从配置读取状态回填复选框，并真连上 change 事件', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     m.isIncrementalSyncEnabled.mockReturnValue(true)
 
     initializeIncrementalSyncFromRibbon()
@@ -549,7 +549,7 @@ describe('initializeIncrementalSyncFromRibbon', () => {
   })
 
   it('配置为关闭 → 复选框回填 false', () => {
-    const checkbox = mountInput('chkIncremental')
+    const checkbox = mountInput('checkboxIncremental')
     checkbox.checked = true
     m.isIncrementalSyncEnabled.mockReturnValue(false)
 
@@ -560,7 +560,7 @@ describe('initializeIncrementalSyncFromRibbon', () => {
   })
 
   it('读取配置抛错 → 落 WARN，但仍继续注册监听与初始化冲突策略', () => {
-    mountInput('chkIncremental')
+    mountInput('checkboxIncremental')
     const select = mountSelect('conflictStrategy')
     m.isIncrementalSyncEnabled.mockImplementation(() => {
       throw new Error('配置损坏')
@@ -639,8 +639,8 @@ describe('initializeSkipConflictsFromRibbon', () => {
     expect(m.setSkipConflicts).toHaveBeenLastCalledWith(false)
   })
 
-  it('无 select 无 radio 但有 #chkSkipConflicts → 注册复选框监听', () => {
-    const checkbox = mountInput('chkSkipConflicts')
+  it('无 select 无 radio 但有 #checkboxSkipConflicts → 注册复选框监听', () => {
+    const checkbox = mountInput('checkboxSkipConflicts')
 
     initializeSkipConflictsFromRibbon()
 

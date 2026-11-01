@@ -6,7 +6,7 @@
  *   1. updateStickyOffsets —— 吸顶偏移测量：
  *      将顶栏实际高度写入 --topbar-h、窄态（≤880px）横向导航块高度写入 --nav-h，
  *      供 CSS 控制 sidebar 吸顶位置与锚点 scroll-padding 偏移补偿。
- *      此前只有 panel-bootstrap 调用，settings / enrich 页未设置导致：
+ *      此前只有 sync-panel-bootstrap 调用，settings / enrich 页未设置导致：
  *      - 侧栏吸顶位置落在顶栏之下被遮挡（导航按钮显示不全）
  *      - 锚点跳转时目标区块标题被顶栏盖住（视觉错位）
  *

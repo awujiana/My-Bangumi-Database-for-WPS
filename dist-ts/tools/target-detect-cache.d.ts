@@ -23,7 +23,7 @@
  *  - **存储失败不影响主流程**：PluginStorage 不可用 / 内容损坏时一律视为未命中。
  */
 /** 缓存用途：面板与富化页各存一份（语义不同，互不覆盖） */
-export type TargetCachePurpose = 'panel' | 'enrich';
+export type TargetCachePurpose = 'sync-panel' | 'enrich';
 /** 识别结果（可持久化的最小集合） */
 export interface CachedTarget {
     workbookName: string;

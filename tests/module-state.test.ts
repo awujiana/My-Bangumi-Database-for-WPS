@@ -79,7 +79,7 @@ function nativeButton(id: string, label: string): string {
   )
 }
 
-/** 与 HTML 一致：唯一没有 h3 的模块（panel 的跨栏操作区，门禁白名单里显式登记） */
+/** 与 HTML 一致：唯一没有 h3 的模块（sync-panel 的跨栏操作区，门禁白名单里显式登记） */
 const NO_TOGGLE_ID = 'sec-command'
 
 /** 某页注册表的全部模块 id（用于「全页隐藏」，避免写死清单随注册表变动而失真） */
@@ -108,7 +108,7 @@ function buildPageDom(page: string): void {
 
 /** 最小 panel 结构 */
 function buildPanelDom(): void {
-  buildPageDom('panel')
+  buildPageDom('sync-panel')
 }
 
 /** 最小 settings 结构（含不可隐藏的排序编辑器） */
@@ -147,7 +147,7 @@ beforeEach(() => {
   configStore.clear()
   throwState.next = false
   document.body.replaceChildren()
-  document.body.dataset.page = 'panel'
+  document.body.dataset.page = 'sync-panel'
   registerNotifyApi({
     alert: vi.fn(),
     confirm: vi.fn(),
@@ -157,7 +157,7 @@ beforeEach(() => {
     input: vi.fn(),
   })
   // 复位「本页已提示过全隐藏」的内部标记：此时无模块被隐藏，套用一次即清除该页记录
-  applyModuleState('panel')
+  applyModuleState('sync-panel')
   toastSpy.mockClear()
   utilityMock.showSettingsPanel.mockClear()
 })
@@ -169,7 +169,7 @@ afterEach(() => {
 
 describe('canHideModule', () => {
   it('普通模块允许隐藏', () => {
-    expect(canHideModule('panel', 'sec-account')).toBe(true)
+    expect(canHideModule('sync-panel', 'sec-account')).toBe(true)
   })
 
   it('设置页的排序编辑器模块不可隐藏（否则没有入口能恢复）', () => {
@@ -183,58 +183,74 @@ describe('canHideModule', () => {
 
 describe('读取：自愈与容错', () => {
   it('无配置时返回空数组', () => {
-    expect(getCollapsedModules('panel')).toEqual([])
-    expect(getHiddenModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
+    expect(getHiddenModules('sync-panel')).toEqual([])
   })
 
   it('未知页面返回空数组', () => {
-    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"panel":["sec-account"]}')
+    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"sync-panel":["sec-account"]}')
     expect(getCollapsedModules('not-a-page')).toEqual([])
     expect(getHiddenModules('not-a-page')).toEqual([])
   })
 
   it('该页配置不是数组时返回空数组', () => {
-    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{"panel":{"a":1}}')
-    expect(getHiddenModules('panel')).toEqual([])
+    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{"sync-panel":{"a":1}}')
+    expect(getHiddenModules('sync-panel')).toEqual([])
   })
 
   it('过滤掉非字符串与已下线的模块 id', () => {
     configStore.set(
       CONFIG_KEYS.MODULE_COLLAPSED,
-      '{"panel":["sec-account", 42, "sec-removed", null]}',
+      '{"sync-panel":["sec-account", 42, "sec-removed", null]}',
     )
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
   })
 
   it('去重（重复 id 不会让模块被算两次）', () => {
-    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{"panel":["sec-scope","sec-scope"]}')
-    expect(getHiddenModules('panel')).toEqual(['sec-scope'])
+    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{"sync-panel":["sec-scope","sec-scope"]}')
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-scope'])
   })
 
   it('保持存储中的先后顺序', () => {
-    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"panel":["sec-scope","sec-account"]}')
-    expect(getCollapsedModules('panel')).toEqual(['sec-scope', 'sec-account'])
+    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"sync-panel":["sec-scope","sec-account"]}')
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-scope', 'sec-account'])
   })
 
   it('配置为 null / 数字 / 数组时不崩溃，按「无配置」处理', () => {
     for (const raw of ['null', '123', '[]', '"str"', 'true']) {
       configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, raw)
-      expect(getCollapsedModules('panel')).toEqual([])
+      expect(getCollapsedModules('sync-panel')).toEqual([])
     }
   })
 
   it('JSON 解析失败时回落到空配置而不是抛错', () => {
     configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{ 不是 json')
-    expect(getHiddenModules('panel')).toEqual([])
+    expect(getHiddenModules('sync-panel')).toEqual([])
+  })
+
+  it('2.3.0 的旧页面键 panel 会迁到 sync-panel（升级用户的折叠 / 隐藏状态不丢）', () => {
+    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"panel":["sec-account"]}')
+    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, '{"panel":["sec-scope"]}')
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-scope'])
+  })
+
+  it('迁完清空后旧键不会被下一次读补回来', () => {
+    configStore.set(CONFIG_KEYS.MODULE_COLLAPSED, '{"panel":["sec-account"]}')
+    expect(setCollapsedModules('sync-panel', [])).toBe(true)
+    expect(getCollapsedModules('sync-panel')).toEqual([])
+    expect(JSON.parse(configStore.get(CONFIG_KEYS.MODULE_COLLAPSED) ?? '{}')).not.toHaveProperty(
+      'panel',
+    )
   })
 })
 
 describe('写入', () => {
   it('写入后可读回', () => {
-    expect(setCollapsedModules('panel', ['sec-account'])).toBe(true)
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
-    expect(setHiddenModules('panel', ['sec-scope'])).toBe(true)
-    expect(getHiddenModules('panel')).toEqual(['sec-scope'])
+    expect(setCollapsedModules('sync-panel', ['sec-account'])).toBe(true)
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
+    expect(setHiddenModules('sync-panel', ['sec-scope'])).toBe(true)
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-scope'])
   })
 
   it('未知页面写入失败', () => {
@@ -243,41 +259,41 @@ describe('写入', () => {
   })
 
   it('过滤未知 id 与重复项', () => {
-    setCollapsedModules('panel', ['sec-account', 'sec-nope', 'sec-account'])
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
+    setCollapsedModules('sync-panel', ['sec-account', 'sec-nope', 'sec-account'])
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
   })
 
   it('写入空数组时删掉该页的记录，配置里不留空数组', () => {
-    setCollapsedModules('panel', ['sec-account'])
+    setCollapsedModules('sync-panel', ['sec-account'])
     setHiddenModules('clean', ['sec-log'])
-    setCollapsedModules('panel', [])
+    setCollapsedModules('sync-panel', [])
     // 该页条目被移除；另一个页面的记录不受影响
     expect(configStore.get(CONFIG_KEYS.MODULE_COLLAPSED)).toBe('{}')
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
     expect(getHiddenModules('clean')).toEqual(['sec-log'])
   })
 
   it('折叠与隐藏互不干扰', () => {
-    setCollapsedModules('panel', ['sec-account'])
-    setHiddenModules('panel', ['sec-scope'])
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
-    expect(getHiddenModules('panel')).toEqual(['sec-scope'])
+    setCollapsedModules('sync-panel', ['sec-account'])
+    setHiddenModules('sync-panel', ['sec-scope'])
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-scope'])
   })
 })
 
 describe('toggle', () => {
   it('未折叠 → 折叠；再点 → 取消', () => {
-    toggleModuleCollapsed('panel', 'sec-account')
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
-    toggleModuleCollapsed('panel', 'sec-account')
-    expect(getCollapsedModules('panel')).toEqual([])
+    toggleModuleCollapsed('sync-panel', 'sec-account')
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
+    toggleModuleCollapsed('sync-panel', 'sec-account')
+    expect(getCollapsedModules('sync-panel')).toEqual([])
   })
 
   it('未隐藏 → 隐藏；再点 → 恢复', () => {
-    toggleModuleHidden('panel', 'sec-scope')
-    expect(getHiddenModules('panel')).toEqual(['sec-scope'])
-    toggleModuleHidden('panel', 'sec-scope')
-    expect(getHiddenModules('panel')).toEqual([])
+    toggleModuleHidden('sync-panel', 'sec-scope')
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-scope'])
+    toggleModuleHidden('sync-panel', 'sec-scope')
+    expect(getHiddenModules('sync-panel')).toEqual([])
   })
 
   it('未知页面切换不写入任何状态', () => {
@@ -293,8 +309,8 @@ describe('toggle', () => {
   })
 
   it('按页面分别记录：折叠 panel 的不影响 clean 的同名模块', () => {
-    toggleModuleCollapsed('panel', 'sec-preview')
-    expect(getCollapsedModules('panel')).toContain('sec-preview')
+    toggleModuleCollapsed('sync-panel', 'sec-preview')
+    expect(getCollapsedModules('sync-panel')).toContain('sec-preview')
     expect(getCollapsedModules('clean')).not.toContain('sec-preview')
   })
 })
@@ -327,8 +343,8 @@ describe('受保护模块：设置页「模块排序」永远可见', () => {
 describe('applyModuleState', () => {
   it('隐藏：模块与侧栏锚点一起消失（只隐藏一处会出现「点了跳到空区块」）', () => {
     buildPanelDom()
-    setHiddenModules('panel', ['sec-account'])
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', ['sec-account'])
+    applyModuleState('sync-panel')
     expect(moduleElement('sec-account').hidden).toBe(true)
     expect(anchorOf('sec-account').hidden).toBe(true)
     expect(moduleElement('sec-scope').hidden).toBe(false)
@@ -337,8 +353,8 @@ describe('applyModuleState', () => {
 
   it('折叠：加 is-module-collapsed 类，模块本身不隐藏', () => {
     buildPanelDom()
-    setCollapsedModules('panel', ['sec-scope'])
-    applyModuleState('panel')
+    setCollapsedModules('sync-panel', ['sec-scope'])
+    applyModuleState('sync-panel')
     expect(moduleElement('sec-scope').classList.contains('is-module-collapsed')).toBe(true)
     expect(moduleElement('sec-scope').hidden).toBe(false)
     expect(moduleElement('sec-account').classList.contains('is-module-collapsed')).toBe(false)
@@ -347,10 +363,10 @@ describe('applyModuleState', () => {
   it('同步折叠按钮的 aria-expanded 与图标', () => {
     buildPanelDom()
     bindCollapseToggles()
-    applyModuleState('panel')
+    applyModuleState('sync-panel')
     expect(collapseButton('sec-account').getAttribute('aria-expanded')).toBe('true')
-    setCollapsedModules('panel', ['sec-account'])
-    applyModuleState('panel')
+    setCollapsedModules('sync-panel', ['sec-account'])
+    applyModuleState('sync-panel')
     expect(collapseButton('sec-account').getAttribute('aria-expanded')).toBe('false')
     expect(collapseButton('sec-account').textContent).toBe('▸')
   })
@@ -358,17 +374,17 @@ describe('applyModuleState', () => {
   it('模块 / 锚点 / 按钮缺失时都安全跳过（页面结构差异不该抛错）', () => {
     document.body.innerHTML =
       '<main class="main"><section class="section" id="sec-account"><h3>a</h3></section></main>'
-    setHiddenModules('panel', ['sec-account'])
-    setCollapsedModules('panel', ['sec-account'])
+    setHiddenModules('sync-panel', ['sec-account'])
+    setCollapsedModules('sync-panel', ['sec-account'])
     expect(() => {
-      applyModuleState('panel')
+      applyModuleState('sync-panel')
     }).not.toThrow()
     expect(moduleElement('sec-account').hidden).toBe(true)
   })
 
   it('缺省页面键时取 body[data-page]', () => {
     buildPanelDom()
-    setHiddenModules('panel', ['sec-scope'])
+    setHiddenModules('sync-panel', ['sec-scope'])
     applyModuleState()
     expect(moduleElement('sec-scope').hidden).toBe(true)
   })
@@ -389,7 +405,7 @@ describe('applyModuleState', () => {
   it('无 document 时（Node 上下文）静默返回', () => {
     vi.stubGlobal('document', undefined)
     expect(() => {
-      applyModuleState('panel')
+      applyModuleState('sync-panel')
     }).not.toThrow()
   })
 })
@@ -398,11 +414,11 @@ describe('bindCollapseToggles：按钮由 HTML 原生提供', () => {
   it('按钮来自 HTML（本模块不再创建按钮），无 h3 的模块没有按钮', () => {
     buildPanelDom()
     expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
-      allModuleIds('panel').length - 1,
+      allModuleIds('sync-panel').length - 1,
     )
     bindCollapseToggles()
     expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
-      allModuleIds('panel').length - 1,
+      allModuleIds('sync-panel').length - 1,
     )
     // sec-command 没有 h3，生产 HTML 里也没给它按钮（门禁白名单里显式登记）
     expect(document.querySelector('.mod-collapse-btn[data-mod-collapse="sec-command"]')).toBeNull()
@@ -411,7 +427,7 @@ describe('bindCollapseToggles：按钮由 HTML 原生提供', () => {
   it('aria-controls 由套用状态时补齐（HTML 里不重复写同一个 id）', () => {
     buildPanelDom()
     expect(collapseButton('sec-account').getAttribute('aria-controls')).toBeNull()
-    applyModuleState('panel')
+    applyModuleState('sync-panel')
     expect(collapseButton('sec-account').getAttribute('aria-controls')).toBe('sec-account')
     expect(collapseButton('sec-account').getAttribute('aria-label')).toContain('账户与凭证')
   })
@@ -422,7 +438,7 @@ describe('bindCollapseToggles：按钮由 HTML 原生提供', () => {
     bindCollapseToggles()
     bindCollapseToggles()
     collapseButton('sec-account').click()
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
   })
 
   it('无 document 时静默返回', () => {
@@ -438,7 +454,7 @@ describe('点击折叠按钮', () => {
     buildPanelDom()
     bindCollapseToggles()
     collapseButton('sec-account').click()
-    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
+    expect(getCollapsedModules('sync-panel')).toEqual(['sec-account'])
     expect(moduleElement('sec-account').classList.contains('is-module-collapsed')).toBe(true)
     expect(collapseButton('sec-account').textContent).toBe('▸')
   })
@@ -448,7 +464,7 @@ describe('点击折叠按钮', () => {
     bindCollapseToggles()
     collapseButton('sec-account').click()
     collapseButton('sec-account').click()
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
     expect(moduleElement('sec-account').classList.contains('is-module-collapsed')).toBe(false)
   })
 
@@ -459,7 +475,7 @@ describe('点击折叠按钮', () => {
       .getElementById('sec-account')
       ?.querySelector('.body')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
   })
 
   it('按钮缺 data-mod-collapse 时不触发', () => {
@@ -469,7 +485,7 @@ describe('点击折叠按钮', () => {
     orphan.className = 'mod-collapse-btn'
     document.body.appendChild(orphan)
     orphan.click()
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
   })
 
   it('页面键为空时不触发（不知道该改哪页的配置）', () => {
@@ -477,7 +493,7 @@ describe('点击折叠按钮', () => {
     bindCollapseToggles()
     delete document.body.dataset.page
     collapseButton('sec-account').click()
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
   })
 
   it('所在页面未知时不写入（写入失败就不改 DOM，避免出现「看着折叠了但没存住」）', () => {
@@ -493,18 +509,18 @@ describe('点击折叠按钮', () => {
     buildPanelDom()
     bindCollapseToggles()
     document.dispatchEvent(new MouseEvent('click'))
-    expect(getCollapsedModules('panel')).toEqual([])
+    expect(getCollapsedModules('sync-panel')).toEqual([])
   })
 })
 
 describe('startModuleStateSync', () => {
   it('启动即套用一次状态（避免首屏闪回展开）', () => {
     buildPanelDom()
-    setCollapsedModules('panel', ['sec-scope'])
+    setCollapsedModules('sync-panel', ['sec-scope'])
     vi.useFakeTimers()
-    const stop = startModuleStateSync('panel')
+    const stop = startModuleStateSync('sync-panel')
     expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
-      allModuleIds('panel').length - 1,
+      allModuleIds('sync-panel').length - 1,
     )
     expect(moduleElement('sec-scope').classList.contains('is-module-collapsed')).toBe(true)
     stop()
@@ -513,9 +529,9 @@ describe('startModuleStateSync', () => {
   it('其它页改了配置后，轮询把变化同步到本页', () => {
     buildPanelDom()
     vi.useFakeTimers()
-    const stop = startModuleStateSync('panel')
+    const stop = startModuleStateSync('sync-panel')
     // 模拟「设置页在另一个任务窗格隐藏了模块」
-    setHiddenModules('panel', ['sec-account'])
+    setHiddenModules('sync-panel', ['sec-account'])
     vi.advanceTimersByTime(3000)
     expect(moduleElement('sec-account').hidden).toBe(true)
     stop()
@@ -524,12 +540,12 @@ describe('startModuleStateSync', () => {
   it('命中变化后切换到快拍轮询（600ms 内再次检查），连续调整才跟手', () => {
     buildPanelDom()
     vi.useFakeTimers()
-    const stop = startModuleStateSync('panel')
-    setCollapsedModules('panel', ['sec-account'])
+    const stop = startModuleStateSync('sync-panel')
+    setCollapsedModules('sync-panel', ['sec-account'])
     vi.advanceTimersByTime(3000)
     expect(collapseButton('sec-account').getAttribute('aria-expanded')).toBe('false')
 
-    setCollapsedModules('panel', ['sec-scope'])
+    setCollapsedModules('sync-panel', ['sec-scope'])
     vi.advanceTimersByTime(600)
     expect(collapseButton('sec-scope').getAttribute('aria-expanded')).toBe('false')
     stop()
@@ -538,12 +554,12 @@ describe('startModuleStateSync', () => {
   it('读取抛异常时轮询继续，不会中断同步', () => {
     buildPanelDom()
     vi.useFakeTimers()
-    const stop = startModuleStateSync('panel')
+    const stop = startModuleStateSync('sync-panel')
     throwState.next = true
     expect(() => {
       vi.advanceTimersByTime(3000)
     }).not.toThrow()
-    setHiddenModules('panel', ['sec-scope'])
+    setHiddenModules('sync-panel', ['sec-scope'])
     vi.advanceTimersByTime(3000)
     expect(moduleElement('sec-scope').hidden).toBe(true)
     stop()
@@ -552,18 +568,18 @@ describe('startModuleStateSync', () => {
   it('返回的清理函数能停掉定时器', () => {
     buildPanelDom()
     vi.useFakeTimers()
-    const stop = startModuleStateSync('panel')
+    const stop = startModuleStateSync('sync-panel')
     stop()
-    setHiddenModules('panel', ['sec-account'])
+    setHiddenModules('sync-panel', ['sec-account'])
     vi.advanceTimersByTime(6000)
     expect(moduleElement('sec-account').hidden).toBe(false)
   })
 
   it('无 window 时返回空清理函数且不套用状态', () => {
     buildPanelDom()
-    setCollapsedModules('panel', ['sec-scope'])
+    setCollapsedModules('sync-panel', ['sec-scope'])
     vi.stubGlobal('window', undefined)
-    const stop = startModuleStateSync('panel')
+    const stop = startModuleStateSync('sync-panel')
     expect(moduleElement('sec-scope').classList.contains('is-module-collapsed')).toBe(false)
     expect(() => {
       stop()
@@ -578,41 +594,41 @@ describe('startModuleStateSync', () => {
 describe('全隐藏兜底', () => {
   it('本页模块全被隐藏时插入常驻占位块并提示一次', () => {
     buildPanelDom()
-    setHiddenModules('panel', allModuleIds('panel'))
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
+    applyModuleState('sync-panel')
     expect(emptyHint()).not.toBeNull()
     expect(toastSpy).toHaveBeenCalledTimes(1)
   })
 
   it('重复套用（轮询每次命中都会跑）不会重复提示', () => {
     buildPanelDom()
-    setHiddenModules('panel', allModuleIds('panel'))
-    applyModuleState('panel')
-    applyModuleState('panel')
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
+    applyModuleState('sync-panel')
+    applyModuleState('sync-panel')
+    applyModuleState('sync-panel')
     expect(document.querySelectorAll('[id="module-empty-hint"]')).toHaveLength(1)
     expect(toastSpy).toHaveBeenCalledTimes(1)
   })
 
   it('恢复任一模块可见后占位块移除，再次全隐藏会重新提示', () => {
     buildPanelDom()
-    setHiddenModules('panel', allModuleIds('panel'))
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
+    applyModuleState('sync-panel')
     expect(emptyHint()).not.toBeNull()
 
-    setHiddenModules('panel', ['sec-account'])
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', ['sec-account'])
+    applyModuleState('sync-panel')
     expect(emptyHint()).toBeNull()
 
-    setHiddenModules('panel', allModuleIds('panel'))
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
+    applyModuleState('sync-panel')
     expect(toastSpy).toHaveBeenCalledTimes(2)
   })
 
   it('占位块里的「打开设置」按钮打开设置页（唯一的恢复入口）', () => {
     buildPanelDom()
-    setHiddenModules('panel', allModuleIds('panel'))
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
+    applyModuleState('sync-panel')
     const button = emptyHint()?.querySelector<HTMLElement>('.module-empty-hint-btn')
     expect(button).not.toBeNull()
     button?.click()
@@ -629,9 +645,9 @@ describe('全隐藏兜底', () => {
 
   it('页面没有 main 容器时只提示、不抛错', () => {
     document.body.innerHTML = '<div>no main</div>'
-    setHiddenModules('panel', allModuleIds('panel'))
+    setHiddenModules('sync-panel', allModuleIds('sync-panel'))
     expect(() => {
-      applyModuleState('panel')
+      applyModuleState('sync-panel')
     }).not.toThrow()
     expect(emptyHint()).toBeNull()
     expect(toastSpy).toHaveBeenCalledTimes(1)
@@ -640,9 +656,9 @@ describe('全隐藏兜底', () => {
 
 // ========== 专注模式（只显示单个模块，可上下切换） ==========
 
-/** panel 页注册表（`PAGE_MODULES.panel` 的类型是可选索引，直接下标会报 TS18048） */
-function panelModules(): readonly NavModule[] {
-  return PAGE_MODULES.panel ?? []
+/** panel 页注册表（`PAGE_MODULES['sync-panel']` 的类型是可选索引，直接下标会报 TS18048） */
+function syncPanelModules(): readonly NavModule[] {
+  return PAGE_MODULES['sync-panel'] ?? []
 }
 
 /** 取专注控制条（未进入时为 null） */
@@ -666,15 +682,15 @@ describe('专注模式', () => {
   })
 
   it('进入后只放行目标模块，其余模块与侧栏锚点全部隐藏', () => {
-    const first = panelModules()[1]
+    const first = syncPanelModules()[1]
     if (!first) throw new Error('panel 注册表为空')
-    enterSoloMode('panel', first.id)
+    enterSoloMode('sync-panel', first.id)
 
     expect(isSoloMode()).toBe(true)
     expect(currentSoloModule()).toBe(first.id)
     expect(moduleElement(first.id).hidden).toBe(false)
     // 目标模块自身必须可见，其余一律藏（含侧栏锚点）
-    const others = panelModules().filter((module) => module.id !== first.id)
+    const others = syncPanelModules().filter((module) => module.id !== first.id)
     for (const module of others) {
       expect(moduleElement(module.id).hidden).toBe(true)
       expect(anchorOf(module.id).hidden).toBe(true)
@@ -685,25 +701,25 @@ describe('专注模式', () => {
   })
 
   it('目标模块即使原本是收起状态，也被强制展开（否则只看到一条标题栏）', () => {
-    const target = panelModules()[1]
+    const target = syncPanelModules()[1]
     if (!target) throw new Error('panel 注册表为空')
-    setCollapsedModules('panel', [target.id])
+    setCollapsedModules('sync-panel', [target.id])
 
-    enterSoloMode('panel', target.id)
+    enterSoloMode('sync-panel', target.id)
 
     expect(moduleElement(target.id).classList.contains('is-module-collapsed')).toBe(false)
   })
 
   it('退出后恢复各模块本来的隐藏 / 折叠状态', () => {
-    const target = panelModules()[1]
+    const target = syncPanelModules()[1]
     if (!target) throw new Error('panel 注册表为空')
     // 先造一个「本来就隐藏了某模块」的基线
-    const other = panelModules()[2]
+    const other = syncPanelModules()[2]
     if (!other) throw new Error('panel 注册表模块不足')
-    setHiddenModules('panel', [other.id])
-    applyModuleState('panel')
+    setHiddenModules('sync-panel', [other.id])
+    applyModuleState('sync-panel')
 
-    enterSoloMode('panel', target.id)
+    enterSoloMode('sync-panel', target.id)
     expect(moduleElement(other.id).hidden).toBe(true)
 
     exitSoloMode()
@@ -717,7 +733,7 @@ describe('专注模式', () => {
   })
 
   it('未注册的模块 id 被拒绝进入（不会把页面搞成只剩一个未知模块）', () => {
-    enterSoloMode('panel', 'sec-does-not-exist')
+    enterSoloMode('sync-panel', 'sec-does-not-exist')
     expect(isSoloMode()).toBe(false)
     expect(soloBar()).toBeNull()
   })
@@ -726,12 +742,14 @@ describe('专注模式', () => {
     // 口径与 stepSoloMode 内部一致：**全部** DOM 里存在的模块（含没有 h3 的跨栏
     // 操作区）。↑/↓ 是「把每块都看一遍」的导航，不该因为某块没有标题按钮就跳过它 ——
     // 跳过的结果是用户永远翻不到它，反而是缺陷。
-    const modules = panelModules().filter((module) => document.getElementById(module.id) !== null)
-    if (modules.length < 3) throw new Error('panel 可切换模块不足 3 个')
+    const modules = syncPanelModules().filter(
+      (module) => document.getElementById(module.id) !== null,
+    )
+    if (modules.length < 3) throw new Error('sync-panel 可切换模块不足 3 个')
     const [first, second, third, fourth] = modules
     if (!first || !second || !third || !fourth) throw new Error('解构失败')
 
-    enterSoloMode('panel', first.id)
+    enterSoloMode('sync-panel', first.id)
     stepSoloMode(1)
     expect(currentSoloModule()).toBe(second.id)
 
@@ -741,7 +759,7 @@ describe('专注模式', () => {
     // 正向走到末尾再一步 → 回绕到第一个
     const last = modules.at(-1)
     if (!last) throw new Error('注册表为空')
-    enterSoloMode('panel', last.id)
+    enterSoloMode('sync-panel', last.id)
     stepSoloMode(1)
     expect(currentSoloModule()).toBe(first.id)
 
@@ -760,29 +778,29 @@ describe('专注模式', () => {
   })
 
   it('专注模式下不弹「全部隐藏」兜底提示（那是用户主动选的，不是误藏空）', () => {
-    const target = panelModules()[1]
+    const target = syncPanelModules()[1]
     if (!target) throw new Error('panel 注册表为空')
-    enterSoloMode('panel', target.id)
+    enterSoloMode('sync-panel', target.id)
 
     expect(emptyHint()).toBeNull()
     expect(toastSpy).not.toHaveBeenCalled()
   })
 
   it('startModuleStateSync 给每个模块标题注入专注按钮（幂等，不重复注入）', () => {
-    startModuleStateSync('panel')
+    startModuleStateSync('sync-panel')
     const before = document.querySelectorAll('.mod-solo-btn').length
 
-    startModuleStateSync('panel')
+    startModuleStateSync('sync-panel')
     const after = document.querySelectorAll('.mod-solo-btn').length
 
-    // 只给有 h3 的模块注入：panel 的跨栏操作区没有 h3，故比注册表少一个
-    expect(before).toBe(panelModules().length - 1)
+    // 只给有 h3 的模块注入：sync-panel 的跨栏操作区没有 h3，故比注册表少一个
+    expect(before).toBe(syncPanelModules().length - 1)
     expect(after).toBe(before)
   })
 
   it('点模块标题里的专注按钮进入专注；再点一次退出', () => {
-    startModuleStateSync('panel')
-    const target = panelModules()[1]
+    startModuleStateSync('sync-panel')
+    const target = syncPanelModules()[1]
     if (!target) throw new Error('panel 注册表为空')
     const button = soloButtonOf(target.id)
 
@@ -797,15 +815,15 @@ describe('专注模式', () => {
   })
 
   it('专注目标切换时，高亮跟着走', () => {
-    startModuleStateSync('panel')
-    const modules = panelModules().filter(
-      (module) => module.id !== NO_TOGGLE_ID && canHideModule('panel', module.id),
+    startModuleStateSync('sync-panel')
+    const modules = syncPanelModules().filter(
+      (module) => module.id !== NO_TOGGLE_ID && canHideModule('sync-panel', module.id),
     )
     const first = modules[0]
     const second = modules[1]
     if (!first || !second) throw new Error('panel 可专注模块不足 2 个')
 
-    enterSoloMode('panel', first.id)
+    enterSoloMode('sync-panel', first.id)
     expect(soloButtonOf(first.id).classList.contains('is-active')).toBe(true)
     expect(soloButtonOf(second.id).classList.contains('is-active')).toBe(false)
 
@@ -815,9 +833,9 @@ describe('专注模式', () => {
   })
 
   it('控制条上的「退出专注」按钮真的退出', () => {
-    const target = panelModules()[1]
+    const target = syncPanelModules()[1]
     if (!target) throw new Error('panel 注册表为空')
-    enterSoloMode('panel', target.id)
+    enterSoloMode('sync-panel', target.id)
 
     const exit = soloBar()?.querySelector<HTMLButtonElement>('.solo-mode-bar-btn--exit')
     if (!exit) throw new Error('控制条缺少退出按钮')
@@ -828,13 +846,13 @@ describe('专注模式', () => {
   })
 
   it('控制条上的 ↑ / ↓ 与 stepSoloMode 同一行为', () => {
-    const modules = panelModules().filter(
-      (module) => module.id !== NO_TOGGLE_ID && canHideModule('panel', module.id),
+    const modules = syncPanelModules().filter(
+      (module) => module.id !== NO_TOGGLE_ID && canHideModule('sync-panel', module.id),
     )
     const first = modules[0]
     const second = modules[1]
     if (!first || !second) throw new Error('panel 可专注模块不足 2 个')
-    enterSoloMode('panel', first.id)
+    enterSoloMode('sync-panel', first.id)
 
     const buttons = [
       ...(soloBar()?.querySelectorAll<HTMLButtonElement>('.solo-mode-bar-btn') ?? []),
@@ -857,39 +875,39 @@ describe('module-state · 侧栏功能导航可隐藏', () => {
   it('隐藏后写进同一份按页映射，且不会被「只接受注册表 id」的过滤丢掉', () => {
     buildPanelDom()
 
-    toggleModuleHidden('panel', NAV_MODULE_ID)
+    toggleModuleHidden('sync-panel', NAV_MODULE_ID)
 
-    expect(getHiddenModules('panel')).toContain(NAV_MODULE_ID)
+    expect(getHiddenModules('sync-panel')).toContain(NAV_MODULE_ID)
     const stored = JSON.parse(configStore.get(CONFIG_KEYS.MODULE_HIDDEN) ?? '{}') as Record<
       string,
       string[]
     >
-    expect(stored.panel).toContain(NAV_MODULE_ID)
+    expect(stored['sync-panel']).toContain(NAV_MODULE_ID)
   })
 
   it('applyModuleState 按隐藏状态切换 body.is-nav-hidden（CSS 靠它收掉侧栏列）', () => {
     buildPanelDom()
 
-    toggleModuleHidden('panel', NAV_MODULE_ID)
-    applyModuleState('panel')
+    toggleModuleHidden('sync-panel', NAV_MODULE_ID)
+    applyModuleState('sync-panel')
     expect(document.body.classList.contains('is-nav-hidden')).toBe(true)
 
-    toggleModuleHidden('panel', NAV_MODULE_ID)
-    applyModuleState('panel')
+    toggleModuleHidden('sync-panel', NAV_MODULE_ID)
+    applyModuleState('sync-panel')
     expect(document.body.classList.contains('is-nav-hidden')).toBe(false)
   })
 
   it('未知模块 id 仍被过滤：放行只针对侧栏伪模块，不是「什么都收」', () => {
     buildPanelDom()
 
-    setHiddenModules('panel', ['sec-command', 'not-a-module'])
+    setHiddenModules('sync-panel', ['sec-command', 'not-a-module'])
 
-    expect(getHiddenModules('panel')).toEqual(['sec-command'])
+    expect(getHiddenModules('sync-panel')).toEqual(['sec-command'])
   })
 
   it('按页独立：隐藏 panel 的侧栏不影响 settings 的侧栏', () => {
     buildPanelDom()
-    toggleModuleHidden('panel', NAV_MODULE_ID)
+    toggleModuleHidden('sync-panel', NAV_MODULE_ID)
 
     buildSettingsDom()
     applyModuleState('settings')

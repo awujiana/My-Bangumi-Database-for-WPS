@@ -23,9 +23,12 @@ vi.mock('../ts/tools/util/index.js', () => ({
 
 import {
   applyConditionalFormatPlan,
+  bgrToRgbHex,
   duplicateForeignRule,
   getForeignCondition,
   moveForeignRule,
+  rgbHexToBgr,
+  shiftRelativeRows,
   updateForeignRule,
 } from '../ts/panel/conditional-format-apply.js'
 import type {
@@ -88,6 +91,26 @@ function makeWorksheet(sheetRules: unknown[], usedRangeRules?: unknown[]): WpsWo
   return worksheet as unknown as WpsWorksheet
 }
 
+/**
+ * 造一条「真机形态」的规则对象：`Interior` / `Font` 可读写，**没有 `With`**
+ *
+ * 真机实测（WPS 12.1.0.29158）：`FormatCondition` 只有 `Interior` / `Font`，
+ * `fc.With` 是 `undefined`。假体必须照这个形态建——早期假体只给 `With`，
+ * 于是「规则加进去了、填充色一次都没写进去」这个真 bug 在单测里全程隐形
+ * （30 个用例全绿，真机上一片白底）。
+ */
+function makeHostCondition(formula: string): {
+  Formula1: string
+  Interior: { Color: number }
+  Font: { Color: number; Bold: boolean }
+} {
+  return {
+    Formula1: formula,
+    Interior: { Color: 0 },
+    Font: { Color: 0, Bold: false },
+  }
+}
+
 /** 可写工作表：Add 会真的往集合里加一条（Count 可观测；`swallowAdd` 模拟静默丢弃） */
 function makeAddableWorksheet(
   initial: unknown[],
@@ -95,7 +118,7 @@ function makeAddableWorksheet(
 ): { worksheet: WpsWorksheet; rules: unknown[] } {
   const rules = [...initial]
   const add = (condition: { Formula1?: string }): Record<string, unknown> => {
-    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    const created = makeHostCondition(condition.Formula1 ?? '')
     if (options.swallowAdd !== true) rules.push(created)
     return created
   }
@@ -121,7 +144,7 @@ function makeAddableWorksheet(
 function makeSheetLevelWorksheet(): { worksheet: WpsWorksheet; rules: unknown[] } {
   const rules: unknown[] = []
   const add = (condition: { Formula1?: string }): Record<string, unknown> => {
-    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    const created = makeHostCondition(condition.Formula1 ?? '')
     rules.push(created)
     return created
   }
@@ -312,12 +335,39 @@ interface EditableRuleState {
  * 假规则：公式 / 范围 / 颜色都可读写，可按需模拟「接受写入但不生效」
  *
  * 颜色用数字（与宿主 Interior.Color 同口径），断言时按 hex 比对。
+ *
+ * ⚠️ `Interior` / `Font` 必须是**稳定的对象**（`Color` 带 getter/setter 回写 state）：
+ * 早先写成 `get Interior() { return { Color: state.fill } }`，每次读都新建一个临时
+ * 对象——`interior.Color = x` 改的是那个临时对象，state 一点没变，于是「改了颜色」
+ * 的用例看起来通过、其实什么都没写。真机是 COM 代理，赋值确实落到规则上。
  */
 function makeEditableRule(initial: EditableRuleState): {
   rule: Record<string, unknown>
   state: EditableRuleState
+  withSpy: ReturnType<typeof vi.fn>
 } {
   const state = { ...initial }
+  const withSpy = vi.fn((options: { Interior?: { Color?: string | number } }) => {
+    const color = options.Interior?.Color
+    if (typeof color === 'number') state.fill = color
+  })
+  const interior = {
+    get Color(): number {
+      return state.fill
+    },
+    set Color(next: number) {
+      state.fill = next
+    },
+  }
+  const font = {
+    get Color(): number {
+      return state.font
+    },
+    set Color(next: number) {
+      state.font = next
+    },
+    Bold: false,
+  }
   const rule: Record<string, unknown> = {
     get Formula1(): string {
       return state.formula
@@ -331,18 +381,11 @@ function makeEditableRule(initial: EditableRuleState): {
     ModifyAppliesToRange(next: string): void {
       if (state.ignoreRangeWrite !== true) state.range = next
     },
-    get Interior(): { Color: number } {
-      return { Color: state.fill }
-    },
-    get Font(): { Color: number } {
-      return { Color: state.font }
-    },
-    With: vi.fn((options: { Interior?: { Color?: string | number } }) => {
-      const color = options.Interior?.Color
-      if (typeof color === 'number') state.fill = color
-    }),
+    Interior: interior,
+    Font: font,
+    With: withSpy,
   }
-  return { rule, state }
+  return { rule, state, withSpy }
 }
 
 describe('updateForeignRule：编辑既有规则（范围 / 公式 / 颜色）', () => {
@@ -410,6 +453,43 @@ describe('updateForeignRule：编辑既有规则（范围 / 公式 / 颜色）',
       expect(result.error).toContain('范围未写入')
       expect(result.error).toContain('B3:B100')
     }
+  })
+
+  it('改填充色：走 Interior 直接赋值（WPS 无 With），回读一致', () => {
+    const { rule, state, withSpy } = makeEditableRule({
+      formula: '=$R3=""',
+      range: 'B3:B100',
+      fill: 0,
+      font: 0,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { interior: '#FF0000' })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.changed).toEqual(['填充色'])
+    // #FF0000 的 BGR 是 255（红通道在最低字节）
+    expect(state.fill).toBe(255)
+    expect(withSpy).not.toHaveBeenCalled()
+  })
+
+  it('改字体色 + 加粗：同样走 Interior / Font 直接赋值', () => {
+    const { rule, state, withSpy } = makeEditableRule({
+      formula: '=$R3=""',
+      range: 'B3:B100',
+      fill: 0,
+      font: 0,
+    })
+    const worksheet = makeWorksheet([rule])
+
+    const result = updateForeignRule(worksheet, 1, { fontColor: '#0000FF', fontBold: true })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.changed).toEqual(['字体色', '加粗'])
+    // #0000FF 的 BGR 是 0xFF0000
+    expect(state.font).toBe(16_711_680)
+    expect((rule.Font as { Bold: boolean }).Bold).toBe(true)
+    expect(withSpy).not.toHaveBeenCalled()
   })
 
   it('没有任何改动时明确失败（不发空写入）', () => {
@@ -480,7 +560,7 @@ function makeClearableWorksheet(initial: unknown[]): {
     rules.length = 0
   })
   const add = (condition: { Formula1?: string }): Record<string, unknown> => {
-    const created = { Formula1: condition.Formula1, With: vi.fn() }
+    const created = makeHostCondition(condition.Formula1 ?? '')
     rules.push(created)
     return created
   }
@@ -558,8 +638,15 @@ describe('applyConditionalFormatPlan：应用链路', () => {
   })
 
   it('表上已有同「范围 + 公式」→ 只刷新格式，不重复 Add', () => {
+    const fill = { Color: 0 }
     const withSpy = vi.fn()
-    const existing = { Formula1: '$R3=""', AppliesTo: { Address: 'B3:B100' }, With: withSpy }
+    const existing = {
+      Formula1: '$R3=""',
+      AppliesTo: { Address: 'B3:B100' },
+      Interior: fill,
+      Font: { Color: 0, Bold: false },
+      With: withSpy,
+    }
     const { worksheet, rules } = makeAddableWorksheet([existing])
     const result = applyConditionalFormatPlan(
       worksheet,
@@ -579,7 +666,10 @@ describe('applyConditionalFormatPlan：应用链路', () => {
     expect(result.added).toBe(0)
     expect(result.refreshed).toBe(1)
     expect(rules).toHaveLength(1)
-    expect(withSpy).toHaveBeenCalledWith({ Interior: { Color: '#123456' } })
+    // 走 Interior 直接赋值，颜色是 BGR 整数（#123456 → 0x563412）
+    expect(fill.Color).toBe(5_649_426)
+    // 回归钉：宿主同时提供 With 时也**不许**走它（WPS 上 With 根本不存在）
+    expect(withSpy).not.toHaveBeenCalled()
   })
 
   it('deletions 只删账本里指定指纹的那一条，别的规则原样保留', () => {
@@ -625,6 +715,230 @@ describe('applyConditionalFormatPlan：应用链路', () => {
     const { worksheet, rules } = makeAddableWorksheet([other])
     const result = applyConditionalFormatPlan(worksheet, planOf({}))
     expect(result).toMatchObject({ added: 0, refreshed: 0, deleted: 0, failed: 0, verified: 1 })
+    expect(rules).toHaveLength(1)
+  })
+})
+
+// ===== 颜色编码：规则库的 '#RRGGBB' ↔ 宿主的 BGR 整数 =====
+
+describe('rgbHexToBgr / bgrToRgbHex：BGR 而不是 RGB', () => {
+  it('#FF0000（红）→ 255：红通道落在最低字节（真机实测 直接赋 255 回读 255）', () => {
+    expect(rgbHexToBgr('#FF0000')).toBe(255)
+  })
+
+  it('#0000FF（蓝）→ 0xFF0000：若按 RGB 直传会变成红，这条钉死排列顺序', () => {
+    expect(rgbHexToBgr('#0000FF')).toBe(16_711_680)
+  })
+
+  it('项目主色 #00B050 → 0x50B000', () => {
+    expect(rgbHexToBgr('#00B050')).toBe(0x50_b0_00)
+  })
+
+  it('不带 # / 小写 / 三位简写都收', () => {
+    expect(rgbHexToBgr('00B050')).toBe(0x50_b0_00)
+    expect(rgbHexToBgr('#00b050')).toBe(0x50_b0_00)
+    expect(rgbHexToBgr('#F00')).toBe(255)
+  })
+
+  it('非法颜色抛错并带上原值（不静默给个黑）', () => {
+    expect(() => rgbHexToBgr('#GGGGGG')).toThrow(/颜色格式不合法/u)
+    expect(() => rgbHexToBgr('#GGGGGG')).toThrow(/#GGGGGG/u)
+    expect(() => rgbHexToBgr('')).toThrow(/颜色格式不合法/u)
+  })
+
+  it('互逆：往返一圈回到原值', () => {
+    for (const hex of ['#000000', '#FFFFFF', '#FF0000', '#00B050', '#123456']) {
+      expect(bgrToRgbHex(rgbHexToBgr(hex))).toBe(hex)
+    }
+  })
+
+  it('回读方向：#FF0000 不会被印成 #0000FF（旧实现把 BGR 当 RGB 打印）', () => {
+    expect(bgrToRgbHex(255)).toBe('#FF0000')
+  })
+})
+
+// ===== WPS「相对行 +1」偏移的抵消 =====
+
+describe('shiftRelativeRows：只平移相对行', () => {
+  it('相对行跟着 delta 走', () => {
+    expect(shiftRelativeRows('=$B2>8', -1)).toBe('=$B1>8')
+    expect(shiftRelativeRows('=$B2>8', 3)).toBe('=$B5>8')
+  })
+
+  it('绝对行 $B$2 原样不动（真机实测它本来就不偏移）', () => {
+    expect(shiftRelativeRows('=$B$2>8', -1)).toBe('=$B$2>8')
+  })
+
+  it('绝对列 + 相对行（$C3）：只动行', () => {
+    expect(shiftRelativeRows('=$B2>$C3', -1)).toBe('=$B1>$C2')
+  })
+
+  it('相对列 + 绝对行（C$3）：行绝对，一行都不动', () => {
+    expect(shiftRelativeRows('=$B2>C$3', -1)).toBe('=$B1>C$3')
+  })
+
+  it('delta 为 0 时原样返回（连字符串都不重建）', () => {
+    const formula = '=$B2>8'
+    expect(shiftRelativeRows(formula, 0)).toBe(formula)
+  })
+
+  it('字符串字面量里的「字母+数字」不当引用（"B2" 不是单元格）', () => {
+    expect(shiftRelativeRows('=$A2="B2"', -1)).toBe('=$A1="B2"')
+    expect(shiftRelativeRows('=$A5="R3C4"', -1)).toBe('=$A4="R3C4"')
+  })
+
+  it('函数名不当引用（LOG10 不是单元格 LOG10）', () => {
+    expect(shiftRelativeRows('=LOG10(A2)>1', -1)).toBe('=LOG10(A1)>1')
+  })
+
+  it('平移后行号 < 1 的原样保留（不生成 B0 这种非法引用）', () => {
+    expect(shiftRelativeRows('=$B1>0', -1)).toBe('=$B1>0')
+    expect(shiftRelativeRows('=$B2>0', -2)).toBe('=$B2>0')
+  })
+
+  it('整列引用（无行号）不受影响', () => {
+    expect(shiftRelativeRows('=COUNTIF($B:$B,1)>0', -1)).toBe('=COUNTIF($B:$B,1)>0')
+  })
+})
+
+/**
+ * 独立的「宿主行为」实现：把公式里的「字母+数字」一律 +1
+ *
+ * 故意不复用被测的 `shiftRelativeRows` 来冒充宿主——两边一起错也能对上，等于没测。
+ * 足够朴素（连 `$` 都不认），但足以模拟真机 WPS 的 `FormatConditions.Add` 偏移。
+ */
+function wpsShiftRelativeRows(formula: string): string {
+  return formula.replace(
+    /([A-Z]+)(\d+)/gu,
+    (_match, column: string, row: string) => `${column}${String(Number(row) + 1)}`,
+  )
+}
+
+/**
+ * 真机形态回归（2026-10-24 用户宏实测）
+ *
+ * 两个 bug 都只有在「假体照真机形态建」时才会暴露：
+ * 1. `FormatCondition` 没有 `With` → 填充色一次都没写进去；
+ * 2. `FormatConditions.Add({ Formula1 })` 会把相对行 +1 → B3 用 B4 的值判断。
+ */
+describe('applyConditionalFormatPlan：真机形态回归', () => {
+  it('宿主只有 Interior / Font（无 With）→ 填充色与字体都写进去', () => {
+    const { worksheet, rules } = makeAddableWorksheet([])
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({
+        entries: [
+          {
+            rule: {
+              id: 'r1',
+              name: 'r1',
+              group: 'G',
+              appliesTo: 'B2:B100',
+              formula: '=$B2>8',
+              interior: '#00B050',
+              fontColor: '#FF0000',
+              fontBold: true,
+            },
+          },
+        ],
+      }),
+    )
+
+    expect(result).toMatchObject({ added: 1, failed: 0, missing: [] })
+    const created = rules[0] as {
+      Interior: { Color: number }
+      Font: { Color: number; Bold: boolean }
+    }
+    expect(created.Interior.Color).toBe(rgbHexToBgr('#00B050'))
+    expect(created.Font.Color).toBe(255)
+    expect(created.Font.Bold).toBe(true)
+  })
+
+  it('宿主既无 Interior 也无 With → 记进 failures 并带上原因，不静默成功', () => {
+    const rules: unknown[] = []
+    // 故意造一个「Add 成功、但返回对象没有任何格式入口」的宿主
+    const add = (condition: { Formula1?: string }): Record<string, unknown> => {
+      const created = { Formula1: condition.Formula1 }
+      rules.push(created)
+      return created
+    }
+    const worksheet = {
+      FormatConditions: {
+        get Count(): number {
+          return rules.length
+        },
+        Item: (index: number) => rules[index - 1],
+        Add: add,
+      },
+      Range: () => ({ FormatConditions: { Add: add } }),
+    } as unknown as WpsWorksheet
+
+    const result = applyConditionalFormatPlan(worksheet, planOf({ entries: [pluginEntry('r1')] }))
+
+    expect(result.added).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures[0]?.reason).toContain('无法设置格式')
+  })
+
+  it('WPS 的相对行 +1 被抵消：最终只剩 1 条，公式与规则库一致', () => {
+    const rules: Record<string, unknown>[] = []
+    const add = (condition: { Formula1?: string }): Record<string, unknown> => {
+      const created: Record<string, unknown> = {
+        Formula1: wpsShiftRelativeRows(condition.Formula1 ?? ''),
+        Interior: { Color: 0 },
+        Font: { Color: 0, Bold: false },
+        Delete: () => {
+          const index = rules.indexOf(created)
+          if (index !== -1) rules.splice(index, 1)
+        },
+      }
+      rules.push(created)
+      return created
+    }
+    const worksheet = {
+      FormatConditions: {
+        get Count(): number {
+          return rules.length
+        },
+        Item: (index: number) => rules[index - 1],
+        Add: add,
+      },
+      Range: () => ({ FormatConditions: { Add: add } }),
+    } as unknown as WpsWorksheet
+
+    const result = applyConditionalFormatPlan(
+      worksheet,
+      planOf({ entries: [pluginEntry('r1', 'B2:B100', '=$B2>8')] }),
+    )
+
+    // 只留补偿后的那一条（第一次 Add 的那条被删掉了，不会「越点越多」）
+    expect(rules).toHaveLength(1)
+    expect(rules[0]?.Formula1).toBe('=$B2>8')
+    expect(result).toMatchObject({ added: 1, failed: 0, missing: [] })
+  })
+
+  it('宿主不暴露 Formula1（读回空串）→ 不猜偏移，不重复 Add', () => {
+    const rules: unknown[] = []
+    const add = (): Record<string, unknown> => {
+      const created = { Interior: { Color: 0 } }
+      rules.push(created)
+      return created
+    }
+    const worksheet = {
+      FormatConditions: {
+        get Count(): number {
+          return rules.length
+        },
+        Item: (index: number) => rules[index - 1],
+        Add: add,
+      },
+      Range: () => ({ FormatConditions: { Add: add } }),
+    } as unknown as WpsWorksheet
+
+    applyConditionalFormatPlan(worksheet, planOf({ entries: [pluginEntry('r1')] }))
+
+    // 读不到公式时硬套 -1 会把本来正确的公式改错，故原样保留
     expect(rules).toHaveLength(1)
   })
 })

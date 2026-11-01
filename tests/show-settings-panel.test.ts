@@ -390,7 +390,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
 })
 
 // ============ 场景 4: 任务窗格 URL 归一化 ============
-// 回归：从面板页面（.../ui/panel.html）内打开设置面板时，
+// 回归：从面板页面（.../ui/sync-panel.html）内打开设置面板时，
 // getUrlPath() 会返回 ".../ui"，若直接拼接会产生 ".../ui/ui/settings.html"。
 describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
   it('manifest_base_path 已带 /ui 时不得重复拼接', () => {

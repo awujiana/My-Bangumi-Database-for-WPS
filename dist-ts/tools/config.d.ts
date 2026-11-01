@@ -38,6 +38,8 @@ export declare const CONFIG_KEYS: {
     readonly MODULE_COLLAPSED: "bgm_module_collapsed";
     readonly MODULE_HIDDEN: "bgm_module_hidden";
     readonly LOG_LEVEL: "bgm_log_level";
+    /** 界面语言（BCP 47：zh-CN / zh-TW / en）；空 = 按系统语言猜 */
+    readonly LANGUAGE: "bgm_language";
 };
 /**
  * 设置配置值

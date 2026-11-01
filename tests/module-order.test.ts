@@ -127,7 +127,7 @@ describe('渲染', () => {
   it('四个页面的分组都渲染出来，条目数等于注册表模块数', () => {
     renderModuleOrderEditor()
     // 数量从注册表推导：往任何一页加模块都不该让这条断言变红
-    for (const page of ['panel', 'enrich', 'clean', 'highlight', 'conditional-format', 'settings']) {
+    for (const page of ['sync-panel', 'enrich', 'clean', 'highlight', 'conditional-format', 'settings']) {
       expect(itemsOf(page)).toHaveLength(PAGE_MODULES[page]?.length ?? 0)
     }
   })
@@ -140,18 +140,18 @@ describe('渲染', () => {
   })
 
   it('被隐藏的模块带 is-module-hidden 标记并显示 🚫', () => {
-    setHiddenInStore('panel', ['sec-account'])
+    setHiddenInStore('sync-panel', ['sec-account'])
     renderModuleOrderEditor()
     const hiddenItem = document.querySelector('.module-order-item.is-module-hidden')
     expect(hiddenItem?.querySelector('.module-order-label')?.textContent).toBe('账户与凭证')
     expect(
-      buttonOf('panel', indexOfModule('panel', 'sec-account'), '[data-mod-hidden]').textContent,
+      buttonOf('sync-panel', indexOfModule('sync-panel', 'sec-account'), '[data-mod-hidden]').textContent,
     ).toBe('🚫')
   })
 
   it('未隐藏的模块显示 👁️', () => {
     renderModuleOrderEditor()
-    expect(buttonOf('panel', 0, '[data-mod-hidden]').textContent).toBe('👁️')
+    expect(buttonOf('sync-panel', 0, '[data-mod-hidden]').textContent).toBe('👁️')
   })
 
   it('设置页的「模块排序」模块不可隐藏（隐藏后就没有入口能恢复任何模块）', () => {
@@ -167,42 +167,42 @@ describe('渲染', () => {
 
   it('首尾条目的上移 / 下移按钮禁用', () => {
     renderModuleOrderEditor()
-    expect(buttonOf('panel', 0, '[data-mod-move="up"]').hasAttribute('disabled')).toBe(true)
-    expect(buttonOf('panel', 0, '[data-mod-move="down"]').hasAttribute('disabled')).toBe(false)
+    expect(buttonOf('sync-panel', 0, '[data-mod-move="up"]').hasAttribute('disabled')).toBe(true)
+    expect(buttonOf('sync-panel', 0, '[data-mod-move="down"]').hasAttribute('disabled')).toBe(false)
   })
 })
 
 describe('排序交互', () => {
   it('点上移写入新顺序', () => {
     renderModuleOrderEditor()
-    const second = itemsOf('panel')[1]?.dataset.module ?? ''
-    click(buttonOf('panel', 1, '[data-mod-move="up"]'))
-    expect(getNavOrder('panel')[0]).toBe(second)
+    const second = itemsOf('sync-panel')[1]?.dataset.module ?? ''
+    click(buttonOf('sync-panel', 1, '[data-mod-move="up"]'))
+    expect(getNavOrder('sync-panel')[0]).toBe(second)
   })
 
   it('点下移写入新顺序', () => {
     renderModuleOrderEditor()
-    const first = itemsOf('panel')[0]?.dataset.module ?? ''
-    click(buttonOf('panel', 0, '[data-mod-move="down"]'))
-    expect(getNavOrder('panel')[1]).toBe(first)
+    const first = itemsOf('sync-panel')[0]?.dataset.module ?? ''
+    click(buttonOf('sync-panel', 0, '[data-mod-move="down"]'))
+    expect(getNavOrder('sync-panel')[1]).toBe(first)
   })
 
   it('恢复默认顺序', () => {
-    setNavOrder('panel', ['sec-help', 'sec-account'])
+    setNavOrder('sync-panel', ['sec-help', 'sec-account'])
     renderModuleOrderEditor()
-    const reset = document.querySelector<HTMLElement>('[data-mod-reset="panel"]')
+    const reset = document.querySelector<HTMLElement>('[data-mod-reset="sync-panel"]')
     if (!reset) throw new Error('缺少恢复默认按钮')
     click(reset)
-    expect(getNavOrder('panel')[0]).toBe('sec-command')
+    expect(getNavOrder('sync-panel')[0]).toBe('sec-command')
   })
 
   it('模块 id 不在注册表里时不动配置并提示失败', () => {
     renderModuleOrderEditor()
     // 处理器读的是按钮上的 data-module（不是 li 的）
-    buttonOf('panel', 0, '[data-mod-move="down"]').dataset.module = 'sec-nope'
-    click(buttonOf('panel', 0, '[data-mod-move="down"]'))
+    buttonOf('sync-panel', 0, '[data-mod-move="down"]').dataset.module = 'sec-nope'
+    click(buttonOf('sync-panel', 0, '[data-mod-move="down"]'))
     expect(toastMessages()).toContain('调整顺序失败')
-    expect(getNavOrder('panel')[0]).toBe('sec-command')
+    expect(getNavOrder('sync-panel')[0]).toBe('sec-command')
   })
 
   it('点到空白处不触发任何操作', () => {
@@ -375,9 +375,9 @@ describe('跨页同步与初始化', () => {
     initializeModuleOrderEditor()
     initializeModuleOrderEditor()
     renderModuleOrderEditor()
-    const first = itemsOf('panel')[0]?.dataset.module ?? ''
-    click(buttonOf('panel', 0, '[data-mod-move="down"]'))
-    expect(getNavOrder('panel')[1]).toBe(first)
+    const first = itemsOf('sync-panel')[0]?.dataset.module ?? ''
+    click(buttonOf('sync-panel', 0, '[data-mod-move="down"]'))
+    expect(getNavOrder('sync-panel')[1]).toBe(first)
   })
 
   it('非设置页初始化时静默跳过', () => {
@@ -394,9 +394,9 @@ describe('跨页同步与初始化', () => {
 
 describe('兜底分支', () => {
   it('恢复默认顺序写盘失败时提示错误（配置保持原样）', () => {
-    setNavOrder('panel', ['sec-help', 'sec-account'])
+    setNavOrder('sync-panel', ['sec-help', 'sec-account'])
     renderModuleOrderEditor()
-    const reset = document.querySelector<HTMLElement>('[data-mod-reset="panel"]')
+    const reset = document.querySelector<HTMLElement>('[data-mod-reset="sync-panel"]')
     if (!reset) throw new Error('缺少恢复默认按钮')
 
     setWriteShouldFail(true)
@@ -405,7 +405,7 @@ describe('兜底分支', () => {
 
     expect(toastMessages()).toContain('恢复默认顺序失败')
     // 写盘失败 → 存储里仍是之前写入的顺序
-    expect(getNavOrder('panel')[0]).toBe('sec-help')
+    expect(getNavOrder('sync-panel')[0]).toBe('sec-help')
   })
 
   it('beforeunload 时清掉轮询定时器（不再跟随其它窗格的改动）', () => {

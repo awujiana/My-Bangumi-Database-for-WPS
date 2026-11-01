@@ -73,7 +73,7 @@ setTimeout(() => {
 }, 800);
 </script>`
 
-const pages_ = pages.length > 0 ? pages : ['clean', 'panel']
+const pages_ = pages.length > 0 ? pages : ['clean', 'sync-panel']
 
 for (const page of pages_) {
   const html = await new Promise((resolve) => {

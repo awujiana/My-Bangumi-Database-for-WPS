@@ -24,6 +24,7 @@
  * 宿主直接读 `window.Application?.PluginStorage`（与 getApp 的取值路径一致）。
  */
 import { logger } from './logger.js';
+import { legacyPageKeys, normalizePageKey } from './page-key.js';
 /** 心跳写入的 PluginStorage 键前缀（完整键：`pane_alive_<pageKey>`） */
 const HEARTBEAT_KEY_PREFIX = 'pane_alive_';
 /** 心跳默认周期：30s。太密是无谓的 COM 往返，太疏拉长「检测到死亡」的窗口 */
@@ -42,12 +43,14 @@ function readHost() {
 /**
  * 页面侧：启动心跳（各窗格页 bootstrap 各调一次）
  *
- * @param pageKey 页面标识，与 `showXxxPanel` 校验时用的键一致
- *   ('panel' / 'clean' / 'enrich' / 'highlight' / 'conditionalFormat' / 'settings')
+ * @param rawPageKey 页面标识，与 `showXxxPanel` 校验时用的键一致
+ *   ('sync-panel' / 'clean' / 'enrich' / 'highlight' / 'conditionalFormat' / 'settings')
+ *   历史标识（2.3.0 的 `panel`）会先被归一到当前标识
  */
-export function startPaneHeartbeat(pageKey, intervalMs = DEFAULT_INTERVAL_MS) {
+export function startPaneHeartbeat(rawPageKey, intervalMs = DEFAULT_INTERVAL_MS) {
     if (typeof window === 'undefined')
         return;
+    const pageKey = normalizePageKey(rawPageKey);
     if (startedPages.has(pageKey))
         return;
     startedPages.add(pageKey);
@@ -78,13 +81,33 @@ export function startPaneHeartbeat(pageKey, intervalMs = DEFAULT_INTERVAL_MS) {
  *          true = 可以复用窗格（含无法判定的保守情况）
  */
 export function isPanePageAlive(pageKey, maxAgeMs = HEARTBEAT_MAX_AGE_MS) {
-    const raw = readHost()?.PluginStorage?.getItem?.(HEARTBEAT_KEY_PREFIX + pageKey);
+    const raw = readHeartbeat(pageKey);
     if (!raw)
         return true;
     const lastBeat = Number(raw);
     if (!Number.isFinite(lastBeat) || lastBeat <= 0)
         return true;
     return Date.now() - lastBeat < maxAgeMs;
+}
+/**
+ * 读心跳原始值：当前键优先，没有才回退历史键（2.3.0 的 `pane_alive_panel`）。
+ *
+ * 回退是必要的：升级瞬间还开着的旧窗格会一直往旧键写心跳，只看新键会把它判成
+ * 「从没写过」→ 保守判活 → 用户点按钮时堆出孤儿窗格（正好是心跳要防的那件事）。
+ */
+function readHeartbeat(pageKey) {
+    const storage = readHost()?.PluginStorage;
+    if (!storage?.getItem)
+        return null;
+    const direct = storage.getItem(HEARTBEAT_KEY_PREFIX + normalizePageKey(pageKey));
+    if (direct)
+        return direct;
+    for (const legacy of legacyPageKeys(pageKey)) {
+        const fallback = storage.getItem(HEARTBEAT_KEY_PREFIX + legacy);
+        if (fallback)
+            return fallback;
+    }
+    return null;
 }
 /** 仅测试用：清空「已启动」记录，让 startPaneHeartbeat 可以重复装配 */
 export function resetPaneHeartbeatForTest() {

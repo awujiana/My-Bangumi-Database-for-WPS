@@ -1,36 +1,39 @@
 <customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
     <ribbon startFromScratch="false">
         <tabs>
-            <tab id="wpsAddinTab" label="Bangumi同步">
+            <!-- getLabel 只对 <tab> 生效（group / button / checkBox 实测从不调用，
+                 见 文档/真机验证手册.md §7.1）；label 保留为简体兜底值，语言包没加载完时
+                 显示它，加载完由 ribbonUI.Invalidate() 重新回调切到当前语言 -->
+            <tab id="wpsAddinTab" label="Bangumi同步" getLabel="GetRibbonLabel">
 				<group id="bangumiGroup" label="Bangumi">
-                    <button id="btnShowPanel" label="打开同步面板" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnSyncBangumi" label="上传同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <checkBox id="chkIncrementalSync" label="仅同步变更" getPressed="GetIncrementalSyncPressed" onAction="OnIncrementalSyncChange" />
-                    <checkBox id="chkSkipConflicts" label="跳过冲突" getPressed="GetSkipConflictsPressed" onAction="OnSkipConflictsChange" />
-                    <checkBox id="chkEnableSyncRecord" label="启用同步记录" getPressed="GetEnableSyncRecordPressed" onAction="OnEnableSyncRecordChange" />
-                    <button id="btnSetToken" label="设置Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnTestToken" label="测试Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnCopyToken" label="复制Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnSetUserId" label="设置用户ID" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnSyncFromGithub" label="数据同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnUndoLastSync" label="撤销同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnDonate" label="赞赏" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnOpenSettings" label="设置" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnCloseAllPanels" label="关闭所有页面" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenSyncPanel" label="打开同步面板" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonSyncBangumi" label="上传同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <checkBox id="checkboxIncrementalSync" label="仅同步变更" getPressed="GetIncrementalSyncPressed" onAction="OnIncrementalSyncChange" />
+                    <checkBox id="checkboxSkipConflicts" label="跳过冲突" getPressed="GetSkipConflictsPressed" onAction="OnSkipConflictsChange" />
+                    <checkBox id="checkboxEnableSyncRecord" label="启用同步记录" getPressed="GetEnableSyncRecordPressed" onAction="OnEnableSyncRecordChange" />
+                    <button id="buttonSetToken" label="设置Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonTestToken" label="测试Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonCopyToken" label="复制Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonSetUserId" label="设置用户ID" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonSyncFromGithub" label="数据同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonUndoLastSync" label="撤销同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenDonatePanel" label="赞赏" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenSettingsPanel" label="设置" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonCloseAllPanels" label="关闭所有页面" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   
 				</group>
 				<group id="enrichGroup" label="新番表富化">
-                    <button id="btnOpenEnrichPanel" label="新番表富化" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenEnrichPanel" label="新番表富化" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
 				<group id="cleanGroup" label="数据清理">
-                    <button id="btnOpenCleanPanel" label="数据清理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenCleanPanel" label="数据清理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
 				<group id="highlightGroup" label="番剧高亮">
-                    <button id="btnOpenHighlightPanel" label="番剧高亮" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenHighlightPanel" label="番剧高亮" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
 				<group id="conditionalFormatGroup" label="条件格式">
-                    <button id="btnOpenConditionalFormatPanel" label="条件格式管理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="buttonOpenConditionalFormatPanel" label="条件格式管理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
             </tab>
         </tabs>

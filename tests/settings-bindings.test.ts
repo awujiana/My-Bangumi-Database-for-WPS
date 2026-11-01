@@ -164,14 +164,14 @@ describe('settings-bindings · handleEnableSyncRecordChange', () => {
   })
 
   it('勾选 → 启用并提示', () => {
-    mountCheckbox('chkEnableSyncRecord', true)
+    mountCheckbox('checkboxEnableSyncRecord', true)
     handleEnableSyncRecordChange()
     expect(mockReferences.mockSetSyncRecordEnabled).toHaveBeenCalledWith(true)
     expect(mockReferences.mockShowToast).toHaveBeenCalledWith('已启用同步记录功能', 'info')
   })
 
   it('取消勾选 → 关闭并提示', () => {
-    mountCheckbox('chkEnableSyncRecord', false)
+    mountCheckbox('checkboxEnableSyncRecord', false)
     handleEnableSyncRecordChange()
     expect(mockReferences.mockSetSyncRecordEnabled).toHaveBeenCalledWith(false)
     expect(mockReferences.mockShowToast).toHaveBeenCalledWith('已关闭同步记录功能', 'info')
@@ -640,14 +640,14 @@ describe('settings-bindings · setupTimeFilterControls', () => {
       setupTimeFilterControls()
     }).not.toThrow()
 
-    mountCheckbox('chkTimeFilter', false)
+    mountCheckbox('checkboxTimeFilter', false)
     expect(() => {
       setupTimeFilterControls()
     }).not.toThrow()
   })
 
   it('复选框切换 → 显示/隐藏筛选控件区', () => {
-    const checkbox = mountCheckbox('chkTimeFilter', false)
+    const checkbox = mountCheckbox('checkboxTimeFilter', false)
     const controls = mountDiv('timeFilterControls')
     setupTimeFilterControls()
 
@@ -661,7 +661,7 @@ describe('settings-bindings · setupTimeFilterControls', () => {
   })
 
   it('筛选范围切到「预告/未来」→ 隐藏年月季度、显示提示行', () => {
-    mountCheckbox('chkTimeFilter', true)
+    mountCheckbox('checkboxTimeFilter', true)
     mountDiv('timeFilterControls')
     const range = mountSelectWithValue('timeFilterRange', 'future')
     const yearRow = mountDiv('yearRow')
@@ -679,7 +679,7 @@ describe('settings-bindings · setupTimeFilterControls', () => {
   })
 
   it('筛选范围切到「季度」/「月份」→ 只显示对应行', () => {
-    mountCheckbox('chkTimeFilter', true)
+    mountCheckbox('checkboxTimeFilter', true)
     mountDiv('timeFilterControls')
     const range = mountSelectWithValue('timeFilterRange', 'quarter')
     appendOption(range, 'month')
@@ -704,7 +704,7 @@ describe('settings-bindings · setupTimeFilterControls', () => {
   })
 
   it('缺少提示行元素时不报错（提示行非必需）', () => {
-    mountCheckbox('chkTimeFilter', true)
+    mountCheckbox('checkboxTimeFilter', true)
     mountDiv('timeFilterControls')
     const range = mountSelectWithValue('timeFilterRange', 'future')
     mountDiv('yearRow')

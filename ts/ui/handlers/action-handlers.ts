@@ -1076,7 +1076,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
-  // 关闭主面板（panel）
+  // 关闭同步面板（sync-panel）
   closePanel: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭主面板')
     const app = getApp() as {
@@ -1126,7 +1126,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   // 设置页面：切换增量同步开关
   toggleIncrementalSync: (_context) => {
-    const checkbox = document.getElementById('chkIncrementalSync') as HTMLInputElement | null
+    const checkbox = document.getElementById('checkboxIncrementalSync') as HTMLInputElement | null
     const isEnabled = checkbox?.checked ?? false
     setIncrementalSync(isEnabled)
     showToast(`增量同步已${isEnabled ? '开启' : '关闭'}`, 'success')
@@ -1135,7 +1135,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   // 设置页面：切换跳过冲突开关
   toggleSkipConflicts: (_context) => {
-    const checkbox = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
+    const checkbox = document.getElementById('checkboxSkipConflicts') as HTMLInputElement | null
     const isEnabled = checkbox?.checked ?? false
     setSkipConflicts(isEnabled)
     showToast(`冲突处理: ${isEnabled ? '跳过冲突' : 'Excel覆盖'}`, 'success')
@@ -1144,7 +1144,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   // 设置页面：切换启用同步记录开关
   toggleEnableSyncRecord: (_context) => {
-    const checkbox = document.getElementById('chkEnableSyncRecord') as HTMLInputElement | null
+    const checkbox = document.getElementById('checkboxEnableSyncRecord') as HTMLInputElement | null
     const isEnabled = checkbox?.checked ?? false
     setSyncRecordEnabled(isEnabled)
     showToast(`同步记录已${isEnabled ? '开启' : '关闭'}`, 'success')
@@ -1152,7 +1152,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 
   toggleNavIconsOnly: (_context) => {
-    const checkbox = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
+    const checkbox = document.getElementById('checkboxNavIconsOnly') as HTMLInputElement | null
     const isEnabled = checkbox?.checked ?? false
     setNavIconsOnly(isEnabled)
     showToast(`导航模式: ${isEnabled ? '仅图标' : '图标+文字'}`, 'success')

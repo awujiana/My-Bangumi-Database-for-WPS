@@ -24,7 +24,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 const mockState = vi.hoisted(() => ({
   bgmLog: vi.fn(),
   handleError: vi.fn(),
-  showBangumiPanel: vi.fn(),
+  showSyncPanel: vi.fn(),
   syncWithConfirmation: vi.fn(() => Promise.resolve()),
   closeAllPanels: vi.fn(() => 0),
   notifyToast: vi.fn(),
@@ -32,7 +32,7 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock('../ts/index.js', () => ({
   WPS_ENUM: {},
-  showBangumiPanel: mockState.showBangumiPanel,
+  showSyncPanel: mockState.showSyncPanel,
   showEnrichPanel: vi.fn(),
   showSettingsPanel: vi.fn(),
   showCleanPanel: vi.fn(),
@@ -89,32 +89,32 @@ afterEach(() => {
 
 describe('OnAction 分发', () => {
   it('面板类按钮命中同步分发表并调用对应打开函数', () => {
-    expect(OnAction({ Id: 'btnShowPanel' })).toBe(true)
+    expect(OnAction({ Id: 'buttonOpenSyncPanel' })).toBe(true)
 
-    expect(mockState.showBangumiPanel).toHaveBeenCalledTimes(1)
+    expect(mockState.showSyncPanel).toHaveBeenCalledTimes(1)
     expect(countUnknownButtonWarnings()).toBe(0)
   })
 
   it('异步按钮命中异步分发表（同步返回 true，不阻塞宿主）', () => {
-    expect(OnAction({ Id: 'btnSyncBangumi' })).toBe(true)
+    expect(OnAction({ Id: 'buttonSyncBangumi' })).toBe(true)
 
     expect(mockState.syncWithConfirmation).toHaveBeenCalledTimes(1)
     expect(countUnknownButtonWarnings()).toBe(0)
   })
 
   it('未登记的按钮 ID 落「未知按钮」告警，但仍返回 true（不打断宿主）', () => {
-    expect(OnAction({ Id: 'btnNotDeclaredInXml' })).toBe(true)
+    expect(OnAction({ Id: 'buttonNotDeclaredInXml' })).toBe(true)
 
     expect(countUnknownButtonWarnings()).toBe(1)
     expect(mockState.handleError).not.toHaveBeenCalled()
   })
 
   it('同步处理函数抛错时被捕获并交给 handleError，OnAction 仍返回 true', () => {
-    mockState.showBangumiPanel.mockImplementationOnce(() => {
+    mockState.showSyncPanel.mockImplementationOnce(() => {
       throw new Error('面板打开失败')
     })
 
-    expect(OnAction({ Id: 'btnShowPanel' })).toBe(true)
+    expect(OnAction({ Id: 'buttonOpenSyncPanel' })).toBe(true)
 
     expect(mockState.handleError).toHaveBeenCalledTimes(1)
   })
@@ -122,7 +122,7 @@ describe('OnAction 分发', () => {
   it('异步处理函数 reject 时被捕获并交给 handleError，不产生未处理的 Promise 拒绝', async () => {
     mockState.syncWithConfirmation.mockRejectedValueOnce(new Error('同步失败'))
 
-    expect(OnAction({ Id: 'btnSyncBangumi' })).toBe(true)
+    expect(OnAction({ Id: 'buttonSyncBangumi' })).toBe(true)
 
     await vi.waitFor(() => {
       expect(mockState.handleError).toHaveBeenCalledTimes(1)
@@ -134,7 +134,7 @@ describe('OnAction：一键关闭所有页面', () => {
   it('命中同步分发表，按实际关闭数量播报', () => {
     mockState.closeAllPanels.mockReturnValueOnce(3)
 
-    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+    expect(OnAction({ Id: 'buttonCloseAllPanels' })).toBe(true)
 
     expect(mockState.closeAllPanels).toHaveBeenCalledTimes(1)
     expect(mockState.notifyToast).toHaveBeenCalledWith('已关闭 3 个工具页面', 'success')
@@ -144,7 +144,7 @@ describe('OnAction：一键关闭所有页面', () => {
   it('一个都没关时明确播报「没有打开的工具页面」（否则用户以为按钮坏了）', () => {
     mockState.closeAllPanels.mockReturnValueOnce(0)
 
-    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+    expect(OnAction({ Id: 'buttonCloseAllPanels' })).toBe(true)
 
     expect(mockState.notifyToast).toHaveBeenCalledWith('当前没有打开的工具页面', 'info')
   })
@@ -154,7 +154,7 @@ describe('OnAction：一键关闭所有页面', () => {
       throw new Error('宿主不可用')
     })
 
-    expect(OnAction({ Id: 'btnCloseAllPanels' })).toBe(true)
+    expect(OnAction({ Id: 'buttonCloseAllPanels' })).toBe(true)
 
     expect(mockState.handleError).toHaveBeenCalledTimes(1)
     expect(mockState.notifyToast).not.toHaveBeenCalled()
@@ -163,10 +163,10 @@ describe('OnAction：一键关闭所有页面', () => {
 
 describe('GetBangumiImage 图标兜底', () => {
   it('未登记的按钮 ID 返回 newFromTemp.svg 兜底', () => {
-    expect(GetBangumiImage({ Id: 'btnNotDeclaredInXml' })).toBe(FALLBACK_ICON)
+    expect(GetBangumiImage({ Id: 'buttonNotDeclaredInXml' })).toBe(FALLBACK_ICON)
   })
 
   it('已登记的按钮 ID 返回 images/ 下的 svg 路径', () => {
-    expect(GetBangumiImage({ Id: 'btnShowPanel' })).toMatch(/^images\/.+\.svg$/u)
+    expect(GetBangumiImage({ Id: 'buttonOpenSyncPanel' })).toMatch(/^images\/.+\.svg$/u)
   })
 })

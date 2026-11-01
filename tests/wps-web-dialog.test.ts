@@ -78,10 +78,10 @@ describe('resolveDialogUrl', () => {
   it('相对页名按当前页面所在目录解析（调试态 http、发布态本地资源都对）', () => {
     // ⚠️ 别写成 'ui/manager.html'：那会被解析成 /ui/ui/manager.html ——
     // 当前页面本身就在 /ui/ 下，相对路径要相对**目录**而不是站点根
-    expect(resolveDialogUrl('manager.html', 'http://127.0.0.1:3889/ui/panel.html')).toBe(
+    expect(resolveDialogUrl('manager.html', 'http://127.0.0.1:3889/ui/sync-panel.html')).toBe(
       'http://127.0.0.1:3889/ui/manager.html',
     )
-    expect(resolveDialogUrl('./manager.html', 'http://127.0.0.1:3889/ui/panel.html')).toBe(
+    expect(resolveDialogUrl('./manager.html', 'http://127.0.0.1:3889/ui/sync-panel.html')).toBe(
       'http://127.0.0.1:3889/ui/manager.html',
     )
   })

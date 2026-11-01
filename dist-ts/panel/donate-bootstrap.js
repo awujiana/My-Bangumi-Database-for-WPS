@@ -16,6 +16,7 @@ import '../core/result.js';
 import '../tools/wps.js';
 import { showToast } from '../ui/dialog.js';
 import { initializeTheme } from '../tools/theme.js';
+import { initializeI18n } from '../i18n/index.js';
 import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js';
 /**
  * 绑定联系方式按钮：点击复制到剪贴板并弹出 Toast。
@@ -52,6 +53,7 @@ if (typeof document !== 'undefined') {
             name: '应用主题',
             run: () => {
                 initializeTheme();
+                initializeI18n();
                 // 标记页面已成功加载：下次开窗复用同一窗格，而不是走「URL 未标记」自愈重建
                 markDonatePaneLoaded();
             },

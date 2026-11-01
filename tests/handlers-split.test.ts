@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * handlers 拆分模块单元测试（panel-context / log-panel）
+ * handlers 拆分模块单元测试（sync-panel-context / log-panel）
  *
  * 覆盖：
- *  - isPanelContext：无 window 早退、panel.html 判定、其他页面判定
+ *  - isPanelContext：无 window 早退、sync-panel.html 判定、其他页面判定
  *  - renderLogEntries：缺失容器早退、空日志占位、按级别传入 getRecentLogs、
  *    条目渲染（class 与文本）、重复渲染先清空、渲染后滚动到底部
  */
@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getRecentLogs } from '../ts/tools/logger.js'
 import type { LogEntry } from '../ts/tools/logger.js'
 import { renderLogEntries } from '../ts/ui/handlers/log-panel.js'
-import { isPanelContext } from '../ts/ui/handlers/panel-context.js'
+import { isPanelContext } from '../ts/ui/handlers/sync-panel-context.js'
 
 vi.mock('../ts/tools/logger.js', () => ({
   getRecentLogs: vi.fn(() => []),
@@ -30,7 +30,7 @@ function mountLogBody(): HTMLDivElement {
   return body
 }
 
-describe('ui/handlers/panel-context', () => {
+describe('ui/handlers/sync-panel-context', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -46,12 +46,12 @@ describe('ui/handlers/panel-context', () => {
     }
   })
 
-  it('路径含 panel.html 时返回 true', () => {
-    vi.stubGlobal('window', { location: { pathname: '/ui/panel.html' } })
+  it('路径含 sync-panel.html 时返回 true', () => {
+    vi.stubGlobal('window', { location: { pathname: '/ui/sync-panel.html' } })
     expect(isPanelContext()).toBe(true)
   })
 
-  it('路径不含 panel.html 时返回 false', () => {
+  it('路径不含 sync-panel.html 时返回 false', () => {
     vi.stubGlobal('window', { location: { pathname: '/ui/settings.html' } })
     expect(isPanelContext()).toBe(false)
   })

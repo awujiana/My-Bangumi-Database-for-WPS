@@ -26,7 +26,7 @@
 import { getApp } from './util/index.js'
 
 /** 缓存用途：面板与富化页各存一份（语义不同，互不覆盖） */
-export type TargetCachePurpose = 'panel' | 'enrich'
+export type TargetCachePurpose = 'sync-panel' | 'enrich'
 
 /** 识别结果（可持久化的最小集合） */
 export interface CachedTarget {
@@ -126,7 +126,7 @@ function readStore(storage: StorageLike): CacheStore {
     // 逐键取用：只接受已知用途，忽略旧版本/手工写入的多余键
     const record = parsed as Record<string, unknown>
     const store: CacheStore = {}
-    for (const purpose of ['panel', 'enrich'] as const) {
+    for (const purpose of ['sync-panel', 'enrich'] as const) {
       const entry = record[purpose]
       if (entry !== null && typeof entry === 'object') {
         store[purpose] = entry

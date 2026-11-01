@@ -17,7 +17,7 @@ export interface DataContextSnapshot {
     columns: string[];
     /** 数据行数（不含表头；拿不到时 0） */
     rowCount: number;
-    /** 获取数据的页面标识（panel / enrich / …） */
+    /** 获取数据的页面标识（sync-panel / enrich / …） */
     fromPage: string;
     /** 写入时间（Date.now()） */
     savedAt: number;

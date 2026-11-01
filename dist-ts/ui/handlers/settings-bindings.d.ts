@@ -3,6 +3,7 @@
  * @module ui/handlers/settings-bindings
  * @description 从 handlers/index.ts 抽出：各设置控件的 change 处理器与时间筛选控件初始化。
  */
+import type { LocaleCode } from '../../i18n/index.js';
 export declare const handleEnableSyncRecordChange: () => void;
 export declare const handleLogLevelFilterChange: () => void;
 /** 设置页「📜 日志偏好」：全局日志记录级别（0=DEBUG … 3=ERROR） */
@@ -62,4 +63,21 @@ export declare const handleRefreshIntervalChange: () => void;
  * - 选择「预告/未来动漫」时隐藏年份/季度/月份，显示提示
  */
 export declare function setupTimeFilterControls(): void;
+/**
+ * 同步语言分段按钮的 active / aria 状态，并刷新覆盖率提示
+ *
+ * 覆盖率只对**非源语言**显示：简体是基准，显示「已翻译 100%」没有信息量，
+ * 反而会让人以为「还有 0% 没翻」。
+ */
+export declare function updateLanguageButtons(code: LocaleCode): void;
+/**
+ * 语言切换
+ *
+ * 乐观更新按钮态（点下去立刻有反馈），`setLocale` 失败再回滚——语言包缺失是
+ * 真实可能（用户手动删过 `locales/<code>/`），不能假装切成功。
+ *
+ * 成功后的 toast 用**新语言**渲染：`setLocale` 内部已经 `applyI18n()` 过，
+ * 此时 `t()` 取到的就是新文案，用户能立刻看到切换生效。
+ */
+export declare const handleLanguageClick: (event: Event) => void;
 //# sourceMappingURL=settings-bindings.d.ts.map

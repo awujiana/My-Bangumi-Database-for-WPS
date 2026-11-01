@@ -7,7 +7,7 @@
  *   1. **两种状态互相独立**：
  *      - 折叠（collapsed）：模块标题保留、内容收起，用户随时可点开；
  *      - 隐藏（hidden）：模块在主区与侧栏锚点中彻底消失，只能在设置页恢复。
- *   2. **按页面分别记录**：`sec-preview` 在 panel / enrich / clean 三页都存在，
+ *   2. **按页面分别记录**：`sec-preview` 在 sync-panel / enrich / clean 三页都存在，
  *      折叠 panel 的不影响 enrich —— 与排序配置（`nav-order`）的按页存储口径一致。
  *   3. **都持久化进 PluginStorage**（`bgm_module_collapsed` / `bgm_module_hidden`），
  *      即用户说的「计入缓存配置」：刷新 / 重开任务窗格后仍在。
@@ -35,6 +35,7 @@ import { runBeforeEnterSolo } from '../core/solo-hooks.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
 import { subscribeConfigPoll } from './config-poll.js'
 import { PAGE_MODULES } from './nav-order.js'
+import { applyPageKeyAliases } from './page-key.js'
 import { bgmLog, showSettingsPanel } from './util/index.js'
 
 import type { NavModule } from './nav-order.js'
@@ -323,7 +324,8 @@ function readMap(key: string, isSilent: boolean): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
+      // 2.3.0 的页面键是 `panel`，改名后要迁到 `sync-panel`（见 tools/page-key）
+      return applyPageKeyAliases(parsed as Record<string, unknown>)
     }
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[moduleState] 状态配置解析失败: ${(error as Error).message}`)

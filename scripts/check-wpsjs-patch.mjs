@@ -18,7 +18,7 @@
  * 本脚本守三条，前两条 FAIL，第三条 WARN：
  *   A. 本地 node_modules/wpsjs 存在，且 debug_publish.js / debug_xmlplugin.js
  *      都带 BGM patch 标记（patch 丢了 / node_modules 被重装都能被发现）；
- *   B. **运行中的** dev server（3889）返回的 panel.html 不含注入脚本 ——
+ *   B. **运行中的** dev server（3889）返回的 sync-panel.html 不含注入脚本 ——
  *      这一条直接对应用户症状「Main resource content verification failed +
  *      页面打不开」，能在 gate 里当场抓住；
  *   C. 全局安装的 wpsjs 若存在且未 patch，说明 `wpsjs debug` 有被解析到
@@ -81,13 +81,13 @@ if (!existsSync(localWpsjs)) {
 // ---------- B. 运行中的 dev server 是否还在注入 ----------
 
 /**
- * 探测 3889 上的 panel.html。
+ * 探测 3889 上的 sync-panel.html。
  * server 没开时静默跳过（本地开发不总是开着 dev server，不能因此挂掉 gate）。
  */
 async function probeRunningServer() {
   let response
   try {
-    response = await fetch(`http://127.0.0.1:${DEBUG_PORT}/ui/panel.html`, {
+    response = await fetch(`http://127.0.0.1:${DEBUG_PORT}/ui/sync-panel.html`, {
       signal: AbortSignal.timeout(2000),
     })
   } catch {
@@ -95,7 +95,7 @@ async function probeRunningServer() {
   }
   if (!response.ok) {
     warnings.push(
-      `dev server(3889) 有响应但 /ui/panel.html 返回 ${response.status} —— 与 patch 无关，仍需留意`,
+      `dev server(3889) 有响应但 /ui/sync-panel.html 返回 ${response.status} —— 与 patch 无关，仍需留意`,
     )
     return
   }

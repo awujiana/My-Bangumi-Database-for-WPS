@@ -79,5 +79,13 @@ export declare function OnAction(control: {
 export declare function GetBangumiImage(control: {
     Id: string;
 }): string;
+/**
+ * Ribbon 动态文案回调（`getLabel`）
+ *
+ * 只有 `<tab>` 会走到这里。切语言后由 `ribbonUI.Invalidate()` 触发重调。
+ */
+export declare function GetRibbonLabel(control: {
+    Id: string;
+}): string;
 export {};
 //# sourceMappingURL=ribbon.d.ts.map

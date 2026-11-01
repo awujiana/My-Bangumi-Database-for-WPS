@@ -12,7 +12,7 @@ export declare const LOCKED_SHEET_KEY = "bgm_locked_sheet";
 /**
  * 各页独立的锁定键：panel 与 enrich 曾共用一把锁互相覆盖 ——
  * 在面板锁了表，切到富化页锁另一张，回来面板的锁没了。现在各页各存各的。
- * @param page 页面标识（'panel' / 'enrich' …）
+ * @param page 页面标识（'sync-panel' / 'enrich' …）
  */
 export declare function lockedSheetKey(page: string): string;
 export interface LockedSheetInfo {

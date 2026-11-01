@@ -119,7 +119,7 @@ export function updateTokenStatus() {
 // 缓存上次更新的状态，避免重复日志和 DOM 操作
 let _lastUserIdSnapshot;
 export function updateUserIdStatus() {
-    // panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新；
+    // sync-panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新；
     // 用属性选择器命中全部同名 id 元素（querySelector 只能命中第一个）
     const userIdStatusEls = document.querySelectorAll('[id="userIdStatus"]');
     if (userIdStatusEls.length === 0)

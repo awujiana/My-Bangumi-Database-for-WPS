@@ -366,7 +366,7 @@ export {
   // 请求 Bangumi 当前登录用户资料（Promise + 带 HTTP status 的判别联合）
   fetchBgmMe,
   // 显示主面板
-  showBangumiPanel,
+  showSyncPanel,
   // 显示设置面板（带动态停靠位置）
   showSettingsPanel,
   // 显示新番表富化面板
@@ -515,7 +515,7 @@ export {
 export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from './core/types.js'
 
 // ============================================================================
-// 15. 页面逻辑（来自 panel/panel-page.js）
+// 15. 页面逻辑（来自 panel/sync-panel-page.js）
 // ============================================================================
 
 export {
@@ -526,7 +526,7 @@ export {
   refreshData,
   // 放大预览表格
   enlargePreview,
-} from './panel/panel-page.js'
+} from './panel/sync-panel-page.js'
 // ============================================================================
 // 16. 预览模块（类型部分）
 // ============================================================================

@@ -28,10 +28,11 @@ export declare const HEARTBEAT_MAX_AGE_MS = 90000;
 /**
  * 页面侧：启动心跳（各窗格页 bootstrap 各调一次）
  *
- * @param pageKey 页面标识，与 `showXxxPanel` 校验时用的键一致
- *   ('panel' / 'clean' / 'enrich' / 'highlight' / 'conditionalFormat' / 'settings')
+ * @param rawPageKey 页面标识，与 `showXxxPanel` 校验时用的键一致
+ *   ('sync-panel' / 'clean' / 'enrich' / 'highlight' / 'conditionalFormat' / 'settings')
+ *   历史标识（2.3.0 的 `panel`）会先被归一到当前标识
  */
-export declare function startPaneHeartbeat(pageKey: string, intervalMs?: number): void;
+export declare function startPaneHeartbeat(rawPageKey: string, intervalMs?: number): void;
 /**
  * COM 侧（ribbon 调用方）：判断某页面的窗格内容是否真的活着
  *

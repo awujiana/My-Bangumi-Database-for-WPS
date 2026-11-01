@@ -21,15 +21,20 @@ export default defineConfig({
         // 修复嵌套问题：src 保留完整路径，dest 是前缀
         // 原 { src: 'images/*', dest: 'images' } 会复制到 dist/images/images/，导致路径错误
         { src: 'images/*', dest: '.' },     // 按钮图标 → dist/images/*.svg
-        { src: 'ui/*', dest: '.' },         // 任务面板 HTML → dist/ui/panel.html
+        { src: 'ui/*', dest: '.' },         // 任务面板 HTML → dist/ui/sync-panel.html
         { src: 'main.js', dest: '.' },      // 动态模块加载器
         { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' }, // WPS SDK
-        // 新增：复制 dist-ts 目录（TS 编译产物，main.js 和 panel.html 均依赖）
+        // 新增：复制 dist-ts 目录（TS 编译产物，main.js 和 sync-panel.html 均依赖）
         { src: 'dist-ts/**/*.js', dest: '.' }, // → dist/dist-ts/core/constants.js 等
-        // 新增：复制 css 目录（panel.html 通过 ../css/ 引用）
+        // 新增：复制 css 目录（sync-panel.html 通过 ../css/ 引用）
         { src: 'css/*', dest: '.' },           // → dist/css/styles.css
-        // 新增：复制 libs 目录（purify.js 等，panel.html 通过 ../libs/ 引用）
-        { src: 'libs/*', dest: '.' }           // → dist/libs/purify.js
+        // 新增：复制 libs 目录（purify.js 等，sync-panel.html 通过 ../libs/ 引用）
+        { src: 'libs/*', dest: '.' },          // → dist/libs/purify.js
+        // 新增：复制 locales 目录（语言包）。
+        // 必须用 `**` 保留二级目录：localeUrl() 在运行时按
+        // `dist-ts/i18n/locale-store.js` → `../../locales/<code>/locale.json` 拼路径，
+        // 若只写 `locales/*` 则语言包不会进 dist，打出的 zip 里缺失 → 所有页面退回硬编码中文。
+        { src: 'locales/**/*', dest: '.' }     // → dist/locales/zh-CN/locale.json
       ]
     })
   ],

@@ -181,7 +181,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   safeActivate: vi.fn(),
   shellExecuteByOAAssist: vi.fn(),
   getUrlPath: vi.fn((): string => ''),
-  showBangumiPanel: vi.fn(),
+  showSyncPanel: vi.fn(),
   copyTokenToClipboard: vi.fn(),
 }))
 

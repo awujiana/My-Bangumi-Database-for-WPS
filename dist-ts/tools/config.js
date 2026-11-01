@@ -42,6 +42,8 @@ export const CONFIG_KEYS = {
     MODULE_COLLAPSED: 'bgm_module_collapsed',
     MODULE_HIDDEN: 'bgm_module_hidden',
     LOG_LEVEL: 'bgm_log_level',
+    /** 界面语言（BCP 47：zh-CN / zh-TW / en）；空 = 按系统语言猜 */
+    LANGUAGE: 'bgm_language',
 };
 /**
  * 获取 PluginStorage

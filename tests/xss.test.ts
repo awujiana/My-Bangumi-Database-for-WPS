@@ -247,7 +247,7 @@ describe('sanitizeTableRows - 表格行片段', () => {
  * 真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留。
  *
  * 背景（2026-09 发现的系统性问题，见 文档/TS_AUDIT_2026_09_10.md 的 P0-1）：所有任务
- * 窗格页面（ui/panel.html、clean.html、enrich.html、settings.html）都先加载
+ * 窗格页面（ui/sync-panel.html、clean.html、enrich.html、settings.html）都先加载
  * libs/purify.js，因此运行时 sanitizeHtml 走 DOMPurify 严格白名单路径；而当时 jsdom
  * 单测默认没有 DOMPurify，走的是「保留 data-*」的轻量降级路径。两条路径的属性行为不
  * 一致，且白名单只登记了 5 个 data-* 属性 —— 导致 clean-page 的分组按钮/勾选键、

@@ -9,6 +9,7 @@
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
+import { initializeI18n } from '../i18n/index.js';
 import { startNavModeSync } from '../tools/nav-mode.js';
 import { startModuleStateSync } from '../tools/module-state.js';
 import { startNavOrderSync } from '../tools/nav-order.js';
@@ -44,7 +45,7 @@ function isSettingsContext() {
  */
 function initializeSettingsPage() {
     // 1. 加载 Token 和用户信息状态
-    // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 panel.html 相同的 ID
+    // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 sync-panel.html 相同的 ID
     void (async () => {
         try {
             const { updateTokenStatus, updateUserIdStatus } = await import('../ui/handlers/token.js');
@@ -60,18 +61,18 @@ function initializeSettingsPage() {
         try {
             const { isIncrementalSyncEnabled, isSkipConflictsEnabled, isSyncRecordEnabled, areNavIconsOnly, applyLogLevel, getLogLevel, } = await import('../tools/config.js');
             // 设置复选框
-            const chkIncremental = document.getElementById('chkIncrementalSync');
-            if (chkIncremental)
-                chkIncremental.checked = isIncrementalSyncEnabled(true);
-            const chkSkip = document.getElementById('chkSkipConflicts');
-            if (chkSkip)
-                chkSkip.checked = isSkipConflictsEnabled(true);
-            const chkSyncRecord = document.getElementById('chkEnableSyncRecord');
-            if (chkSyncRecord)
-                chkSyncRecord.checked = isSyncRecordEnabled(true);
-            const chkNavIcons = document.getElementById('chkNavIconsOnly');
-            if (chkNavIcons)
-                chkNavIcons.checked = areNavIconsOnly(true);
+            const checkboxIncremental = document.getElementById('checkboxIncrementalSync');
+            if (checkboxIncremental)
+                checkboxIncremental.checked = isIncrementalSyncEnabled(true);
+            const checkboxSkip = document.getElementById('checkboxSkipConflicts');
+            if (checkboxSkip)
+                checkboxSkip.checked = isSkipConflictsEnabled(true);
+            const checkboxSyncRecord = document.getElementById('checkboxEnableSyncRecord');
+            if (checkboxSyncRecord)
+                checkboxSyncRecord.checked = isSyncRecordEnabled(true);
+            const checkboxNavIcons = document.getElementById('checkboxNavIconsOnly');
+            if (checkboxNavIcons)
+                checkboxNavIcons.checked = areNavIconsOnly(true);
             // 应用全局日志级别到内存（bgmLog 依赖 BGM.LOG_LEVEL 过滤），并预填下拉
             applyLogLevel();
             const logLevelSelect = document.getElementById('logLevelSelect');
@@ -92,7 +93,8 @@ function applyAppearance() {
         return;
     // 主题：从配置读取并应用（含跟随系统监听）
     initializeTheme();
-    // 跨页主题同步：监听其他页面（panel / enrich）的主题变更并重应用
+    initializeI18n();
+    // 跨页主题同步：监听其他页面（sync-panel / enrich）的主题变更并重应用
     startThemeSync();
     // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
     startNavModeSync();

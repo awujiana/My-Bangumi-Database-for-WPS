@@ -14,7 +14,7 @@
  *      其中一个（取决于遍历顺序），用户会觉得「快捷键时灵时不灵」。故
  *      `setShortcutBinding` 遇到重复组合直接返回占用者，由 UI 提示，不写盘。
  *   4. **分发器只挂一次**：`startShortcutDispatcher` 幂等，由 `initializeTheme`
- *      统一启动 —— 那是所有页面（panel / enrich / clean / highlight /
+ *      统一启动 —— 那是所有页面（sync-panel / enrich / clean / highlight /
  *      conditional-format / settings / donate）唯一都调用的公共入口，
  *      不必再维护「哪几个入口要记得加」的平行清单。
  *   5. **输入框里不抢键**：焦点在 input / textarea / select / contenteditable 时

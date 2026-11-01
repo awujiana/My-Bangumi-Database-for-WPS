@@ -213,7 +213,7 @@ export function initializeShortcutSettings() {
         return;
     renderShortcutList();
     renderMouseRows();
-    const enabled = document.getElementById('chkShortcutsEnabled');
+    const enabled = document.getElementById('checkboxShortcutsEnabled');
     if (enabled instanceof HTMLInputElement)
         enabled.checked = areShortcutsEnabled(true);
     // 容器级委托：清单会整体重渲染，逐行绑定会随节点一起失效。

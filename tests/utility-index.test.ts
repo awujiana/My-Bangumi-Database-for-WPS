@@ -55,7 +55,7 @@ import {
   markCleanPaneLoaded,
   markSettingsPaneLoaded,
   shellExecuteByOAAssist,
-  showBangumiPanel,
+  showSyncPanel,
   showCleanPanel,
   showEnrichPanel,
   showSettingsPanel,
@@ -616,14 +616,14 @@ describe('util · showCleanPanel', () => {
   })
 })
 
-// ========== showBangumiPanel ==========
+// ========== showSyncPanel ==========
 
-describe('util · showBangumiPanel', () => {
+describe('util · showSyncPanel', () => {
   it('无宿主时优先用宿主注入的 BGMError 提示', () => {
     const bgmError = vi.fn()
     Reflect.set(window, 'BGMError', bgmError)
     try {
-      showBangumiPanel()
+      showSyncPanel()
       expect(bgmError).toHaveBeenCalledWith('无法获取 WPS Application 对象！', '错误')
       expect(notifyMock.error).not.toHaveBeenCalled()
     } finally {
@@ -632,7 +632,7 @@ describe('util · showBangumiPanel', () => {
   })
 
   it('无宿主且无 BGMError 时退回通知口', () => {
-    showBangumiPanel()
+    showSyncPanel()
     expect(notifyMock.error).toHaveBeenCalledWith('无法获取 WPS Application 对象！', '错误')
   })
 
@@ -644,7 +644,7 @@ describe('util · showBangumiPanel', () => {
     })
     mountApp(app)
 
-    showBangumiPanel()
+    showSyncPanel()
 
     expect(pane.Visible).toBe(true)
     expect(store.get('bgm_panel_shown_at')).toBeTruthy()
@@ -658,7 +658,7 @@ describe('util · showBangumiPanel', () => {
     })
     mountApp(app)
 
-    showBangumiPanel()
+    showSyncPanel()
 
     expect(pane.Visible).toBe(false)
     expect(store.has('bgm_panel_shown_at')).toBe(false)
@@ -668,10 +668,10 @@ describe('util · showBangumiPanel', () => {
     const { app, store, createdUrls } = createFakeApp()
     mountApp(app)
 
-    showBangumiPanel()
+    showSyncPanel()
 
     expect(createdUrls).toHaveLength(1)
-    expect(createdUrls[0]).toMatch(/\/ui\/panel\.html$/)
+    expect(createdUrls[0]).toMatch(/\/ui\/sync-panel\.html$/)
     expect(store.get('panel_id')).toBeTruthy()
     expect(store.get('bgm_panel_shown_at')).toBeTruthy()
   })
@@ -686,7 +686,7 @@ describe('util · showBangumiPanel', () => {
     mountApp(app)
 
     expect(() => {
-      showBangumiPanel()
+      showSyncPanel()
     }).not.toThrow()
     expect(pane.Visible).toBe(true)
     expect(loggerSpies.warn).toHaveBeenCalledWith(expect.stringContaining('写入面板显示信号失败'))
@@ -696,7 +696,7 @@ describe('util · showBangumiPanel', () => {
     const { app, store } = createFakeApp({ isCreateTaskPaneMissing: true })
     mountApp(app)
     expect(() => {
-      showBangumiPanel()
+      showSyncPanel()
     }).not.toThrow()
     expect(store.has('bgm_panel_shown_at')).toBe(false)
   })

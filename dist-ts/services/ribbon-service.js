@@ -640,7 +640,7 @@ export async function syncFromGithubForRibbon() {
 /**
  * 确保 panel 面板可见（不切换，仅显示）
  *
- * 与 showBangumiPanel 的区别：showBangumiPanel 会切换可见性（可见→隐藏），
+ * 与 showSyncPanel 的区别：showSyncPanel 会切换可见性（可见→隐藏），
  * 本函数仅确保面板可见，不会隐藏已显示的面板。
  */
 function ensurePanelVisible() {
@@ -650,10 +650,10 @@ function ensurePanelVisible() {
             return;
         const tsId = app.PluginStorage?.getItem('panel_id');
         if (!tsId) {
-            // 面板未创建，调用 showBangumiPanel 创建并显示
+            // 面板未创建，调用 showSyncPanel 创建并显示
             void (async () => {
-                const { showBangumiPanel } = await import('../index.js');
-                showBangumiPanel();
+                const { showSyncPanel } = await import('../index.js');
+                showSyncPanel();
             })();
             return;
         }

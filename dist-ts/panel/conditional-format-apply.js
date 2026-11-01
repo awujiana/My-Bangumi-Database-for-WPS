@@ -55,6 +55,73 @@ export function checkFormatConditionsReadable(worksheet) {
 function normalizeFormulaForCompare(formula) {
     return formula.replace(/\s+/gu, '').replace(/^=/u, '');
 }
+/**
+ * 把公式里的**相对行引用**整体平移 `delta` 行（绝对行 `$B$2` 原样不动）
+ *
+ * 起因：WPS 的 `FormatConditions.Add({ Formula1 })` 会把相对行引用再 +1。
+ * 真机实测（12.1.0.29158）：传 `=$B2>8` 回读 `=$B3>8`，传 `=$B$2>8` 回读不偏移，
+ * 传 `=$B1>8` 正好回读 `=$B2>8`。写入前先 -1 抵消，回读才等于规则库里的公式。
+ *
+ * 处理细节：
+ * - 字符串字面量（`"B2"`）由**同一个正则的另一个分支**整体吃掉，里面的字母数字
+ *   不会被当成引用（用「先挖掉再塞回」的写法要引入 `\u0001` 这类控制字符当哨兵，
+ *   既触发 `no-control-regex`，也怕公式本身含哨兵）；
+ * - 函数名（`LOG10(`）不当引用（后面紧跟 `(`）；
+ * - 平移后行号 < 1 的原样保留，不生成 `B0` 这种非法引用。
+ */
+export function shiftRelativeRows(formula, delta) {
+    if (delta === 0)
+        return formula;
+    return formula.replace(
+    // 分支一：字符串字面量（`""` 是转义的双引号）——整体匹配、原样返回
+    // 分支二：单元格引用（可带 $），排除函数名与标识符中间
+    /"(?:[^"]|"")*"|(?<![A-Za-z_$])(\$?)([A-Za-z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_]|\s*\()/gu, (match, columnAbs, column, rowAbs, rowText) => {
+        // 走的是字符串字面量分支（引用分支的捕获组全空）
+        if (column === undefined || rowText === undefined)
+            return match;
+        if (rowAbs === '$')
+            return match;
+        const next = Number(rowText) + delta;
+        if (next < 1)
+            return match;
+        return `${columnAbs ?? ''}${column}${rowAbs ?? ''}${String(next)}`;
+    });
+}
+/** 回读比对：宿主存下来的公式是否等于我们要的 */
+function isSameFormula(actual, expected) {
+    return normalizeFormulaForCompare(actual) === normalizeFormulaForCompare(expected);
+}
+/**
+ * 新增一条公式规则，并抵消 WPS 的「相对行 +1」偏移
+ *
+ * 先按原公式 Add → 回读比对 → 不一致才用补偿公式删了重加。
+ * 不直接硬编码 -1，是因为别的宿主（或不偏移的 WPS 版本）第一次就对上了，
+ * 不该被无谓改写。两次都对不上时返回宿主最终给的那条，由回读校验记 missing。
+ *
+ * 复制规则也走这里：源规则的 `Formula1` 读回来已是宿主存下的（可能已 +1）版本，
+ * 再 Add 一次会二次偏移，补偿逻辑会把它拉回与源规则相同的值——正好是「同公式」。
+ */
+function addConditionWithFormula(target, formula) {
+    const collection = target.FormatConditions;
+    if (collection === undefined || typeof collection.Add !== 'function')
+        return null;
+    const created = collection.Add({ Type: XL_EXPRESSION, Formula1: formula });
+    const actual = readFormulaSafe(created);
+    // 读回空串 = 宿主不暴露 Formula1，无从判断有没有偏移 → 不猜（硬套 -1 会把
+    // 本来正确的公式改错），交给调用方写后回读校验去记 missing
+    if (actual === '' || isSameFormula(actual, formula))
+        return created;
+    const compensated = shiftRelativeRows(formula, -1);
+    if (compensated === formula)
+        return created;
+    try {
+        created.Delete?.();
+    }
+    catch {
+        // 删不掉就留着，回读校验会把它报成 missing
+    }
+    return collection.Add({ Type: XL_EXPRESSION, Formula1: compensated });
+}
 /** 归一化范围用于回读比对：去空白、去 `$`、转大写（`b2:b50001` 与 `$B$2:$B$50001` 等价） */
 function normalizeRangeForCompare(range) {
     return range.replace(/\s+/gu, '').replace(/\$/gu, '').toUpperCase();
@@ -64,13 +131,51 @@ function normalizeColorForCompare(color) {
     const bare = color.replace(/^#/u, '').toUpperCase();
     return `#${bare}`;
 }
+/**
+ * `'#RRGGBB'`（规则库里的写法）→ WPS/VBA 的 BGR 整数
+ *
+ * WPS 的 `Interior.Color` 与项目里的 `BGM_COLOR` 一样是 **BGR** 排列
+ * （`0x0000FF` = 纯红）。规则库里存的是人类可读的 `'#FF0000'`，
+ * 直接塞给 `Interior.Color` 会被宿主当成非法值丢掉。
+ *
+ * @example rgbHexToBgr('#FF0000') === 255
+ */
+export function rgbHexToBgr(hex) {
+    const bare = hex.trim().replace(/^#/u, '');
+    const full = bare.length === 3
+        ? bare
+            .split('')
+            .map((channel) => channel + channel)
+            .join('')
+        : bare;
+    if (!/^[0-9a-fA-F]{6}$/u.test(full)) {
+        throw new Error(`颜色格式不合法：${hex}（需要 #RRGGBB 或 #RGB）`);
+    }
+    const red = Number.parseInt(full.slice(0, 2), 16);
+    const green = Number.parseInt(full.slice(2, 4), 16);
+    const blue = Number.parseInt(full.slice(4, 6), 16);
+    return blue * 65_536 + green * 256 + red;
+}
+/**
+ * BGR 整数 → `'#RRGGBB'`
+ *
+ * 与 {@link rgbHexToBgr} 互为逆运算。回读时**必须**走它：直接把 BGR 数字
+ * 当 RGB 打印，红色（`255`）会显示成 `#0000FF` 蓝。
+ */
+export function bgrToRgbHex(value) {
+    const blue = (value >> 16) & 0xff;
+    const green = (value >> 8) & 0xff;
+    const red = value & 0xff;
+    return `#${[red, green, blue]
+        .map((channel) => channel.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase()}`;
+}
 /** 读一条规则的填充色（尽力而为；宿主拒绝时留空） */
 function readInteriorColor(fc) {
     try {
         const color = fc.Interior?.Color;
-        return typeof color === 'number'
-            ? `#${color.toString(16).padStart(6, '0').toUpperCase()}`
-            : undefined;
+        return typeof color === 'number' ? bgrToRgbHex(color) : undefined;
     }
     catch {
         return undefined;
@@ -80,9 +185,7 @@ function readInteriorColor(fc) {
 function readFontColor(fc) {
     try {
         const color = fc.Font?.Color;
-        return typeof color === 'number'
-            ? `#${color.toString(16).padStart(6, '0').toUpperCase()}`
-            : undefined;
+        return typeof color === 'number' ? bgrToRgbHex(color) : undefined;
     }
     catch {
         return undefined;
@@ -375,14 +478,10 @@ export function updateForeignRule(worksheet, index, patch) {
     const hasFormatPatch = patch.interior !== undefined || patch.fontColor !== undefined || patch.fontBold !== undefined;
     if (hasFormatPatch) {
         try {
-            fc.With?.({
-                ...(patch.interior !== undefined && { Interior: { Color: patch.interior } }),
-                ...((patch.fontColor !== undefined || patch.fontBold !== undefined) && {
-                    Font: {
-                        ...(patch.fontColor !== undefined && { Color: patch.fontColor }),
-                        ...(patch.fontBold !== undefined && { Bold: patch.fontBold }),
-                    },
-                }),
+            writeConditionFormat(fc, {
+                ...(patch.interior !== undefined && { interior: patch.interior }),
+                ...(patch.fontColor !== undefined && { fontColor: patch.fontColor }),
+                ...(patch.fontBold !== undefined && { fontBold: patch.fontBold }),
             });
         }
         catch (error) {
@@ -443,12 +542,13 @@ export function duplicateForeignRule(worksheet, index, targetRange) {
     const fontColor = readFontColor(fc);
     try {
         const target = worksheet?.Range(range);
-        const created = target?.FormatConditions?.Add?.({ Type: XL_EXPRESSION, Formula1: formula });
+        const created = target === undefined ? null : addConditionWithFormula(target, formula);
         if (!created)
             return { ok: false, error: '添加副本失败（宿主未返回规则对象）' };
-        created.With?.({
-            ...(fill !== undefined && { Interior: { Color: fill } }),
-            ...(fontColor !== undefined && { Font: { Color: fontColor } }),
+        // 与新增 / 编辑走同一个格式写入器（With 在 WPS 上不存在，`created.With?.(...)` 是空操作）
+        writeConditionFormat(created, {
+            ...(fill !== undefined && { interior: fill }),
+            ...(fontColor !== undefined && { fontColor }),
         });
     }
     catch (error) {
@@ -569,20 +669,57 @@ export function readForeignRules(worksheet) {
     }
     return snapshots;
 }
-/** 给单条规则上格式（With 对象形式；字体三属性全空时不上 Font） */
-function applyEntryFormat(fc, entry) {
-    const withFormat = fc.With;
-    if (withFormat === undefined)
+/**
+ * 把格式写到一条规则上（**Interior 直接赋值优先，With 只作兜底**）
+ *
+ * ## 为什么不能只走 With
+ * WPS 的 `FormatCondition` **没有 With 方法**（真机实测：`fc.With is not a function`）。
+ * 旧实现是 `const withFormat = fc.With; if (withFormat === undefined) return` ——
+ * 在这里直接静默返回：规则加进去了、填充色一次都没设上，用户看到的是
+ * **「规则应用了但没颜色」**；编辑既有规则改颜色同理（改了、回读没变、只报软告警）。
+ *
+ * ## 为什么不是「只走 Interior」
+ * WebOffice 的 `FormatCondition` 反而是对象形式的 `With({ Interior: { Color } })`。
+ * 两条路都留着，按宿主能力挑，两个都没有才抛错（不静默当成功）。
+ *
+ * 颜色一律经 {@link rgbHexToBgr} 转成 BGR 整数：`Interior.Color` 不认 `'#FF0000'`。
+ */
+function writeConditionFormat(fc, patch) {
+    const interior = fc.Interior;
+    if (interior !== undefined) {
+        if (patch.interior !== undefined)
+            interior.Color = rgbHexToBgr(patch.interior);
+        const font = fc.Font;
+        if (font !== undefined) {
+            if (patch.fontColor !== undefined)
+                font.Color = rgbHexToBgr(patch.fontColor);
+            if (patch.fontBold !== undefined)
+                font.Bold = patch.fontBold;
+        }
         return;
+    }
+    const withFormat = fc.With;
+    if (typeof withFormat === 'function') {
+        withFormat({
+            ...(patch.interior !== undefined && { Interior: { Color: rgbHexToBgr(patch.interior) } }),
+            ...((patch.fontColor !== undefined || patch.fontBold !== undefined) && {
+                Font: {
+                    ...(patch.fontColor !== undefined && { Color: rgbHexToBgr(patch.fontColor) }),
+                    ...(patch.fontBold !== undefined && { Bold: patch.fontBold }),
+                },
+            }),
+        });
+        return;
+    }
+    throw new Error('宿主既没有 FormatCondition.Interior 也没有 With，无法设置格式');
+}
+/** 给单条规则上格式（新增路径：颜色必填，字体可选） */
+function applyEntryFormat(fc, entry) {
     const { rule } = entry;
-    withFormat({
-        Interior: { Color: rule.interior },
-        ...((rule.fontColor !== undefined || rule.fontBold !== undefined) && {
-            Font: {
-                ...(rule.fontColor !== undefined && { Color: rule.fontColor }),
-                ...(rule.fontBold !== undefined && { Bold: rule.fontBold }),
-            },
-        }),
+    writeConditionFormat(fc, {
+        interior: rule.interior,
+        ...(rule.fontColor !== undefined && { fontColor: rule.fontColor }),
+        ...(rule.fontBold !== undefined && { fontBold: rule.fontBold }),
     });
 }
 /**
@@ -743,10 +880,7 @@ export function applyConditionalFormatPlan(worksheet, plan) {
         const { rule } = entry;
         try {
             const target = worksheet.Range(rule.appliesTo);
-            const fc = target.FormatConditions?.Add?.({
-                Type: XL_EXPRESSION,
-                Formula1: rule.formula,
-            });
+            const fc = addConditionWithFormula(target, rule.formula);
             if (fc) {
                 applyEntryFormat(fc, entry);
                 created.push(fc);

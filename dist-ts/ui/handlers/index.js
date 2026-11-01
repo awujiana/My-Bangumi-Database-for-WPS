@@ -5,6 +5,7 @@
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, showConfirm, refreshData, previewSyncContent, isSyncRecordEnabled, getTheme, getListType, getTimeFilter, getRefreshInterval, getLogLevel, getModalButtonsPosition, getThemeSchedule, getClusterMode, getMergeMode, } from '../../index.js';
+import { getLocale, onLocaleChange } from '../../i18n/index.js';
 import { loadGithubConfigIntoForm } from './github-settings.js';
 import { initializeAccountManager } from './accounts.js';
 import { initializeModuleOrderEditor } from './module-order.js';
@@ -17,9 +18,9 @@ import { handleActionClick } from './action-handlers.js';
 import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js';
 import { loadHighlightSettingsIntoForm } from './highlight-settings.js';
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js';
-import { setupEventListeners, setupMessageListener } from './panel-events.js';
+import { setupEventListeners, setupMessageListener } from './sync-panel-events.js';
 import { loadTemplateFileInfo } from './template-file.js';
-import { handleClusterModeClick, handleMergeModeClick, handleEnableSyncRecordChange, handleListTypeChange, handleLogLevelChange, handleLogLevelFilterChange, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, setupTimeFilterControls, updateModalButtonsPositionButtons, updateClusterModeButtons, updateMergeModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
+import { handleClusterModeClick, handleMergeModeClick, handleEnableSyncRecordChange, handleListTypeChange, handleLogLevelChange, handleLogLevelFilterChange, handleLanguageClick, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, setupTimeFilterControls, updateLanguageButtons, updateModalButtonsPositionButtons, updateClusterModeButtons, updateMergeModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
 import { setupUpdateChecker } from './update-checker.js';
 import { syncFromPanel } from './sync.js';
 import { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, } from './token.js';
@@ -28,7 +29,7 @@ export { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatu
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js';
 export { cleanLockedDataSheet } from './sheet.js';
 export { clearAllPendingTimeouts } from './resource-tracking.js';
-export { removeMessageListener } from './panel-events.js';
+export { removeMessageListener } from './sync-panel-events.js';
 // 连接测试弹窗
 // ========== 面板操作分发 ==========
 export function onAction(action) {
@@ -99,18 +100,18 @@ export function setupButtonListeners() {
         trackedAddEventListener(button, 'click', handleActionClick);
     });
     // 启用同步记录 开关：从 config 读取初始状态 + 注册 change 监听器
-    const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
-    if (chkEnableSyncRecord) {
-        // 从 config 读取初始状态（与 chkIncremental/chkSkipConflicts 一致的双向同步机制）
+    const checkboxEnableSyncRecord = document.getElementById('checkboxEnableSyncRecord');
+    if (checkboxEnableSyncRecord) {
+        // 从 config 读取初始状态（与 checkboxIncremental/checkboxSkipConflicts 一致的双向同步机制）
         try {
             const isEnabled = isSyncRecordEnabled();
-            chkEnableSyncRecord.checked = isEnabled;
+            checkboxEnableSyncRecord.checked = isEnabled;
             bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${isEnabled ? '开启' : '关闭'}`);
         }
         catch (error) {
             bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${error.message}`);
         }
-        trackedAddEventListener(chkEnableSyncRecord, 'change', handleEnableSyncRecordChange);
+        trackedAddEventListener(checkboxEnableSyncRecord, 'change', handleEnableSyncRecordChange);
         bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册');
     }
     // GitHub 配置：面板加载时自动填充已保存的值（含策略与同步源类型）
@@ -155,6 +156,16 @@ export function setupButtonListeners() {
     }
     updateThemeModeButtons(getTheme(true));
     updateThemeToggle(getTheme(true));
+    // 设置页：界面语言（分段按钮：简体 / 繁體 / English）
+    for (const button of document.querySelectorAll('[data-locale]')) {
+        trackedAddEventListener(button, 'click', handleLanguageClick);
+    }
+    updateLanguageButtons(getLocale());
+    // 语言变更（本页切换 / 其它窗格切换轮询回来）→ 同步按钮态与覆盖率文案。
+    // 覆盖率那行不是 data-i18n 节点（内容是动态拼的），applyI18n 刷不到它。
+    onLocaleChange((code) => {
+        updateLanguageButtons(code);
+    });
     // 模态框按钮位置分段按钮（回填 + 点击切换）
     for (const button of document.querySelectorAll('[data-modal-buttons-position]')) {
         trackedAddEventListener(button, 'click', handleModalButtonsPositionClick);
@@ -243,7 +254,7 @@ function startHandlers() {
 /**
  * 初始化 UI 事件处理模块。
  *
- * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
+ * 显式入口函数，由 `ts/entry/sync-panel-entry.ts` 调用。
  * 不在模块加载时自动执行，避免：
  *  - 模块加载期间触发 trackedSetTimeout(setupButtonListeners, 0)
  *  - 在测试环境（无 DOM/BGM 全局对象）下意外触发副作用

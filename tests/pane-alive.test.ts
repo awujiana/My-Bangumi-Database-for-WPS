@@ -44,7 +44,7 @@ describe('isPanePageAlive', () => {
   })
 
   it('无心跳记录 → 判活（保守：旧版本升级 / PluginStorage 不可写不能判死，否则每次点击都重建堆孤儿窗）', () => {
-    expect(isPanePageAlive('panel')).toBe(true)
+    expect(isPanePageAlive('sync-panel')).toBe(true)
   })
 
   it('心跳新鲜 → 判活', () => {
@@ -52,8 +52,8 @@ describe('isPanePageAlive', () => {
       window as unknown as {
         Application: { PluginStorage: { setItem: (k: string, v: string) => void } }
       }
-    ).Application.PluginStorage.setItem('pane_alive_panel', String(Date.now()))
-    expect(isPanePageAlive('panel')).toBe(true)
+    ).Application.PluginStorage.setItem('pane_alive_sync-panel', String(Date.now()))
+    expect(isPanePageAlive('sync-panel')).toBe(true)
   })
 
   it('心跳过期（超过 3 个周期没跳动）→ 判死', () => {
@@ -62,10 +62,10 @@ describe('isPanePageAlive', () => {
         Application: { PluginStorage: { setItem: (k: string, v: string) => void } }
       }
     ).Application.PluginStorage.setItem(
-      'pane_alive_panel',
+      'pane_alive_sync-panel',
       String(Date.now() - HEARTBEAT_MAX_AGE_MS - 1),
     )
-    expect(isPanePageAlive('panel')).toBe(false)
+    expect(isPanePageAlive('sync-panel')).toBe(false)
   })
 
   it('心跳过期但没超过上限（页面被节流但还活着）→ 判活', () => {
@@ -73,8 +73,23 @@ describe('isPanePageAlive', () => {
       window as unknown as {
         Application: { PluginStorage: { setItem: (k: string, v: string) => void } }
       }
-    ).Application.PluginStorage.setItem('pane_alive_panel', String(Date.now() - 60_000))
-    expect(isPanePageAlive('panel')).toBe(true)
+    ).Application.PluginStorage.setItem('pane_alive_sync-panel', String(Date.now() - 60_000))
+    expect(isPanePageAlive('sync-panel')).toBe(true)
+  })
+
+  it('只剩 2.3.0 的旧键 pane_alive_panel → 仍然读得到（升级瞬间旧窗格还在写旧键）', () => {
+    const storage = installFakeHost()
+    storage.set('pane_alive_panel', String(Date.now() - HEARTBEAT_MAX_AGE_MS - 1))
+    // 旧键已停跳 → 判死，而不是「没记录 → 保守判活」把孤儿窗格堆出来
+    expect(isPanePageAlive('sync-panel')).toBe(false)
+    expect(isPanePageAlive('panel')).toBe(false)
+  })
+
+  it('新键有值时不看旧键（旧键残留的过期值不该把活着的窗格判死）', () => {
+    const storage = installFakeHost()
+    storage.set('pane_alive_panel', String(Date.now() - HEARTBEAT_MAX_AGE_MS - 1))
+    storage.set('pane_alive_sync-panel', String(Date.now()))
+    expect(isPanePageAlive('sync-panel')).toBe(true)
   })
 
   it('脏值（非数字 / 负数 / NaN）→ 判活（保守：无法判定时不重建）', () => {
@@ -83,17 +98,17 @@ describe('isPanePageAlive', () => {
         Application: { PluginStorage: { setItem: (k: string, v: string) => void } }
       }
     ).Application.PluginStorage
-    host.setItem('pane_alive_panel', '不是数字')
-    expect(isPanePageAlive('panel')).toBe(true)
-    host.setItem('pane_alive_panel', '-5')
-    expect(isPanePageAlive('panel')).toBe(true)
-    host.setItem('pane_alive_panel', '')
-    expect(isPanePageAlive('panel')).toBe(true)
+    host.setItem('pane_alive_sync-panel', '不是数字')
+    expect(isPanePageAlive('sync-panel')).toBe(true)
+    host.setItem('pane_alive_sync-panel', '-5')
+    expect(isPanePageAlive('sync-panel')).toBe(true)
+    host.setItem('pane_alive_sync-panel', '')
+    expect(isPanePageAlive('sync-panel')).toBe(true)
   })
 
   it('宿主不存在（纯 Node / 宿主未注入）→ 判活而不是抛错', () => {
     ;(window as unknown as { Application?: unknown }).Application = undefined
-    expect(isPanePageAlive('panel')).toBe(true)
+    expect(isPanePageAlive('sync-panel')).toBe(true)
   })
 })
 

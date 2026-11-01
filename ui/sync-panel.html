@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#11111b" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892 https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
+    <link rel="stylesheet" href="../css/sortable-list.css" />
+    <link rel="stylesheet" href="../css/context-menu.css" />
+    <link rel="stylesheet" href="../css/diff.css" />
+  </head>
+  <body data-page="sync-panel">
+    <!-- ES6 模块加载（外联，符合 CSP script-src 'self'） -->
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/sync-panel-bootstrap.js"></script>
+    <script src="../libs/fit-viewport.js"></script>
+    <script src="../libs/wps-sdk-loader.js"></script>
+
+    <div class="global">
+      <!-- ===================== 顶栏 ===================== -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span data-i18n="syncPanel.app.title" class="brand-title">我的 Bangumi 数据库</span>
+            <span data-i18n="syncPanel.app.subtitle" class="brand-sub"
+              >上传同步 · 收藏下载 · 远程数据同步</span
+            >
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button
+            data-i18n-title="syncPanel.header.saveTitle"
+            data-i18n-aria-label="syncPanel.header.saveTitle"
+            class="header-icon-btn"
+            id="saveBtn"
+            data-action="saveAllConfig"
+            title="保存所有配置"
+            aria-label="保存所有配置"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M13.5 11.5V12a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-.5" />
+              <path d="M.5 8.5V8a3 3 0 0 1 3-3h.5" />
+              <polyline points="4 7.5 7 10.5 12 5.5" />
+            </svg>
+          </button>
+          <button
+            data-i18n-title="syncPanel.header.settingsTitle"
+            data-i18n-aria-label="syncPanel.header.settingsTitle"
+            class="header-icon-btn"
+            id="settingsBtn"
+            data-action="openSettings"
+            title="设置"
+            aria-label="设置"
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+              <path
+                d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM8 4a4 4 0 110 8 4 4 0 010-8zm0 1.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"
+              />
+              <path d="M8 5a3 3 0 100 6 3 3 0 000-6zm0 1a2 2 0 110 4 2 2 0 010-4z" />
+            </svg>
+          </button>
+          <div
+            data-i18n-aria-label="syncPanel.header.avatar"
+            class="topbar-avatar"
+            id="topbarAvatar"
+            style="display: none"
+            title=""
+            aria-label="用户头像"
+          >
+            <img
+              data-i18n-alt="syncPanel.header.avatar"
+              id="topbarAvatarImg"
+              src=""
+              alt="用户头像"
+            />
+          </div>
+        </div>
+      </header>
+
+      <!-- ===================== 侧栏（导航 + 账户卡） ===================== -->
+      <aside class="sidebar">
+        <div class="side-card">
+          <div class="user-profile" id="userProfile" style="display: none">
+            <div class="avatar-container">
+              <img
+                data-i18n-alt="syncPanel.header.avatar"
+                id="userAvatar"
+                class="user-avatar"
+                src=""
+                alt="用户头像"
+              />
+            </div>
+            <div class="user-info">
+              <span id="userNameDisplay" class="user-name"></span>
+              <span id="userIdDisplay" class="user-id"></span>
+              <span id="profileExpiresDisplay" class="profile-expires" style="display: none"></span>
+            </div>
+          </div>
+          <div class="token-status-line" id="sidebarTokenLine" style="display: none">
+            <span id="userIdStatus">未设置</span>
+          </div>
+          <p
+            data-i18n="syncPanel.app.sidebarHint"
+            class="hint"
+            id="sidebarHint"
+            style="margin-top: 8px"
+          >
+            未登录：点击右上角或下方「Token 设置」配置 Access Token
+          </p>
+        </div>
+
+        <nav data-i18n-aria-label="syncPanel.nav.label" class="nav" aria-label="功能导航">
+          <div data-i18n="syncPanel.nav.label" class="nav-label">功能导航</div>
+          <a data-i18n-title="syncPanel.nav.command" href="#sec-command" title="同步操作"
+            ><span class="nav-ico">🚀</span
+            ><span data-i18n="syncPanel.nav.command" class="nav-text">同步操作</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.account" href="#sec-account" title="账户与凭证"
+            ><span class="nav-ico">🔑</span
+            ><span data-i18n="syncPanel.nav.account" class="nav-text">账户与凭证</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.scope" href="#sec-scope" title="同步范围与选择"
+            ><span class="nav-ico">🎯</span
+            ><span data-i18n="syncPanel.nav.scope" class="nav-text">同步范围与选择</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.strategy" href="#sec-strategy" title="同步策略"
+            ><span class="nav-ico">⚖️</span
+            ><span data-i18n="syncPanel.nav.strategy" class="nav-text">同步策略</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.remote" href="#sec-remote" title="远程数据同步"
+            ><span class="nav-ico">🗄️</span
+            ><span data-i18n="syncPanel.nav.remote" class="nav-text">远程数据同步</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.preview" href="#sec-preview" title="数据预览"
+            ><span class="nav-ico">👁️</span
+            ><span data-i18n="syncPanel.nav.preview" class="nav-text">数据预览</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.records" href="#sec-records" title="记录与日志"
+            ><span class="nav-ico">📊</span
+            ><span data-i18n="syncPanel.nav.records" class="nav-text">记录与日志</span></a
+          >
+          <a data-i18n-title="syncPanel.nav.help" href="#sec-help" title="帮助与格式"
+            ><span class="nav-ico">📖</span
+            ><span data-i18n="syncPanel.nav.help" class="nav-text">帮助与格式</span></a
+          >
+        </nav>
+      </aside>
+
+      <!-- ===================== 主区 ===================== -->
+      <main class="main main-grid">
+        <!-- 核心操作指令中心（视觉焦点） -->
+        <section
+          data-i18n-aria-label="syncPanel.command.aria"
+          class="command-center"
+          id="sec-command"
+          data-detachable
+          aria-label="核心操作"
+        >
+          <div class="command-head">
+            <div data-i18n="syncPanel.command.title" class="command-title">开始同步</div>
+            <div data-i18n="syncPanel.command.hint" class="command-desc">
+              选择一种操作：将 Excel 观看记录上传至 Bangumi，或从 Bangumi
+              回写收藏、拉取远程资料数据。
+            </div>
+          </div>
+          <div class="command-actions">
+            <button
+              data-i18n="syncPanel.command.upload"
+              class="bgm-btn primary"
+              id="syncBtn"
+              data-action="sync"
+            >
+              📤 上传同步
+            </button>
+            <button
+              data-i18n="syncPanel.command.syncSelected"
+              class="bgm-btn"
+              data-action="testSelected"
+            >
+              👆 选中行同步
+            </button>
+            <button
+              data-i18n="syncPanel.command.retryFailed"
+              data-i18n-title="syncPanel.command.retryFailedTitle"
+              class="bgm-btn"
+              data-action="selectFailedRows"
+              title="选中上次同步失败的行，再点「👆 选中行同步」只重发这几行（仅记住本次会话）"
+            >
+              🎯 重试失败行
+            </button>
+            <button
+              data-i18n="syncPanel.command.download"
+              class="bgm-btn success"
+              data-action="syncCollectionFromBgm"
+            >
+              📥 收藏下载
+            </button>
+            <button
+              data-i18n="syncPanel.command.preview"
+              class="bgm-btn"
+              data-action="previewSyncContent"
+            >
+              👁️ 预览同步
+            </button>
+          </div>
+        </section>
+
+        <!-- 账户与凭证 -->
+        <section class="section" id="sec-account" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.account.title">🔑 账户与凭证</span
+            ><button
+              data-i18n-aria-label="syncPanel.account.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-account"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「账户与凭证」"
+            >
+              ▾
+            </button>
+          </h3>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.account.tokenLabel">Token 设置</label>
+            <div class="token-display">
+              <div class="token-status-info">
+                <div class="token-status-left">
+                  <span id="tokenStatus">未设置</span>
+                  <span id="tokenExpiresDisplay" class="token-expires" style="display: none"></span>
+                </div>
+                <div class="token-status-right" id="tokenStatusRight" style="display: none">
+                  <div class="token-user-info">
+                    <span id="tokenUserName" class="token-user-name"></span>
+                    <span id="tokenUserId" class="token-user-id"></span>
+                  </div>
+                  <div class="token-avatar">
+                    <img
+                      data-i18n-alt="syncPanel.header.avatar"
+                      id="tokenAvatarImg"
+                      src=""
+                      alt="用户头像"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="token-buttons">
+                <button
+                  data-i18n="syncPanel.account.tokenSet"
+                  class="bgm-btn small"
+                  data-action="showTokenDialog"
+                >
+                  设置/修改
+                </button>
+                <button
+                  data-i18n="syncPanel.account.tokenCopy"
+                  data-i18n-aria-label="syncPanel.account.copyAria"
+                  class="bgm-btn small"
+                  data-action="copyToken"
+                  aria-label="复制 Token 到剪贴板"
+                >
+                  📋 复制
+                </button>
+                <button
+                  data-i18n="syncPanel.account.tokenClear"
+                  class="bgm-btn small"
+                  data-action="clearToken"
+                >
+                  清除
+                </button>
+                <button
+                  data-i18n="syncPanel.account.tokenTest"
+                  class="bgm-btn small primary"
+                  data-action="testToken"
+                >
+                  测试
+                </button>
+              </div>
+            </div>
+            <p class="hint">
+              <span data-i18n="syncPanel.account.tokenHintPrefix">Access Token 获取方式：</span
+              ><a href="#" data-action="openTokenPage" data-i18n="syncPanel.account.tokenCreate"
+                >点击创建</a
+              ><br />
+              <span data-i18n="syncPanel.account.tokenHintSuffix"
+                >Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</span
+              >
+            </p>
+          </div>
+
+          <div class="form-group" style="margin-top: 6px">
+            <label data-i18n="syncPanel.account.userIdLabel">收藏页面访问</label>
+            <div class="token-display">
+              <span id="userIdStatus">未设置</span>
+              <button
+                data-i18n="syncPanel.account.userIdSet"
+                class="bgm-btn small"
+                data-action="showUserIdDialog"
+              >
+                设置用户ID
+              </button>
+              <button
+                data-i18n="syncPanel.account.openCollection"
+                class="bgm-btn small primary"
+                data-action="openUserCollection"
+              >
+                打开收藏页
+              </button>
+            </div>
+            <p data-i18n="syncPanel.account.userIdHint" class="hint">
+              用户ID：Bangumi 主页 URL 中的数字 / 字母
+            </p>
+          </div>
+        </section>
+
+        <!-- 同步范围与选择 -->
+        <section class="section" id="sec-scope" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.scope.title">🎯 同步范围与选择</span
+            ><button
+              data-i18n-aria-label="syncPanel.scope.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-scope"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「同步范围与选择」"
+            >
+              ▾
+            </button>
+          </h3>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.scope.dataLabel">数据选择</label>
+            <div class="mode-selector">
+              <label class="radio-label">
+                <input type="radio" name="selectMode" value="auto" checked />
+                <span data-i18n="syncPanel.scope.autoMode" class="radio-text">🤖 自动模式</span>
+                <span data-i18n="syncPanel.scope.autoModeHint" class="radio-desc"
+                  >自动识别筛选后的可见数据</span
+                >
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="selectMode" value="manual" />
+                <span data-i18n="syncPanel.scope.manualMode" class="radio-text">✋️ 手动选择</span>
+                <span data-i18n="syncPanel.scope.manualModeHint" class="radio-desc"
+                  >手动指定起始和结束行号</span
+                >
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.scope.workbookLabel">选择工作簿</label>
+            <select id="workbookSelect" class="input" style="flex: 1">
+              <option data-i18n="syncPanel.scope.workbookActive" value="">
+                -- 当前活动工作簿 --
+              </option>
+            </select>
+            <div class="sheet-select-row">
+              <button
+                data-i18n="syncPanel.scope.refreshWorkbook"
+                data-i18n-aria-label="syncPanel.scope.refreshWorkbookAria"
+                class="bgm-btn small"
+                data-action="refreshWorkbooks"
+                aria-label="刷新工作簿列表"
+              >
+                🔄 刷新
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.scope.sheetLabel">选择工作表</label>
+            <select id="sheetSelect" class="input" style="flex: 1">
+              <option data-i18n="syncPanel.scope.sheetPlaceholder" value="">-- 请选择 --</option>
+            </select>
+            <div class="sheet-select-row">
+              <button
+                data-i18n="syncPanel.scope.refreshSheet"
+                data-i18n-aria-label="syncPanel.scope.refreshSheetAria"
+                class="bgm-btn small"
+                data-action="refreshSheets"
+                aria-label="刷新工作表列表"
+              >
+                🔄 刷新
+              </button>
+              <button
+                data-i18n-aria-label="syncPanel.scope.lockAria"
+                class="bgm-btn small"
+                id="lockSheetBtn"
+                data-action="toggleSheetLock"
+                aria-label="锁定或解锁当前工作表"
+              >
+                🔒 锁定
+              </button>
+              <span id="lockStatus" class="lock-status" style="display: none"></span>
+              <button
+                data-i18n="syncPanel.scope.cleanData"
+                data-i18n-title="syncPanel.scope.cleanTitle"
+                class="bgm-btn small"
+                data-action="cleanLockedDataSheet"
+                title="去除无 Bangumi URL 的重复行，合并标签/分级"
+              >
+                🧹 数据清洗
+              </button>
+            </div>
+          </div>
+
+          <div id="manualRangeInputs" style="display: none">
+            <div class="form-group">
+              <label data-i18n="syncPanel.scope.startRow">起始行号</label>
+              <input
+                data-i18n-placeholder="syncPanel.scope.startRowPlaceholder"
+                type="number"
+                id="startRow"
+                class="input"
+                value="2"
+                min="2"
+                placeholder="从第几行开始"
+              />
+            </div>
+            <div class="form-group">
+              <label data-i18n="syncPanel.scope.endRow">结束行号</label>
+              <input
+                data-i18n-placeholder="syncPanel.scope.endRowPlaceholder"
+                type="number"
+                id="endRow"
+                class="input"
+                value="0"
+                min="0"
+                placeholder="0=到最后一行"
+              />
+            </div>
+          </div>
+
+          <div id="autoRangeInfo" class="range-info">
+            <span class="info-icon">ℹ️</span>
+            <span id="filterStatus">正在检测筛选状态...</span>
+          </div>
+          <button data-i18n="syncPanel.scope.refreshData" class="bgm-btn" data-action="refreshData">
+            🔄 刷新数据
+          </button>
+        </section>
+
+        <!-- 同步策略 -->
+        <section class="section" id="sec-strategy" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.strategy.title">⚖️ 同步策略</span
+            ><button
+              data-i18n-aria-label="syncPanel.strategy.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-strategy"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「同步策略」"
+            >
+              ▾
+            </button>
+          </h3>
+          <div class="form-group">
+            <label data-i18n="syncPanel.strategy.conflictLabel">冲突处理策略</label>
+            <select id="conflictStrategy" class="input">
+              <option data-i18n="syncPanel.strategy.conflictSkip" value="skip" selected>
+                跳过冲突（保留 Bangumi 数据）
+              </option>
+              <option data-i18n="syncPanel.strategy.conflictOverwrite" value="excel">
+                Excel 覆盖（用 Excel 数据覆盖）
+              </option>
+            </select>
+            <p data-i18n="syncPanel.strategy.conflictHint" class="hint">
+              当 Excel 条目与 Bangumi 收藏状态不一致时，自动按所选策略处理。
+            </p>
+          </div>
+          <p data-i18n="syncPanel.strategy.incrementalMovedHint" class="hint">
+            「仅同步变更（增量同步）」属于长期偏好，已统一收拢到「设置 →
+            同步偏好」，此处不再重复提供。
+          </p>
+        </section>
+
+        <!-- 远程数据同步 -->
+        <section class="section" id="sec-remote" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.remote.title">🗄️ 数据同步（远程仓库 → 本地）</span
+            ><button
+              data-i18n-aria-label="syncPanel.remote.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-remote"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「远程数据同步」"
+            >
+              ▾
+            </button>
+          </h3>
+          <p data-i18n-html="syncPanel.remote.hint" class="hint">
+            从远程仓库下载 Bangumi 资料数据（名称、标签、集数等），按 SID
+            增量合并到当前工作表（新增+更新，不删除）。<br />
+            与「📤 上传同步」方向相反：上传同步是 Excel→Bangumi，数据同步是 远程仓库→Excel。
+          </p>
+
+          <div class="form-row">
+            <label data-i18n="syncPanel.remote.sourceTypeLabel" for="syncSourceType"
+              >同步源类型</label
+            >
+            <select
+              data-i18n-title="syncPanel.remote.sourceTypeTitle"
+              id="syncSourceType"
+              title="选择数据源"
+            >
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+              <option value="gitee">Gitee</option>
+              <option data-i18n="syncPanel.remote.sourceLocal" value="local">📁 本地文件</option>
+              <option value="gist">Gist</option>
+            </select>
+          </div>
+
+          <div id="remoteSourceFields">
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.ownerLabel" for="githubOwner">仓库所有者</label>
+              <input
+                data-i18n-placeholder="syncPanel.remote.ownerPlaceholder"
+                type="text"
+                id="githubOwner"
+                placeholder="如：awujiana"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.repoLabel" for="githubRepo">仓库名</label>
+              <input
+                data-i18n-placeholder="syncPanel.remote.repoPlaceholder"
+                type="text"
+                id="githubRepo"
+                placeholder="如：Bangumi-Archive-Anime-Excel"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.branchLabel" for="githubBranch">分支名</label>
+              <input
+                data-i18n-placeholder="syncPanel.remote.branchPlaceholder"
+                type="text"
+                id="githubBranch"
+                placeholder="默认 main"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.pathLabel" for="githubPath">文件路径</label>
+              <input
+                data-i18n-placeholder="syncPanel.remote.pathPlaceholder"
+                type="text"
+                id="githubPath"
+                placeholder="如：data/anime.manifest.json"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+          </div>
+
+          <div id="shardSelectFields">
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.shardLabel" for="shardSelectList">数据分片</label>
+              <div id="shardSelectList" class="shard-select-list">
+                <!-- 由 loadGithubConfigIntoForm 按 SHARD_OPTIONS 动态填充 -->
+              </div>
+            </div>
+            <p data-i18n-html="syncPanel.remote.shardHint" class="hint">
+              不勾选任何分片 = <strong>按当前表头自动选择</strong>，只下载会用到的分片（例如表里没有
+              长文本列就不会下载 infobox
+              片）。勾选后以勾选结果为准；<strong>基础分片不可取消</strong>， 因为 SID / 名称 /
+              更新时间都只在它里面。<br />
+              数据仓库的清单文件是 <code>data/anime.manifest.json</code>，分片同目录。
+            </p>
+            <button
+              data-i18n="syncPanel.remote.shardListOpen"
+              type="button"
+              class="bgm-btn small"
+              id="shardListBtn"
+            >
+              📋 分片清单
+            </button>
+          </div>
+
+          <!-- 分片清单浮窗：每片的完整字段清单与取舍说明（含关联条目ID / 关联的动漫ID 区别） -->
+          <div
+            data-i18n-aria-label="syncPanel.remote.shardListTitle"
+            class="shard-list-modal"
+            id="shardListModal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="数据分片清单"
+            style="display: none"
+          >
+            <div class="shard-list-modal-content">
+              <div class="shard-list-modal-header">
+                <h3 data-i18n="syncPanel.remote.shardListTitle">数据分片清单</h3>
+                <button
+                  data-i18n-aria-label="syncPanel.common.close"
+                  type="button"
+                  class="modal-close-btn"
+                  id="shardListCloseBtn"
+                  aria-label="关闭"
+                >
+                  &times;
+                </button>
+              </div>
+              <div class="shard-list-modal-body" id="shardListBody"></div>
+            </div>
+          </div>
+
+          <div id="localFileFields" style="display: none">
+            <div class="form-row">
+              <label data-i18n="syncPanel.remote.localPathLabel" for="localFilePath"
+                >本地文件路径</label
+              >
+              <div style="display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0">
+                <input
+                  data-i18n-placeholder="syncPanel.remote.localPathPlaceholder"
+                  type="text"
+                  id="localFilePath"
+                  placeholder="如：D:\data\anime.manifest.json（绝对路径）"
+                  autocomplete="off"
+                  spellcheck="false"
+                  style="flex: 1"
+                />
+                <button
+                  data-i18n="syncPanel.remote.localPathChoose"
+                  data-i18n-title="syncPanel.remote.localPathChooseTitle"
+                  class="bgm-btn small"
+                  data-action="browseLocalFile"
+                  title="选择本地分片清单"
+                >
+                  📁 选择
+                </button>
+              </div>
+            </div>
+            <p data-i18n-html="syncPanel.remote.localPathHint" class="hint">
+              必须指向<strong>分片清单</strong>（<code>anime.manifest.json</code>），分片文件需与其同目录；
+              复用 #githubPath 字段存储路径（与远程源互斥）。
+            </p>
+          </div>
+
+          <div id="gistFields" style="display: none">
+            <div class="form-row">
+              <label for="gistId">Gist ID</label>
+              <input
+                data-i18n-placeholder="syncPanel.remote.gistPlaceholder"
+                type="text"
+                id="gistId"
+                placeholder="如：abc123def456（Gist URL 末段）"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <p data-i18n-html="syncPanel.remote.rateLimitHint" class="hint">
+              通过 <code>https://api.github.com/gists/{gistId}</code> 获取，未认证限流 60 次/小时。
+            </p>
+          </div>
+
+          <div class="form-row">
+            <label data-i18n="syncPanel.remote.strategyLabel" for="githubStrategy">同步策略</label>
+            <select
+              data-i18n-title="syncPanel.remote.strategyTitle"
+              id="githubStrategy"
+              title="选择增量更新策略"
+            >
+              <option data-i18n="syncPanel.remote.strategyAddUpdate" value="add-update">
+                新增+更新（不删除）
+              </option>
+              <option data-i18n="syncPanel.remote.strategyAddOnly" value="add-only">
+                仅新增（不更新已有）
+              </option>
+              <option data-i18n="syncPanel.remote.strategyUpdateOnly" value="update-only">
+                仅更新（不新增）
+              </option>
+              <option data-i18n="syncPanel.remote.strategyMirror" value="mirror">
+                镜像同步（含删除）
+              </option>
+              <option data-i18n="syncPanel.remote.strategyForceOverwrite" value="force-overwrite">
+                强制覆盖（含空值）
+              </option>
+            </select>
+            <button
+              data-i18n-title="syncPanel.remote.strategyHelpTitle"
+              class="bgm-btn tiny"
+              data-action="showSyncGuide"
+              title="查看策略详细说明"
+            >
+              ❓
+            </button>
+          </div>
+          <div
+            data-i18n-html="syncPanel.remote.mirrorNote"
+            id="mirrorSyncNote"
+            class="hint"
+            style="
+              display: none;
+              padding: 8px 12px;
+              margin: 4px 0;
+              border-left: 3px solid var(--warning);
+              background: rgba(249, 226, 175, 0.1);
+              border-radius: 4px;
+              color: var(--warning);
+              font-size: 12px;
+              line-height: 1.6;
+            "
+          >
+            ⚠️
+            <strong>镜像同步</strong
+            >说明：该策略并非完全镜像远程仓库。若要完全与远程一致，需先删除本地全部数据后再同步。<br />
+            • <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br />
+            • <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以
+            <code> | </code> 分隔），其他字段直接覆盖<br />
+            •
+            <strong>制作公司/动画制作公司</strong
+            >：远程「动画制作公司」字段会同时更新本地「制作公司」和「动画制作公司」两列
+          </div>
+          <div class="form-row">
+            <label>
+              <input type="checkbox" id="checkboxSyncSelectedOnly" />
+              <span data-i18n="syncPanel.remote.selectedOnly"
+                >仅同步选中行（按 Bangumi URL 列匹配 SID）</span
+              >
+            </label>
+          </div>
+          <div
+            class="form-row time-filter-box"
+            style="
+              border: 1px solid var(--border-strong);
+              border-radius: var(--r-md);
+              padding: 12px;
+              margin: 8px 0;
+              background: var(--bg-surface);
+            "
+          >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                cursor: pointer;
+                font-size: var(--fs-body);
+                color: var(--text-1);
+                padding: 6px 0;
+                border-bottom: 1px dashed var(--border);
+                margin-bottom: 10px;
+              "
+            >
+              <input
+                type="checkbox"
+                id="checkboxTimeFilter"
+                style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary)"
+              />
+              <span data-i18n="syncPanel.remote.timeFilterEnable" style="font-weight: 600"
+                >✅ 启用时间筛选（按开播日期过滤）</span
+              >
+            </label>
+            <div
+              id="timeFilterControls"
+              style="
+                padding: 8px;
+                background: var(--bg-mantle);
+                border-radius: var(--r-sm);
+                display: none;
+              "
+            >
+              <div class="form-row time-filter-row" id="yearRow">
+                <label
+                  data-i18n="syncPanel.remote.timeYearLabel"
+                  for="timeFilterYear"
+                  class="time-filter-label"
+                  >年份</label
+                >
+                <select id="timeFilterYear" class="input time-filter-select" style="flex: 1">
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                  <option value="2023">2023</option>
+                  <option value="2022">2022</option>
+                  <option value="2021">2021</option>
+                  <option value="2020">2020</option>
+                  <option value="2019">2019</option>
+                  <option value="2018">2018</option>
+                  <option value="2017">2017</option>
+                  <option value="2016">2016</option>
+                  <option value="2015">2015</option>
+                  <option value="2014">2014</option>
+                  <option value="2013">2013</option>
+                  <option value="2012">2012</option>
+                  <option value="2011">2011</option>
+                  <option value="2010">2010</option>
+                </select>
+              </div>
+              <div class="form-row time-filter-row">
+                <label
+                  data-i18n="syncPanel.remote.timeRangeLabel"
+                  for="timeFilterRange"
+                  class="time-filter-label"
+                  >筛选范围</label
+                >
+                <select id="timeFilterRange" class="input time-filter-select" style="flex: 1">
+                  <option data-i18n="syncPanel.remote.timeAllYear" value="year">全年</option>
+                  <option data-i18n="syncPanel.remote.timeSeason" value="quarter">季度新番</option>
+                  <option data-i18n="syncPanel.remote.timeMonth" value="month">具体月份</option>
+                  <option data-i18n="syncPanel.remote.timeUpcoming" value="future">
+                    🔮 预告/未来动漫
+                  </option>
+                </select>
+              </div>
+              <div class="form-row time-filter-row" id="quarterRow" style="display: none">
+                <label
+                  data-i18n="syncPanel.remote.seasonLabel"
+                  for="timeFilterQuarter"
+                  class="time-filter-label"
+                  >季度</label
+                >
+                <select id="timeFilterQuarter" class="input time-filter-select" style="flex: 1">
+                  <option data-i18n="syncPanel.remote.season1" value="1">
+                    1月新番（上年12月-本年2月）
+                  </option>
+                  <option data-i18n="syncPanel.remote.season4" value="4">4月新番（3月-5月）</option>
+                  <option data-i18n="syncPanel.remote.season7" value="7">7月新番（6月-8月）</option>
+                  <option data-i18n="syncPanel.remote.season10" value="10">
+                    10月新番（9月-11月）
+                  </option>
+                </select>
+              </div>
+              <div class="form-row time-filter-row" id="monthRow" style="display: none">
+                <label
+                  data-i18n="syncPanel.remote.monthLabel"
+                  for="timeFilterMonth"
+                  class="time-filter-label"
+                  >月份</label
+                >
+                <select id="timeFilterMonth" class="input time-filter-select" style="flex: 1">
+                  <option data-i18n="syncPanel.remote.month1" value="1">1月</option>
+                  <option data-i18n="syncPanel.remote.month2" value="2">2月</option>
+                  <option data-i18n="syncPanel.remote.month3" value="3">3月</option>
+                  <option data-i18n="syncPanel.remote.month4" value="4">4月</option>
+                  <option data-i18n="syncPanel.remote.month5" value="5">5月</option>
+                  <option data-i18n="syncPanel.remote.month6" value="6">6月</option>
+                  <option data-i18n="syncPanel.remote.month7" value="7">7月</option>
+                  <option data-i18n="syncPanel.remote.month8" value="8">8月</option>
+                  <option data-i18n="syncPanel.remote.month9" value="9">9月</option>
+                  <option data-i18n="syncPanel.remote.month10" value="10">10月</option>
+                  <option data-i18n="syncPanel.remote.month11" value="11">11月</option>
+                  <option data-i18n="syncPanel.remote.month12" value="12">12月</option>
+                </select>
+              </div>
+              <div class="form-row time-filter-row" id="futureHintRow" style="display: none">
+                <p
+                  data-i18n-html="syncPanel.remote.upcomingHint"
+                  class="hint"
+                  style="
+                    margin: 4px 0 0;
+                    padding: 8px;
+                    background: rgba(137, 180, 250, 0.1);
+                    border-radius: var(--r-sm);
+                    border: 1px solid rgba(137, 180, 250, 0.3);
+                  "
+                >
+                  📌 将筛选所有无开播日期的条目（预告/未来动漫），<br />
+                  <strong>不限年份</strong>，仅下载 date 字段为空的条目。
+                </p>
+              </div>
+            </div>
+            <p
+              data-i18n-html="syncPanel.remote.seasonHint"
+              class="hint"
+              style="margin-top: 8px; font-size: 11px; color: var(--text-3); padding: 0 2px"
+            >
+              💡
+              季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月<br />
+              💡 预告/未来动漫：筛选无开播日期的条目（适用于未公布播出时间的动漫）
+            </p>
+          </div>
+          <div class="bgm-btn-group">
+            <button
+              data-i18n="syncPanel.remote.save"
+              class="bgm-btn small primary"
+              data-action="saveGithubConfig"
+            >
+              💾 保存配置
+            </button>
+            <button
+              data-i18n="syncPanel.remote.syncNow"
+              class="bgm-btn small"
+              data-action="syncFromGithub"
+            >
+              ⬇️ 立即同步
+            </button>
+            <button
+              data-i18n="syncPanel.remote.undoLast"
+              class="bgm-btn small"
+              data-action="undoLastSync"
+            >
+              ↩️ 撤销上次同步
+            </button>
+            <button
+              data-i18n="syncPanel.remote.test"
+              data-i18n-title="syncPanel.remote.testTitle"
+              class="bgm-btn small"
+              data-action="testGithubConfig"
+              title="测试配置是否可用（HEAD 请求）"
+            >
+              🔌 测试
+            </button>
+            <button
+              data-i18n="syncPanel.remote.clearCache"
+              data-i18n-title="syncPanel.remote.clearCacheTitle"
+              class="bgm-btn small"
+              data-action="clearGithubCache"
+              id="clearCacheBtn"
+              title="清除本地缓存的 GitHub 数据"
+            >
+              🗑️ 清除缓存
+            </button>
+          </div>
+          <p class="hint" id="githubCacheStatus">
+            <span data-i18n="syncPanel.remote.cacheStatus">💾 数据缓存：</span
+            ><span data-i18n="syncPanel.remote.cacheChecking" id="githubCacheStatusText"
+              >检查中...</span
+            >
+          </p>
+          <p data-i18n-html="syncPanel.remote.shardFormatHint" class="hint">
+            <strong>分片清单</strong>：<code>data/anime.manifest.json</code> 列出 6 个分片（base /
+            meta / relations / stats / summary / infobox），插件按你的表头只下载需要的片<br />
+            <strong>分片格式</strong>：每片是 gzip 压缩的 JSONL，第 1
+            行是表头（字段名数组），其后每行是与表头等长的值数组；各片都含
+            <code>subjectId</code>、行序一致，插件按行号拼接<br />
+            <code
+              >["sid","name","updatedAt","date","meta_tags","nsfw","话数","导演","动画制作公司","系列构成"]</code
+            ><br />
+            <code
+              >["8","Code Geass
+              R2","2026-09-08","2008-04-06",["机战","TV","日本"],false,"25","谷口悟朗","サンライズ","大河内一楼"]</code
+            ><br />
+            基础字段：<code>subjectId</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br />
+            扩展字段：<code>date</code>、<code>meta_tags</code>、<code>nsfw</code>、<code>话数</code>、<code>导演</code>、<code>音乐</code>、<code>动画制作公司</code>、<code
+              >系列构成</code
+            >
+            等<br />
+            默认仓库：<code
+              >awujiana/Bangumi-Archive-Anime-Excel/main/data/anime.manifest.json</code
+            >
+          </p>
+        </section>
+
+        <!-- 数据预览 -->
+        <section class="section" id="sec-preview" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.preview.title">👁️ 数据预览</span>
+            <span id="previewCount"></span
+            ><button
+              data-i18n-aria-label="syncPanel.preview.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-preview"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「数据预览」"
+            >
+              ▾
+            </button>
+          </h3>
+          <div id="previewStats"></div>
+          <div class="preview-wrapper">
+            <div class="preview-box" id="previewBox">
+              <p data-i18n="syncPanel.preview.empty" class="hint">
+                点击"刷新数据"加载预览（支持筛选后数据）
+              </p>
+            </div>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row" style="margin-top: 8px">
+            <button
+              class="bgm-btn"
+              id="enlargePreviewBtn"
+              data-action="enlargePreview"
+              style="flex: 1"
+            >
+              <span class="bgm-btn-icon">🔍</span>
+              <span data-i18n="syncPanel.preview.enlarge">放大预览</span>
+            </button>
+            <button
+              class="bgm-btn"
+              id="previewBtn"
+              data-action="previewSyncContent"
+              style="flex: 1"
+            >
+              <span class="bgm-btn-icon">👁️</span>
+              <span data-i18n="syncPanel.preview.detail">预览详情</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 记录与日志 -->
+        <section class="section" id="sec-records" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.records.title">📊 记录与日志</span
+            ><button
+              data-i18n-aria-label="syncPanel.records.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-records"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「记录与日志」"
+            >
+              ▾
+            </button>
+          </h3>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.records.syncRecordLabel">同步记录</label>
+            <div class="bgm-btn-group">
+              <button class="bgm-btn" data-action="openSyncRecordSheet">
+                <span class="bgm-btn-icon">📊</span>
+                <span data-i18n="syncPanel.records.viewSync">查看同步记录</span>
+              </button>
+              <button class="bgm-btn warning" data-action="clearSyncRecords">
+                <span class="bgm-btn-icon">🗑️</span>
+                <span data-i18n="syncPanel.records.clearSync">清除记录</span>
+              </button>
+              <button class="bgm-btn" data-action="deduplicateSyncRecords">
+                <span class="bgm-btn-icon">🔗</span>
+                <span data-i18n="syncPanel.records.dedupe">去重记录</span>
+              </button>
+              <button
+                data-i18n-title="syncPanel.records.formatTitle"
+                class="bgm-btn"
+                data-action="formatSyncRecordSheet"
+                title="自动列宽/行高 · 字体 Maple Mono · 水平居中 · 名称+收藏状态边框 · URL列固定42宽"
+              >
+                <span class="bgm-btn-icon">🎨</span>
+                <span data-i18n="syncPanel.records.format">设置格式</span>
+              </button>
+            </div>
+            <p data-i18n-html="syncPanel.records.syncHint" class="hint">
+              同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等<br />
+              记录功能的启用开关与保留偏好位于「设置 → 同步偏好」
+            </p>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                data-i18n="syncPanel.records.exportCsv"
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","csv"]'
+                style="flex: 1"
+              >
+                📄 导出 CSV
+              </button>
+              <button
+                data-i18n="syncPanel.records.exportTxt"
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","txt"]'
+                style="flex: 1"
+              >
+                📝 导出 TXT
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.records.logLabel">系统日志</label>
+            <div class="bgm-btn-group">
+              <button
+                data-i18n="syncPanel.records.viewLog"
+                class="bgm-btn small"
+                data-action="showLogPanel"
+              >
+                📜 查看日志
+              </button>
+              <button
+                data-i18n="syncPanel.records.clearLog"
+                class="bgm-btn small"
+                data-action="clearLogs"
+              >
+                🗑️ 清空日志
+              </button>
+            </div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                data-i18n="syncPanel.records.exportCsv"
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","csv"]'
+                style="flex: 1"
+              >
+                📄 导出 CSV
+              </button>
+              <button
+                data-i18n="syncPanel.records.exportTxt"
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","txt"]'
+                style="flex: 1"
+              >
+                📝 导出 TXT
+              </button>
+            </div>
+            <p data-i18n="syncPanel.records.logHint" class="hint">
+              查看最近 1000 条系统日志，用于排查同步失败等问题
+            </p>
+          </div>
+        </section>
+
+        <!-- 帮助与格式 -->
+        <section class="section" id="sec-help" data-detachable>
+          <h3>
+            <span data-i18n="syncPanel.help.title">📖 帮助与格式</span
+            ><button
+              data-i18n-aria-label="syncPanel.help.collapseAria"
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-help"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「帮助与格式」"
+            >
+              ▾
+            </button>
+          </h3>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.help.templateLabel">模板文件</label>
+            <div class="template-file">
+              <div class="template-file__meta" id="templateFileMeta">正在获取最新版本…</div>
+              <div class="bgm-btn-group" style="margin-top: 8px">
+                <button
+                  data-i18n="syncPanel.help.templateDownload"
+                  data-i18n-title="syncPanel.help.templateDownloadTitle"
+                  class="bgm-btn small"
+                  id="templateDownloadBtn"
+                  data-action="downloadTemplateFile"
+                  title="打开数据仓库 Latest Release 的模板文件下载链接（42 列精简表，已带表头）"
+                >
+                  📥 下载模板
+                </button>
+                <button
+                  data-i18n="syncPanel.help.templateCopy"
+                  data-i18n-title="syncPanel.help.templateCopyTitle"
+                  class="bgm-btn small"
+                  id="templateCopyLinkBtn"
+                  data-action="copyTemplateLink"
+                  title="复制下载链接，粘到浏览器里下载（宿主拦截导航时用这条）"
+                >
+                  🔗 复制链接
+                </button>
+                <button
+                  data-i18n="syncPanel.help.templateRelease"
+                  data-i18n-title="syncPanel.help.templateReleaseTitle"
+                  class="bgm-btn small"
+                  id="templateOpenReleaseBtn"
+                  data-action="openTemplateRelease"
+                  title="打开数据仓库 Releases 页，可挑历史版本"
+                >
+                  🌐 打开 Release 页
+                </button>
+              </div>
+              <div
+                data-i18n-html="syncPanel.help.templateHint"
+                class="hint"
+                style="margin-top: 6px"
+              >
+                默认取数据仓库每周三推送的 Latest Release（<code>*-template.xlsx</code>，42
+                列精简表）。任务窗格无法直连 GitHub 资产域（跨域限制），下载交给浏览器。
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.help.guideLabel">使用引导</label>
+            <div class="guide">
+              <div class="step">
+                <span class="step-num">1</span
+                ><span data-i18n="syncPanel.help.guide1">设置 Token（只需设置一次）</span>
+              </div>
+              <div class="step">
+                <span class="step-num">2</span
+                ><span data-i18n="syncPanel.help.guide2">确保 Excel 包含必填列（Bangumi_URL）</span>
+              </div>
+              <div class="step">
+                <span class="step-num">3</span
+                ><span data-i18n="syncPanel.help.guide3">选择工作表和行范围</span>
+              </div>
+              <div class="step">
+                <span class="step-num">4</span
+                ><span data-i18n="syncPanel.help.guide4">选择操作类型并执行</span>
+              </div>
+            </div>
+            <div class="bgm-btn-group" style="margin-top: 8px">
+              <button class="bgm-btn small" data-action="toggleUsageGuide" id="toggleUsageGuideBtn">
+                📖 显示详细操作
+              </button>
+            </div>
+            <div
+              data-i18n-html="syncPanel.help.usageDetail"
+              id="usageGuideDetail"
+              style="
+                display: none;
+                margin-top: 10px;
+                padding: 12px;
+                background: var(--bg-surface);
+                border-radius: var(--r-md);
+                border: 1px solid var(--border);
+                font-size: 12px;
+                line-height: 1.7;
+                color: var(--text-2);
+              "
+            >
+              <strong style="color: var(--primary)">📘 操作流程详解</strong><br /><br />
+              <strong>1️⃣ Token 设置</strong><br />
+              • 点击「设置/修改」按钮，按引导创建 Bangumi OAuth Token<br />
+              • Token 有效期通常为 30 天，过期后需重新获取<br />
+              • 设置后自动显示用户头像和信息<br /><br />
+              <strong>2️⃣ 数据同步（远程仓库 → 本地 Excel）</strong><br />
+              • 配置远程仓库地址（GitHub/GitLab/Gitee/Gist/本地文件）<br />
+              • 选择同步策略：新增+更新 / 仅新增 / 仅更新 / 镜像同步 / 强制覆盖<br />
+              • 可选：启用时间筛选（按开播日期过滤）<br />
+              • 点击「立即同步」开始下载并合并数据<br /><br />
+              <strong>3️⃣ 上传同步（本地 Excel → Bangumi）</strong><br />
+              • 确保每行包含 Bangumi_URL 列<br />
+              • 选择行范围，设置冲突处理策略<br />
+              • 点击「📤 上传同步」执行<br /><br />
+              <strong>4️⃣ 收藏下载（Bangumi → 本地 Excel）</strong><br />
+              • 选择收藏类型：已看 / 想看 / 在看<br />
+              • 点击「📥 收藏下载」标记到 Excel<br /><br />
+              <strong style="color: var(--warning)">⚠️ 注意事项</strong><br />
+              • 镜像同步不是完全镜像！要完全与远程一致需先删除本地数据<br />
+              • 批量操作建议先在副本上测试确认无误后再在正式数据上执行
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-i18n="syncPanel.help.formatLabel">数据格式要求</label>
+            <div class="format-table">
+              <table>
+                <tr>
+                  <th data-i18n="syncPanel.help.thColumn">列名（支持模糊匹配）</th>
+                  <th data-i18n="syncPanel.help.thDesc">说明</th>
+                  <th data-i18n="syncPanel.help.thRequired">必填</th>
+                </tr>
+                <tr>
+                  <td>Bangumi_URL / bgm</td>
+                  <td data-i18n="syncPanel.help.tdUrl">Bangumi 条目链接</td>
+                  <td data-i18n="syncPanel.help.tdRequired" class="required">✅ 必填</td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdWatched">是否看完 / 观看状态</td>
+                  <td data-i18n="syncPanel.help.tdWatchedValues">是/否/在看</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdFinishedAt">完播时间 / 看完时间</td>
+                  <td data-i18n="syncPanel.help.tdFinishedAtExample">如 2024-01-01</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdScore">打分 / 评分</td>
+                  <td data-i18n="syncPanel.help.tdScoreExample">1-10 分</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdComment">感想 / 评价 / 简评</td>
+                  <td data-i18n="syncPanel.help.tdCommentDesc">个人评论</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdTags">标签 / 分类</td>
+                  <td data-i18n="syncPanel.help.tdTagsDesc">用 | 、/ 分隔</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdSpecials">特典 / 印象</td>
+                  <td data-i18n="syncPanel.help.tdSpecialsDesc">用 | 、/ 分隔</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td data-i18n="syncPanel.help.tdEpisodes">集数 / 看到</td>
+                  <td data-i18n="syncPanel.help.tdEpisodesExample">如 1-12</td>
+                  <td></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <div
+            class="section debug-section"
+            id="debugSection"
+            style="
+              display: none;
+              background: var(--bg-mantle);
+              border: 1px dashed var(--border-strong);
+            "
+          >
+            <h3 data-i18n="syncPanel.help.debugTitle">🐛 调试信息</h3>
+            <div id="DemoSpan" class="debug-content"></div>
+            <button
+              data-i18n="syncPanel.help.testConnection"
+              class="bgm-btn small"
+              data-action="testDebugConnection"
+            >
+              测试连接
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ===================== 模态框（覆盖层） ===================== -->
+    <div
+      data-i18n-aria-label="syncPanel.detail.aria"
+      id="detailModal"
+      class="detail-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="详细预览"
+      style="display: none"
+    >
+      <div class="detail-modal-content">
+        <div class="detail-modal-header">
+          <h3 data-i18n="syncPanel.detail.title">👁️ 详细预览</h3>
+          <button
+            data-i18n-aria-label="syncPanel.detail.closeAria"
+            class="detail-close-btn"
+            data-action="closeDetailModal"
+            aria-label="关闭详细预览对话框"
+          >
+            ×
+          </button>
+        </div>
+        <div class="detail-modal-toolbar" id="detailModalToolbar">
+          <span id="detailCount"></span>
+        </div>
+        <div class="detail-modal-body" id="detailModalBody">
+          <div id="detailList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      data-i18n-aria-label="syncPanel.log.aria"
+      id="logModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="系统日志"
+      style="display: none"
+    >
+      <div class="modal-content" style="max-width: 800px">
+        <div class="modal-header">
+          <h3 data-i18n="syncPanel.log.title">📜 系统日志</h3>
+          <button
+            data-i18n-aria-label="syncPanel.common.close"
+            class="modal-close-btn"
+            data-action="closeLogModal"
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="bgm-btn-group" style="flex-direction: row; gap: 8px; margin-bottom: 12px">
+            <select id="logLevelFilter" class="input" style="width: auto">
+              <option data-i18n="syncPanel.log.levelAll" value="">全部级别</option>
+              <option data-i18n="syncPanel.log.levelError" value="ERROR">仅 ERROR</option>
+              <option data-i18n="syncPanel.log.levelWarn" value="WARN">仅 WARN</option>
+              <option data-i18n="syncPanel.log.levelInfo" value="INFO">仅 INFO</option>
+              <option data-i18n="syncPanel.log.levelDebug" value="DEBUG">仅 DEBUG</option>
+            </select>
+            <button data-i18n="syncPanel.log.export" class="bgm-btn small" data-action="exportLogs">
+              📤 导出
+            </button>
+          </div>
+          <div id="logModalBody" style="max-height: 440px; overflow-y: auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      data-i18n-aria-label="syncPanel.syncPreview.title"
+      id="syncPreviewModal"
+      class="modal sync-preview-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="同步预览数据"
+      style="display: none"
+    >
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 data-i18n="syncPanel.syncPreview.title">同步预览数据</h3>
+          <div class="sync-preview-modal-toolbar">
+            <button
+              data-i18n="syncPanel.syncPreview.syncAll"
+              id="syncAllBtn"
+              class="modal-action-btn"
+            >
+              全部同步
+            </button>
+            <button
+              data-i18n-aria-label="syncPanel.common.close"
+              id="closeSyncPreview"
+              class="modal-close-btn"
+              aria-label="关闭"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+        <div class="modal-body"></div>
+        <button
+          data-i18n-title="syncPanel.scroll.top"
+          id="scrollToTopBtn"
+          class="scroll-btn scroll-to-top"
+          title="回到顶部"
+        >
+          ↑
+        </button>
+        <button
+          data-i18n-title="syncPanel.scroll.bottom"
+          id="scrollToBottomBtn"
+          class="scroll-btn scroll-to-bottom"
+          title="滚到底部"
+        >
+          ↓
+        </button>
+      </div>
+    </div>
+
+    <div
+      data-i18n-aria-label="syncPanel.connectionTest.aria"
+      id="connectionTestModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="连接测试结果"
+      style="display: none"
+    >
+      <div class="modal-content" style="max-width: 520px">
+        <div class="modal-header">
+          <h3 data-i18n="syncPanel.connectionTest.title">🔌 连接测试结果</h3>
+          <button
+            data-i18n-aria-label="syncPanel.common.close"
+            class="modal-close-btn"
+            data-action="closeConnectionTest"
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </div>
+        <div class="modal-body" id="connectionTestBody"></div>
+        <div class="modal-footer">
+          <button
+            data-i18n="syncPanel.connectionTest.retry"
+            class="bgm-btn small"
+            data-action="testGithubConfig"
+            id="retryConnectionTestBtn"
+          >
+            🔄 重新测试
+          </button>
+          <button
+            data-i18n="syncPanel.common.close"
+            class="bgm-btn small primary"
+            data-action="closeConnectionTest"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

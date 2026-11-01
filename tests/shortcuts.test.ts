@@ -38,7 +38,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: (): void => {
     /* 日志不参与断言 */
   },
-  showBangumiPanel: (): void => {
+  showSyncPanel: (): void => {
     mockState.openedPanels.push('bangumi')
   },
   showEnrichPanel: (): void => {
@@ -105,7 +105,7 @@ beforeEach(() => {
   mockState.hiddenCalls.length = 0
   mockState.exitSoloCount = 0
   document.body.replaceChildren()
-  document.body.dataset.page = 'panel'
+  document.body.dataset.page = 'sync-panel'
 })
 
 afterEach(() => {
@@ -303,14 +303,14 @@ describe('侧栏鼠标手势', () => {
     cleanupDispatcher = startShortcutDispatcher()
     const link = mountNavLink('sec-preview')
     link.dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1 }))
-    expect(mockState.soloCalls).toEqual([['panel', 'sec-preview']])
+    expect(mockState.soloCalls).toEqual([['sync-panel', 'sec-preview']])
   })
 
   it('Ctrl + 左键点击导航项 → 隐藏该模块', () => {
     cleanupDispatcher = startShortcutDispatcher()
     const link = mountNavLink('sec-records')
     link.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, ctrlKey: true }))
-    expect(mockState.hiddenCalls).toEqual([['panel', 'sec-records']])
+    expect(mockState.hiddenCalls).toEqual([['sync-panel', 'sec-records']])
   })
 
   it('普通左键点击不受影响（交给锚点跳转）', () => {

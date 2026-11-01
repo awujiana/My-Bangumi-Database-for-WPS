@@ -847,7 +847,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
 
   it('启用时间筛选（季度）→ timeFilter 带上 quarter', async () => {
     mocks.syncFromRemote.mockResolvedValueOnce(result)
-    const chk = mountInput('chkTimeFilter')
+    const chk = mountInput('checkboxTimeFilter')
     chk.checked = true
     mountSelect('timeFilterYear', '2026')
     mountSelect('timeFilterRange', 'quarter')
@@ -864,7 +864,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
 
   it('勾选「仅同步选中行」→ 透传 selectedOnly', async () => {
     mocks.syncFromRemote.mockResolvedValueOnce(result)
-    const chk = mountInput('chkSyncSelectedOnly')
+    const chk = mountInput('checkboxSyncSelectedOnly')
     chk.checked = true
 
     runAction('syncFromGithub')
@@ -1014,7 +1014,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
   // 这里只关心文案分支，故让用户在确认框点取消，避免把同步流程整条跑起来。
   it('时间筛选 range=future → 确认文案标注「预告/未来动漫」', () => {
     mocks.answer.confirm = false
-    const chk = mountInput('chkTimeFilter')
+    const chk = mountInput('checkboxTimeFilter')
     chk.checked = true
     mountSelect('timeFilterRange', 'future')
 
@@ -1027,7 +1027,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
 
   it('时间筛选 range=year → 确认文案标注「全年」', () => {
     mocks.answer.confirm = false
-    const chk = mountInput('chkTimeFilter')
+    const chk = mountInput('checkboxTimeFilter')
     chk.checked = true
     mountSelect('timeFilterYear', '2025')
     mountSelect('timeFilterRange', 'year')
@@ -1040,7 +1040,7 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
 
   it('时间筛选 range=month → 确认文案标注月份，并把 month 透传给同步', async () => {
     mocks.syncFromRemote.mockResolvedValueOnce(result)
-    const chk = mountInput('chkTimeFilter')
+    const chk = mountInput('checkboxTimeFilter')
     chk.checked = true
     mountSelect('timeFilterYear', '2026')
     mountSelect('timeFilterRange', 'month')
@@ -1593,7 +1593,7 @@ describe('ACTION_HANDLERS · closePanel', () => {
 
 describe('ACTION_HANDLERS · 设置页开关', () => {
   it('toggleIncrementalSync → 按勾选状态落盘并提示', () => {
-    const checkbox = mountInput('chkIncrementalSync')
+    const checkbox = mountInput('checkboxIncrementalSync')
     checkbox.checked = true
     runAction('toggleIncrementalSync')
     expect(mocks.setIncrementalSync).toHaveBeenCalledWith(true)
@@ -1606,7 +1606,7 @@ describe('ACTION_HANDLERS · 设置页开关', () => {
   })
 
   it('toggleSkipConflicts → 文案区分「跳过冲突 / Excel覆盖」', () => {
-    const checkbox = mountInput('chkSkipConflicts')
+    const checkbox = mountInput('checkboxSkipConflicts')
     checkbox.checked = true
     runAction('toggleSkipConflicts')
     expect(mocks.setSkipConflicts).toHaveBeenCalledWith(true)
@@ -1618,7 +1618,7 @@ describe('ACTION_HANDLERS · 设置页开关', () => {
   })
 
   it('toggleEnableSyncRecord → 落盘并提示', () => {
-    const checkbox = mountInput('chkEnableSyncRecord')
+    const checkbox = mountInput('checkboxEnableSyncRecord')
     checkbox.checked = true
     runAction('toggleEnableSyncRecord')
     expect(mocks.setSyncRecordEnabled).toHaveBeenCalledWith(true)
@@ -1626,7 +1626,7 @@ describe('ACTION_HANDLERS · 设置页开关', () => {
   })
 
   it('toggleNavIconsOnly → 落盘 + 同步 body 类名（仅图标模式）', () => {
-    const checkbox = mountInput('chkNavIconsOnly')
+    const checkbox = mountInput('checkboxNavIconsOnly')
     checkbox.checked = true
     runAction('toggleNavIconsOnly')
     expect(mocks.setNavIconsOnly).toHaveBeenCalledWith(true)

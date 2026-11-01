@@ -15,7 +15,7 @@ import { LOG_LEVELS } from '../core/constants.js';
 const DATA_CONTEXT_KEY = 'bgm_data_context';
 /** 页面标识 → 展示名 */
 const PAGE_LABELS = {
-    panel: '主面板',
+    'sync-panel': '同步面板',
     enrich: '富化',
     highlight: '高亮',
     clean: '清理',

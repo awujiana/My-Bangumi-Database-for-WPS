@@ -104,6 +104,11 @@ vi.mock('../ts/tools/save-file.js', () => ({
   directoryNameOf: m.directoryNameOf,
 }))
 
+// i18n：页面装配时会初始化语言；翻译行为在 tests/i18n.test.ts 单独测
+vi.mock('../ts/i18n/index.js', () => ({
+  initializeI18n: vi.fn(),
+}))
+
 vi.mock('../ts/panel/conditional-format-apply.js', () => ({
   applyConditionalFormatPlan: m.applyConditionalFormatPlan,
   checkFormatConditionsReadable: m.checkFormatConditionsReadable,

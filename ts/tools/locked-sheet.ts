@@ -11,6 +11,7 @@ import { getApp, bgmLog, BGM, getCellValue, findHeaderRow, clearSheetCache } fro
 // 调用方据此回退逐格读（见 buildCandidate）。
 import { readRangeValues } from './util/sheet.js'
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js'
+import { legacyPageKeys, normalizePageKey } from './page-key.js'
 import type { WpsWorkbook, WpsWorksheet, WpsWindow } from './wps.js'
 import type { CachedTarget } from './target-detect-cache.js'
 
@@ -20,10 +21,29 @@ export const LOCKED_SHEET_KEY = 'bgm_locked_sheet'
 /**
  * 各页独立的锁定键：panel 与 enrich 曾共用一把锁互相覆盖 ——
  * 在面板锁了表，切到富化页锁另一张，回来面板的锁没了。现在各页各存各的。
- * @param page 页面标识（'panel' / 'enrich' …）
+ * @param page 页面标识（'sync-panel' / 'enrich' …）
  */
 export function lockedSheetKey(page: string): string {
-  return `${LOCKED_SHEET_KEY}_${page}`
+  return `${LOCKED_SHEET_KEY}_${normalizePageKey(page)}`
+}
+
+/**
+ * 读取某页的锁定原始串（当前键 → 历史键回退）。
+ *
+ * 2.3.0 的同步面板用 `panel` 当页面标识，键是 `bgm_locked_sheet_panel`；
+ * 改名后新键为空时要回退去翻旧键，否则升级用户会突然发现「锁定的表没了」。
+ * 回退**只读不写**：等下一次 `saveLockedSheet` 自然落到新键上，旧键留在原处当垃圾。
+ */
+function readLockedSheetRaw(page: string): string | null {
+  const storage = getApp()?.PluginStorage
+  if (!storage) return null
+  const direct = storage.getItem(lockedSheetKey(page))
+  if (direct) return direct
+  for (const legacy of legacyPageKeys(page)) {
+    const fallback = storage.getItem(`${LOCKED_SHEET_KEY}_${legacy}`)
+    if (fallback) return fallback
+  }
+  return null
 }
 
 export interface LockedSheetInfo {
@@ -34,7 +54,7 @@ export interface LockedSheetInfo {
 
 // ========== 持久化与状态重置 ==========
 
-export function saveLockedSheet(info: LockedSheetInfo | null, page = 'panel'): void {
+export function saveLockedSheet(info: LockedSheetInfo | null, page = 'sync-panel'): void {
   const app = getApp()
   if (!app?.PluginStorage) {
     bgmLog(LOG_LEVELS.WARN, '[lockedSheet] saveLockedSheet: PluginStorage 不可用')
@@ -106,7 +126,7 @@ export function renderSheetLockUi(
 }
 
 /** 清除 BGM.sheet 锁定状态（内存 + 持久化） */
-export function clearLockedSheet(page = 'panel'): void {
+export function clearLockedSheet(page = 'sync-panel'): void {
   applyLockedSheet(null)
   saveLockedSheet(null, page)
 }
@@ -116,13 +136,13 @@ export function clearLockedSheet(page = 'panel'): void {
  * @param page 页面标识（读该页自己的锁定键）
  * @returns 是否成功恢复
  */
-export function restoreLockedSheet(page = 'panel'): boolean {
+export function restoreLockedSheet(page = 'sync-panel'): boolean {
   const app = getApp()
   if (!app?.PluginStorage) {
     bgmLog(LOG_LEVELS.WARN, '[lockedSheet] restoreLockedSheet: PluginStorage 不可用')
     return false
   }
-  const raw = app.PluginStorage.getItem(lockedSheetKey(page))
+  const raw = readLockedSheetRaw(page)
   if (!raw) return false
 
   try {
@@ -359,7 +379,7 @@ export function resolveCachedTarget(target: CachedTarget): CachedTarget | null {
  * 解析当前锁定的工作簿 + 工作表引用（跨所有已打开工作簿）
  * @returns [工作簿, 工作表] 元组；未锁定或引用失效时清除锁并返回 null
  */
-export function getLockedSheet(page = 'panel'): [WpsWorkbook, WpsWorksheet] | null {
+export function getLockedSheet(page = 'sync-panel'): [WpsWorkbook, WpsWorksheet] | null {
   if (!BGM.sheet.isLocked) return null
   const app = getApp()
   const wb = BGM.sheet.lockedWorkbookName

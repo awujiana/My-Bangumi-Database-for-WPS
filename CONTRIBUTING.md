@@ -90,8 +90,8 @@ npm run debug        # 编译 + watch + 拉起 WPS 调试
 ```
 ts/
 ├── core/        # 常量、类型、结果、错误处理、UI 桥接
-├── entry/       # ribbon / panel / settings 入口
-├── panel/       # 各面板页面逻辑（panel / settings / clean / enrich / highlight / conditional-format / donate）
+├── entry/       # ribbon / sync-panel / settings 入口
+├── panel/       # 各面板页面逻辑（sync-panel / settings / clean / enrich / highlight / conditional-format / donate）
 ├── schemas/     # zod 校验 schema
 ├── services/    # 配置、Ribbon 服务
 ├── sync/        # 同步引擎（github / gitlab / gitee / gist / local-file / Archive）
