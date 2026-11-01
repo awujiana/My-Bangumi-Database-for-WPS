@@ -8,6 +8,7 @@ import {
   LOG_LEVELS,
   bgmLog,
   getRefreshInterval,
+  getUrlPath,
   saveTheme,
   setListType,
   setLogLevel,
@@ -28,11 +29,17 @@ import {
 } from '../../tools/config.js'
 import type { ThemeMode } from '../../tools/config.js'
 import {
+  LOCALE_CODES,
   SOURCE_LOCALE,
+  applyI18n,
+  describeInstalledPacks,
   getLocale,
   getLocaleCoverage,
   getLocaleLabel,
+  installLocalePacks,
   isLocaleCode,
+  loadLocaleManifest,
+  openLocaleDirectory,
   setLocale,
   t,
 } from '../../i18n/index.js'
@@ -472,4 +479,82 @@ export const handleLanguageClick = (event: Event): void => {
     updateLanguageButtons(previous)
     showToast(t('settings.appearance.languageFailed'), 'error')
   })()
+}
+
+// ========== 设置页：语言包在线安装 ==========
+
+/** 状态行是否已经被「操作结果」写过（写过就不再被「已装版本」覆盖） */
+let hasLocalePackReport = false
+
+/** 写语言包状态行 */
+function setLocalePackStatus(text: string): void {
+  const status = document.getElementById('localePackStatus')
+  if (status) status.textContent = text
+}
+
+/**
+ * 刷新状态行：列出每个语言「已装的版本」
+ *
+ * 只读内存里已加载的语言包，不碰磁盘也不联网——`version` / `updatedAt` 就在包头上。
+ * 首次进入设置页时语言包还在异步加载，所以这条要在 `onLocaleChange` 之后才准。
+ */
+export function refreshLocalePackStatus(): void {
+  if (hasLocalePackReport) return
+  setLocalePackStatus(describeInstalledPacks(LOCALE_CODES))
+}
+
+/**
+ * 「更新语言包」：读清单 → 下载 → 校验 → 落盘 → 重渲染
+ *
+ * 语言包是随插件发布的，这个按钮只在两种情况下有意义：用户删坏过 `locales/`，
+ * 或者想拿到比当前插件更新的译文。两条路都要走「下载 + 校验」，所以不区分。
+ */
+export async function handleLocalePackInstall(): Promise<void> {
+  const button = document.getElementById('localePackInstallBtn') as HTMLButtonElement | null
+  if (button) button.disabled = true
+  hasLocalePackReport = true
+  setLocalePackStatus(t('settings.appearance.localePackChecking'))
+
+  try {
+    const fetchFunction = (url: string): Promise<Response> => fetch(url)
+    const loaded = await loadLocaleManifest({ fetchFunction })
+    if (loaded.manifest === null) {
+      setLocalePackStatus(t('settings.appearance.localePackFailed', { reason: loaded.detail }))
+      bgmLog(LOG_LEVELS.WARN, `[settings] 语言包清单不可用：${loaded.detail}`)
+      return
+    }
+
+    const outcome = await installLocalePacks({
+      baseUrl: getUrlPath(),
+      manifest: loaded.manifest,
+      fetchFunction,
+    })
+
+    if (outcome.status === 'unsupported') {
+      setLocalePackStatus(t('settings.appearance.localePackUnsupported'))
+      return
+    }
+    if (outcome.status === 'installed') {
+      const count = outcome.reports.filter((report) => report.status === 'installed').length
+      setLocalePackStatus(t('settings.appearance.localePackInstalled', { count }))
+    } else {
+      setLocalePackStatus(t('settings.appearance.localePackFailed', { reason: outcome.detail }))
+    }
+
+    // 装的可能就是当前语言：直接重渲染，别让用户以为没生效。
+    // 其它语言由下次切换时的 setLocale() 自然生效。
+    applyI18n()
+    updateLanguageButtons(getLocale())
+  } finally {
+    if (button) button.disabled = false
+  }
+}
+
+/** 「打开语言包目录」：交给资源管理器，方便手动拖入 */
+export function handleLocalePackOpenDirectory(): void {
+  const outcome = openLocaleDirectory(getUrlPath())
+  if (outcome.ok) return
+  // 成功时不弹 toast：资源管理器窗口本身就是反馈，再弹一次反而多余
+  showToast(t('settings.appearance.localePackOpenFailed', { reason: outcome.detail }), 'error')
+  bgmLog(LOG_LEVELS.WARN, `[settings] 打开语言包目录失败：${outcome.detail}`)
 }

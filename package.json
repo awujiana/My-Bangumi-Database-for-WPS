@@ -27,6 +27,8 @@
     "check:csp": "node scripts/check-csp.mjs",
     "check:i18n": "node scripts/check-i18n-consistency.mjs",
     "check:i18n-reverse": "node scripts/check-i18n-consistency.mjs --self-test",
+    "i18n:index": "node scripts/gen-locale-index.mjs",
+    "check:i18n-index": "node scripts/gen-locale-index.mjs --check",
     "check:wpsjs-patch": "node scripts/check-wpsjs-patch.mjs",
     "typecheck:tests": "node scripts/check-tests-types.mjs",
     "check:guards-reverse": "node scripts/verify-guards-reverse.mjs",

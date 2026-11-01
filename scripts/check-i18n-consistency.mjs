@@ -22,8 +22,11 @@
  * 7. `ui/settings.html` 的语言按钮 `data-locale` 与 `ts/i18n/translate.ts` 的
  *    `LOCALE_CODES` 一一对应（顺序也要一致——界面上的排列就是这里的顺序）；
  * 8. 每个非源语言都必须 100% 覆盖简体的 key（缺一个就会在界面上退回中文）；
- * 9. `data-i18n` 不能挂在带子元素的节点上（`textContent` 会把图标 / `<br>` 抹掉）；
- * 10. `data-i18n-html` 里不能有 `id` / `data-action` / 表单控件（`innerHTML` 重建会
+ * 9. `locales/index.js` 清单必须与实际语言包一致（sha256 / 字节数 / key 数 / 覆盖率 /
+ *    版本）——设置页「下载语言包」拿它当发布端的真相，清单陈旧就会装到旧包，
+ *    或者下载下来哈希对不上被自己拒掉；
+ * 10. `data-i18n` 不能挂在带子元素的节点上（`textContent` 会把图标 / `<br>` 抹掉）；
+ * 11. `data-i18n-html` 里不能有 `id` / `data-action` / 表单控件（`innerHTML` 重建会
  *    让一次性绑定的事件失效、input 勾选状态丢失）。
  *
  * ## 退出码
@@ -37,12 +40,16 @@
  * 正则写错会让门禁永远通过——那比没有门禁更危险。
  */
 
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE_LOCALE = 'zh-CN'
+
+/** `locales/index.js` 的结构版本（与 `scripts/gen-locale-index.mjs` 保持一致） */
+const INDEX_SCHEMA_VERSION = 1
 
 /** 读取文件内容（缺失/不可读时抛出带路径的可读错误） */
 function readText(relativePath) {
@@ -55,6 +62,29 @@ function readText(relativePath) {
 }
 
 /**
+ * 读取文件内容，缺失时返回 `null`
+ *
+ * 给「缺失本身就是一条问题」的输入用：清单没生成时应该由规则 ⑨ 报「缺失或无法解析」，
+ * 而不是让 `readText` 抛一个看起来像脚本崩了的错误。
+ */
+function tryReadText(relativePath) {
+  try {
+    return readFileSync(join(projectRoot, relativePath), 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 剥掉 `export default …;` 外壳，留下纯 JSON 文本
+ *
+ * 语言包和清单是同一个外壳（`export default` 后面跟纯 JSON），所以共用这段剥壳逻辑。
+ */
+function stripModuleWrapper(text) {
+  return text.replace(/^[\s\S]*?export\s+default\s+/u, '').replace(/;\s*$/u, '')
+}
+
+/**
  * 解析语言包模块源码（`export default {…};`）→ 对象
  *
  * 语言包是 ESM 而不是 JSON：安装态页面跑在 `file://` 下，`fetch` 读本地文件会被
@@ -62,11 +92,20 @@ function readText(relativePath) {
  * 内容仍是纯数据，所以这里剥掉外壳后按 JSON 解析——解析不了就是脏包，必须报出来。
  */
 function parseLocaleModule(text, relativePath) {
-  const stripped = text.replace(/^[\s\S]*?export\s+default\s+/u, '').replace(/;\s*$/u, '')
   try {
-    return JSON.parse(stripped)
+    return JSON.parse(stripModuleWrapper(text))
   } catch {
     throw new Error(`${relativePath} 不是合法的语言包（export default 后面必须是 JSON 对象）`)
+  }
+}
+
+/** 解析 `locales/index.js` 清单（缺失/解析不了都返回 `null`，交给规则 ⑨ 报出来） */
+function parseLocaleIndex(text) {
+  if (text === null) return null
+  try {
+    return JSON.parse(stripModuleWrapper(text))
+  } catch {
+    return null
   }
 }
 
@@ -77,6 +116,23 @@ function extractPlaceholders(template) {
     if (matched[1] !== undefined) names.add(matched[1])
   }
   return [...names].sort((left, right) => left.localeCompare(right))
+}
+
+/**
+ * 覆盖率口径：必须与 `ts/i18n/translate.ts` 的 `computeCoverage` 完全一致
+ *
+ * 两边算得不一样，清单里的百分比就会和设置页显示的对不上——而这是用户唯一能
+ * 看见的数字，对不上就会有人来问。
+ */
+function computeCoverage(sourceMessages, targetMessages) {
+  const total = Object.keys(sourceMessages).length
+  if (total === 0) return 100
+  let translated = 0
+  for (const key of Object.keys(sourceMessages)) {
+    const value = targetMessages[key]
+    if (value !== undefined && value.trim() !== '') translated += 1
+  }
+  return Math.floor((translated / total) * 100)
 }
 
 /**
@@ -224,6 +280,8 @@ function readHtmlI18nStructure(html) {
  * @param {object} input
  * @param {Record<string, {schemaVersion: number, code: string, messages: Record<string, string>}>} input.locales
  * @param {string[]} input.localeCodes
+ * @param {Record<string, string>} input.localeTexts 语言包原始文本（已按 LF 归一，用于算哈希）
+ * @param {object | null} input.localeIndex `locales/index.js` 解析结果（缺失为 null）
  * @param {string} input.ribbonXml
  * @param {Record<string, string>} input.htmlByFile
  * @returns {string[]} 问题列表（空数组 = 通过）
@@ -355,6 +413,67 @@ function collectProblems(input) {
     }
   }
 
+  // ⑨ 语言包清单必须与实际文件一致
+  //
+  // 设置页「下载语言包」把清单当发布端的真相：清单说 sha256=X、bytes=N，下载完就按
+  // 这个值校验。清单陈旧的后果是**下载下来的包被自己拒掉**，而界面只会说「哈希不一致」，
+  // 排查时毫无线索——所以必须在门禁里红，而不是等到用户点下载。
+  const index = input.localeIndex
+  if (index === null) {
+    problems.push('locales/index.js 缺失或无法解析（跑 `npm run i18n:index` 生成）')
+  } else {
+    const entries = Array.isArray(index.locales) ? index.locales : []
+    if (index.schemaVersion !== INDEX_SCHEMA_VERSION) {
+      problems.push(
+        `locales/index.js 的 schemaVersion=${String(index.schemaVersion)}，期望 ${String(INDEX_SCHEMA_VERSION)}`,
+      )
+    }
+    if (index.sourceLocale !== SOURCE_LOCALE) {
+      problems.push(
+        `locales/index.js 的 sourceLocale 是「${String(index.sourceLocale)}」，期望「${SOURCE_LOCALE}」`,
+      )
+    }
+    if (entries.length === 0) problems.push('locales/index.js 的 locales 为空')
+    if (index.keyCount !== sourceKeys.size) {
+      problems.push(
+        `locales/index.js 的 keyCount 是 ${String(index.keyCount)}，实际 ${String(sourceKeys.size)}`,
+      )
+    }
+    for (const entry of entries) {
+      const code = typeof entry?.code === 'string' ? entry.code : ''
+      if (!input.localeCodes.includes(code)) {
+        problems.push(`locales/index.js 有 LOCALE_CODES 里不存在的语言「${code}」`)
+      }
+    }
+    for (const code of input.localeCodes) {
+      const entry = entries.find((item) => item?.code === code)
+      if (entry === undefined) {
+        problems.push(`locales/index.js 缺少语言「${code}」`)
+        continue
+      }
+      const messages = input.locales[code]?.messages ?? {}
+      const raw = input.localeTexts[code] ?? ''
+      // 按 LF 归一后的内容算：工作区是 CRLF 检出，发布出去的是 LF
+      const actual = {
+        name: input.locales[code]?.name,
+        nativeName: input.locales[code]?.nativeName,
+        version: input.locales[code]?.version,
+        updatedAt: input.locales[code]?.updatedAt,
+        keyCount: Object.keys(messages).length,
+        coverage: computeCoverage(source.messages, messages),
+        sha256: createHash('sha256').update(raw, 'utf8').digest('hex'),
+        bytes: Buffer.byteLength(raw, 'utf8'),
+      }
+      for (const [field, value] of Object.entries(actual)) {
+        if (entry[field] !== value) {
+          problems.push(
+            `locales/index.js 的 ${code}.${field} 是「${String(entry[field])}」，实际「${String(value)}」`,
+          )
+        }
+      }
+    }
+  }
+
   return problems
 }
 
@@ -362,16 +481,29 @@ function collectProblems(input) {
 function loadInput() {
   const localeCodes = readLocaleCodes(readText('ts/i18n/translate.ts'))
   const locales = {}
+  const localeTexts = {}
   for (const code of localeCodes) {
     const relativePath = join('locales', code, 'locale.js')
-    locales[code] = parseLocaleModule(readText(relativePath), relativePath)
+    const raw = readText(relativePath)
+    // 行尾归一：工作区是 CRLF 检出（core.autocrlf=true），发布出去的是 LF。
+    // 清单里的 sha256 / bytes 必须按**发布出去的形态**算，否则算出一个永远对不上
+    // 发布端的值，用户点下载就被自己的校验拒掉。
+    localeTexts[code] = raw.replaceAll('\r\n', '\n')
+    locales[code] = parseLocaleModule(raw, relativePath)
   }
   const htmlByFile = {}
   for (const file of readdirSync(join(projectRoot, 'ui'))) {
     if (!file.endsWith('.html')) continue
     htmlByFile[`ui/${file}`] = readText(join('ui', file))
   }
-  return { locales, localeCodes, ribbonXml: readText('ribbon.xml'), htmlByFile }
+  return {
+    locales,
+    localeCodes,
+    localeTexts,
+    localeIndex: parseLocaleIndex(tryReadText('locales/index.js')),
+    ribbonXml: readText('ribbon.xml'),
+    htmlByFile,
+  }
 }
 
 /**
@@ -507,6 +639,43 @@ function selfTest() {
     '缺 1 个 key',
   )
 
+  // —— 规则 ⑨：清单 ——
+  //
+  // 这三个用例盯的是「改了语言包却忘了 `npm run i18n:index`」。这一档最阴的地方在于
+  // 单看界面一切正常，只有用户点「下载语言包」时才会炸，而那时报的是「哈希不一致」。
+  addCase(
+    '清单的 sha256 过期（改了语言包没重新生成清单）',
+    (broken) => {
+      broken.localeIndex.locales[0].sha256 = '0'.repeat(64)
+    },
+    '.sha256 是',
+  )
+
+  addCase(
+    '清单的覆盖率与语言包实际内容对不上',
+    (broken) => {
+      broken.localeIndex.locales[1].coverage = 99
+    },
+    '.coverage 是',
+  )
+
+  addCase(
+    '清单少了一种语言',
+    (broken) => {
+      const other = broken.localeCodes.find((code) => code !== SOURCE_LOCALE)
+      broken.localeIndex.locales = broken.localeIndex.locales.filter((item) => item.code !== other)
+    },
+    'locales/index.js 缺少语言',
+  )
+
+  addCase(
+    '清单文件缺失',
+    (broken) => {
+      broken.localeIndex = null
+    },
+    'locales/index.js 缺失或无法解析',
+  )
+
   const failed = cases.filter((item) => !item.ok)
   if (failed.length > 0) {
     console.error('✖ i18n 门禁自检失败（说明检查项失效，门禁会永远通过）：')
@@ -537,7 +706,9 @@ function main() {
         '  1) 新增/改名 key 时，三份 locales/<code>/locale.js 一起改（简体是基准，其余是子集）；\n' +
         '  2) 带占位符的文案，译文里必须保留同名 {变量}；\n' +
         '  3) 改 ribbon.xml 的 label 时，同步改 locales/*/locale.js 的 ribbon.<控件id>；\n' +
-        '  4) ui/*.html 里加 data-i18n 前，先把 key 写进简体语言包。\n' +
+        '  4) ui/*.html 里加 data-i18n 前，先把 key 写进简体语言包；\n' +
+        '  5) 改过 locales/*/locale.js 之后跑 `npm run i18n:index` 重新生成清单\n' +
+        '     （清单里的 sha256 是用户下载语言包时唯一的校验依据，陈旧就会被自己拒掉）。\n' +
         '原因：这些不一致都不会报错，只会让界面露出 key、露出 {变量}，或者中英混排。',
     )
     process.exit(1)

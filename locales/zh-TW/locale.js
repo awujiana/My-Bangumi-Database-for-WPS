@@ -419,6 +419,14 @@ export default {
     "settings.appearance.languageCoverage": "已翻譯 {percent}%",
     "settings.appearance.languageFallback": "未翻譯的條目會回退顯示簡體中文。",
     "settings.appearance.languageApplied": "語言已切換為「{name}」",
-    "settings.appearance.languageFailed": "語言切換失敗（語言包缺失或損壞）"
+    "settings.appearance.languageFailed": "語言切換失敗（語言包缺失或損壞）",
+    "settings.appearance.localePackInstall": "⬇️ 更新語言包",
+    "settings.appearance.localePackOpenDir": "📂 開啟語言包資料夾",
+    "settings.appearance.localePackHint": "語言包隨外掛發布，平時不用管。介面出現「settings.xxx」這種字樣，表示語言包遺失或損壞——點「更新語言包」會從 GitHub 重新下載並驗證雜湊；也可以點「開啟語言包資料夾」手動放入。",
+    "settings.appearance.localePackChecking": "正在檢查語言包…",
+    "settings.appearance.localePackInstalled": "已更新 {count} 個語言包",
+    "settings.appearance.localePackFailed": "更新失敗：{reason}",
+    "settings.appearance.localePackUnsupported": "目前環境不支援線上更新（開發期頁面或非本機安裝）",
+    "settings.appearance.localePackOpenFailed": "無法開啟語言包資料夾：{reason}"
   }
 };

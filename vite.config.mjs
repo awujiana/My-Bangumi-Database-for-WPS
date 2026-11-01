@@ -30,11 +30,13 @@ export default defineConfig({
         { src: 'css/*', dest: '.' },           // → dist/css/styles.css
         // 新增：复制 libs 目录（purify.js 等，sync-panel.html 通过 ../libs/ 引用）
         { src: 'libs/*', dest: '.' },          // → dist/libs/purify.js
-        // 新增：复制 locales 目录（语言包）。
+        // 新增：复制 locales 目录（语言包 + 清单）。
         // 必须用 `**` 保留二级目录：localeUrl() 在运行时按
         // `dist-ts/i18n/locale-store.js` → `../../locales/<code>/locale.js` 拼路径，
         // 若只写 `locales/*` 则语言包不会进 dist，打出的 zip 里缺失 → 所有页面退回硬编码中文。
-        { src: 'locales/**/*', dest: '.' }     // → dist/locales/zh-CN/locale.js
+        // 只要 `.js`：`locales/术语表.md` 是翻译时的校对依据（9 KB 汉字），
+        // 不属于运行期资源，不该占发布包的体积。
+        { src: 'locales/**/*.js', dest: '.' }  // → dist/locales/{index.js,zh-CN/locale.js}
       ]
     })
   ],

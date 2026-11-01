@@ -59,6 +59,19 @@ export declare function pickSavePath(options: {
  */
 export declare function canWriteTextFile(filePath: string, content: string, isUnicode?: boolean): boolean;
 /**
+ * 用 FSO 确保目录存在（已存在视为成功）
+ *
+ * 为什么需要它：`CreateTextFile` **不会**自动建父目录，父目录缺失时直接抛错。
+ * 语言包在线安装要往 `locales/<code>/` 写文件，用户手动删过目录就得先建回来。
+ *
+ * 注意 `CreateFolder` 在目录已存在时**抛错**，所以必须先 `FolderExists` 探一次；
+ * 两个方法任一缺失（老版本 FSO）就当作「无法确保」，由调用方报错，不要假装成功。
+ *
+ * @param directoryPath 目标目录绝对路径
+ * @returns 目录可用 true；FSO 不可用 / 建不出来 false
+ */
+export declare function ensureDirectory(directoryPath: string): boolean;
+/**
  * 完整保存流程：选位置 → 写文件 →（失败）回退下载
  *
  * @returns 保存结果；用户取消返回 null（调用方不写文件、不提示成功）

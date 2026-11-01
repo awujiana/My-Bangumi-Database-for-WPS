@@ -118,6 +118,49 @@ export function canWriteTextFile(filePath, content, isUnicode = true) {
     }
 }
 /**
+ * 用 FSO 确保目录存在（已存在视为成功）
+ *
+ * 为什么需要它：`CreateTextFile` **不会**自动建父目录，父目录缺失时直接抛错。
+ * 语言包在线安装要往 `locales/<code>/` 写文件，用户手动删过目录就得先建回来。
+ *
+ * 注意 `CreateFolder` 在目录已存在时**抛错**，所以必须先 `FolderExists` 探一次；
+ * 两个方法任一缺失（老版本 FSO）就当作「无法确保」，由调用方报错，不要假装成功。
+ *
+ * @param directoryPath 目标目录绝对路径
+ * @returns 目录可用 true；FSO 不可用 / 建不出来 false
+ */
+export function ensureDirectory(directoryPath) {
+    if (directoryPath === '')
+        return false;
+    try {
+        const { wps } = window;
+        const coCreate = wps?.OAAssist?.CoCreateInstance;
+        if (typeof coCreate !== 'function') {
+            bgmLog(LOG_LEVELS.WARN, '[save-file] OAAssist.CoCreateInstance 不可用');
+            return false;
+        }
+        const fso = coCreate('Scripting.FileSystemObject');
+        if (!fso) {
+            bgmLog(LOG_LEVELS.WARN, '[save-file] FileSystemObject 创建失败');
+            return false;
+        }
+        const { FolderExists, CreateFolder } = fso;
+        if (typeof FolderExists !== 'function' || typeof CreateFolder !== 'function') {
+            bgmLog(LOG_LEVELS.WARN, '[save-file] FileSystemObject 缺少 FolderExists/CreateFolder');
+            return false;
+        }
+        if (FolderExists.call(fso, directoryPath))
+            return true;
+        CreateFolder.call(fso, directoryPath);
+        return true;
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        bgmLog(LOG_LEVELS.WARN, `[save-file] 创建目录失败(${directoryPath}): ${message}`);
+        return false;
+    }
+}
+/**
  * 完整保存流程：选位置 → 写文件 →（失败）回退下载
  *
  * @returns 保存结果；用户取消返回 null（调用方不写文件、不提示成功）

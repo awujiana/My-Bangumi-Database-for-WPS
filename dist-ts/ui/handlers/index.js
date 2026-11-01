@@ -20,7 +20,7 @@ import { loadHighlightSettingsIntoForm } from './highlight-settings.js';
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js';
 import { setupEventListeners, setupMessageListener } from './sync-panel-events.js';
 import { loadTemplateFileInfo } from './template-file.js';
-import { handleClusterModeClick, handleMergeModeClick, handleEnableSyncRecordChange, handleListTypeChange, handleLogLevelChange, handleLogLevelFilterChange, handleLanguageClick, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, setupTimeFilterControls, updateLanguageButtons, updateModalButtonsPositionButtons, updateClusterModeButtons, updateMergeModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
+import { handleClusterModeClick, handleMergeModeClick, handleEnableSyncRecordChange, handleLanguageClick, handleListTypeChange, handleLocalePackInstall, handleLocalePackOpenDirectory, handleLogLevelChange, handleLogLevelFilterChange, handleRefreshIntervalChange, handleThemeChange, handleModalButtonsPositionClick, handleThemeModeClick, handleThemeScheduleChange, handleThemeToggleClick, handleTimeFilterChange, refreshLocalePackStatus, setupTimeFilterControls, updateLanguageButtons, updateModalButtonsPositionButtons, updateClusterModeButtons, updateMergeModeButtons, updateThemeModeButtons, updateThemeToggle, } from './settings-bindings.js';
 import { setupUpdateChecker } from './update-checker.js';
 import { syncFromPanel } from './sync.js';
 import { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, } from './token.js';
@@ -165,7 +165,20 @@ export function setupButtonListeners() {
     // 覆盖率那行不是 data-i18n 节点（内容是动态拼的），applyI18n 刷不到它。
     onLocaleChange((code) => {
         updateLanguageButtons(code);
+        // 语言包这时才异步加载完，状态行里「已装版本」要等这一拍才准
+        refreshLocalePackStatus();
     });
+    // 语言包在线安装（修复 / 追新）：两个按钮都在设置页，不存在时静默跳过
+    const localePackInstallButton = document.getElementById('localePackInstallBtn');
+    if (localePackInstallButton) {
+        trackedAddEventListener(localePackInstallButton, 'click', () => {
+            void handleLocalePackInstall();
+        });
+    }
+    const localePackOpenButton = document.getElementById('localePackOpenDirBtn');
+    if (localePackOpenButton) {
+        trackedAddEventListener(localePackOpenButton, 'click', handleLocalePackOpenDirectory);
+    }
     // 模态框按钮位置分段按钮（回填 + 点击切换）
     for (const button of document.querySelectorAll('[data-modal-buttons-position]')) {
         trackedAddEventListener(button, 'click', handleModalButtonsPositionClick);

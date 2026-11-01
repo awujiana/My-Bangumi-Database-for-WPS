@@ -419,6 +419,14 @@ export default {
     "settings.appearance.languageCoverage": "已翻译 {percent}%",
     "settings.appearance.languageFallback": "未翻译的条目会回退显示简体中文。",
     "settings.appearance.languageApplied": "语言已切换为「{name}」",
-    "settings.appearance.languageFailed": "语言切换失败（语言包缺失或损坏）"
+    "settings.appearance.languageFailed": "语言切换失败（语言包缺失或损坏）",
+    "settings.appearance.localePackInstall": "⬇️ 更新语言包",
+    "settings.appearance.localePackOpenDir": "📂 打开语言包目录",
+    "settings.appearance.localePackHint": "语言包随插件发布，平时不用管。界面出现「settings.xxx」这种字样，说明语言包缺失或损坏——点「更新语言包」会从 GitHub 重新下载并校验哈希；也可以点「打开语言包目录」手动放入。",
+    "settings.appearance.localePackChecking": "正在检查语言包…",
+    "settings.appearance.localePackInstalled": "已更新 {count} 个语言包",
+    "settings.appearance.localePackFailed": "更新失败：{reason}",
+    "settings.appearance.localePackUnsupported": "当前环境不支持在线更新（开发期页面或非本地安装）",
+    "settings.appearance.localePackOpenFailed": "无法打开语言包目录：{reason}"
   }
 };

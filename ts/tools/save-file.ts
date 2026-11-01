@@ -54,6 +54,10 @@ interface FileSystemObjectLike {
     Write(text: string): void
     Close(): void
   }
+  /** 目录是否存在（老版本可能没有，用前必须探测） */
+  FolderExists?: (folderPath: string) => boolean
+  /** 新建目录；**目录已存在时会抛错**（这是 COM 的行为，不是 bug） */
+  CreateFolder?: (folderPath: string) => void
 }
 
 /** wps 全局上的 OAAssist 桥 */
@@ -179,6 +183,47 @@ export function canWriteTextFile(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.WARN, `[save-file] 写文件失败(${filePath}): ${message}`)
+    return false
+  }
+}
+
+/**
+ * 用 FSO 确保目录存在（已存在视为成功）
+ *
+ * 为什么需要它：`CreateTextFile` **不会**自动建父目录，父目录缺失时直接抛错。
+ * 语言包在线安装要往 `locales/<code>/` 写文件，用户手动删过目录就得先建回来。
+ *
+ * 注意 `CreateFolder` 在目录已存在时**抛错**，所以必须先 `FolderExists` 探一次；
+ * 两个方法任一缺失（老版本 FSO）就当作「无法确保」，由调用方报错，不要假装成功。
+ *
+ * @param directoryPath 目标目录绝对路径
+ * @returns 目录可用 true；FSO 不可用 / 建不出来 false
+ */
+export function ensureDirectory(directoryPath: string): boolean {
+  if (directoryPath === '') return false
+  try {
+    const { wps } = window as unknown as WindowWithWps
+    const coCreate = wps?.OAAssist?.CoCreateInstance
+    if (typeof coCreate !== 'function') {
+      bgmLog(LOG_LEVELS.WARN, '[save-file] OAAssist.CoCreateInstance 不可用')
+      return false
+    }
+    const fso = coCreate('Scripting.FileSystemObject') as FileSystemObjectLike | undefined
+    if (!fso) {
+      bgmLog(LOG_LEVELS.WARN, '[save-file] FileSystemObject 创建失败')
+      return false
+    }
+    const { FolderExists, CreateFolder } = fso
+    if (typeof FolderExists !== 'function' || typeof CreateFolder !== 'function') {
+      bgmLog(LOG_LEVELS.WARN, '[save-file] FileSystemObject 缺少 FolderExists/CreateFolder')
+      return false
+    }
+    if (FolderExists.call(fso, directoryPath)) return true
+    CreateFolder.call(fso, directoryPath)
+    return true
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.WARN, `[save-file] 创建目录失败(${directoryPath}): ${message}`)
     return false
   }
 }

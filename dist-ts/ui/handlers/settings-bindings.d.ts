@@ -80,4 +80,20 @@ export declare function updateLanguageButtons(code: LocaleCode): void;
  * 此时 `t()` 取到的就是新文案，用户能立刻看到切换生效。
  */
 export declare const handleLanguageClick: (event: Event) => void;
+/**
+ * 刷新状态行：列出每个语言「已装的版本」
+ *
+ * 只读内存里已加载的语言包，不碰磁盘也不联网——`version` / `updatedAt` 就在包头上。
+ * 首次进入设置页时语言包还在异步加载，所以这条要在 `onLocaleChange` 之后才准。
+ */
+export declare function refreshLocalePackStatus(): void;
+/**
+ * 「更新语言包」：读清单 → 下载 → 校验 → 落盘 → 重渲染
+ *
+ * 语言包是随插件发布的，这个按钮只在两种情况下有意义：用户删坏过 `locales/`，
+ * 或者想拿到比当前插件更新的译文。两条路都要走「下载 + 校验」，所以不区分。
+ */
+export declare function handleLocalePackInstall(): Promise<void>;
+/** 「打开语言包目录」：交给资源管理器，方便手动拖入 */
+export declare function handleLocalePackOpenDirectory(): void;
 //# sourceMappingURL=settings-bindings.d.ts.map

@@ -453,6 +453,14 @@ export default {
     "settings.appearance.languageCoverage": "{percent}% translated",
     "settings.appearance.languageFallback": "Untranslated items fall back to Simplified Chinese.",
     "settings.appearance.languageApplied": "Language switched to “{name}”",
-    "settings.appearance.languageFailed": "Failed to switch language (pack missing or corrupted)"
+    "settings.appearance.languageFailed": "Failed to switch language (pack missing or corrupted)",
+    "settings.appearance.localePackInstall": "⬇️ Update language packs",
+    "settings.appearance.localePackOpenDir": "📂 Open language pack folder",
+    "settings.appearance.localePackHint": "Language packs ship with the add-in, so you normally never touch this. Seeing keys like \"settings.xxx\" in the UI means a pack is missing or corrupted — \"Update language packs\" re-downloads them from GitHub and verifies their hashes; you can also drop files in by hand via \"Open language pack folder\".",
+    "settings.appearance.localePackChecking": "Checking language packs…",
+    "settings.appearance.localePackInstalled": "Updated {count} language pack(s)",
+    "settings.appearance.localePackFailed": "Update failed: {reason}",
+    "settings.appearance.localePackUnsupported": "Online updates are unavailable here (development page or non-local install)",
+    "settings.appearance.localePackOpenFailed": "Cannot open the language pack folder: {reason}"
   }
 };

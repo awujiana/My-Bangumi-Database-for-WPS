@@ -44,8 +44,16 @@ const listeners = new Set();
 export function localeUrl(code) {
     return new URL(`../../locales/${code}/locale.js`, import.meta.url).href;
 }
-/** 校验宿主拿到的 JSON 是否像一个语言包（脏包直接拒绝，不半信半疑地用） */
-function parseBundle(raw, expected) {
+/**
+ * 校验宿主拿到的 JSON 是否像一个语言包（脏包直接拒绝，不半信半疑地用）
+ *
+ * 导出给在线安装复用：下载回来的模块要先过这一关才允许写盘，
+ * 两处用同一个校验器才不会出现「装上去了但加载时被拒」的自相矛盾。
+ *
+ * @param raw `import()` / `JSON.parse` 拿到的原始值
+ * @param expected 期望的语言代码（与包内声明不符时以它为准，目录即真相）
+ */
+export function parseLocaleBundle(raw, expected) {
     if (typeof raw !== 'object' || raw === null) {
         bgmLog(LOG_LEVELS.WARN, `[i18n] 语言包 ${expected} 不是 JSON 对象，已忽略`);
         return null;
@@ -102,7 +110,7 @@ export async function loadLocale(code) {
             // 注意：**不能**改回 fetch。安装态页面是 file://，那里 fetch 本地文件直接
             // `Failed to fetch`（2026-11-01 真机实测），只有 ESM 的 import() 能读。
             const module_ = await importLocale(localeUrl(code));
-            const bundle = parseBundle(module_.default, code);
+            const bundle = parseLocaleBundle(module_.default, code);
             if (bundle !== null)
                 bundles.set(code, bundle);
             return bundle;
@@ -121,6 +129,19 @@ export async function loadLocale(code) {
     })();
     pending.set(code, task);
     return task;
+}
+/**
+ * 直接替换一个语言包（在线安装写盘成功后调用）
+ *
+ * 为什么不能靠「重新 `loadLocale()`」：ESM 的模块表按 **URL** 缓存，同一个
+ * `locales/en/locale.js` 第二次 `import()` 拿到的是**旧模块对象**，加时间戳
+ * 查询串在 `file://` 下是否被 CEF 忽略又没法保证（老内核）。所以安装流程
+ * 已经手上有解析好的新包，直接塞进来最稳，也免了一次多余的加载。
+ *
+ * 只改缓存，不切语言、不渲染：要不要立刻应用由调用方决定（装的可能不是当前语言）。
+ */
+export function replaceLocaleBundle(bundle) {
+    bundles.set(bundle.code, bundle);
 }
 /** 确保源语言已加载（回退与覆盖率都要拿它当基准） */
 async function ensureSourceLocale() {

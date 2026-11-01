@@ -340,6 +340,33 @@
               才换（WPS 只允许 tab 名在运行时刷新）。
             </p>
             <p class="hint" id="localeCoverage" hidden></p>
+            <!-- 语言包在线安装：语言包随插件发布，这里只是「修复 / 追新」的通道。
+                 落盘前会把内容转成纯 ASCII——FSO 只能写 UTF-16 或系统 ANSI，写不了
+                 UTF-8，而 .js 模块必须是 UTF-8（详见 ts/i18n/locale-install.ts） -->
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                data-i18n="settings.appearance.localePackInstall"
+                type="button"
+                class="bgm-btn small"
+                id="localePackInstallBtn"
+              >
+                ⬇️ 更新语言包
+              </button>
+              <button
+                data-i18n="settings.appearance.localePackOpenDir"
+                type="button"
+                class="bgm-btn small"
+                id="localePackOpenDirBtn"
+              >
+                📂 打开语言包目录
+              </button>
+            </div>
+            <p class="hint" id="localePackStatus" role="status" aria-live="polite"></p>
+            <p class="hint" data-i18n="settings.appearance.localePackHint">
+              语言包随插件发布，平时不用管。界面出现「settings.xxx」这种字样，
+              说明语言包缺失或损坏——点「更新语言包」会从 GitHub 重新下载并校验哈希；
+              也可以点「打开语言包目录」手动放入。
+            </p>
           </div>
         </section>
 
