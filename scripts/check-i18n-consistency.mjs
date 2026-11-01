@@ -21,8 +21,9 @@
  * 6. `ui/*.html` 里所有 `data-i18n*` 引用的 key 都真的存在；
  * 7. `ui/settings.html` 的语言按钮 `data-locale` 与 `ts/i18n/translate.ts` 的
  *    `LOCALE_CODES` 一一对应（顺序也要一致——界面上的排列就是这里的顺序）；
- * 8. `data-i18n` 不能挂在带子元素的节点上（`textContent` 会把图标 / `<br>` 抹掉）；
- * 9. `data-i18n-html` 里不能有 `id` / `data-action` / 表单控件（`innerHTML` 重建会
+ * 8. 每个非源语言都必须 100% 覆盖简体的 key（缺一个就会在界面上退回中文）；
+ * 9. `data-i18n` 不能挂在带子元素的节点上（`textContent` 会把图标 / `<br>` 抹掉）；
+ * 10. `data-i18n-html` 里不能有 `id` / `data-action` / 表单控件（`innerHTML` 重建会
  *    让一次性绑定的事件失效、input 勾选状态丢失）。
  *
  * ## 退出码
@@ -335,6 +336,25 @@ function collectProblems(input) {
     problems.push('ui/settings.html 不存在，无法校验语言按钮')
   }
 
+  // ⑧ 覆盖率：非源语言必须覆盖简体的全部 key
+  //
+  // 这一条盯的是**新增 key 时只改了一份语言包**——界面不会报错，只会在该语言下
+  // 默默显示中文。缺几个就报几个，不做百分比阈值：阈值以下的缺口照样是「用户看到
+  // 中文」，而 95% 这种线还会让「加了 1 个 key 忘了翻」稳稳过关。
+  for (const code of input.localeCodes) {
+    const bundle = input.locales[code]
+    if (bundle === undefined || code === SOURCE_LOCALE) continue
+    const missing = [...sourceKeys].filter((key) => bundle.messages[key] === undefined)
+    if (missing.length > 0) {
+      const shown = missing.slice(0, 5).join('、')
+      problems.push(
+        `${code} 缺 ${String(missing.length)} 个 key（已覆盖 ` +
+          `${String(sourceKeys.size - missing.length)}/${String(sourceKeys.size)}）：${shown}` +
+          (missing.length > 5 ? ' …' : ''),
+      )
+    }
+  }
+
   return problems
 }
 
@@ -478,6 +498,15 @@ function selfTest() {
     'locale.js 不存在',
   )
 
+  addCase(
+    '新增 key 只改了简体（覆盖率不足）',
+    (broken) => {
+      const other = broken.localeCodes.find((code) => code !== SOURCE_LOCALE)
+      if (other !== undefined) delete broken.locales[other].messages['settings.about.title']
+    },
+    '缺 1 个 key',
+  )
+
   const failed = cases.filter((item) => !item.ok)
   if (failed.length > 0) {
     console.error('✖ i18n 门禁自检失败（说明检查项失效，门禁会永远通过）：')
@@ -514,10 +543,19 @@ function main() {
     process.exit(1)
   }
 
-  const keyCount = Object.keys(input.locales[SOURCE_LOCALE].messages).length
+  const sourceKeys = Object.keys(input.locales[SOURCE_LOCALE].messages)
+  const coverage = input.localeCodes
+    .filter((code) => code !== SOURCE_LOCALE)
+    .map((code) => {
+      const filled = sourceKeys.filter(
+        (key) => input.locales[code]?.messages[key] !== undefined,
+      ).length
+      return `${code} ${String(filled)}`
+    })
+    .join(' / ')
   console.log(
-    `✔ i18n 一致：${String(input.localeCodes.length)} 个语言 / 简体 ${String(keyCount)} 个 key / ` +
-      `ribbon ${String(readRibbonControls(input.ribbonXml).length)} 个控件 / ` +
+    `✔ i18n 一致：${String(input.localeCodes.length)} 个语言 / 简体 ${String(sourceKeys.length)} 个 key / ` +
+      `覆盖 ${coverage} / ribbon ${String(readRibbonControls(input.ribbonXml).length)} 个控件 / ` +
       `${String(Object.keys(input.htmlByFile).length)} 个 HTML 页面的 data-i18n 全部对得上`,
   )
 }

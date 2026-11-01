@@ -32,7 +32,11 @@
  *   node scripts/audit-layout.mjs sync-panel.html      # 只审计指定页面
  *   node scripts/audit-layout.mjs --json          # 输出 JSON
  *   node scripts/audit-layout.mjs --widths 400,500
+ *   node scripts/audit-layout.mjs --locale en      # 先套上语言包再量（英文比中文长）
  *   CHROME_PATH=<chrome.exe> node scripts/audit-layout.mjs
+ *
+ * `--locale` 会在量之前把该语言包套到页面上：英文比中文长 30–50%，同样的容器
+ * 在中文下正常、在英文下可能折行或溢出，只量静态中文是量不出这个的。
  *
  * 退出码：0 无异常；1 发现异常；2 无法运行（缺浏览器 / 未找到页面）。
  *
@@ -44,7 +48,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -191,7 +195,69 @@ function listPages(filter) {
  *   ② 样式表 href 要解析成**绝对** file:// URL —— 探针副本在 temp 目录，`../css/...` 会失效
  *      → 整页无样式 → 量出幽灵数据。
  */
-function buildProbe(htmlPath, layoutWidth) {
+/** 读一个语言包的 messages（语言包是 `export default {…}` 后跟纯 JSON） */
+function readLocaleMessages(code) {
+  const text = readFileSync(join(projectRoot, 'locales', code, 'locale.js'), 'utf8')
+  const stripped = text.replace(/^[\s\S]*?export\s+default\s+/u, '').replace(/;\s*$/u, '')
+  return JSON.parse(stripped).messages
+}
+
+/**
+ * 生成「先套语言包再量布局」的探针脚本
+ *
+ * 为什么把语言包**内联**成 JSON，而不是在探针里 `import()`：Chrome 把 `file://` 当
+ * opaque origin，动态 `import()` 本地模块会**永远挂住**（既不 resolve 也不 reject）。
+ * 实测 `--allow-file-access-from-files` 无效；`--disable-web-security` 配独立 profile
+ * 在空白页能过，但在带多个样式表的真实页面上同样卡死。语言包本来就是纯数据，
+ * 内联没有信息损失。
+ *
+ * 替换逻辑与 `ts/i18n/dom.ts` 的 `applyI18n()` 逐条对应（同样两个循环 + 5 个属性绑定），
+ * **改那边的选择器时这里要跟着改**。末尾断言「至少替换到一个节点」——静默空转会量出
+ * 一份没套语言包的页面，然后报告「无异常」，那比不量更危险。
+ */
+function buildLocaleProbe(locale) {
+  const messages = readLocaleMessages(locale)
+  const fallback = readLocaleMessages('zh-CN')
+  return `<script>(() => {
+  const MESSAGES = ${JSON.stringify(messages)}
+  const FALLBACK = ${JSON.stringify(fallback)}
+  const t = (key) => MESSAGES[key] ?? FALLBACK[key] ?? key
+  let touched = 0
+  for (const node of document.querySelectorAll('[data-i18n]')) {
+    const key = node.dataset.i18n
+    if (key !== undefined && key !== '') { node.textContent = t(key); touched += 1 }
+  }
+  for (const node of document.querySelectorAll('[data-i18n-html]')) {
+    const key = node.dataset.i18nHtml
+    if (key !== undefined && key !== '') { node.innerHTML = t(key); touched += 1 }
+  }
+  for (const [selector, dataAttribute, targetAttribute] of [
+    ['[data-i18n-placeholder]', 'data-i18n-placeholder', 'placeholder'],
+    ['[data-i18n-title]', 'data-i18n-title', 'title'],
+    ['[data-i18n-aria-label]', 'data-i18n-aria-label', 'aria-label'],
+    ['[data-i18n-value]', 'data-i18n-value', 'value'],
+    ['[data-i18n-alt]', 'data-i18n-alt', 'alt'],
+  ]) {
+    for (const node of document.querySelectorAll(selector)) {
+      const key = node.getAttribute(dataAttribute)
+      if (key !== null && key !== '') { node.setAttribute(targetAttribute, t(key)); touched += 1 }
+    }
+  }
+  if (touched === 0) {
+    const pre = document.createElement('pre')
+    pre.id = 'audit'
+    pre.textContent = JSON.stringify({
+      title: document.title,
+      problems: [{ kind: 'locale-noop', path: ${JSON.stringify(locale)}, detail: '一个 data-i18n 都没替换到' }],
+    })
+    document.body.append(pre)
+    return
+  }
+${AUDIT}
+})()</script>`
+}
+
+function buildProbe(htmlPath, layoutWidth, locale) {
   let html = readFileSync(htmlPath, 'utf8')
   html = html.replace(
     /<meta\s+http-equiv="Content-Security-Policy"[\s\S]*?\/>/gu,
@@ -200,8 +266,18 @@ function buildProbe(htmlPath, layoutWidth) {
   html = html.replace(/(<link[^>]+href=")(\.\.\/[^"]+)(")/gu, (_m, head, href, tail) => {
     return `${head}${pathToFileURL(resolve(projectRoot, 'ui', href)).href}${tail}`
   })
-  const inject = `<style>html { width: ${String(layoutWidth)}px; }</style><script>${AUDIT}</script>`
-  return html.replace(/<\/body>/u, `${inject}</body>`)
+  const style = `<style>html { width: ${String(layoutWidth)}px; }</style>`
+  let script = `<script>${AUDIT}</script>`
+  if (locale !== undefined) {
+    if (/data-i18n(-[a-z-]+)?="/u.test(html)) {
+      script = buildLocaleProbe(locale)
+    } else {
+      // 还没打标记的页面（P5 待迁移）按原文量，不算异常——否则 --locale 会对
+      // 半个仓库报「一个都没替换到」，把真正的问题淹掉
+      console.warn(`  ⚠ ${basename(htmlPath)} 还没有 data-i18n 标记（P5 待迁移），按原文量`)
+    }
+  }
+  return html.replace(/<\/body>/u, `${style}${script}</body>`)
 }
 
 function run(browser, pagePath) {
@@ -244,6 +320,16 @@ function main() {
           .map((v) => Number.parseInt(v.trim(), 10))
           .filter((v) => Number.isFinite(v))
   const pages = listPages(args.filter((a) => a.endsWith('.html')))
+  const localeArg = args.indexOf('--locale')
+  const locale = localeArg === -1 ? undefined : (args[localeArg + 1] ?? '')
+  if (locale === '') {
+    console.error('✖ --locale 后面要跟语言代码，例如 `--locale en`')
+    return 2
+  }
+  if (locale !== undefined && !existsSync(join(projectRoot, 'locales', locale, 'locale.js'))) {
+    console.error(`✖ 找不到 locales/${locale}/locale.js`)
+    return 2
+  }
 
   const browser = findBrowser()
   if (browser === undefined) {
@@ -264,13 +350,16 @@ function main() {
       report[page] = {}
       for (const width of widths) {
         const file = join(dir, `${page}.${String(width)}.html`)
-        writeFileSync(file, buildProbe(join(projectRoot, 'ui', page), width), 'utf8')
+        writeFileSync(file, buildProbe(join(projectRoot, 'ui', page), width, locale), 'utf8')
         try {
           const result = run(browser, file)
           report[page][width] = result.problems
           total += result.problems.length
         } catch (error) {
+          // 探针跑不起来同样是「这次没验成」，必须计入失败——否则「全部页面抛错」
+          // 会打印成「✔ 未发现布局异常」并退出 0（踩过）
           report[page][width] = { error: error.message }
+          total += 1
         }
       }
     }
@@ -284,7 +373,8 @@ function main() {
   }
 
   console.log(`浏览器：${browser}`)
-  console.log(`页面：${String(pages.length)} 个 × 布局宽 ${widths.join('/')}px\n`)
+  console.log(`页面：${String(pages.length)} 个 × 布局宽 ${widths.join('/')}px`)
+  console.log(`语言：${locale ?? '页面静态文案（未套语言包）'}\n`)
   for (const page of pages) {
     for (const width of widths) {
       const items = report[page][width]

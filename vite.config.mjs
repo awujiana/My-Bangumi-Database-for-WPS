@@ -32,9 +32,9 @@ export default defineConfig({
         { src: 'libs/*', dest: '.' },          // → dist/libs/purify.js
         // 新增：复制 locales 目录（语言包）。
         // 必须用 `**` 保留二级目录：localeUrl() 在运行时按
-        // `dist-ts/i18n/locale-store.js` → `../../locales/<code>/locale.json` 拼路径，
+        // `dist-ts/i18n/locale-store.js` → `../../locales/<code>/locale.js` 拼路径，
         // 若只写 `locales/*` 则语言包不会进 dist，打出的 zip 里缺失 → 所有页面退回硬编码中文。
-        { src: 'locales/**/*', dest: '.' }     // → dist/locales/zh-CN/locale.json
+        { src: 'locales/**/*', dest: '.' }     // → dist/locales/zh-CN/locale.js
       ]
     })
   ],
