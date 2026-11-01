@@ -10,7 +10,12 @@
  *   - 其余：原生 `<select>`（键盘 / 无障碍最稳，也不占太多高度）。
  *
  *   纯 DOM、零依赖；每次渲染重建内容，调用方只管把最新选项传进来。
+ *
+ * 文案走 `tOr(key, 原文, 变量)` 而不是 `t()`：选择器在页面 init 里就会被渲染，
+ * 那时语言包可能还没 `import()` 完成，`t()` 会把 `common.searchPlaceholder`
+ * 这种 key 直接画到搜索框上。`tOr` 的兜底原文就是简体，正好是没加载时的正确表现。
  */
+import { tOr } from '../../i18n/index.js';
 /** 单选组 name 的唯一后缀（同页多个 picker 不互相串组） */
 let pickerSeed = 0;
 /**
@@ -26,7 +31,7 @@ export function renderOptionPicker(container, items, options) {
     if (items.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'bgm-option-picker-empty';
-        empty.textContent = options.emptyText ?? '（没有可选项）';
+        empty.textContent = options.emptyText ?? tOr('common.optionEmpty', '（没有可选项）');
         container.append(empty);
         return;
     }
@@ -91,8 +96,10 @@ function renderSearchableList(container, items, options) {
     const search = document.createElement('input');
     search.type = 'search';
     search.className = 'bgm-option-picker-search';
-    search.placeholder = `搜索${options.ariaLabel}…`;
-    search.setAttribute('aria-label', `搜索${options.ariaLabel}`);
+    search.placeholder = tOr('common.searchPlaceholder', '搜索{label}…', {
+        label: options.ariaLabel,
+    });
+    search.setAttribute('aria-label', tOr('common.searchAria', '搜索{label}', { label: options.ariaLabel }));
     const list = document.createElement('div');
     list.className = 'bgm-option-picker-list';
     list.setAttribute('role', 'listbox');
@@ -100,13 +107,11 @@ function renderSearchableList(container, items, options) {
     const renderList = (query) => {
         list.replaceChildren();
         const keyword = query.trim().toLowerCase();
-        const filtered = keyword === ''
-            ? items
-            : items.filter((item) => item.label.toLowerCase().includes(keyword));
+        const filtered = keyword === '' ? items : items.filter((item) => item.label.toLowerCase().includes(keyword));
         if (filtered.length === 0) {
             const empty = document.createElement('p');
             empty.className = 'bgm-option-picker-empty';
-            empty.textContent = '没有匹配项';
+            empty.textContent = tOr('common.optionNoMatch', '没有匹配项');
             list.append(empty);
             return;
         }

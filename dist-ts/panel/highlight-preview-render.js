@@ -13,7 +13,13 @@
  *
  * 上限 {@link PREVIEW_DETAIL_LIMIT} 是**渲染上限**，不是命中上限：命中可能上千行
  * （一整季的番剧），全量铺进 DOM 会让预览区卡住；超出部分只报数，不静默丢。
+ *
+ * 文案用 `tOr(key, 简体原文)`：这是纯字符串拼装模块，单测直接比 HTML，不加载语言包；
+ * 兜底原文既是「语言包没就绪」时的正确表现，也让单测不必伪造一份 570+ key 的包。
+ * 漏翻在这里不会静默——`check:i18n` 规则 ⑧ 保证非源语言 100% 覆盖，运行期不存在
+ * 「某个 key 只有简体」这种状态。
  */
+import { tOr } from '../i18n/index.js';
 /**
  * 详情区最多渲染多少行
  *
@@ -45,7 +51,8 @@ function cellText(text) {
 function buildMoreHint(total) {
     if (total <= PREVIEW_DETAIL_LIMIT)
         return '';
-    return `<p class="highlight-preview-more">仅显示前 ${String(PREVIEW_DETAIL_LIMIT)} 行，共 ${String(total)} 行（完整结果请点「应用高亮」后在表里查看）</p>`;
+    const text = tOr('highlight.preview.moreHint', '仅显示前 {limit} 行，共 {total} 行（完整结果请点「应用高亮」后在表里查看）', { limit: PREVIEW_DETAIL_LIMIT, total });
+    return `<p class="highlight-preview-more">${escapeHtml(text)}</p>`;
 }
 /**
  * 表格视图
@@ -65,7 +72,7 @@ export function buildPreviewTableHtml(items) {
     return `<div class="highlight-preview-table">
       <table>
         <thead>
-          <tr><th>行</th><th>名称</th><th>匹配值</th></tr>
+          <tr><th>${escapeHtml(tOr('highlight.preview.tableHeaderRow', '行'))}</th><th>${escapeHtml(tOr('highlight.preview.tableHeaderName', '名称'))}</th><th>${escapeHtml(tOr('highlight.preview.tableHeaderValue', '匹配值'))}</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -76,7 +83,7 @@ export function buildPreviewCardsHtml(items) {
     const shown = items.slice(0, PREVIEW_DETAIL_LIMIT);
     const cards = shown
         .map((item) => `<article class="highlight-preview-card">
-          <span class="highlight-preview-card-row">行 ${String(item.row)}</span>
+          <span class="highlight-preview-card-row">${escapeHtml(tOr('highlight.preview.cardRow', '行 {row}', { row: item.row }))}</span>
           <div class="highlight-preview-card-name" title="${cellText(item.name)}">${cellText(item.name)}</div>
           <div class="highlight-preview-card-value" title="${cellText(item.value)}">${cellText(item.value)}</div>
         </article>`)

@@ -256,10 +256,17 @@ export function t(key: string, variables?: Readonly<Record<string, string | numb
  *
  * 注意别拿它替代 `t()` 写普通文案——那样漏翻时会**静默**显示中文，
  * 而 `t()` 至少会把 key 暴露出来。
+ *
+ * `variables` 同时作用于译文与兜底原文：兜底那句也是带 `{占位符}` 的模板，
+ * 不插值会原样露出花括号。
  */
-export function tOr(key: string, fallback: string): string {
-  const text = t(key)
-  return text === key ? fallback : text
+export function tOr(
+  key: string,
+  fallback: string,
+  variables?: Readonly<Record<string, string | number>>,
+): string {
+  const text = t(key, variables)
+  return text === key ? interpolate(fallback, variables) : text
 }
 
 /** 每个 key 只告警一次 */

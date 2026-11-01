@@ -10,6 +10,10 @@
  *   - 其余：原生 `<select>`（键盘 / 无障碍最稳，也不占太多高度）。
  *
  *   纯 DOM、零依赖；每次渲染重建内容，调用方只管把最新选项传进来。
+ *
+ * 文案走 `tOr(key, 原文, 变量)` 而不是 `t()`：选择器在页面 init 里就会被渲染，
+ * 那时语言包可能还没 `import()` 完成，`t()` 会把 `common.searchPlaceholder`
+ * 这种 key 直接画到搜索框上。`tOr` 的兜底原文就是简体，正好是没加载时的正确表现。
  */
 /** 一个可选项 */
 export interface OptionPickerItem {

@@ -20,13 +20,13 @@ import { showToast } from '../ui/dialog.js';
 import { escapeHtml } from '../tools/string-utilities.js';
 import { bgmLog, findHeaderRow, getApp, getColumnMap, getLastRow, markHighlightPaneLoaded, readRangeValues, } from '../tools/util/index.js';
 import { CONFIG_KEYS, getConfig, setConfig } from '../tools/config.js';
-import { currentSeason, formatSeasonKey, formatSeasonLabel, isSeasonFilterMatch, rowsToRangeAddresses, runRangeGroupsWithSplit, selectSeasonRows, splitRangeAddresses, } from './highlight-season.js';
+import { currentSeason, formatSeasonKey, isSeasonFilterMatch, rowsToRangeAddresses, runRangeGroupsWithSplit, selectSeasonRows, splitRangeAddresses, } from './highlight-season.js';
 import { registerSheetChangeAutoRefresh } from './sync-panel-auto-refresh.js';
 import { buildPreviewDetailHtml, normalizePreviewView } from './highlight-preview-render.js';
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { initializeI18n } from '../i18n/index.js';
+import { initializeI18n, t } from '../i18n/index.js';
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js';
 import { mountDataContextNotice, registerTargetSheetApplier, saveDataContext, snapshotFromWorksheet, } from '../tools/data-context.js';
 import { renderOptionPicker } from '../ui/components/option-picker.js';
@@ -110,6 +110,15 @@ function setText(id, text) {
     const element = byId(id);
     if (element)
         element.textContent = text;
+}
+/**
+ * 季文本（UI 展示用）：中文 `2026 年 10 月`、英文 `2026-10`
+ *
+ * 不复用引擎的 `formatSeasonLabel`：那句是写死的中文。引擎保持纯数据，
+ * 展示口径由页面按当前语言决定。
+ */
+function seasonLabel(ym) {
+    return t('highlight.season.label', { year: ym.year, month: ym.month });
 }
 // ===== 数据源与列 =====
 function columnLetter(column) {
@@ -203,10 +212,10 @@ function renderSourcePicker() {
     }
     renderOptionPicker(container, values.map((value) => ({
         value,
-        label: value === '__auto__' ? '自动识别（日期列优先）' : value,
+        label: value === '__auto__' ? t('highlight.picker.auto') : value,
     })), {
         value: configured,
-        ariaLabel: '识别列',
+        ariaLabel: t('highlight.picker.sourceAria'),
         onChange: (value) => {
             onSourceChange(value);
         },
@@ -228,8 +237,8 @@ function renderColumnList() {
         return `
       <label class="highlight-row">
         <input type="checkbox" data-column="${escapeHtml(c.name)}"${c.selected ? ' checked' : ''}${isLocked ? ' disabled' : ''} />
-        <span class="highlight-column-name">${escapeHtml(c.name)}${isLocked ? '（日期源，必选）' : ''}</span>
-        <span class="highlight-column-letter">${escapeHtml(c.letter)} 列</span>
+        <span class="highlight-column-name">${escapeHtml(c.name)}${isLocked ? escapeHtml(t('highlight.columns.dateSourceLocked')) : ''}</span>
+        <span class="highlight-column-letter">${escapeHtml(t('highlight.columns.letter', { letter: c.letter }))}</span>
       </label>`;
     })
         .join('');
@@ -282,8 +291,8 @@ function renderWorkbookPicker() {
     }
     renderOptionPicker(container, workbookNames.map((name) => ({ value: name, label: name })), {
         value: currentWorkbookName(),
-        ariaLabel: '工作簿',
-        emptyText: '（无已打开的工作簿）',
+        ariaLabel: t('highlight.condition.workbook'),
+        emptyText: t('highlight.picker.workbookEmpty'),
         onChange: (workbook) => {
             onWorkbookChange(workbook);
         },
@@ -298,8 +307,8 @@ function renderSheetPicker() {
     const visible = state.sheets.filter((entry) => entry.workbook === workbook);
     renderOptionPicker(container, visible.map((entry) => ({ value: entry.key, label: entry.sheet })), {
         value: state.selectedKey,
-        ariaLabel: '工作表',
-        emptyText: '（该工作簿下没有可显示的工作表）',
+        ariaLabel: t('highlight.condition.sheet'),
+        emptyText: t('highlight.picker.sheetEmpty'),
         onChange: (key) => {
             onSheetChange(key);
         },
@@ -311,7 +320,7 @@ function renderSheetPicker() {
         notice.textContent =
             state.selectionMissing === ''
                 ? ''
-                : `⚠️ 原目标表 ${state.selectionMissing} 已不存在，请重新选择`;
+                : t('highlight.picker.sheetMissing', { sheet: state.selectionMissing });
     }
 }
 /** 工作簿切换：只重渲工作表选择器（轻量，不读数据） */
@@ -345,8 +354,8 @@ function resetSheetData() {
     state.sourceKey = '';
     state.sourceCol = 0;
     renderSourcePicker();
-    setText('highlightSheetName', selectedSheetEntry()?.sheet ?? '请选择工作表');
-    renderPreviewEmpty('点「加载并预览」读取该表并生成预览');
+    setText('highlightSheetName', selectedSheetEntry()?.sheet ?? t('highlight.sheet.placeholder'));
+    renderPreviewEmpty(t('highlight.preview.emptyDefault'));
 }
 // ===== 预览 =====
 function currentTarget() {
@@ -362,7 +371,7 @@ function refreshPreview() {
     if (!source) {
         state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 };
         state.lastTarget = null;
-        renderPreviewEmpty('未识别到日期列（开播季度 / 开播日期 / 完播日），请检查表头');
+        renderPreviewEmpty(t('highlight.preview.emptyNoDateColumn'));
         return;
     }
     state.sourceKey = source.key;
@@ -375,7 +384,7 @@ function refreshPreview() {
     const firstRow = headerRow + 1;
     if (lastRow < firstRow) {
         state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 };
-        renderPreviewEmpty('表里没有数据行');
+        renderPreviewEmpty(t('highlight.preview.emptyNoRows'));
         return;
     }
     // 一次矩形读：日期源列 + 名称列（名称仅用于预览展示）+ 非动漫兜底列
@@ -397,7 +406,7 @@ function refreshPreview() {
     const block = readRangeValues(worksheet, firstRow, lastRow, minColumn, maxColumn);
     if (block.length === 0) {
         state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 };
-        renderPreviewEmpty('读取工作表失败，请重试');
+        renderPreviewEmpty(t('highlight.preview.emptyReadFailed'));
         return;
     }
     const names = new Map();
@@ -486,11 +495,14 @@ function selectVisibleRows(rows, fallbackValues, target) {
 function renderPreview() {
     const { matchedRows, emptyCount, invalidCount } = state.lastSelect;
     const target = state.lastTarget;
-    setText('highlightPreviewCount', `命中 ${String(matchedRows.length)} 行`);
+    setText('highlightPreviewCount', t('highlight.preview.count', { count: matchedRows.length }));
     setText('highlightPreviewTarget', target
-        ? `目标：${formatSeasonLabel(target)}（${formatSeasonKey(target)}）${isFormulaSource() ? ' · 公式列口径' : ' · 原始日期口径'}`
+        ? t(isFormulaSource() ? 'highlight.preview.targetFormula' : 'highlight.preview.targetRaw', {
+            season: seasonLabel(target),
+            key: formatSeasonKey(target),
+        })
         : '');
-    setText('highlightPreviewSkip', `空 ${String(emptyCount)} 格 · 非日期文本 ${String(invalidCount)} 条（已跳过）`);
+    setText('highlightPreviewSkip', t('highlight.preview.skip', { empty: emptyCount, invalid: invalidCount }));
     renderPreviewDetail();
 }
 /** 详情区：按当前视图渲染命中行（无命中时清空，摘要行已经说明「命中 0 行」） */
@@ -519,7 +531,7 @@ function syncPreviewViewButtons() {
 }
 function renderPreviewEmpty(message) {
     state.lastMatched = [];
-    setText('highlightPreviewCount', '命中 0 行');
+    setText('highlightPreviewCount', t('highlight.preview.countZero'));
     setText('highlightPreviewTarget', message);
     setText('highlightPreviewSkip', '');
     renderPreviewDetail();
@@ -583,13 +595,13 @@ function applyHighlight(isSilent = false) {
     const { worksheet } = state;
     if (!worksheet) {
         if (!isSilent)
-            showToast('请先打开一个数据工作表', 'warn');
+            showToast(t('highlight.toast.noSheet'), 'warn');
         return;
     }
     const rows = state.lastSelect.matchedRows;
     if (rows.length === 0) {
         if (!isSilent)
-            showToast('没有可高亮的匹配行', 'warn');
+            showToast(t('highlight.toast.noMatchedRows'), 'warn');
         return;
     }
     // 连续行合并 + 按 8000 字符装车：块失败自动对半拆（见 paintSheet）
@@ -602,27 +614,27 @@ function applyHighlight(isSilent = false) {
     const painted = paintSheet(worksheet, addresses, { fillColor: HIGHLIGHT_COLOR, fontColor: 0 });
     if (painted === 0) {
         if (!isSilent)
-            showToast('高亮写入失败，请查看日志', 'error');
+            showToast(t('highlight.toast.applyFailed'), 'error');
         return;
     }
     const record = { sheet: worksheet.Name, addresses };
     setConfig(KEY_LAST_APPLIED, JSON.stringify(record));
     bgmLog(LOG_LEVELS.INFO, `[highlight] 已高亮 ${String(rows.length)} 行 × ${String(selectedColumns)} 列（${String(painted)} 个区域块）`);
     if (!isSilent) {
-        showToast(`已高亮 ${String(rows.length)} 行 × ${String(selectedColumns)} 列`, 'success');
+        showToast(t('highlight.toast.applied', { rows: rows.length, columns: selectedColumns }), 'success');
     }
 }
 function clearHighlight(isSilent = false) {
     const record = readLastApplied();
     if (!record) {
         if (!isSilent)
-            showToast('没有本插件施加的高亮记录', 'info');
+            showToast(t('highlight.toast.noClearRecord'), 'info');
         return;
     }
     const { worksheet } = state;
     if (worksheet?.Name !== record.sheet) {
         if (!isSilent)
-            showToast(`请先切换到工作表「${record.sheet}」再清除`, 'warn');
+            showToast(t('highlight.toast.switchSheetFirst', { sheet: record.sheet }), 'warn');
         return;
     }
     paintSheet(worksheet, record.addresses, {
@@ -632,7 +644,7 @@ function clearHighlight(isSilent = false) {
     setConfig(KEY_LAST_APPLIED, '');
     bgmLog(LOG_LEVELS.INFO, '[highlight] 已清除上次高亮');
     if (!isSilent)
-        showToast('已清除高亮', 'success');
+        showToast(t('highlight.toast.cleared'), 'success');
 }
 // ===== 自动关注（设置页统一管理，页面只读配置同步监听）=====
 /** 按配置同步「自动关注」监听：开→注册 SheetChange 监听，关→注销。
@@ -669,7 +681,7 @@ function buildManualSelectors() {
         const thisYear = new Date().getFullYear();
         const years = [thisYear - 3, thisYear - 2, thisYear - 1, thisYear, thisYear + 1];
         yearSelect.innerHTML = years
-            .map((y) => `<option value="${String(y)}">${String(y)} 年</option>`)
+            .map((y) => `<option value="${String(y)}">${escapeHtml(t('highlight.season.yearOption', { year: y }))}</option>`)
             .join('');
         yearSelect.value = String(state.manual.year);
         yearSelect.addEventListener('change', () => {
@@ -681,7 +693,7 @@ function buildManualSelectors() {
     const monthSelect = selectById('highlightManualMonth');
     if (monthSelect) {
         monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
-            .map((m) => `<option value="${String(m)}">${String(m)} 月</option>`)
+            .map((m) => `<option value="${String(m)}">${escapeHtml(t('highlight.season.monthOption', { month: m }))}</option>`)
             .join('');
         monthSelect.value = String(state.manual.month);
         monthSelect.addEventListener('change', () => {
@@ -705,7 +717,7 @@ function buildFilterControls() {
         const thisYear = new Date().getFullYear();
         const years = Array.from({ length: 11 }, (_, index) => thisYear - 5 + index);
         yearSelect.innerHTML = years
-            .map((y) => `<option value="${String(y)}">${String(y)} 年</option>`)
+            .map((y) => `<option value="${String(y)}">${escapeHtml(t('highlight.season.yearOption', { year: y }))}</option>`)
             .join('');
         yearSelect.value = String(state.filter.year);
         yearSelect.addEventListener('change', () => {
@@ -716,7 +728,7 @@ function buildFilterControls() {
     }
     const quarterSelect = selectById('highlightFilterQuarter');
     if (quarterSelect) {
-        quarterSelect.innerHTML = QUARTER_OPTIONS.map((m) => `<option value="${String(m)}">${String(m)} 月季</option>`).join('');
+        quarterSelect.innerHTML = QUARTER_OPTIONS.map((m) => `<option value="${String(m)}">${escapeHtml(t('highlight.season.quarterOption', { month: m }))}</option>`).join('');
         quarterSelect.value = String(state.filter.quarter ?? 1);
         quarterSelect.addEventListener('change', () => {
             state.filter = { ...state.filter, quarter: Number(quarterSelect.value) };
@@ -727,7 +739,7 @@ function buildFilterControls() {
     const monthSelect = selectById('highlightFilterMonth');
     if (monthSelect) {
         monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
-            .map((m) => `<option value="${String(m)}">${String(m)} 月</option>`)
+            .map((m) => `<option value="${String(m)}">${escapeHtml(t('highlight.season.monthOption', { month: m }))}</option>`)
             .join('');
         monthSelect.value = String(state.filter.month ?? 1);
         monthSelect.addEventListener('change', () => {
@@ -817,7 +829,7 @@ function applyFilterRows(isSilent = false) {
     const span = state.filterSpan;
     if (!worksheet || !span) {
         if (!isSilent)
-            showToast('请先点「加载并预览」', 'warn');
+            showToast(t('highlight.toast.loadFirst'), 'warn');
         return;
     }
     const matched = new Set(state.lastSelect.matchedRows);
@@ -828,7 +840,7 @@ function applyFilterRows(isSilent = false) {
     }
     if (hiddenRows.length === 0) {
         if (!isSilent)
-            showToast('所有行都命中，无需筛选', 'info');
+            showToast(t('highlight.toast.allMatched'), 'info');
         return;
     }
     const painted = runRangeGroupsWithSplit(splitRangeAddresses(rowsToRangeAddresses(hiddenRows, 'A')), (group) => {
@@ -836,12 +848,12 @@ function applyFilterRows(isSilent = false) {
     });
     if (painted === 0) {
         if (!isSilent)
-            showToast('筛选写入失败，请查看日志', 'error');
+            showToast(t('highlight.toast.filterFailed'), 'error');
         return;
     }
     bgmLog(LOG_LEVELS.INFO, `[highlight] 已筛选显示 ${String(matched.size)} 行（隐藏 ${String(hiddenRows.length)} 行）`);
     if (!isSilent) {
-        showToast(`已筛选显示 ${String(matched.size)} 行（隐藏 ${String(hiddenRows.length)} 行）`, 'success');
+        showToast(t('highlight.toast.filtered', { matched: matched.size, hidden: hiddenRows.length }), 'success');
     }
 }
 /** 取消筛选：把数据区整体显示回来 */
@@ -850,12 +862,12 @@ function clearFilterRows(isSilent = false) {
     const span = state.filterSpan;
     if (!worksheet || !span) {
         if (!isSilent)
-            showToast('请先点「加载并预览」', 'warn');
+            showToast(t('highlight.toast.loadFirst'), 'warn');
         return;
     }
     worksheet.Range(`A${String(span.firstRow)}:A${String(span.lastRow)}`).Rows.Hidden = false;
     if (!isSilent)
-        showToast('已取消筛选', 'success');
+        showToast(t('highlight.toast.filterCleared'), 'success');
 }
 /** 按 state.mode 渲染模式按钮 active 与手动框显隐（只读反映配置，不在本页切换） */
 function renderModeUi() {
@@ -880,8 +892,8 @@ function applyFeatureTogglesFromConfig() {
 function reloadSheet() {
     const { worksheet } = state;
     if (!worksheet) {
-        setText('highlightSheetName', '请选择数据工作表');
-        renderPreviewEmpty('请先在上方选择工作簿与工作表，然后点「加载并预览」');
+        setText('highlightSheetName', t('highlight.sheet.none'));
+        renderPreviewEmpty(t('highlight.preview.emptyNoSheet'));
         return;
     }
     // 每次加载工作表前重读功能开关（设置页改的模式 / 自动关注在此对齐）
@@ -984,7 +996,7 @@ function reloadSheetSelection() {
     if (!isSelectionValid && state.sheets.length > 0) {
         if (isSheetLocked()) {
             state.selectedKey = '';
-            state.selectionMissing = state.selectedKey || '（未知）';
+            state.selectionMissing = state.selectedKey || t('highlight.sheet.unknown');
         }
         else {
             const active = activeWorksheet();
@@ -1007,10 +1019,10 @@ function highlightPhaseBind() {
     // onWorkbookChange / onSheetChange / onSourceChange，不再绑 <select> 的 change
     // 高亮模式已上移设置页「⚙️ 功能开关」统一管理；此处按钮只读展示当前模式，点击给指引
     byId('highlightModeAuto')?.addEventListener('click', () => {
-        showToast('高亮模式请在「设置 · 功能开关」中修改', 'info');
+        showToast(t('highlight.toast.modeInSettings'), 'info');
     });
     byId('highlightModeManual')?.addEventListener('click', () => {
-        showToast('高亮模式请在「设置 · 功能开关」中修改', 'info');
+        showToast(t('highlight.toast.modeInSettings'), 'info');
     });
     byId('highlightRefreshBtn')?.addEventListener('click', () => {
         reloadSheet();
@@ -1043,7 +1055,7 @@ function highlightPhaseBind() {
         watchBox.checked = getConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, '0', true) === '1';
         watchBox.addEventListener('change', () => {
             watchBox.checked = getConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, '0', true) === '1';
-            showToast('自动关注请在「设置 · 功能开关」中修改', 'info');
+            showToast(t('highlight.toast.autoWatchInSettings'), 'info');
         });
     }
     // 目标表锁定：默认不锁（选中键失效时兜底跳活动表，保持既有行为）。

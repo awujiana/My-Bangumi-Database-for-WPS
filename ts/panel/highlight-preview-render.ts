@@ -13,7 +13,20 @@
  *
  * 上限 {@link PREVIEW_DETAIL_LIMIT} 是**渲染上限**，不是命中上限：命中可能上千行
  * （一整季的番剧），全量铺进 DOM 会让预览区卡住；超出部分只报数，不静默丢。
+ *
+ * 文案用 `tOr(key, 简体原文)`：这是纯字符串拼装模块，单测直接比 HTML，不加载语言包；
+ * 兜底原文既是「语言包没就绪」时的正确表现，也让单测不必伪造一份 570+ key 的包。
+ * 漏翻在这里不会静默——`check:i18n` 规则 ⑧ 保证非源语言 100% 覆盖，运行期不存在
+ * 「某个 key 只有简体」这种状态。
+ *
+ * **从 `i18n/locale-store` 直接取，不走 `i18n/index` 桶**：桶会连带引入
+ * `locale-install` → `tools/save-file` → `ts/index`，而 `ts/index` 在模块顶层就写
+ * `window.initializePanelCore`。本模块的单测跑在 node 环境（没有 `window`），
+ * 走桶会让一个纯函数模块必须套 jsdom 才能测——这正是本文件当初「自带 escapeHtml、
+ * 不依赖 tools 层」想避免的事。
  */
+
+import { tOr } from '../i18n/locale-store.js'
 
 /** 预览视图 */
 export type PreviewView = 'table' | 'card'
@@ -63,7 +76,12 @@ function cellText(text: string): string {
 /** 超出渲染上限时的说明（没有超出则返回空串） */
 function buildMoreHint(total: number): string {
   if (total <= PREVIEW_DETAIL_LIMIT) return ''
-  return `<p class="highlight-preview-more">仅显示前 ${String(PREVIEW_DETAIL_LIMIT)} 行，共 ${String(total)} 行（完整结果请点「应用高亮」后在表里查看）</p>`
+  const text = tOr(
+    'highlight.preview.moreHint',
+    '仅显示前 {limit} 行，共 {total} 行（完整结果请点「应用高亮」后在表里查看）',
+    { limit: PREVIEW_DETAIL_LIMIT, total },
+  )
+  return `<p class="highlight-preview-more">${escapeHtml(text)}</p>`
 }
 
 /**
@@ -86,7 +104,7 @@ export function buildPreviewTableHtml(items: readonly PreviewRowDetail[]): strin
   return `<div class="highlight-preview-table">
       <table>
         <thead>
-          <tr><th>行</th><th>名称</th><th>匹配值</th></tr>
+          <tr><th>${escapeHtml(tOr('highlight.preview.tableHeaderRow', '行'))}</th><th>${escapeHtml(tOr('highlight.preview.tableHeaderName', '名称'))}</th><th>${escapeHtml(tOr('highlight.preview.tableHeaderValue', '匹配值'))}</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -99,7 +117,7 @@ export function buildPreviewCardsHtml(items: readonly PreviewRowDetail[]): strin
   const cards = shown
     .map(
       (item) => `<article class="highlight-preview-card">
-          <span class="highlight-preview-card-row">行 ${String(item.row)}</span>
+          <span class="highlight-preview-card-row">${escapeHtml(tOr('highlight.preview.cardRow', '行 {row}', { row: item.row }))}</span>
           <div class="highlight-preview-card-name" title="${cellText(item.name)}">${cellText(item.name)}</div>
           <div class="highlight-preview-card-value" title="${cellText(item.value)}">${cellText(item.value)}</div>
         </article>`,

@@ -115,8 +115,11 @@ export declare function t(key: string, variables?: Readonly<Record<string, strin
  *
  * 注意别拿它替代 `t()` 写普通文案——那样漏翻时会**静默**显示中文，
  * 而 `t()` 至少会把 key 暴露出来。
+ *
+ * `variables` 同时作用于译文与兜底原文：兜底那句也是带 `{占位符}` 的模板，
+ * 不插值会原样露出花括号。
  */
-export declare function tOr(key: string, fallback: string): string;
+export declare function tOr(key: string, fallback: string, variables?: Readonly<Record<string, string | number>>): string;
 /** 覆盖率（源语言为 100%；未加载的语言为 0%） */
 export declare function getLocaleCoverage(code: LocaleCode): LocaleCoverage;
 /** 订阅语言变更（返回退订函数） */
