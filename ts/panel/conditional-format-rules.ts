@@ -25,6 +25,8 @@
 
 // 只引类型（`import type` 会被完全擦除）：本文件保持零运行时依赖，
 // 但「自动聚类口径」的取值集合由 tools/config 单点定义，不在这里再抄一份。
+// 直接从 locale-store 取 tOr，不要走 i18n 桶（桶会连带 ts/index，node 单测没有 window）
+import { tOr } from '../i18n/locale-store.js'
 import type { ClusterMode } from '../tools/config.js'
 
 /** 单条条件格式规则（Store 里的一条记录） */
@@ -458,8 +460,11 @@ function clusterGroupName(
   if (mode === 'range-formula') return `${snapshot.range} · ${pattern}`
   const start = parseRangeStart(snapshot.range)
   if (start === null) return null
-  if (mode === 'column') return `列 ${start.column}`
-  return start.row === null ? null : `行 ${String(start.row)}`
+  if (mode === 'column')
+    return tOr('conditionalFormat.rules.columnLabel', '列 {column}', { column: start.column })
+  return start.row === null
+    ? null
+    : tOr('conditionalFormat.rules.rowLabel', '行 {row}', { row: start.row })
 }
 
 // ===== 合并重复项（同一公式的多条单行规则并成一条）=====
@@ -905,7 +910,12 @@ export function foreignSnapshotToRule(
   if (snapshot.kind !== 'expression' || !snapshot.formula) return null
   return {
     id: makeId(),
-    name: `导入 ${snapshot.range || '未知范围'}`,
+    name: tOr('conditionalFormat.rules.importedName', '导入 {range}', {
+      range:
+        snapshot.range === ''
+          ? tOr('conditionalFormat.rules.unknownRange', '未知范围')
+          : snapshot.range,
+    }),
     group,
     appliesTo: snapshot.range,
     formula: snapshot.formula,
@@ -1017,7 +1027,11 @@ export function planApply(
   if (strategy === 'replace') {
     if (foreign.length > 0) {
       warnings.push(
-        `将清空工作表上全部 ${String(foreign.length)} 条规则（含手工规则），范围与公式已在确认框列出`,
+        tOr(
+          'conditionalFormat.rules.warnClearAll',
+          '将清空工作表上全部 {count} 条规则（含手工规则），范围与公式已在确认框列出',
+          { count: foreign.length },
+        ),
       )
     }
     return {
@@ -1052,8 +1066,11 @@ export function planApply(
   const deletions = previousApplied.filter((record) => !wantedKeys.has(ruleFingerprint(record)))
   if (deletions.length > 0) {
     warnings.push(
-      `将移除上一轮由本插件写入、规则库里已不存在的 ${String(deletions.length)} 条旧规则` +
-        '（工作表上的其它规则不动）',
+      tOr(
+        'conditionalFormat.rules.warnRemoveStale',
+        '将移除上一轮由本插件写入、规则库里已不存在的 {count} 条旧规则（工作表上的其它规则不动）',
+        { count: deletions.length },
+      ),
     )
   }
 

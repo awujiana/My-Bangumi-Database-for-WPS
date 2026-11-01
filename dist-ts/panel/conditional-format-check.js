@@ -20,6 +20,8 @@
  *   - `false` = 能写进去但**结果不对**（如范围在 B 列、公式却在判 I 列）——
  *     这类不拦，但要摆在用户眼前，否则就是「写进去了却看着没生效」。
  */
+// 直接从 locale-store 取 tOr，不要走 i18n 桶（桶会连带 ts/index，node 单测没有 window）
+import { tOr } from '../i18n/locale-store.js';
 import { normalizeHexColor } from './conditional-format-rules.js';
 import { columnNumberOf, parseRangeRect } from './conditional-format-table.js';
 /** 自动修复的轮次上限（防「修法制造新问题」时死循环） */
@@ -77,7 +79,7 @@ export function inspectRule(rule) {
         issues.push({
             code: 'range-empty',
             field: 'appliesTo',
-            message: '应用范围为空，宿主会直接拒绝（请先填范围，如 B2:B50001）',
+            message: tOr('conditionalFormat.check.rangeEmpty', '应用范围为空，宿主会直接拒绝（请先填范围，如 B2:B50001）'),
             blocking: true,
         });
     }
@@ -90,7 +92,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'range-sheet-prefix',
                 field: 'appliesTo',
-                message: `范围带了工作表名前缀（“${rawRange}”），条件格式只能落在本表范围内`,
+                message: tOr('conditionalFormat.check.rangeSheetPrefix', '范围带了工作表名前缀（“{range}”），条件格式只能落在本表范围内', { range: rawRange }),
                 fixed: bareRange,
                 blocking: true,
             });
@@ -102,7 +104,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'range-unparsable',
                 field: 'appliesTo',
-                message: `范围“${rawRange}”不是合法地址（应为 B2:B50001 / $J:$J / 2:500 这类写法）`,
+                message: tOr('conditionalFormat.check.rangeUnparsable', '范围“{range}”不是合法地址（应为 B2:B50001 / $J:$J / 2:500 这类写法）', { range: rawRange }),
                 blocking: true,
             });
         }
@@ -110,7 +112,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'range-out-of-sheet',
                 field: 'appliesTo',
-                message: `范围超出了工作表边界（最大 ${String(MAX_ROW)} 行 / 16384 列）`,
+                message: tOr('conditionalFormat.check.rangeOutOfBounds', '范围超出了工作表边界（最大 {maxRow} 行 / 16384 列）', { maxRow: MAX_ROW }),
                 fixed: buildClampedRange(rect),
                 blocking: true,
             });
@@ -121,7 +123,7 @@ export function inspectRule(rule) {
         issues.push({
             code: 'formula-empty',
             field: 'formula',
-            message: '公式为空，宿主会直接拒绝（如 =$I2="拼多多驿站"）',
+            message: tOr('conditionalFormat.check.formulaEmpty', '公式为空，宿主会直接拒绝（如 =$I2="拼多多驿站"）'),
             blocking: true,
         });
     }
@@ -130,7 +132,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'formula-redundant-equals',
                 field: 'formula',
-                message: `公式开头有多余的等号（“${rawFormula.slice(0, 8)}…”）`,
+                message: tOr('conditionalFormat.check.formulaLeadingEquals', '公式开头有多余的等号（“{head}…”）', { head: rawFormula.slice(0, 8) }),
                 fixed: rawFormula.replace(/^=+/u, '='),
                 blocking: true,
             });
@@ -139,7 +141,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'formula-quote-unbalanced',
                 field: 'formula',
-                message: '公式里的英文引号没配对（奇数个 "），宿主会判语法错误',
+                message: tOr('conditionalFormat.check.formulaQuoteUnbalanced', '公式里的英文引号没配对（奇数个 "），宿主会判语法错误'),
                 fixed: `${rawFormula}"`,
                 blocking: true,
             });
@@ -148,7 +150,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'formula-other-sheet',
                 field: 'formula',
-                message: '公式引用了别的工作表（含 “!”），条件格式里通常不生效',
+                message: tOr('conditionalFormat.check.formulaOtherSheet', '公式引用了别的工作表（含 “!”），条件格式里通常不生效'),
                 blocking: false,
             });
         }
@@ -164,7 +166,7 @@ export function inspectRule(rule) {
             issues.push({
                 code: 'range-formula-column-mismatch',
                 field: 'appliesTo',
-                message: `范围首列在第 ${String(rect.startColumn)} 列，公式却在判 ${referenced} 列 —— 能写进去，但看起来会“没生效”`,
+                message: tOr('conditionalFormat.check.formulaColumnMismatch', '范围首列在第 {rangeColumn} 列，公式却在判 {formulaColumn} 列 —— 能写进去，但看起来会“没生效”', { rangeColumn: rect.startColumn, formulaColumn: referenced }),
                 blocking: false,
             });
         }
@@ -206,7 +208,9 @@ function inspectColor(field, raw, fallback) {
     return {
         code: 'color-invalid',
         field,
-        message: `颜色“${raw}”不是合法的 #RRGGBB，写进宿主会被拒绝`,
+        message: tOr('conditionalFormat.check.colorInvalid', '颜色“{color}”不是合法的 #RRGGBB，写进宿主会被拒绝', {
+            color: raw,
+        }),
         fixed: fallback,
         blocking: true,
     };

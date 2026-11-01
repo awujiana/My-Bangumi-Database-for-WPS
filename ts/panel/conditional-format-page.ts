@@ -11,6 +11,9 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { showToast } from '../ui/dialog.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js'
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js'
 import {
   BGM,
@@ -452,7 +455,13 @@ function reloadSheets(): void {
     // 监听或初始化，否则整页「不能点击」。降级为「可重试」空态 + 提示。
     const message = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 枚举工作表失败：${message}`)
-    showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.loadWorkbooksFailed',
+        '读取工作簿列表失败，请点「🔄 刷新列表」重试',
+      ),
+      'error',
+    )
     state.sheets = []
     renderWorkbookPicker()
     renderSheetPicker()
@@ -662,7 +671,7 @@ function renderExistingBatchBar(): void {
     <button type="button" class="bgm-btn small" data-batch-action="edit" title="批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填；改完立刻写表）">✎ 批量修改</button>
     <button type="button" class="bgm-btn small" data-batch-action="import" ${
       rebuildableCount === 0 ? 'disabled' : ''
-    } title="${rebuildableCount === 0 ? '所选规则里没有可导入的公式类规则' : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
+    } title="${rebuildableCount === 0 ? tOr('conditionalFormat.toast.importNoFormulaSelected', '所选规则里没有可导入的公式类规则') : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
     <button type="button" class="bgm-btn small" data-batch-action="export" title="把所选规则导出为 JSON 文件（另存为对话框选保存位置）">📤 导出所选</button>
     <button type="button" class="bgm-btn small danger" data-batch-action="delete" title="从工作表删除所选规则">✕ 批量删除</button>
     <button type="button" class="bgm-btn small" data-batch-action="clear" title="取消选择">取消选择</button>`
@@ -888,12 +897,24 @@ function batchExportForeignRules(): void {
     }
   }
   if (rules.length === 0) {
-    showToast('所选规则里没有可导出的公式类规则', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.exportNoFormulaSelected', '所选规则里没有可导出的公式类规则'),
+      'warn',
+    )
     return
   }
-  saveRulesJson(rules, '所选规则')
+  saveRulesJson(rules, '所选规则', tOr('conditionalFormat.export.labelSelected', '所选规则'))
   if (skipped > 0) {
-    showToast(`${String(skipped)} 条类型不支持，未包含在导出文件里`, 'info')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.exportSkippedTypes',
+        '{count} 条类型不支持，未包含在导出文件里',
+        {
+          count: String(skipped),
+        },
+      ),
+      'info',
+    )
   }
 }
 
@@ -916,7 +937,7 @@ function existingGroupIndices(group: string): number[] {
 function toggleExistingGroupSelection(group: string): void {
   const indices = existingGroupIndices(group)
   if (indices.length === 0) {
-    showToast('本组没有可勾选的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.groupNoSelectable', '本组没有可勾选的规则'), 'warn')
     return
   }
   const next = new Set(state.existingSelection)
@@ -943,12 +964,28 @@ function exportExistingGroup(group: string): void {
     }
   }
   if (rules.length === 0) {
-    showToast('本组没有可导出的公式类规则', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.groupExportNoFormula', '本组没有可导出的公式类规则'),
+      'warn',
+    )
     return
   }
-  saveRulesJson(rules, `「${group}」分组`)
+  saveRulesJson(
+    rules,
+    `「${group}」分组`,
+    tOr('conditionalFormat.export.labelGroup', '「{group}」分组', { group }),
+  )
   if (skipped > 0) {
-    showToast(`${String(skipped)} 条类型不支持，未包含在导出文件里`, 'info')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.exportSkippedTypes',
+        '{count} 条类型不支持，未包含在导出文件里',
+        {
+          count: String(skipped),
+        },
+      ),
+      'info',
+    )
   }
 }
 
@@ -964,7 +1001,7 @@ function deleteExistingGroup(group: string): void {
   if (!entry) return
   const indices = existingGroupIndices(group)
   if (indices.length === 0) {
-    showToast('本组没有可删除的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.groupNoDeletable', '本组没有可删除的规则'), 'warn')
     return
   }
   // BGM.Dialog.confirm（项目范式，非 window.confirm）：不可撤销操作必须确认
@@ -979,7 +1016,14 @@ function deleteExistingGroup(group: string): void {
       for (const index of descending) {
         const result = deleteForeignRule(entry.worksheet, index)
         if (result.ok) succeeded += 1
-        else failures.push(`第 ${String(index)} 条：${result.error}`)
+        else {
+          failures.push(
+            tOr('conditionalFormat.toast.failureItem', '第 {index} 条：{error}', {
+              index: String(index),
+              error: result.error,
+            }),
+          )
+        }
       }
       const removed = new Set(indices)
       state.existingSelection = new Set(
@@ -987,11 +1031,25 @@ function deleteExistingGroup(group: string): void {
       )
       if (failures.length > 0) {
         showToast(
-          `已删除 ${String(succeeded)} 条，${String(failures.length)} 条失败（${failures[0] ?? '未知原因'}）`,
+          tOr(
+            'conditionalFormat.toast.deleteFailedCount',
+            '已删除 {ok} 条，{failed} 条失败（{reason}）',
+            {
+              ok: String(succeeded),
+              failed: String(failures.length),
+              reason: failures[0] ?? tOr('conditionalFormat.toast.unknownReason', '未知原因'),
+            },
+          ),
           'error',
         )
       } else {
-        showToast(`已删除「${group}」分组 ${String(succeeded)} 条规则`, 'success')
+        showToast(
+          tOr('conditionalFormat.toast.groupDeleted', '已删除「{group}」分组 {count} 条规则', {
+            group,
+            count: String(succeeded),
+          }),
+          'success',
+        )
       }
       loadExistingRules()
     },
@@ -1040,7 +1098,7 @@ function openGroupNameModal(): void {
 function openRenameGroupModal(group: string): void {
   const count = Object.values(state.existingGroups).filter((value) => value === group).length
   if (count === 0) {
-    showToast('分组不存在，可能已被解散', 'warn')
+    showToast(tOr('conditionalFormat.toast.groupMissing', '分组不存在，可能已被解散'), 'warn')
     return
   }
   state.renamingGroup = group
@@ -1093,7 +1151,7 @@ function closeGroupNameModal(): void {
 function confirmGroupName(): void {
   const name = inputById('conditionalFormatGroupName')?.value.trim() ?? ''
   if (name === '') {
-    showToast('分组名不能为空', 'warn')
+    showToast(tOr('conditionalFormat.toast.groupNameEmpty', '分组名不能为空'), 'warn')
     return
   }
 
@@ -1104,7 +1162,7 @@ function confirmGroupName(): void {
     const renamed = renameGroupMapping(state.existingGroups, oldName, name)
     if (renamed === null) {
       closeGroupNameModal()
-      showToast('分组不存在，可能已被解散', 'warn')
+      showToast(tOr('conditionalFormat.toast.groupMissing', '分组不存在，可能已被解散'), 'warn')
       return
     }
     state.existingGroups = renamed
@@ -1116,7 +1174,12 @@ function confirmGroupName(): void {
     )
     closeGroupNameModal()
     renderExistingRules()
-    showToast(`分组已重命名为「${name}」`, 'success')
+    showToast(
+      tOr('conditionalFormat.toast.groupRenamed', '分组已重命名为「{name}」', {
+        name,
+      }),
+      'success',
+    )
     return
   }
 
@@ -1134,7 +1197,13 @@ function confirmGroupName(): void {
   persistExistingGroups()
   closeGroupNameModal()
   renderExistingRules()
-  showToast(`已把 ${String(count)} 条规则归入「${name}」`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.groupAssigned', '已把 {count} 条规则归入「{name}」', {
+      count: String(count),
+      name,
+    }),
+    'success',
+  )
 }
 
 /**
@@ -1146,7 +1215,7 @@ function confirmGroupName(): void {
 function dissolveExistingGroupLocal(group: string): void {
   const next = dissolveGroupMapping(state.existingGroups, group)
   if (next === null) {
-    showToast('分组不存在，可能已被解散', 'warn')
+    showToast(tOr('conditionalFormat.toast.groupMissing', '分组不存在，可能已被解散'), 'warn')
     return
   }
   state.existingGroups = next
@@ -1155,7 +1224,15 @@ function dissolveExistingGroupLocal(group: string): void {
     [...state.existingGroupCollapsed].filter((collapsed) => collapsed !== group),
   )
   renderExistingRules()
-  showToast(`已解散分组「${group}」，规则回「未分组」`, 'success')
+  showToast(
+    // 「未分组」是数据契约里的真实组名（UNGROUPED_LABEL），当变量传而不是写死在译文里，
+    // 否则英文用户会看到 “Ungrouped”，而列表上那一组仍叫「未分组」。
+    tOr('conditionalFormat.toast.groupDissolved', '已解散分组「{group}」，规则回「{ungrouped}」', {
+      group,
+      ungrouped: UNGROUPED_LABEL,
+    }),
+    'success',
+  )
 }
 
 /**
@@ -1168,7 +1245,7 @@ function dissolveExistingGroupLocal(group: string): void {
  */
 function autoClusterExistingGroups(): void {
   if (state.existing.length === 0) {
-    showToast('当前表没有既有规则', 'info')
+    showToast(tOr('conditionalFormat.toast.noExistingRules', '当前表没有既有规则'), 'info')
     return
   }
   const mode = getClusterMode(true)
@@ -1195,13 +1272,19 @@ function autoClusterExistingGroups(): void {
  */
 function mergeExistingDuplicates(): void {
   if (state.existing.length === 0) {
-    showToast('当前表没有既有规则', 'info')
+    showToast(tOr('conditionalFormat.toast.noExistingRules', '当前表没有既有规则'), 'info')
     return
   }
   const mode = getMergeMode(true)
   const result = mergeDuplicateRules(state.existing, mode)
   if (result.removedCount === 0) {
-    showToast('没有可合并的单行重复规则（需要同公式、同列且为单行范围）', 'info')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.noMergeable',
+        '没有可合并的单行重复规则（需要同公式、同列且为单行范围）',
+      ),
+      'info',
+    )
     return
   }
   // 快照 → 规则库条目：沿用「导入既有规则」同一条转换路径，避免两套映射
@@ -1215,9 +1298,18 @@ function mergeExistingDuplicates(): void {
   persistRules()
   renderRuleList()
   showToast(
-    `已把 ${String(state.existing.length)} 条合并为 ${String(result.rules.length)} 条并加入规则库（口径：${
-      mode === 'union' ? '强行并成一块' : '仅连续行'
-    }）；点「应用与修复」写回工作表`,
+    tOr(
+      'conditionalFormat.toast.merged',
+      '已把 {from} 条合并为 {to} 条并加入规则库（口径：{mode}）；点「应用与修复」写回工作表',
+      {
+        from: String(state.existing.length),
+        to: String(result.rules.length),
+        mode:
+          mode === 'union'
+            ? tOr('conditionalFormat.toast.mergeModeUnion', '强行并成一块')
+            : tOr('conditionalFormat.toast.mergeModeContiguous', '仅连续行'),
+      },
+    ),
     'success',
   )
   bgmLog(
@@ -1247,8 +1339,15 @@ function anchorExistingGroup(group: string, axis: AnchorAxis = 'column'): void {
   const entry = selectedSheet()
   const anchors = readAnchors()
   const toWholeAxis = axis === 'row' ? toFullRowRange : toFullColumnRange
-  const axisLabel = axis === 'row' ? '整行' : '整列'
-  const immuneLabel = axis === 'row' ? '列' : '行'
+  const axisLabel =
+    axis === 'row'
+      ? tOr('conditionalFormat.toast.axisRow', '整行')
+      : tOr('conditionalFormat.toast.axisColumn', '整列')
+  // axis=row 时免疫的是「列」，反之是「行」——与 axisLabel 相反，别顺手统一
+  const immuneLabel =
+    axis === 'row'
+      ? tOr('conditionalFormat.toast.axisColumnShort', '列')
+      : tOr('conditionalFormat.toast.axisRowShort', '行')
   let count = 0
   for (const [index, snapshot] of state.existing.entries()) {
     // 与渲染同口径（映射缺失 = 未分组）：直接拿映射值比「未分组」永远不相等，
@@ -1268,11 +1367,17 @@ function anchorExistingGroup(group: string, axis: AnchorAxis = 'column'): void {
     }
   }
   if (count === 0) {
-    showToast('本组没有可锚定的规则（需要公式与范围都能读到）', 'info')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.groupNoAnchorable',
+        '本组没有可锚定的规则（需要公式与范围都能读到）',
+      ),
+      'info',
+    )
     return
   }
   if (!setConfig(EXISTING_ANCHORS_STORE_KEY, serializeAnchors(anchors))) {
-    showToast('锚定保存失败', 'error')
+    showToast(tOr('conditionalFormat.toast.anchorSaveFailed', '锚定保存失败'), 'error')
     return
   }
   bgmLog(
@@ -1281,7 +1386,15 @@ function anchorExistingGroup(group: string, axis: AnchorAxis = 'column'): void {
   )
   loadExistingRules()
   showToast(
-    `已锚定 ${String(count)} 条规则：应用范围改为${axisLabel}，${immuneLabel}增删不再影响`,
+    tOr(
+      'conditionalFormat.toast.anchored',
+      '已锚定 {count} 条规则：应用范围改为{axis}，{immune}增删不再影响',
+      {
+        count: String(count),
+        axis: axisLabel,
+        immune: immuneLabel,
+      },
+    ),
     'success',
   )
 }
@@ -1296,7 +1409,7 @@ function anchorExistingGroup(group: string, axis: AnchorAxis = 'column'): void {
 function fixRulesToCell(): void {
   const entry = selectedSheet()
   if (entry === null || state.existing.length === 0) {
-    showToast('当前表没有既有规则', 'info')
+    showToast(tOr('conditionalFormat.toast.noExistingRules', '当前表没有既有规则'), 'info')
     return
   }
   // eslint-disable-next-line no-alert -- 只有一个单元格地址要填，用原生 prompt 比再搭一个模态框更轻
@@ -1304,7 +1417,10 @@ function fixRulesToCell(): void {
   if (input === null) return
   const cell = toAbsoluteCell(input)
   if (cell === null) {
-    showToast('单元格地址无法识别，请输入类似 J5 的形式', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.cellAddressInvalid', '单元格地址无法识别，请输入类似 J5 的形式'),
+      'warn',
+    )
     return
   }
   const targets =
@@ -1321,13 +1437,23 @@ function fixRulesToCell(): void {
     }
   }
   if (count === 0) {
-    showToast('固定失败：没有可写入的规则', 'error')
+    showToast(tOr('conditionalFormat.toast.fixNoWritable', '固定失败：没有可写入的规则'), 'error')
     return
   }
   setConfig(EXISTING_ANCHORS_STORE_KEY, serializeAnchors(anchors))
   bgmLog(LOG_LEVELS.INFO, `[conditionalFormat] 已把 ${String(count)} 条规则固定到 ${cell}`)
   loadExistingRules()
-  showToast(`已固定 ${String(count)} 条规则到 ${cell}：删行删列后仍只作用于该单元格`, 'success')
+  showToast(
+    tOr(
+      'conditionalFormat.toast.fixedToCell',
+      '已固定 {count} 条规则到 {cell}：删行删列后仍只作用于该单元格',
+      {
+        count: String(count),
+        cell,
+      },
+    ),
+    'success',
+  )
 }
 
 /**
@@ -1339,12 +1465,16 @@ function repairAnchors(isAuto: boolean): number {
   const entry = selectedSheet()
   const anchors = readAnchors()
   if (!entry || Object.keys(anchors).length === 0) {
-    if (!isAuto) showToast('还没有锚定任何规则', 'info')
+    if (!isAuto) showToast(tOr('conditionalFormat.toast.noAnchors', '还没有锚定任何规则'), 'info')
     return 0
   }
   const plan = planAnchorRepair(state.existing, anchors)
   if (plan.repairs.length === 0) {
-    if (!isAuto) showToast('所有锚定规则的范围都正确，无需修复', 'info')
+    if (!isAuto)
+      showToast(
+        tOr('conditionalFormat.toast.anchorsAllCorrect', '所有锚定规则的范围都正确，无需修复'),
+        'info',
+      )
     return 0
   }
   let repaired = 0
@@ -1362,9 +1492,20 @@ function repairAnchors(isAuto: boolean): number {
     `[conditionalFormat] 按锚定恢复 ${String(repaired)} 条规则范围（自动=${String(isAuto)}）`,
   )
   if (repaired > 0) {
-    showToast(`已按锚定恢复 ${String(repaired)} 条规则的应用范围`, isAuto ? 'info' : 'success')
+    showToast(
+      tOr('conditionalFormat.toast.anchorsRepaired', '已按锚定恢复 {count} 条规则的应用范围', {
+        count: String(repaired),
+      }),
+      isAuto ? 'info' : 'success',
+    )
   } else if (!isAuto) {
-    showToast('锚定恢复失败：当前 WPS 版本不支持改应用范围', 'error')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.anchorRepairFailed',
+        '锚定恢复失败：当前 WPS 版本不支持改应用范围',
+      ),
+      'error',
+    )
   }
   return repaired
 }
@@ -1372,14 +1513,14 @@ function repairAnchors(isAuto: boolean): number {
 /** 清除所有分组：回到平铺分页视图 */
 function clearExistingGroups(): void {
   if (Object.keys(state.existingGroups).length === 0) {
-    showToast('当前没有分组', 'info')
+    showToast(tOr('conditionalFormat.toast.noGroups', '当前没有分组'), 'info')
     return
   }
   state.existingGroups = {}
   persistExistingGroups()
   state.existingGroupCollapsed = new Set<string>()
   renderExistingRules()
-  showToast('已清除全部分组', 'success')
+  showToast(tOr('conditionalFormat.toast.groupsCleared', '已清除全部分组'), 'success')
 }
 
 /** 快照在既有规则表格里的归组（没归过 → 默认「导入的规则」） */
@@ -1437,16 +1578,36 @@ function batchDeleteForeignRules(): void {
   for (const index of indices) {
     const result = deleteForeignRule(entry.worksheet, index)
     if (result.ok) succeeded += 1
-    else failures.push(`第 ${String(index)} 条：${result.error}`)
+    else {
+      failures.push(
+        tOr('conditionalFormat.toast.failureItem', '第 {index} 条：{error}', {
+          index: String(index),
+          error: result.error,
+        }),
+      )
+    }
   }
   state.existingSelection = new Set<number>()
   if (failures.length > 0) {
     showToast(
-      `已删除 ${String(succeeded)} 条，${String(failures.length)} 条失败（${failures[0] ?? '未知原因'}）`,
+      tOr(
+        'conditionalFormat.toast.deleteFailedCount',
+        '已删除 {ok} 条，{failed} 条失败（{reason}）',
+        {
+          ok: String(succeeded),
+          failed: String(failures.length),
+          reason: failures[0] ?? tOr('conditionalFormat.toast.unknownReason', '未知原因'),
+        },
+      ),
       'error',
     )
   } else {
-    showToast(`已删除 ${String(succeeded)} 条规则`, 'success')
+    showToast(
+      tOr('conditionalFormat.toast.deletedCount', '已删除 {count} 条规则', {
+        count: String(succeeded),
+      }),
+      'success',
+    )
   }
   loadExistingRules()
 }
@@ -1487,10 +1648,22 @@ function batchMoveForeignRules(direction: -1 | 1): void {
     else failed += 1
   }
   if (failed > 0) {
-    showToast(`已调整 ${String(succeeded)} 条，${String(failed)} 条失败`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.reorderedCount', '已调整 {ok} 条，{failed} 条失败', {
+        ok: String(succeeded),
+        failed: String(failed),
+      }),
+      'error',
+    )
   } else if (succeeded > 0) {
     showToast(
-      `已把 ${String(succeeded)} 条规则${direction === -1 ? '提前' : '置后'}（每次一格）`,
+      tOr('conditionalFormat.toast.movedDirection', '已把 {count} 条规则{direction}（每次一格）', {
+        count: String(succeeded),
+        direction:
+          direction === -1
+            ? tOr('conditionalFormat.toast.directionUp', '提前')
+            : tOr('conditionalFormat.toast.directionDown', '置后'),
+      }),
       'success',
     )
   }
@@ -1539,14 +1712,24 @@ function handleExistingTableChange(event: Event): void {
   const result = setForeignStopIfTrue(entry.worksheet, index, target.checked)
   if (result.ok) {
     showToast(
-      `第 ${String(index)} 条规则已设为${target.checked ? '命中即停' : '继续评估后续'}`,
+      tOr('conditionalFormat.toast.stopIfTrueSet', '第 {index} 条规则已设为{state}', {
+        index: String(index),
+        state: target.checked
+          ? tOr('conditionalFormat.toast.stopIfTrueOn', '命中即停')
+          : tOr('conditionalFormat.toast.stopIfTrueOff', '继续评估后续'),
+      }),
       'success',
     )
     loadExistingRules()
   } else {
     // 写不进去要把复选框还原：否则用户以为生效了，实际没有
     target.checked = !target.checked
-    showToast(`设置失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.setFailed', '设置失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
   }
 }
 
@@ -1623,7 +1806,12 @@ function commitCellEdit(
       : setForeignFormula(entry.worksheet, index, next)
   if (!result.ok) {
     // 写不进去要还原输入并明说：否则用户以为改了，实际没有（与 stopIfTrue 同口径）
-    showToast(`修改失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.modifyFailed', '修改失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
     renderExistingRules()
     return
   }
@@ -1645,7 +1833,12 @@ function commitCellEdit(
     'success',
   )
   if (synced > 0) {
-    showToast(`已同步规则库里 ${String(synced)} 条导入的规则`, 'info')
+    showToast(
+      tOr('conditionalFormat.toast.importedSynced', '已同步规则库里 {count} 条导入的规则', {
+        count: String(synced),
+      }),
+      'info',
+    )
   }
   loadExistingRules()
   renderRuleList()
@@ -1684,13 +1877,20 @@ function importForeignRule(index: number): void {
   if (!entry) return
   const snapshot = state.existing[index - 1]
   if (!snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     return
   }
   const rule = foreignSnapshotToRule(snapshot, nextId)
   if (!rule) {
     showToast(
-      `第 ${String(index)} 条是${fcTypeLabel(snapshot.type, snapshot.kind)}，插件无法重建该类型，不能导入`,
+      tOr(
+        'conditionalFormat.toast.typeNotRebuildable',
+        '第 {index} 条是{type}，插件无法重建该类型，不能导入',
+        {
+          index: String(index),
+          type: fcTypeLabel(snapshot.type, snapshot.kind),
+        },
+      ),
       'warn',
     )
     return
@@ -1698,7 +1898,13 @@ function importForeignRule(index: number): void {
   state.rules = [...state.rules, rule]
   persistRules()
   renderRuleList()
-  showToast(`已导入第 ${String(index)} 条规则到「${IMPORTED_GROUP}」`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.importedToGroup', '已导入第 {index} 条规则到「{group}」', {
+      index: String(index),
+      group: IMPORTED_GROUP,
+    }),
+    'success',
+  )
 }
 
 /** 从工作表删除单条既有规则 */
@@ -1707,16 +1913,28 @@ function deleteForeignRuleRow(index: number): void {
   if (!entry) return
   const snapshot = state.existing[index - 1]
   if (!snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     return
   }
-  const label = snapshot.range || `第 ${String(index)} 条`
+  const label =
+    snapshot.range ||
+    tOr('conditionalFormat.toast.ruleIndex', '第 {index} 条', { index: String(index) })
   const result = deleteForeignRule(entry.worksheet, index)
   if (!result.ok) {
-    showToast(`删除失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.deleteFailed', '删除失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
     return
   }
-  showToast(`已删除 ${label} 上的规则`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.deletedOnLabel', '已删除 {label} 上的规则', {
+      label,
+    }),
+    'success',
+  )
   loadExistingRules()
 }
 
@@ -1730,7 +1948,12 @@ function moveForeignRuleRow(index: number, direction: -1 | 1): void {
   if (target < 1 || target > total) return
   const result = moveForeignRule(entry.worksheet, index, direction)
   if (!result.ok) {
-    showToast(`调整失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.reorderFailed', '调整失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
     return
   }
   loadExistingRules()
@@ -1772,7 +1995,13 @@ function notifyApplyNeeded(): void {
   const now = Date.now()
   if (now - lastApplyNoticeAt < 2000) return
   lastApplyNoticeAt = now
-  showToast('改动已存进「我的规则」，点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表', 'info')
+  showToast(
+    tOr(
+      'conditionalFormat.toast.savedToLibrary',
+      '改动已存进「我的规则」，点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表',
+    ),
+    'info',
+  )
 }
 
 function loadExistingGroups(): void {
@@ -1866,28 +2095,49 @@ async function copyTextToSystemClipboard(text: string): Promise<boolean> {
  */
 async function copyRulesToSystemClipboard(rules: readonly ConditionalFormatRule[]): Promise<void> {
   if (rules.length === 0) {
-    showToast('已复制到插件剪贴板（规则已不存在）', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.copiedPluginClipMissing', '已复制到插件剪贴板（规则已不存在）'),
+      'warn',
+    )
     return
   }
   const isOk = await copyTextToSystemClipboard(rulesPayloadJson(rules))
   if (isOk) {
     showToast(
-      `已复制 ${String(rules.length)} 条规则到系统剪贴板（点「粘贴」可生成副本）`,
+      tOr(
+        'conditionalFormat.toast.copiedToSystemClipboard',
+        '已复制 {count} 条规则到系统剪贴板（点「粘贴」可生成副本）',
+        {
+          count: String(rules.length),
+        },
+      ),
       'success',
     )
   } else {
-    showToast('系统剪贴板不可用：仍可用「粘贴」生成副本，或改用「导出规则 → 复制到剪贴板」', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.systemClipboardUnavailable',
+        '系统剪贴板不可用：仍可用「粘贴」生成副本，或改用「导出规则 → 复制到剪贴板」',
+      ),
+      'warn',
+    )
   }
 }
 
 function pasteRules(): void {
   if (state.clipboard.length === 0) {
-    showToast('插件剪贴板是空的——点「粘贴 ▾」可从系统剪贴板或文本粘', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.pluginClipboardEmpty',
+        '插件剪贴板是空的——点「粘贴 ▾」可从系统剪贴板或文本粘',
+      ),
+      'warn',
+    )
     return
   }
   const sources = state.rules.filter((rule) => state.clipboard.includes(rule.id))
   if (sources.length === 0) {
-    showToast('剪贴板里的规则已不存在', 'warn')
+    showToast(tOr('conditionalFormat.toast.clipboardRuleMissing', '剪贴板里的规则已不存在'), 'warn')
     return
   }
   // 自有模态框而非通用 showInput：momo 要「可拖动的浮动窗口 + 可收起 +
@@ -2090,13 +2340,19 @@ function handlePasteTableInput(event: Event): void {
 function applyPasteUniformRange(): void {
   const value = (inputById('conditionalFormatPasteUniformRange')?.value ?? '').trim()
   if (value === '') {
-    showToast('先在上面填一个应用范围', 'warn')
+    showToast(tOr('conditionalFormat.toast.fillRangeFirst', '先在上面填一个应用范围'), 'warn')
     return
   }
   if (pasteRows.length === 0) return
   for (const row of pasteRows) row.range = value
   renderPasteTable()
-  showToast(`已把 ${String(pasteRows.length)} 条的应用范围统一为 ${value}`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.rangesUnified', '已把 {count} 条的应用范围统一为 {range}', {
+      count: String(pasteRows.length),
+      range: value,
+    }),
+    'success',
+  )
 }
 
 /**
@@ -2108,11 +2364,17 @@ function applyPasteUniformRange(): void {
 function openDuplicateModal(index: number): void {
   const snapshot = state.existing[index - 1]
   if (!snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     return
   }
   if (snapshot.kind !== 'expression' || snapshot.formula === '') {
-    showToast('这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.noReadableFormula',
+        '这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）',
+      ),
+      'warn',
+    )
     return
   }
   pasteSources = []
@@ -2203,7 +2465,13 @@ function confirmPaste(): void {
   persistRules()
   closePasteModal()
   renderRuleList()
-  showToast(`已粘贴 ${String(copies.length)} 条规则到 ${targetRange}`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.pastedRules', '已粘贴 {count} 条规则到 {range}', {
+      count: String(copies.length),
+      range: targetRange,
+    }),
+    'success',
+  )
 }
 
 /**
@@ -2240,7 +2508,13 @@ function confirmBatchPaste(): void {
   renderRuleList()
   const ranges = new Set(copies.map((copy) => copy.appliesTo))
   const target = ranges.size === 1 ? [...ranges][0] : `${String(ranges.size)} 个范围`
-  showToast(`已粘贴 ${String(copies.length)} 条规则到 ${target ?? ''}`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.pastedRules', '已粘贴 {count} 条规则到 {range}', {
+      count: String(copies.length),
+      range: target ?? '',
+    }),
+    'success',
+  )
 }
 
 // ===== 批量修改（应用范围 / 公式 / 颜色）=====
@@ -2386,7 +2660,7 @@ function readBatchValue(pickId: string, inputId: string): string | null {
 function openBatchEdit(target: BatchTarget): void {
   const rows = batchRowsOf(target)
   if (rows.length === 0) {
-    showToast('先勾选要修改的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.selectRulesToModify', '先勾选要修改的规则'), 'warn')
     return
   }
   batchTarget = target
@@ -2423,35 +2697,50 @@ function confirmBatchEdit(): void {
 
   if (range !== null) {
     if (range === '') {
-      showToast('应用范围不能为空（不想改就选「保持不变」）', 'warn')
+      showToast(
+        tOr(
+          'conditionalFormat.toast.rangeRequiredKeep',
+          '应用范围不能为空（不想改就选「保持不变」）',
+        ),
+        'warn',
+      )
       return
     }
     patch.range = range
-    labels.push('范围')
+    labels.push(tOr('conditionalFormat.batch.labelRange', '范围'))
   }
   if (formula !== null) {
     if (formula === '') {
-      showToast('公式不能为空（不想改就选「保持不变」）', 'warn')
+      showToast(
+        tOr(
+          'conditionalFormat.toast.formulaRequiredKeep',
+          '公式不能为空（不想改就选「保持不变」）',
+        ),
+        'warn',
+      )
       return
     }
     patch.formula = formula
-    labels.push('公式')
+    labels.push(tOr('conditionalFormat.batch.labelFormula', '公式'))
   }
   if (interior !== null) {
     patch.interior = normalizeHexColor(interior) ?? interior
-    labels.push('填充色')
+    labels.push(tOr('conditionalFormat.batch.labelFill', '填充色'))
   }
   if (fontColor !== null) {
     patch.fontColor = normalizeHexColor(fontColor) ?? fontColor
-    labels.push('字体色')
+    labels.push(tOr('conditionalFormat.batch.labelFontColor', '字体色'))
   }
   const boldValue = selectById('conditionalFormatBatchBold')?.value ?? 'keep'
   if (boldValue !== 'keep') {
     patch.fontBold = boldValue === 'bold'
-    labels.push('加粗')
+    labels.push(tOr('conditionalFormat.batch.labelBold', '加粗'))
   }
   if (labels.length === 0) {
-    showToast('每项都是「保持不变」，没有要改的内容', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.nothingToChange', '每项都是「保持不变」，没有要改的内容'),
+      'warn',
+    )
     return
   }
   closeBatchEdit()
@@ -2460,7 +2749,9 @@ function confirmBatchEdit(): void {
 
 /** 把补丁落到当前目标上 */
 function applyBatchPatch(patch: ForeignRulePatch, labels: readonly string[]): void {
-  const suffix = `（${labels.join(' / ')}）`
+  const suffix = tOr('conditionalFormat.page.parenSuffix', '（{items}）', {
+    items: labels.join(' / '),
+  })
   if (batchTarget === 'paste') {
     pasteRows = pasteRows.map((row) => ({
       ...row,
@@ -2471,14 +2762,24 @@ function applyBatchPatch(patch: ForeignRulePatch, labels: readonly string[]): vo
       ...(patch.fontBold !== undefined && { fontBold: patch.fontBold }),
     }))
     renderPasteTable()
-    showToast(`已批量修改待粘贴的 ${String(pasteRows.length)} 条${suffix}`, 'success')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.pasteRowsBatchModified',
+        '已批量修改待粘贴的 {count} 条{suffix}',
+        {
+          count: String(pasteRows.length),
+          suffix,
+        },
+      ),
+      'success',
+    )
     return
   }
 
   if (batchTarget === 'worksheet') {
     const entry = selectedSheet()
     if (!entry) {
-      showToast('请先选择目标工作表', 'warn')
+      showToast(tOr('conditionalFormat.toast.selectTargetSheet', '请先选择目标工作表'), 'warn')
       return
     }
     const indices = [...state.existingSelection].sort((a, b) => a - b)
@@ -2491,19 +2792,48 @@ function applyBatchPatch(patch: ForeignRulePatch, labels: readonly string[]): vo
         done += 1
         warnings.push(...result.warnings)
       } else {
-        failures.push(`第 ${String(index)} 条：${result.error}`)
+        failures.push(
+          tOr('conditionalFormat.toast.failureItem', '第 {index} 条：{error}', {
+            index: String(index),
+            error: result.error,
+          }),
+        )
       }
     }
     loadExistingRules()
     if (done === 0) {
-      showToast(`批量修改失败：${failures[0] ?? '未知原因'}`, 'error')
+      showToast(
+        tOr('conditionalFormat.toast.batchModifyFailed', '批量修改失败：{reason}', {
+          reason: failures[0] ?? tOr('conditionalFormat.toast.unknownReason', '未知原因'),
+        }),
+        'error',
+      )
       return
     }
     const failureText =
-      failures.length > 0 ? `，${String(failures.length)} 条失败（${failures[0] ?? ''}）` : ''
-    const warningText = warnings.length > 0 ? `；${String(warnings.length)} 项回读不一致` : ''
+      failures.length > 0
+        ? tOr('conditionalFormat.toast.failureText', '，{count} 条失败（{reason}）', {
+            count: String(failures.length),
+            reason: failures[0] ?? '',
+          })
+        : ''
+    const warningText =
+      warnings.length > 0
+        ? tOr('conditionalFormat.toast.warningText', '；{count} 项回读不一致', {
+            count: String(warnings.length),
+          })
+        : ''
     showToast(
-      `已批量修改 ${String(done)} 条工作表规则${suffix}${failureText}${warningText}`,
+      tOr(
+        'conditionalFormat.toast.sheetRulesBatchModified',
+        '已批量修改 {count} 条工作表规则{suffix}{failureText}{warningText}',
+        {
+          count: String(done),
+          suffix,
+          failureText,
+          warningText,
+        },
+      ),
       failures.length > 0 ? 'warn' : 'success',
     )
     return
@@ -2528,7 +2858,14 @@ function applyBatchPatch(patch: ForeignRulePatch, labels: readonly string[]): vo
   persistRules(false)
   renderRuleList()
   showToast(
-    `已批量修改 ${String(changed)} 条${suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表`,
+    tOr(
+      'conditionalFormat.toast.rulesBatchModified',
+      '已批量修改 {count} 条{suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表',
+      {
+        count: String(changed),
+        suffix,
+      },
+    ),
     'success',
   )
 }
@@ -2560,18 +2897,32 @@ function confirmDuplicateRule(): void {
   const index = pasteWorksheetIndex
   const snapshot = state.existing[index - 1]
   if (!entry || !snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     closePasteModal()
     return
   }
   const typed = (inputById('conditionalFormatPasteRange')?.value ?? '').trim()
   const result = duplicateForeignRule(entry.worksheet, index, typed)
   if (!result.ok) {
-    showToast(`复制失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.copyFailed', '复制失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
     return
   }
   closePasteModal()
-  showToast(`已复制到 ${result.range}（优先级最低，可用「↑」上调）`, 'success')
+  showToast(
+    tOr(
+      'conditionalFormat.toast.copiedLowestPriority',
+      '已复制到 {range}（优先级最低，可用「↑」上调）',
+      {
+        range: result.range,
+      },
+    ),
+    'success',
+  )
   loadExistingRules()
 }
 
@@ -2711,6 +3062,7 @@ function renderRuleList(): void {
         exportSelectedRules(
           state.rules.filter((rule) => rule.group === group),
           `「${group}」分组`,
+          tOr('conditionalFormat.export.labelGroup', '「{group}」分组', { group }),
         )
       })
     })
@@ -2801,7 +3153,7 @@ function renderRuleBatchBar(): void {
 /** 批量删除所选规则（全选 / 组内 / 顶部批量条共用） */
 function deleteSelectedRules(ids: readonly string[]): void {
   if (ids.length === 0) {
-    showToast('没有选中的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.noSelectedRules', '没有选中的规则'), 'warn')
     return
   }
   const removed = new Set(ids)
@@ -2810,7 +3162,12 @@ function deleteSelectedRules(ids: readonly string[]): void {
   state.ruleSelection = new Set([...state.ruleSelection].filter((id) => !removed.has(id)))
   persistRules()
   renderRuleList()
-  showToast(`已删除 ${String(ids.length)} 条规则`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.deletedSelectedCount', '已删除 {count} 条规则', {
+      count: String(ids.length),
+    }),
+    'success',
+  )
 }
 
 // ===== 颜色字段（选择器 + 十六进制手输）=====
@@ -3007,7 +3364,7 @@ function openEditor(id: string | null, isNew: boolean): void {
 function openExistingRuleEditor(index: number): void {
   const snapshot = state.existing[index - 1]
   if (!snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     return
   }
   state.editingTarget = 'worksheet'
@@ -3063,13 +3420,13 @@ function closeEditor(): void {
 function saveExistingRuleEdit(): void {
   const entry = selectedSheet()
   if (!entry) {
-    showToast('请先选择目标工作表', 'warn')
+    showToast(tOr('conditionalFormat.toast.selectTargetSheet', '请先选择目标工作表'), 'warn')
     return
   }
   const index = state.editingExistingIndex
   const snapshot = state.existing[index - 1]
   if (!snapshot) {
-    showToast('规则已不存在，请重新读取', 'warn')
+    showToast(tOr('conditionalFormat.toast.ruleMissing', '规则已不存在，请重新读取'), 'warn')
     closeEditor()
     return
   }
@@ -3078,14 +3435,14 @@ function saveExistingRuleEdit(): void {
   const boldInput = inputById('conditionalFormatEditBold')
   const range = rangeInput?.value.trim() ?? ''
   if (range === '') {
-    showToast('应用范围不能为空', 'warn')
+    showToast(tOr('conditionalFormat.toast.rangeRequired', '应用范围不能为空'), 'warn')
     return
   }
   const formula = formulaInput?.value.trim() ?? ''
   // 公式只在「原本就有公式」时必填：数据条 / 色阶 / 图标集这类规则的 Formula1 本来就是空的，
   // 强制必填会让用户连范围都改不了
   if (formula === '' && snapshot.formula !== '') {
-    showToast('公式不能为空', 'warn')
+    showToast(tOr('conditionalFormat.toast.formulaRequired', '公式不能为空'), 'warn')
     return
   }
   const fillColor = readColorField(COLOR_FIELD_FILL, snapshot.interior ?? '#00B050')
@@ -3103,11 +3460,22 @@ function saveExistingRuleEdit(): void {
     ...(isBold !== (baseline?.bold ?? false) && { fontBold: isBold }),
   })
   if (!result.ok) {
-    showToast(`修改失败：${result.error}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.modifyFailed', '修改失败：{error}', {
+        error: result.error,
+      }),
+      'error',
+    )
     return
   }
   closeEditor()
-  showToast(`第 ${String(index)} 条已更新：${result.changed.join(' / ')}`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.ruleUpdated', '第 {index} 条已更新：{changed}', {
+      index: String(index),
+      changed: result.changed.join(' / '),
+    }),
+    'success',
+  )
   for (const warning of result.warnings) showToast(warning, 'warn')
   // 写回成功后重新读表：以宿主实际状态为准（也顺带刷新分组 key 的锚定）
   loadExistingRules()
@@ -3129,7 +3497,10 @@ function saveEditor(): void {
   const appliesTo = rangeInput?.value.trim() ?? ''
   const formula = formulaInput?.value.trim() ?? ''
   if (!name || !appliesTo || !formula) {
-    showToast('名称、范围、公式都不能为空', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.nameRangeFormulaRequired', '名称、范围、公式都不能为空'),
+      'warn',
+    )
     return
   }
 
@@ -3181,7 +3552,13 @@ function detectColumns(): { seasonColumn: string; nameColumn: string; firstRow: 
 function generateDefaults(): void {
   const detected = detectColumns()
   if (!detected) {
-    showToast('未识别到「开播季度」或「名称」列，无法生成默认规则（公式依赖季列）', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.noSeasonColumn',
+        '未识别到「开播季度」或「名称」列，无法生成默认规则（公式依赖季列）',
+      ),
+      'warn',
+    )
     return
   }
   const defaults = buildDefaultRules({ ...detected, makeId: nextId })
@@ -3189,7 +3566,15 @@ function generateDefaults(): void {
   persistRules()
   renderRuleList()
   showToast(
-    `已追加 ${String(defaults.length)} 条默认规则（季列 ${detected.seasonColumn} · 名称列 ${detected.nameColumn}）`,
+    tOr(
+      'conditionalFormat.toast.defaultsAppended',
+      '已追加 {count} 条默认规则（季列 {season} · 名称列 {name}）',
+      {
+        count: String(defaults.length),
+        season: detected.seasonColumn,
+        name: detected.nameColumn,
+      },
+    ),
     'success',
   )
 }
@@ -3304,16 +3689,25 @@ function saveAppliedRecords(sheetName: string, records: readonly AppliedRuleReco
 function runApply(strategy: ApplyStrategy): void {
   const entry = selectedSheet()
   if (!entry) {
-    showToast('请先选择目标工作表', 'warn')
+    showToast(tOr('conditionalFormat.toast.selectTargetSheet', '请先选择目标工作表'), 'warn')
     return
   }
   if (!isFormatConditionsSupported(entry.worksheet)) {
-    showToast('当前 WPS 版本不支持条件格式 API，该功能不可用', 'error')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.unsupportedApiFeature',
+        '当前 WPS 版本不支持条件格式 API，该功能不可用',
+      ),
+      'error',
+    )
     return
   }
   const visible = state.rules.filter((rule) => rule.hidden !== true)
   if (visible.length === 0) {
-    showToast('没有可应用的规则（全部隐藏了？）', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.noApplicableRules', '没有可应用的规则（全部隐藏了？）'),
+      'warn',
+    )
     return
   }
   // 应用前体检：库里的规则可能被手改成脏的（范围带表名、公式引号没配对…），
@@ -3351,36 +3745,115 @@ function runApply(strategy: ApplyStrategy): void {
   // 只报总数会把「局部失败」说成「已写入 N 条」，用户去表上找不到却无从定位。
   if (result.missing.length > 0) {
     const shown = result.missing.slice(0, 3).join(' / ')
-    const more = result.missing.length > 3 ? ` 等 ${String(result.missing.length)} 条` : ''
+    const more =
+      result.missing.length > 3
+        ? tOr('conditionalFormat.toast.missingMore', ' 等 {count} 条', {
+            count: String(result.missing.length),
+          })
+        : ''
     // 弹窗里能改、能自动修、能直接重来 —— toast 只负责报「有几条」，不再让用户去翻日志
     showToast(
-      `${String(result.missing.length)} 条规则没写进工作表：${shown}${more}（已打开「规则体检」，可就地改完重应用）`,
+      tOr(
+        'conditionalFormat.toast.rulesNotWritten',
+        '{count} 条规则没写进工作表：{shown}{more}（已打开「规则体检」，可就地改完重应用）',
+        {
+          count: String(result.missing.length),
+          shown,
+          more,
+        },
+      ),
       'error',
     )
     openFailureDoctor(result, strategy, visible)
   } else if (result.failed > 0) {
     showToast(
-      `新增 ${String(result.added)} 条，失败 ${String(result.failed)} 条（详见日志）`,
+      tOr(
+        'conditionalFormat.toast.addedAndFailed',
+        '新增 {added} 条，失败 {failed} 条（详见日志）',
+        {
+          added: String(result.added),
+          failed: String(result.failed),
+        },
+      ),
       'warn',
     )
   } else {
-    const parts = [`新增 ${String(result.added)} 条`]
-    if (result.refreshed > 0) parts.push(`刷新 ${String(result.refreshed)} 条`)
-    if (result.deleted > 0) parts.push(`移除旧规则 ${String(result.deleted)} 条`)
-    const verifiedNote = result.verified >= 0 ? `，表上共 ${String(result.verified)} 条` : ''
-    showToast(`已应用：${parts.join('，')}${verifiedNote}`, 'success')
+    const parts = [
+      tOr('conditionalFormat.toast.appliedAdded', '新增 {count} 条', {
+        count: String(result.added),
+      }),
+    ]
+    if (result.refreshed > 0) {
+      parts.push(
+        tOr('conditionalFormat.toast.appliedRefreshed', '刷新 {count} 条', {
+          count: String(result.refreshed),
+        }),
+      )
+    }
+    if (result.deleted > 0) {
+      parts.push(
+        tOr('conditionalFormat.toast.appliedDeleted', '移除旧规则 {count} 条', {
+          count: String(result.deleted),
+        }),
+      )
+    }
+    const verifiedNote =
+      result.verified >= 0
+        ? tOr('conditionalFormat.toast.appliedVerified', '，表上共 {count} 条', {
+            count: String(result.verified),
+          })
+        : ''
+    const separator = tOr('conditionalFormat.page.listSeparator', '，')
+    showToast(
+      tOr('conditionalFormat.toast.applied', '已应用：{parts}{verified}', {
+        parts: parts.join(separator),
+        verified: verifiedNote,
+      }),
+      'success',
+    )
   }
   const summary = [
-    `新增 ${String(result.added)}`,
-    `刷新 ${String(result.refreshed)}`,
-    `移除 ${String(result.deleted)}`,
-    `失败 ${String(result.failed)}`,
+    tOr('conditionalFormat.status.summaryAdded', '新增 {count}', {
+      count: String(result.added),
+    }),
+    tOr('conditionalFormat.status.summaryRefreshed', '刷新 {count}', {
+      count: String(result.refreshed),
+    }),
+    tOr('conditionalFormat.status.summaryDeleted', '移除 {count}', {
+      count: String(result.deleted),
+    }),
+    tOr('conditionalFormat.status.summaryFailed', '失败 {count}', {
+      count: String(result.failed),
+    }),
   ].join(' · ')
-  const verifiedText = result.verified >= 0 ? ` · 表上 ${String(result.verified)} 条` : ''
-  const missingText = result.missing.length > 0 ? ` · 未落地 ${String(result.missing.length)}` : ''
+  const verifiedText =
+    result.verified >= 0
+      ? tOr('conditionalFormat.status.verified', ' · 表上 {count} 条', {
+          count: String(result.verified),
+        })
+      : ''
+  const missingText =
+    result.missing.length > 0
+      ? tOr('conditionalFormat.status.missing', ' · 未落地 {count}', {
+          count: String(result.missing.length),
+        })
+      : ''
   setText(
     'conditionalFormatApplyStatus',
-    `上次应用（${strategy === 'replace' ? '清空整表' : '增量'}）：${entry.sheet} · ${summary}${verifiedText}${missingText}`,
+    tOr(
+      'conditionalFormat.status.line',
+      '上次应用（{strategy}）：{sheet} · {summary}{verified}{missing}',
+      {
+        strategy:
+          strategy === 'replace'
+            ? tOr('conditionalFormat.status.strategyReplace', '清空整表')
+            : tOr('conditionalFormat.status.strategyMerge', '增量'),
+        sheet: entry.sheet,
+        summary,
+        verified: verifiedText,
+        missing: missingText,
+      },
+    ),
   )
   // 应用完重读表：让「工作表规则」立刻显示刚落地的规则（不再需要手动点「重新读取」）
   loadExistingRules()
@@ -3448,16 +3921,25 @@ function applyFlow(): void {
 function replaceFlow(): void {
   const entry = selectedSheet()
   if (!entry) {
-    showToast('请先选择目标工作表', 'warn')
+    showToast(tOr('conditionalFormat.toast.selectTargetSheet', '请先选择目标工作表'), 'warn')
     return
   }
   if (!isFormatConditionsSupported(entry.worksheet)) {
-    showToast('当前 WPS 版本不支持条件格式 API，该功能不可用', 'error')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.unsupportedApiFeature',
+        '当前 WPS 版本不支持条件格式 API，该功能不可用',
+      ),
+      'error',
+    )
     return
   }
   const visibleCount = state.rules.filter((rule) => rule.hidden !== true).length
   if (visibleCount === 0) {
-    showToast('没有可应用的规则（全部隐藏了？）', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.noApplicableRules', '没有可应用的规则（全部隐藏了？）'),
+      'warn',
+    )
     return
   }
   const foreign = readForeignRules(entry.worksheet)
@@ -3473,16 +3955,25 @@ function replaceFlow(): void {
 function importForeign(): void {
   const entry = selectedSheet()
   if (!entry) {
-    showToast('请先选择目标工作表', 'warn')
+    showToast(tOr('conditionalFormat.toast.selectTargetSheet', '请先选择目标工作表'), 'warn')
     return
   }
   if (!isFormatConditionsSupported(entry.worksheet)) {
-    showToast('当前 WPS 版本不支持条件格式 API', 'error')
+    showToast(
+      tOr('conditionalFormat.toast.unsupportedApi', '当前 WPS 版本不支持条件格式 API'),
+      'error',
+    )
     return
   }
   const foreign = readForeignRules(entry.worksheet)
   if (foreign.length === 0) {
-    showToast('这张表没有条件格式规则（可在「既有规则」卡片确认）', 'info')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.sheetHasNoRules',
+        '这张表没有条件格式规则（可在「既有规则」卡片确认）',
+      ),
+      'info',
+    )
     loadExistingRules()
     return
   }
@@ -3536,7 +4027,13 @@ function openImportMenu(button: HTMLElement): void {
 function importRulesFromFile(): void {
   const input = byId('conditionalFormatImportFile')
   if (!(input instanceof HTMLInputElement)) {
-    showToast('当前宿主不支持文件选择，改用「📋 粘贴 ▾ → 从文本粘贴」', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.hostNoFilePicker',
+        '当前宿主不支持文件选择，改用「📋 粘贴 ▾ → 从文本粘贴」',
+      ),
+      'warn',
+    )
     return
   }
   // 清空 value：连续选同一个文件也要触发 change
@@ -3556,7 +4053,12 @@ function handleImportFileChange(event: Event): void {
     importRulesFromText(text, file.name)
   })
   reader.addEventListener('error', () => {
-    showToast(`读取文件失败：${file.name}`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.readFileFailed', '读取文件失败：{name}', {
+        name: file.name,
+      }),
+      'error',
+    )
   })
   // 不传编码：交给 FileReader 按 BOM 判断（见 importRulesFromFile 的注释）。
   // 不能用 file.text()：它只按 UTF-8 解码，读项目自己导出的 UTF-16 LE 就是乱码。
@@ -3644,15 +4146,46 @@ function finishImportFromText(
 ): void {
   const { added, skipped } = mergeRulesIntoLibrary(rules)
   const details: string[] = []
-  if (skipped > 0) details.push(`跳过 ${String(skipped)} 条重复`)
-  if (dropped > 0) details.push(`${String(dropped)} 条格式不对未导入`)
-  const suffix = details.length === 0 ? '' : `（${details.join('，')}）`
+  if (skipped > 0) {
+    details.push(
+      tOr('conditionalFormat.toast.importSkippedDuplicate', '跳过 {count} 条重复', {
+        count: String(skipped),
+      }),
+    )
+  }
+  if (dropped > 0) {
+    details.push(
+      tOr('conditionalFormat.toast.importDroppedInvalid', '{count} 条格式不对未导入', {
+        count: String(dropped),
+      }),
+    )
+  }
+  const suffix =
+    details.length === 0
+      ? ''
+      : tOr('conditionalFormat.page.parenSuffix', '（{items}）', {
+          items: details.join(tOr('conditionalFormat.page.listSeparator', '，')),
+        })
   if (added === 0) {
-    showToast(`「${source}」里的规则都已存在${suffix}`, 'info')
+    showToast(
+      tOr('conditionalFormat.toast.allRulesAlreadyExist', '「{source}」里的规则都已存在{suffix}', {
+        source,
+        suffix,
+      }),
+      'info',
+    )
     return
   }
   showToast(
-    `已从「${source}」导入 ${String(added)} 条到「我的规则」${suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表`,
+    tOr(
+      'conditionalFormat.toast.importedFromSource',
+      '已从「{source}」导入 {count} 条到「我的规则」{suffix}——点「🖌️ 应用与修复 → 应用条件格式」才会写进工作表',
+      {
+        source,
+        count: String(added),
+        suffix,
+      },
+    ),
     'success',
   )
 }
@@ -3703,7 +4236,7 @@ function confirmTextImport(): void {
   const textarea = byId('conditionalFormatTextImportInput')
   const text = textarea instanceof HTMLTextAreaElement ? textarea.value : ''
   if (text.trim() === '') {
-    showToast('先把规则 JSON 粘进来', 'warn')
+    showToast(tOr('conditionalFormat.toast.pasteJsonFirst', '先把规则 JSON 粘进来'), 'warn')
     return
   }
   closeTextImportModal()
@@ -3915,7 +4448,10 @@ function importSnapshots(
     }
   }
   if (imported.length === 0) {
-    showToast('所选规则里没有可导入的公式类规则', 'warn')
+    showToast(
+      tOr('conditionalFormat.toast.importNoFormulaSelected', '所选规则里没有可导入的公式类规则'),
+      'warn',
+    )
     return
   }
   // 导入前体检：脏规则不该进库（进了只在「应用」时才炸，且只留一句 toast）
@@ -3963,7 +4499,19 @@ function commitImportedSnapshots(
   persistRules()
   renderRuleList()
   showToast(
-    `已导入 ${String(imported.length)} 条规则${skipped > 0 ? `（${String(skipped)} 条类型不支持，已跳过）` : ''}`,
+    tOr('conditionalFormat.toast.importedRules', '已导入 {count} 条规则{skippedNote}', {
+      count: String(imported.length),
+      skippedNote:
+        skipped > 0
+          ? tOr(
+              'conditionalFormat.toast.importedRulesSkipped',
+              '（{count} 条类型不支持，已跳过）',
+              {
+                count: skipped,
+              },
+            )
+          : '',
+    }),
     skipped > 0 ? 'info' : 'success',
   )
 }
@@ -4124,7 +4672,13 @@ function confirmDoctor(): void {
     doctorEntries = refreshed
     renderDoctorList()
     showToast(
-      `还有 ${String(stillBlocked.length)} 条改完仍不合法（卡片上带红色「必须修」），修好再继续`,
+      tOr(
+        'conditionalFormat.toast.stillInvalid',
+        '还有 {count} 条改完仍不合法（卡片上带红色「必须修」），修好再继续',
+        {
+          count: String(stillBlocked.length),
+        },
+      ),
       'error',
     )
     return
@@ -4161,7 +4715,11 @@ function blockingEntriesOf(rules: readonly ConditionalFormatRule[]): DoctorEntry
  *
  * @returns 是否成功保存（用户取消也是 false，调用方静默返回即可）
  */
-function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): boolean {
+function saveRulesJson(
+  rules: readonly ConditionalFormatRule[],
+  label: string,
+  labelForMessage: string = label,
+): boolean {
   const today = new Date().toISOString().slice(0, 10)
   const payload = {
     format: 'bgm-conditional-format-rules',
@@ -4170,11 +4728,13 @@ function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): 
     rules,
   }
   const result = saveTextFileWithDialog({
-    title: `导出${label}（选择保存位置）`,
+    title: tOr('conditionalFormat.export.dialogTitle', '导出{label}（选择保存位置）', {
+      label: labelForMessage,
+    }),
     defaultDir: getExportPath(true),
     fileName: `bgm-${label}-${today}.json`,
     content: JSON.stringify(payload, null, 2),
-    filterDescription: '规则文件 (*.json)',
+    filterDescription: tOr('conditionalFormat.export.filterDescription', '规则文件 (*.json)'),
     filterExtensions: '*.json',
   })
   // 用户取消（null）：不提示、不动默认位置、返回 false
@@ -4184,7 +4744,17 @@ function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): 
   // 降级通道（FSO 不可用）：落浏览器下载目录，toast 明示落点
   const isDownloadFallback = result.path === ''
   if (isDownloadFallback) {
-    showToast(`已导出 ${String(rules.length)} 条${label}到浏览器下载目录`, 'success')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.exportedToDownloads',
+        '已导出 {count} 条{label}到浏览器下载目录',
+        {
+          count: String(rules.length),
+          label: labelForMessage,
+        },
+      ),
+      'success',
+    )
     return true
   }
 
@@ -4195,9 +4765,21 @@ function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): 
   const isNewDefaultDirectory = hasChosenDirectory && chosenDirectory !== getExportPath(true)
   if (isNewDefaultDirectory) {
     setExportPath(chosenDirectory)
-    showToast(`已记住为默认导出位置: ${chosenDirectory}`, 'info')
+    showToast(
+      tOr('conditionalFormat.toast.defaultExportDirSaved', '已记住为默认导出位置: {dir}', {
+        dir: chosenDirectory,
+      }),
+      'info',
+    )
   }
-  showToast(`已导出 ${String(rules.length)} 条${label}到 ${result.path}`, 'success')
+  showToast(
+    tOr('conditionalFormat.toast.exportedToPath', '已导出 {count} 条{label}到 {path}', {
+      count: String(rules.length),
+      label: labelForMessage,
+      path: result.path,
+    }),
+    'success',
+  )
   return true
 }
 
@@ -4210,9 +4792,10 @@ function saveRulesJson(rules: readonly ConditionalFormatRule[], label: string): 
 async function copyRulesJson(
   rules: readonly ConditionalFormatRule[],
   label: string,
+  labelForMessage: string = label,
 ): Promise<void> {
   if (rules.length === 0) {
-    showToast('没有可复制的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.noRulesToCopy', '没有可复制的规则'), 'warn')
     return
   }
   const payload = {
@@ -4222,26 +4805,41 @@ async function copyRulesJson(
     rules,
   }
   const isOk = await copyTextToSystemClipboard(JSON.stringify(payload, null, 2))
-  if (isOk) showToast(`已复制 ${String(rules.length)} 条${label}到剪贴板`, 'success')
-  else showToast('复制到剪贴板失败，请改用「导出到文件」', 'error')
+  if (isOk)
+    showToast(
+      tOr('conditionalFormat.toast.copiedToClipboard', '已复制 {count} 条{label}到剪贴板', {
+        count: String(rules.length),
+        label: labelForMessage,
+      }),
+      'success',
+    )
+  else
+    showToast(
+      tOr('conditionalFormat.toast.clipboardCopyFailed', '复制到剪贴板失败，请改用「导出到文件」'),
+      'error',
+    )
 }
 
 /** 导出整个规则库（备份 / 迁移 / 分享） */
 function exportRules(): void {
   if (state.rules.length === 0) {
-    showToast('规则库是空的，先新建或导入几条', 'warn')
+    showToast(tOr('conditionalFormat.toast.libraryEmpty', '规则库是空的，先新建或导入几条'), 'warn')
     return
   }
-  saveRulesJson(state.rules, '规则库')
+  saveRulesJson(state.rules, '规则库', tOr('conditionalFormat.export.labelLibrary', '规则库'))
 }
 
 /** 导出所选规则（我的规则勾选 / 分组内勾选 / 工作表规则批量条共用） */
-function exportSelectedRules(rules: readonly ConditionalFormatRule[], label: string): void {
+function exportSelectedRules(
+  rules: readonly ConditionalFormatRule[],
+  label: string,
+  labelForMessage: string = label,
+): void {
   if (rules.length === 0) {
-    showToast('没有选中的规则', 'warn')
+    showToast(tOr('conditionalFormat.toast.noSelectedRules', '没有选中的规则'), 'warn')
     return
   }
-  saveRulesJson(rules, label)
+  saveRulesJson(rules, label, labelForMessage)
 }
 
 // ===== 初始化 =====
@@ -4325,12 +4923,24 @@ function smartFitTable(id: TableResizeId): void {
   const controller = state.tableResize[id]
   if (!controller) return
   if (controller.autoFit() === 0) {
-    showToast('表格还没内容或正藏着，先读取规则再点「📐 自适行列」', 'warn')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.tableNotReady',
+        '表格还没内容或正藏着，先读取规则再点「📐 自适行列」',
+      ),
+      'warn',
+    )
     return
   }
   state.tableAutoFitDone.add(id)
   saveTableSizes()
-  showToast('已按内容分配列宽，行高改为按内容（拖列线可手调，双击列线回到自动）', 'success')
+  showToast(
+    tOr(
+      'conditionalFormat.toast.fitted',
+      '已按内容分配列宽，行高改为按内容（拖列线可手调，双击列线回到自动）',
+    ),
+    'success',
+  )
 }
 
 /**
@@ -4498,7 +5108,12 @@ export function initializeConditionalFormatPage(): void {
         {
           id: 'export-clipboard',
           label: '📋 复制到剪贴板',
-          onSelect: () => copyRulesJson(state.rules, '规则库'),
+          onSelect: () =>
+            copyRulesJson(
+              state.rules,
+              '规则库',
+              tOr('conditionalFormat.export.labelLibrary', '规则库'),
+            ),
         },
       ],
       x: rect.left,
@@ -4512,7 +5127,7 @@ export function initializeConditionalFormatPage(): void {
   byId('conditionalFormatPickAllBtn')?.addEventListener('click', () => {
     const visible = filterRules(state.rules, state.searchQuery)
     if (visible.length === 0) {
-      showToast('没有可全选的规则', 'warn')
+      showToast(tOr('conditionalFormat.toast.noRulesToSelectAll', '没有可全选的规则'), 'warn')
       return
     }
     const visibleIds = visible.map((rule) => rule.id)
@@ -4545,7 +5160,11 @@ export function initializeConditionalFormatPage(): void {
       }
       case 'export': {
         const picked = state.rules.filter((rule) => state.ruleSelection.has(rule.id))
-        exportSelectedRules(picked, '所选规则')
+        exportSelectedRules(
+          picked,
+          '所选规则',
+          tOr('conditionalFormat.export.labelSelected', '所选规则'),
+        )
         break
       }
       case 'clear': {
@@ -4837,7 +5456,13 @@ function populateFromHost(): void {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[conditionalFormat] 首屏宿主读取失败：${message}`)
-    showToast('读取工作簿列表失败，请点「🔄 刷新列表」重试', 'error')
+    showToast(
+      tOr(
+        'conditionalFormat.toast.loadWorkbooksFailed',
+        '读取工作簿列表失败，请点「🔄 刷新列表」重试',
+      ),
+      'error',
+    )
     // 下拉渲染成明确的空态（有刷新按钮可点），不是静默的空下拉
     renderWorkbookPicker()
     renderSheetPicker()
@@ -5079,7 +5704,13 @@ function setupSortablesAndMenus(): void {
               snapshot.stopIfTrue !== true,
             )
             if (result.ok) loadExistingRules()
-            else showToast(`设置失败：${result.error}`, 'error')
+            else
+              showToast(
+                tOr('conditionalFormat.toast.setFailed', '设置失败：{error}', {
+                  error: result.error,
+                }),
+                'error',
+              )
           },
         },
         { id: 'sep1', separator: true },
@@ -5147,9 +5778,20 @@ function reorderForeignRules(fromId: string, overId: string | null, isPlaceAfter
   }
   const done = Math.abs(position - from)
   if (failure !== null) {
-    showToast(`调整中断：${failure}（已完成 ${String(done)} 步）`, 'error')
+    showToast(
+      tOr('conditionalFormat.toast.moveInterrupted', '调整中断：{failure}（已完成 {done} 步）', {
+        failure,
+        done: String(done),
+      }),
+      'error',
+    )
   } else if (done > 0) {
-    showToast(`已移动 ${String(done)} 格`, 'success')
+    showToast(
+      tOr('conditionalFormat.toast.movedCells', '已移动 {count} 格', {
+        count: String(done),
+      }),
+      'success',
+    )
   }
   loadExistingRules()
 }

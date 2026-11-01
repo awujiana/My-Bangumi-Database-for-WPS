@@ -15,6 +15,8 @@
  *   - 分页渲染，347 条不卡（WPS 一次性渲染整表会明显掉帧）；
  *   - 格式预览同时显示填充色与字体色（WPS 只显示填充）。
  */
+// 直接从 locale-store 取 tOr，不要走 i18n 桶（桶会连带 ts/index，node 单测没有 window）
+import { tOr } from '../i18n/locale-store.js';
 import { escapeHtml } from '../tools/string-utilities.js';
 import { UNGROUPED_LABEL, snapshotGroupKey } from './conditional-format-rules.js';
 // ===== 类型标签表 =====
@@ -33,11 +35,33 @@ export const FC_TYPE_LABELS = {
     11: '发生日期',
     12: '表达式',
 };
+/** 类型号 → 语言包 key（与上面的中文表一一对应；中文表仍是兜底原文） */
+const FC_TYPE_KEYS = {
+    1: 'conditionalFormat.type.cellValue',
+    2: 'conditionalFormat.type.formula',
+    3: 'conditionalFormat.type.textContains',
+    4: 'conditionalFormat.type.textNotContains',
+    5: 'conditionalFormat.type.top10Average',
+    6: 'conditionalFormat.type.iconSet',
+    7: 'conditionalFormat.type.top10Percent',
+    8: 'conditionalFormat.type.dataBar',
+    9: 'conditionalFormat.type.colorScale',
+    10: 'conditionalFormat.type.uniqueDuplicate',
+    11: 'conditionalFormat.type.datesOccurring',
+    12: 'conditionalFormat.type.expression',
+};
 /** 取类型标签（读不到类型号时按 kind 给兜底文案） */
 export function fcTypeLabel(type, kind) {
-    if (type === undefined)
-        return kind === 'expression' ? '公式' : '其它类型';
-    return FC_TYPE_LABELS[type] ?? `类型 ${String(type)}`;
+    if (type === undefined) {
+        return kind === 'expression'
+            ? tOr('conditionalFormat.type.formula', '公式')
+            : tOr('conditionalFormat.type.other', '其它类型');
+    }
+    const label = FC_TYPE_LABELS[type];
+    if (label === undefined)
+        return tOr('conditionalFormat.type.unknown', '类型 {type}', { type });
+    const key = FC_TYPE_KEYS[type];
+    return key === undefined ? label : tOr(key, label);
 }
 /**
  * 快照 → 行模型（序号由数组下标推，保证与 FormatConditions.Item 一致）
@@ -55,7 +79,7 @@ export function toForeignRuleRows(snapshots, selection = new Set()) {
             rebuildable: snapshot.kind === 'expression',
             ...(snapshot.interior !== undefined && { fillColor: snapshot.interior }),
             ...(snapshot.fontColor !== undefined && { fontColor: snapshot.fontColor }),
-            range: snapshot.range || '（未读到范围）',
+            range: snapshot.range || tOr('conditionalFormat.table.rangeMissing', '（未读到范围）'),
             formula: snapshot.formula,
             ...(snapshot.stopIfTrue !== undefined && { stopIfTrue: snapshot.stopIfTrue }),
             selected: selection.has(index),
@@ -224,13 +248,13 @@ export function formatSwatchHtml(row) {
         : 'background:repeating-conic-gradient(#3a3a4a 0% 25%, #2a2a36 0% 50%) 50% / 8px 8px';
     const fontBar = row.fontColor === undefined
         ? ''
-        : `<span class="conditional-format-swatch-font" style="background:${escapeHtml(row.fontColor)}" title="字体色 ${escapeHtml(row.fontColor)}"></span>`;
+        : `<span class="conditional-format-swatch-font" style="background:${escapeHtml(row.fontColor)}" title="${tOr('conditionalFormat.table.fontColorTitle', '字体色 {color}', { color: escapeHtml(row.fontColor) })}"></span>`;
     const title = row.fillColor
-        ? `填充 ${escapeHtml(row.fillColor)}${row.fontColor ? ` · 字体 ${escapeHtml(row.fontColor)}` : ''}`
-        : '未读到格式（宿主未暴露 Interior / Font）';
+        ? `${tOr('conditionalFormat.table.fillLabel', '填充 {color}', { color: escapeHtml(row.fillColor) })}${row.fontColor ? ` · ${tOr('conditionalFormat.table.fontLabel', '字体 {color}', { color: escapeHtml(row.fontColor) })}` : ''}`
+        : tOr('conditionalFormat.table.noFormat', '未读到格式（宿主未暴露 Interior / Font）');
     // 色块是**按钮**（momo：点样式直接改）：打开同一条规则的编辑弹窗（范围 / 公式 / 颜色），
     // 与行尾 ✎ 是同一个弹窗，只是入口更贴近「用户看到的东西」——格式不对就点格式。
-    return `<button type="button" class="conditional-format-swatch" data-action="edit-format" style="${fill}" title="${title} · 点击编辑格式" aria-label="编辑第 ${String(row.index)} 条规则的格式">${fontBar}</button>`;
+    return `<button type="button" class="conditional-format-swatch" data-action="edit-format" style="${fill}" title="${tOr('conditionalFormat.table.editFormatHint', '{title} · 点击编辑格式', { title })}" aria-label="${tOr('conditionalFormat.table.editFormatAria', '编辑第 {index} 条规则的格式', { index: row.index })}">${fontBar}</button>`;
 }
 /**
  * 生成单行 HTML
@@ -245,21 +269,21 @@ export function buildForeignRuleRowHtml(row) {
         ? `${row.formula.slice(0, FORMULA_PREVIEW_LIMIT)}…`
         : row.formula;
     return `
-      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}" title="拖拽调整优先级 · 右键打开操作菜单">
-        <label class="conditional-format-col-check" title="选中后可批量操作（删除 / 导入 / 导出）">
-          <input type="checkbox" data-action="select" ${row.selected ? 'checked' : ''} aria-label="选择第 ${String(row.index)} 条规则" />
+      <div class="conditional-format-row${row.rebuildable ? '' : ' conditional-format-row-foreign'}${row.selected ? ' is-selected' : ''}" data-row-index="${String(row.index)}" title="${tOr('conditionalFormat.table.rowDragHint', '拖拽调整优先级 · 右键打开操作菜单')}">
+        <label class="conditional-format-col-check" title="${tOr('conditionalFormat.table.checkboxHint', '选中后可批量操作（删除 / 导入 / 导出）')}">
+          <input type="checkbox" data-action="select" ${row.selected ? 'checked' : ''} aria-label="${tOr('conditionalFormat.table.selectRowAria', '选择第 {index} 条规则', { index: row.index })}" />
         </label>
-        <span class="conditional-format-col-index" title="优先级（靠前先生效）">${String(row.index)}</span>
-        <span class="conditional-format-col-type" title="${row.rebuildable ? '公式类：插件可原样重建' : '该类型插件无法重建，应用时会被丢弃或触发降级'}">${escapeHtml(row.typeLabel)}${row.rebuildable ? '' : '<em class="conditional-format-tag-warn">不可重建</em>'}</span>
+        <span class="conditional-format-col-index" title="${tOr('conditionalFormat.table.priorityHint', '优先级（靠前先生效）')}">${String(row.index)}</span>
+        <span class="conditional-format-col-type" title="${row.rebuildable ? tOr('conditionalFormat.table.rebuildableHint', '公式类：插件可原样重建') : tOr('conditionalFormat.table.notRebuildableHint', '该类型插件无法重建，应用时会被丢弃或触发降级')}">${escapeHtml(row.typeLabel)}${row.rebuildable ? '' : `<em class="conditional-format-tag-warn">${tOr('conditionalFormat.table.notRebuildableTag', '不可重建')}</em>`}</span>
         ${formatSwatchHtml(row)}
         <span class="conditional-format-col-range conditional-format-cell-editable" data-action="edit-range" title="${escapeHtml(row.range)}">${escapeHtml(row.range)}</span>
         <code class="conditional-format-col-formula conditional-format-cell-editable" data-action="edit-formula" title="${escapeHtml(row.formula)}">${escapeHtml(formulaPreview)}</code>
-        <label class="conditional-format-col-stop" title="${isHiddenStop ? '当前 WPS 未暴露该属性，无法修改' : '勾选后：本条命中就不再评估后续规则'}">
+        <label class="conditional-format-col-stop" title="${isHiddenStop ? tOr('conditionalFormat.table.stopHiddenHint', '当前 WPS 未暴露该属性，无法修改') : tOr('conditionalFormat.table.stopHint', '勾选后：本条命中就不再评估后续规则')}">
           <input type="checkbox" data-action="stop" ${row.stopIfTrue === true ? 'checked' : ''} ${isHiddenStop ? 'disabled' : ''} />
         </label>
         <span class="conditional-format-col-actions">
-          <button type="button" data-action="edit" title="编辑这条规则（范围 / 公式 / 颜色）">✎</button>
-          <button type="button" data-action="duplicate" title="复制成一条新规则（同公式同格式，可换范围）">⧉</button>
+          <button type="button" data-action="edit" title="${tOr('conditionalFormat.table.editTitle', '编辑这条规则（范围 / 公式 / 颜色）')}">✎</button>
+          <button type="button" data-action="duplicate" title="${tOr('conditionalFormat.table.duplicateTitle', '复制成一条新规则（同公式同格式，可换范围）')}">⧉</button>
         </span>
       </div>`;
 }
@@ -277,16 +301,16 @@ export function buildForeignRuleRowHtml(row) {
 export function buildForeignRuleHeadHtml(isAllSelected = false) {
     return `
       <div class="conditional-format-row conditional-format-row-head conditional-format-table-head table-resize-head">
-        <label class="conditional-format-col-check" title="全选 / 取消全选（当前页）">
-          <input type="checkbox" data-action="select-all" ${isAllSelected ? 'checked' : ''} aria-label="全选当前页规则" />
+        <label class="conditional-format-col-check" title="${tOr('conditionalFormat.table.selectAllHint', '全选 / 取消全选（当前页）')}">
+          <input type="checkbox" data-action="select-all" ${isAllSelected ? 'checked' : ''} aria-label="${tOr('conditionalFormat.table.selectAllAria', '全选当前页规则')}" />
         </label>
         <span class="conditional-format-col-index">#</span>
-        <span class="conditional-format-col-type">类型</span>
-        <span class="conditional-format-col-swatch">格式</span>
-        <span class="conditional-format-col-range">应用于</span>
-        <span class="conditional-format-col-formula">公式</span>
-        <span class="conditional-format-col-stop">为真则停</span>
-        <span class="conditional-format-col-actions">操作</span>
+        <span class="conditional-format-col-type">${tOr('conditionalFormat.table.colType', '类型')}</span>
+        <span class="conditional-format-col-swatch">${tOr('conditionalFormat.table.colFormat', '格式')}</span>
+        <span class="conditional-format-col-range">${tOr('conditionalFormat.table.colRange', '应用于')}</span>
+        <span class="conditional-format-col-formula">${tOr('conditionalFormat.type.formula', '公式')}</span>
+        <span class="conditional-format-col-stop">${tOr('conditionalFormat.table.colStop', '为真则停')}</span>
+        <span class="conditional-format-col-actions">${tOr('conditionalFormat.table.colActions', '操作')}</span>
       </div>`;
 }
 /**
@@ -333,16 +357,16 @@ export function buildForeignRuleGroupsHtml(rows, groups, collapsed) {
         return `
       <div class="conditional-format-group conditional-format-existing-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
         <div class="conditional-format-group-title">
-          <button type="button" class="conditional-format-group-toggle" data-action="toggle-existing-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-existing-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? tOr('conditionalFormat.table.expandGroup', '展开分组') : tOr('conditionalFormat.table.collapseGroup', '收起分组')}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(groupRows.length)}</span>
-          <button type="button" class="conditional-format-group-edit" data-action="rename-existing-group" title="重命名分组（组内全部规则改用新组名）">✎</button>
-          <button type="button" class="conditional-format-group-remove" data-action="dissolve-existing-group" title="解散分组（规则回「未分组」，不从工作表删除）">✕</button>
-          <button type="button" class="conditional-format-group-pick" data-action="pick-existing-group" title="全选 / 取消本组">☑</button>
-          <button type="button" class="conditional-format-group-export" data-action="export-existing-group" title="导出本组规则为 JSON（选保存位置）">📤</button>
-          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="锚定本组为整列（$J:$J）：公式不变，增删行不再影响">列</button>
-          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group-rows" data-group="${escapeHtml(group)}" title="锚定本组为整行（$5:$5）：公式不变，增删列不再影响">行</button>
-          <button type="button" class="conditional-format-group-delete" data-action="delete-existing-group" title="从工作表删除本组全部规则">🗑</button>
+          <button type="button" class="conditional-format-group-edit" data-action="rename-existing-group" title="${tOr('conditionalFormat.table.renameGroupTitle', '重命名分组（组内全部规则改用新组名）')}">✎</button>
+          <button type="button" class="conditional-format-group-remove" data-action="dissolve-existing-group" title="${tOr('conditionalFormat.table.dissolveGroupTitle', '解散分组（规则回「未分组」，不从工作表删除）')}">✕</button>
+          <button type="button" class="conditional-format-group-pick" data-action="pick-existing-group" title="${tOr('conditionalFormat.table.pickGroupTitle', '全选 / 取消本组')}">☑</button>
+          <button type="button" class="conditional-format-group-export" data-action="export-existing-group" title="${tOr('conditionalFormat.table.exportGroupTitle', '导出本组规则为 JSON（选保存位置）')}">📤</button>
+          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group" data-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.table.anchorColumnTitle', '锚定本组为整列（$J:$J）：公式不变，增删行不再影响')}">${tOr('conditionalFormat.table.anchorColumnText', '列')}</button>
+          <button type="button" class="conditional-format-group-anchor" data-action="anchor-existing-group-rows" data-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.table.anchorRowTitle', '锚定本组为整行（$5:$5）：公式不变，增删列不再影响')}">${tOr('conditionalFormat.table.anchorRowText', '行')}</button>
+          <button type="button" class="conditional-format-group-delete" data-action="delete-existing-group" title="${tOr('conditionalFormat.table.deleteGroupTitle', '从工作表删除本组全部规则')}">🗑</button>
         </div>
         ${groupRows.map((row) => buildForeignRuleRowHtml(row)).join('')}
       </div>`;

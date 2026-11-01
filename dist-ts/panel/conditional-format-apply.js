@@ -14,6 +14,9 @@
  */
 import { LOG_LEVELS } from '../core/constants.js';
 import { bgmLog } from '../tools/util/index.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js';
 import { describeRangeForDiagnosis, readRangeAddress } from '../tools/wps-range.js';
 import { XL_EXPRESSION, ruleFingerprint, ruleFingerprintOfRule, ruleFormulaKey, } from './conditional-format-rules.js';
 /**
@@ -44,10 +47,11 @@ export function isFormatConditionsSupported(worksheet) {
  *   「根本读不到规则」——后者曾被静默当成前者，用户看到的是误导性的空列表）
  */
 export function checkFormatConditionsReadable(worksheet) {
-    if (!isFormatConditionsSupported(worksheet))
-        return '当前 WPS 版本不支持条件格式 API';
+    if (!isFormatConditionsSupported(worksheet)) {
+        return tOr('conditionalFormat.apply.errUnsupported', '当前 WPS 版本不支持条件格式 API');
+    }
     if (typeof resolveFormatConditions(worksheet)?.Item !== 'function') {
-        return '宿主未提供 FormatConditions.Item，无法枚举既有规则';
+        return tOr('conditionalFormat.apply.errNoItem', '宿主未提供 FormatConditions.Item，无法枚举既有规则');
     }
     return null;
 }
@@ -149,7 +153,9 @@ export function rgbHexToBgr(hex) {
             .join('')
         : bare;
     if (!/^[0-9a-fA-F]{6}$/u.test(full)) {
-        throw new Error(`颜色格式不合法：${hex}（需要 #RRGGBB 或 #RGB）`);
+        throw new Error(tOr('conditionalFormat.apply.errColorInvalid', '颜色格式不合法：{hex}（需要 #RRGGBB 或 #RGB）', {
+            hex,
+        }));
     }
     const red = Number.parseInt(full.slice(0, 2), 16);
     const green = Number.parseInt(full.slice(2, 4), 16);
@@ -334,10 +340,17 @@ export function getForeignCondition(worksheet, index) {
  */
 export function deleteForeignRule(worksheet, index) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     if (typeof fc.Delete !== 'function') {
-        return { ok: false, error: '当前 WPS 版本不支持删除单条规则，请用「清空后应用」' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoDelete', '当前 WPS 版本不支持删除单条规则，请用「清空后应用」'),
+        };
     }
     try {
         fc.Delete();
@@ -354,8 +367,12 @@ export function deleteForeignRule(worksheet, index) {
  */
 export function setForeignStopIfTrue(worksheet, index, isStopIfTrue) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     try {
         fc.StopIfTrue = isStopIfTrue;
         return { ok: true };
@@ -374,10 +391,17 @@ export function setForeignStopIfTrue(worksheet, index, isStopIfTrue) {
  */
 export function setForeignAppliesTo(worksheet, index, range) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     if (typeof fc.ModifyAppliesToRange !== 'function') {
-        return { ok: false, error: '当前 WPS 版本不支持修改应用范围' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoModifyRange', '当前 WPS 版本不支持修改应用范围'),
+        };
     }
     try {
         fc.ModifyAppliesToRange(range);
@@ -387,7 +411,12 @@ export function setForeignAppliesTo(worksheet, index, range) {
     }
     const actual = readAppliesToAddress(fc, index);
     if (actual !== '' && normalizeRangeForCompare(actual) !== normalizeRangeForCompare(range)) {
-        return { ok: false, error: `范围未写入（宿主回读为「${actual}」）` };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errRangeNotWritten', '范围未写入（宿主回读为「{actual}」）', {
+                actual,
+            }),
+        };
     }
     return { ok: true };
 }
@@ -400,8 +429,12 @@ export function setForeignAppliesTo(worksheet, index, range) {
  */
 export function setForeignFormula(worksheet, index, formula) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     try {
         fc.Formula1 = formula;
     }
@@ -410,7 +443,12 @@ export function setForeignFormula(worksheet, index, formula) {
     }
     const actual = readFormulaSafe(fc);
     if (actual !== '' && normalizeFormulaForCompare(actual) !== normalizeFormulaForCompare(formula)) {
-        return { ok: false, error: `公式未写入（宿主回读为「${actual}」）` };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errFormulaNotWritten', '公式未写入（宿主回读为「{actual}」）', {
+                actual,
+            }),
+        };
     }
     return { ok: true };
 }
@@ -427,8 +465,13 @@ export function setForeignFormula(worksheet, index, formula) {
  */
 export function updateForeignRule(worksheet, index, patch) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）', warnings: [] };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+            warnings: [],
+        };
+    }
     const changed = [];
     const warnings = [];
     if (patch.formula !== undefined) {
@@ -438,41 +481,57 @@ export function updateForeignRule(worksheet, index, patch) {
                 fc.Formula1 = wanted;
             }
             catch (error) {
-                return { ok: false, error: `公式写入失败：${error.message}`, warnings };
+                return {
+                    ok: false,
+                    error: tOr('conditionalFormat.apply.errFormulaWrite', '公式写入失败：{message}', {
+                        message: error.message,
+                    }),
+                    warnings,
+                };
             }
             const actual = readFormulaSafe(fc);
             if (actual !== '' &&
                 normalizeFormulaForCompare(actual) !== normalizeFormulaForCompare(wanted)) {
                 return {
                     ok: false,
-                    error: `公式未写入（宿主回读为「${actual}」），请改用「清空后应用」重写整表规则`,
+                    error: tOr('conditionalFormat.apply.errFormulaNotWrittenRetry', '公式未写入（宿主回读为「{actual}」），请改用「清空后应用」重写整表规则', { actual }),
                     warnings,
                 };
             }
-            changed.push('公式');
+            changed.push(tOr('conditionalFormat.apply.changedFormula', '公式'));
         }
     }
     if (patch.range !== undefined) {
         const wanted = patch.range.trim();
         if (wanted !== '') {
             if (typeof fc.ModifyAppliesToRange !== 'function') {
-                return { ok: false, error: '当前 WPS 版本不支持修改应用范围', warnings };
+                return {
+                    ok: false,
+                    error: tOr('conditionalFormat.apply.errNoModifyRange', '当前 WPS 版本不支持修改应用范围'),
+                    warnings,
+                };
             }
             try {
                 fc.ModifyAppliesToRange(wanted);
             }
             catch (error) {
-                return { ok: false, error: `范围写入失败：${error.message}`, warnings };
+                return {
+                    ok: false,
+                    error: tOr('conditionalFormat.apply.errRangeWrite', '范围写入失败：{message}', {
+                        message: error.message,
+                    }),
+                    warnings,
+                };
             }
             const actual = readAppliesToAddress(fc, index);
             if (actual !== '' && normalizeRangeForCompare(actual) !== normalizeRangeForCompare(wanted)) {
                 return {
                     ok: false,
-                    error: `范围未写入（宿主回读为「${actual}」），请改用「清空后应用」重写整表规则`,
+                    error: tOr('conditionalFormat.apply.errRangeNotWrittenRetry', '范围未写入（宿主回读为「{actual}」），请改用「清空后应用」重写整表规则', { actual }),
                     warnings,
                 };
             }
-            changed.push('范围');
+            changed.push(tOr('conditionalFormat.apply.changedRange', '范围'));
         }
     }
     const hasFormatPatch = patch.interior !== undefined || patch.fontColor !== undefined || patch.fontBold !== undefined;
@@ -485,29 +544,43 @@ export function updateForeignRule(worksheet, index, patch) {
             });
         }
         catch (error) {
-            return { ok: false, error: `格式写入失败：${error.message}`, warnings };
+            return {
+                ok: false,
+                error: tOr('conditionalFormat.apply.errFormatWrite', '格式写入失败：{message}', {
+                    message: error.message,
+                }),
+                warnings,
+            };
         }
         if (patch.interior !== undefined) {
             const actualFill = readInteriorColor(fc);
             if (actualFill !== undefined &&
                 normalizeColorForCompare(actualFill) !== normalizeColorForCompare(patch.interior)) {
-                warnings.push(`填充色回读为 ${actualFill}（与设定的 ${patch.interior} 不一致）`);
+                warnings.push(tOr('conditionalFormat.apply.warnFillMismatch', '填充色回读为 {actual}（与设定的 {expected} 不一致）', { actual: actualFill, expected: patch.interior }));
             }
-            changed.push('填充色');
+            changed.push(tOr('conditionalFormat.apply.changedFill', '填充色'));
         }
         if (patch.fontColor !== undefined) {
             const actualFont = readFontColor(fc);
             if (actualFont !== undefined &&
                 normalizeColorForCompare(actualFont) !== normalizeColorForCompare(patch.fontColor)) {
-                warnings.push(`字体色回读为 ${actualFont}（与设定的 ${patch.fontColor} 不一致）`);
+                warnings.push(tOr('conditionalFormat.apply.warnFontMismatch', '字体色回读为 {actual}（与设定的 {expected} 不一致）', { actual: actualFont, expected: patch.fontColor }));
             }
-            changed.push('字体色');
+            changed.push(tOr('conditionalFormat.apply.changedFontColor', '字体色'));
         }
-        if (patch.fontBold !== undefined)
-            changed.push(patch.fontBold ? '加粗' : '取消加粗');
+        if (patch.fontBold !== undefined) {
+            changed.push(patch.fontBold
+                ? tOr('conditionalFormat.apply.changedBold', '加粗')
+                : tOr('conditionalFormat.apply.changedUnbold', '取消加粗'));
+        }
     }
-    if (changed.length === 0)
-        return { ok: false, error: '没有任何改动', warnings };
+    if (changed.length === 0) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoChange', '没有任何改动'),
+            warnings,
+        };
+    }
     return { ok: true, changed, warnings };
 }
 /**
@@ -522,20 +595,33 @@ export function updateForeignRule(worksheet, index, patch) {
  */
 export function duplicateForeignRule(worksheet, index, targetRange) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     const formula = readFormulaSafe(fc);
     if (formula === '') {
-        return { ok: false, error: '这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoFormula', '这条规则没有可读到的公式（数据条 / 色阶 / 图标集等类型无法复制）'),
+        };
     }
     const sourceRange = readAppliesToAddress(fc, index);
     const range = (targetRange ?? '').trim() === '' ? sourceRange : (targetRange ?? '').trim();
     if (range === '') {
-        return { ok: false, error: '读不到这条规则的应用范围，请先手动填写目标范围' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoSourceRange', '读不到这条规则的应用范围，请先手动填写目标范围'),
+        };
     }
     const collection = resolveFormatConditions(worksheet);
     if (typeof collection?.Add !== 'function') {
-        return { ok: false, error: '当前 WPS 版本不支持添加条件格式' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoAdd', '当前 WPS 版本不支持添加条件格式'),
+        };
     }
     const countBefore = typeof collection.Count === 'number' ? collection.Count : -1;
     const fill = readInteriorColor(fc);
@@ -543,8 +629,12 @@ export function duplicateForeignRule(worksheet, index, targetRange) {
     try {
         const target = worksheet?.Range(range);
         const created = target === undefined ? null : addConditionWithFormula(target, formula);
-        if (!created)
-            return { ok: false, error: '添加副本失败（宿主未返回规则对象）' };
+        if (!created) {
+            return {
+                ok: false,
+                error: tOr('conditionalFormat.apply.errDupNoObject', '添加副本失败（宿主未返回规则对象）'),
+            };
+        }
         // 与新增 / 编辑走同一个格式写入器（With 在 WPS 上不存在，`created.With?.(...)` 是空操作）
         writeConditionFormat(created, {
             ...(fill !== undefined && { interior: fill }),
@@ -552,11 +642,19 @@ export function duplicateForeignRule(worksheet, index, targetRange) {
         });
     }
     catch (error) {
-        return { ok: false, error: `添加副本失败：${error.message}` };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errDupFailed', '添加副本失败：{message}', {
+                message: error.message,
+            }),
+        };
     }
     const countAfter = typeof collection.Count === 'number' ? collection.Count : -1;
     if (countBefore >= 0 && countAfter >= 0 && countAfter <= countBefore) {
-        return { ok: false, error: '复制未生效（工作表上的规则条数没有增加）' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errDupIneffective', '复制未生效（工作表上的规则条数没有增加）'),
+        };
     }
     return { ok: true, range };
 }
@@ -596,19 +694,28 @@ function readPriority(fc) {
  */
 export function moveForeignRule(worksheet, index, direction) {
     const fc = getForeignCondition(worksheet, index);
-    if (!fc)
-        return { ok: false, error: '定位不到该规则（可能已被删除）' };
+    if (!fc) {
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNotLocated', '定位不到该规则（可能已被删除）'),
+        };
+    }
     const neighbor = getForeignCondition(worksheet, index + direction);
     if (!neighbor) {
         return {
             ok: false,
-            error: direction === -1 ? '已经是优先级最高的规则' : '已经是优先级最低的规则',
+            error: direction === -1
+                ? tOr('conditionalFormat.apply.errAlreadyTop', '已经是优先级最高的规则')
+                : tOr('conditionalFormat.apply.errAlreadyBottom', '已经是优先级最低的规则'),
         };
     }
     const ownPriority = readPriority(fc);
     const neighborPriority = readPriority(neighbor);
     if (ownPriority === null || neighborPriority === null) {
-        return { ok: false, error: '当前 WPS 版本读不到规则优先级，无法调整顺序' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoPriority', '当前 WPS 版本读不到规则优先级，无法调整顺序'),
+        };
     }
     try {
         // 两条都写：不依赖宿主是否在首次写入后自动重排（自动重排的宿主第二次
@@ -617,11 +724,19 @@ export function moveForeignRule(worksheet, index, direction) {
         neighbor.Priority = ownPriority;
     }
     catch (error) {
-        return { ok: false, error: `调整失败：${error.message}` };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errMoveFailed', '调整失败：{message}', {
+                message: error.message,
+            }),
+        };
     }
     // 回读校验：写入被静默忽略时值不会变
     if (readPriority(fc) !== neighborPriority || readPriority(neighbor) !== ownPriority) {
-        return { ok: false, error: '当前 WPS 版本不支持逐格调整优先级（写入未生效）' };
+        return {
+            ok: false,
+            error: tOr('conditionalFormat.apply.errNoPriorityWrite', '当前 WPS 版本不支持逐格调整优先级（写入未生效）'),
+        };
     }
     return { ok: true };
 }
@@ -711,7 +826,7 @@ function writeConditionFormat(fc, patch) {
         });
         return;
     }
-    throw new Error('宿主既没有 FormatCondition.Interior 也没有 With，无法设置格式');
+    throw new Error(tOr('conditionalFormat.apply.errNoInterior', '宿主既没有 FormatCondition.Interior 也没有 With，无法设置格式'));
 }
 /** 给单条规则上格式（新增路径：颜色必填，字体可选） */
 function applyEntryFormat(fc, entry) {
@@ -831,7 +946,7 @@ export function applyConditionalFormatPlan(worksheet, plan) {
                 name: entry.rule.name,
                 range: entry.rule.appliesTo,
                 formula: entry.rule.formula,
-                reason: '当前宿主不支持条件格式 API（FormatConditions.Add 不可用）',
+                reason: tOr('conditionalFormat.apply.errUnsupportedAdd', '当前宿主不支持条件格式 API（FormatConditions.Add 不可用）'),
             })),
         };
     }
@@ -888,7 +1003,7 @@ export function applyConditionalFormatPlan(worksheet, plan) {
             }
             else {
                 failed += 1;
-                recordFailure(failures, rule, '宿主未返回规则对象（范围或公式可能被拒绝）');
+                recordFailure(failures, rule, tOr('conditionalFormat.apply.errNoRuleObject', '宿主未返回规则对象（范围或公式可能被拒绝）'));
             }
         }
         catch (error) {
