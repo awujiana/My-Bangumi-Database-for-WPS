@@ -6,6 +6,7 @@
  *   本块只依赖共享上下文（`enrich-page-context.js`）与外部模块，**不反向依赖源文件**。
  */
 import { LOG_LEVELS } from '../core/constants.js';
+import { tOr } from '../i18n/locale-store.js';
 import { resolveConflictField } from '../sync/enrich-engine.js';
 import { bgmLog, BGM } from '../tools/util/index.js';
 import { state, safeGetElement } from './enrich-page-context.js';
@@ -46,9 +47,9 @@ export function showConflictDialog() {
     // 静态模板只更新文本值，避免运行时拼接 HTML
     const titleElement = safeGetElement('conflictTitle');
     if (titleElement)
-        titleElement.textContent = `⚡️ 字段冲突确认 (${String(current)}/${String(total)})`;
+        titleElement.textContent = tOr('enrich.conflict.titleWithProgress', '⚡️ 字段冲突确认 ({current}/{total})', { current, total });
     // 冲突进度：本函数每个冲突都会调用一次，故实例首次创建后复用
-    progressHosts.conflict ??= createInlineProgress('conflictProgressHost', '冲突进度', '⚡️');
+    progressHosts.conflict ??= createInlineProgress('conflictProgressHost', tOr('enrich.conflict.progressTitle', '冲突进度'), '⚡️');
     progressHosts.conflict?.update(current, total);
     const nameElement = safeGetElement('conflictName');
     if (nameElement)
@@ -94,6 +95,8 @@ function handleConflictResolution(resolution) {
     else {
         hideConflictDialog();
         bgmLog(LOG_LEVELS.INFO, '[conflict] 所有冲突已解决');
-        BGM.Dialog.alert('冲突解决完成', `共处理 ${String(state.currentConflictIndex)} 个字段冲突`);
+        BGM.Dialog.alert(tOr('enrich.conflict.doneTitle', '冲突解决完成'), tOr('enrich.conflict.doneMessage', '共处理 {count} 个字段冲突', {
+            count: state.currentConflictIndex,
+        }));
     }
 }

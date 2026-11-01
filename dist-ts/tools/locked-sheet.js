@@ -10,6 +10,8 @@ import { getApp, bgmLog, BGM, getCellValue, findHeaderRow, clearSheetCache } fro
 // 调用方据此回退逐格读（见 buildCandidate）。
 import { readRangeValues } from './util/sheet.js';
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js';
+// 直接从 locale-store 取 tOr，不要走 i18n 桶（桶会连带 ts/index，node 单测没有 window）
+import { tOr } from '../i18n/locale-store.js';
 import { legacyPageKeys, normalizePageKey } from './page-key.js';
 /** 锁定持久化键前缀（各页独立键：`bgm_locked_sheet_<page>`） */
 export const LOCKED_SHEET_KEY = 'bgm_locked_sheet';
@@ -87,7 +89,9 @@ export function isLockedAt(sheetIndex, workbookName) {
 export function renderSheetLockUi(buttonId, statusId, statusMode = 'inline') {
     const button = document.getElementById(buttonId);
     if (button) {
-        button.textContent = BGM.sheet.isLocked ? '🔓 解锁' : '🔒 锁定';
+        button.textContent = BGM.sheet.isLocked
+            ? tOr('lockSheet.unlock', '🔓 解锁')
+            : tOr('lockSheet.lock', '🔒 锁定');
         button.classList.toggle('locked', BGM.sheet.isLocked);
     }
     const status = document.getElementById(statusId);
@@ -96,13 +100,18 @@ export function renderSheetLockUi(buttonId, statusId, statusMode = 'inline') {
     if (statusMode === 'badge') {
         status.classList.toggle('show', BGM.sheet.isLocked);
         status.textContent = BGM.sheet.isLocked
-            ? `已锁定: ${BGM.sheet.lockedWorkbookName ?? ''} → ${BGM.sheet.lockedName ?? ''}`
+            ? tOr('lockSheet.lockedBadge', '已锁定: {workbook} → {sheet}', {
+                workbook: BGM.sheet.lockedWorkbookName ?? '',
+                sheet: BGM.sheet.lockedName ?? '',
+            })
             : '';
         return;
     }
     status.style.display = BGM.sheet.isLocked ? 'inline' : 'none';
     if (BGM.sheet.isLocked) {
-        status.textContent = `已锁定: ${String(BGM.sheet.lockedName)}`;
+        status.textContent = tOr('lockSheet.lockedInline', '已锁定: {sheet}', {
+            sheet: String(BGM.sheet.lockedName),
+        });
     }
 }
 /** 清除 BGM.sheet 锁定状态（内存 + 持久化） */

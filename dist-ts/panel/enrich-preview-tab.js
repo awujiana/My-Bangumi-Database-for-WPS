@@ -13,6 +13,7 @@
 // isBangumiSheetEmpty 直连子模块（barrel 亦导出该函数供上层使用）：本模块被
 // enrich-source-workbook.test.ts 等聚焦单测引用，其对 core/constants.js 的原子 mock
 // 无法支撑真实 barrel 全图（ui/preview.ts 顶层读 WATCH_STATUS_MAP，见该测试 fixtures）。
+import { tOr } from '../i18n/locale-store.js';
 import { isBangumiSheetEmpty } from '../sync/enrich-matching.js';
 import { state, safeGetElement } from './enrich-page-context.js';
 /** 设置预览区元素的显示/隐藏；hasTextOnly=true 时文本为空则强制隐藏 */
@@ -68,14 +69,16 @@ export function refreshMatchHintText() {
         return;
     if (state.matches.length === 0) {
         hintElement.textContent = state.bangumiSheet
-            ? '尚未预览匹配，点击「预览匹配」查看新番表与目标表的匹配结果'
-            : '请先选择目标 Bangumi 工作表，再点击「预览匹配」';
+            ? tOr('enrich.preview.tabHintNotPreviewed', '尚未预览匹配，点击「预览匹配」查看新番表与目标表的匹配结果')
+            : tOr('enrich.preview.tabHintNoTarget', '请先选择目标 Bangumi 工作表，再点击「预览匹配」');
         return;
     }
     const pendingCount = state.matches.filter((m) => m.matchType === 'unmatched').length;
     hintElement.textContent =
         state.bangumiSheet && isBangumiSheetEmpty(state.bangumiSheet) && pendingCount > 0
-            ? `目标表暂无数据，富化时将新增 ${String(pendingCount)} 行`
+            ? tOr('enrich.preview.tabHintPending', '目标表暂无数据，富化时将新增 {count} 行', {
+                count: pendingCount,
+            })
             : '';
 }
 /** 清空匹配结果（切换源表/重新识别表头时调用，避免展示过期结果） */

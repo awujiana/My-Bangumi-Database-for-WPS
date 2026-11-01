@@ -7,6 +7,7 @@
  */
 import { LOG_LEVELS } from '../core/constants.js';
 import { cleanSheetDuplicates } from '../index.js';
+import { tOr } from '../i18n/locale-store.js';
 import { showToast } from '../ui/dialog.js';
 import { bgmLog, BGM } from '../tools/util/index.js';
 import { getEnrichPreviewConfig } from './enrich-page-state.js';
@@ -27,7 +28,7 @@ export function maybeAutoCleanAfterEnrich() {
     try {
         const result = cleanSheetDuplicates(target);
         if (result.performed) {
-            showToast(`富化后自动去重完成：删除 ${String(result.deletedRows)} 行重复数据，合并 ${String(result.mergedTagGroups)} 组标签`, 'success');
+            showToast(tOr('enrich.result.dedupDone', '富化后自动去重完成：删除 {rows} 行重复数据，合并 {groups} 组标签', { rows: result.deletedRows, groups: result.mergedTagGroups }), 'success');
         }
     }
     catch (error) {

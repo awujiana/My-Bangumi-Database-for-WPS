@@ -6,6 +6,7 @@
  *   本块只依赖共享上下文（`enrich-page-context.js`）与外部模块，**不反向依赖源文件**。
  */
 import { sanitizeHtml } from '../tools/sanitize.js';
+import { tOr } from '../i18n/locale-store.js';
 import { escapeHtml } from '../tools/string-utilities.js';
 import { getCellValue, getLastRow } from '../tools/util/index.js';
 import { COLUMN_MAPPING_FIELDS } from './enrich-page-state.js';
@@ -58,12 +59,14 @@ function renderSourceDetailTable(worksheet) {
         const header = getCellValue(worksheet, headerRow, column).trim();
         const field = fieldByColumn.get(column);
         if (header || field) {
-            const label = header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(column)}列`;
+            const label = header ||
+                (field ? (labelByField.get(field) ?? '') : '') ||
+                tOr('enrich.sourceDetail.columnN', '第{column}列', { column });
             columns.push({ column, label, field });
         }
     }
     if (columns.length === 0) {
-        return '<div class="preview-hint">未找到表头列，无法展示完整表格</div>';
+        return `<div class="preview-hint">${escapeHtml(tOr('enrich.sourceDetail.noHeader', '未找到表头列，无法展示完整表格'))}</div>`;
     }
     const maxRows = 100;
     const lastRow = Math.min(getLastRow(worksheet), dataStartRow + maxRows - 1);

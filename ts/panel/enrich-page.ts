@@ -5,6 +5,9 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
+// 直接从 locale-store 取 tOr，不要走 i18n 桶：桶会连带 locale-install → tools/save-file
+// → ts/index（顶层写 window），node 环境的单测会 ReferenceError。
+import { tOr } from '../i18n/locale-store.js'
 import { enrichEntries } from '../sync/enrich-engine.js'
 import { buildIntroSheetContext, findIntroSheetInWorkbook } from '../sync/enrich-intro.js'
 import { detectAnimeSourceLayout, detectColumns } from '../sync/enrich-layout.js'
@@ -376,16 +379,19 @@ function pickFilesWithMultiSelect(): string[] | null {
     if (!dialog) return null
 
     dialog.AllowMultiSelect = true
-    dialog.Title = '选择新番表文件（可多选，按住 Ctrl/Shift 批量选择）'
+    dialog.Title = tOr(
+      'enrich.page.dlgFileTitle',
+      '选择新番表文件（可多选，按住 Ctrl/Shift 批量选择）',
+    )
     try {
       dialog.Filters.Clear()
     } catch {
       // 部分实现不支持 Clear，直接 Add 即可（Add 会追加）
     }
-    dialog.Filters.Add('Excel 文件 (*.xlsx)', '*.xlsx', 1)
-    dialog.Filters.Add('Excel 97-2003 文件 (*.xls)', '*.xls', 2)
-    dialog.Filters.Add('CSV 文件 (*.csv)', '*.csv', 3)
-    dialog.Filters.Add('所有文件 (*.*)', '*.*', 4)
+    dialog.Filters.Add(tOr('enrich.page.filterExcel', 'Excel 文件 (*.xlsx)'), '*.xlsx', 1)
+    dialog.Filters.Add(tOr('enrich.page.filterExcel97', 'Excel 97-2003 文件 (*.xls)'), '*.xls', 2)
+    dialog.Filters.Add(tOr('enrich.page.filterCsv', 'CSV 文件 (*.csv)'), '*.csv', 3)
+    dialog.Filters.Add(tOr('enrich.page.filterAll', '所有文件 (*.*)'), '*.*', 4)
 
     // Show() 返回 -1 = 确定，0 = 取消
     const result = dialog.Show()
@@ -441,19 +447,32 @@ function selectNewAnimeFileLoop(): void {
   } | null
 
   if (!app || typeof app.GetOpenFilename !== 'function') {
-    BGM.Dialog.alert('提示', 'WPS 文件对话框不可用，请直接在 WPS 中打开文件')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNoDialog', 'WPS 文件对话框不可用，请直接在 WPS 中打开文件'),
+    )
     return
   }
 
-  const fileFilter =
-    'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*'
+  // GetOpenFilename 要的是「描述,通配符」逗号串：描述也翻，通配符不动
+  const fileFilter = [
+    `${tOr('enrich.page.filterExcel', 'Excel 文件 (*.xlsx)')},*.xlsx`,
+    `${tOr('enrich.page.filterExcel97', 'Excel 97-2003 文件 (*.xls)')},*.xls`,
+    `${tOr('enrich.page.filterCsv', 'CSV 文件 (*.csv)')},*.csv`,
+    `${tOr('enrich.page.filterAll', '所有文件 (*.*)')},*.*`,
+  ].join(',')
 
   for (;;) {
     const titleSuffix =
       state.batchFiles.length > 0
-        ? `（已选 ${String(state.batchFiles.length)} 个，继续添加按"取消"结束）`
+        ? tOr('enrich.page.dlgContinueSuffix', '（已选 {count} 个，继续添加按"取消"结束）', {
+            count: state.batchFiles.length,
+          })
         : ''
-    const selected = app.GetOpenFilename(fileFilter, `选择新番表文件${titleSuffix}`)
+    const selected = app.GetOpenFilename(
+      fileFilter,
+      `${tOr('enrich.page.dlgFileTitle', '选择新番表文件')}${titleSuffix}`,
+    )
 
     // 用户取消
     if (typeof selected === 'boolean' || selected === false) {
@@ -466,7 +485,10 @@ function selectNewAnimeFileLoop(): void {
 
     // 重复文件跳过
     if (state.batchFiles.includes(filePath)) {
-      BGM.Dialog.alert('提示', `文件已在列表中：\n${fileName}`)
+      BGM.Dialog.alert(
+        tOr('enrich.page.hintTitle', '提示'),
+        tOr('enrich.page.dlgDuplicate', '文件已在列表中：\n{name}', { name: fileName }),
+      )
     } else {
       state.batchFiles.push(filePath)
       // 首个文件同时作为单文件富化目标
@@ -485,11 +507,15 @@ function selectNewAnimeFileLoop(): void {
       // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
       let shouldContinue = false as boolean
       BGM.Dialog.confirm(
-        `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
+        tOr(
+          'enrich.page.dlgAdded',
+          '已添加 {name}\n当前共 {count} 个文件\n点击【确定】继续添加，点击【取消】完成选择',
+          { name: fileName, count: state.batchFiles.length },
+        ),
         (isConfirmed: boolean) => {
           shouldContinue = isConfirmed
         },
-        '继续添加？',
+        tOr('enrich.page.dlgContinueTitle', '继续添加？'),
       )
       if (!shouldContinue) break
     }
@@ -546,7 +572,7 @@ function renderBatchFileList(): void {
   if (pathElement) {
     if (n === 0) {
       pathElement.textContent = ''
-      pathElement.setAttribute('placeholder', '未选择文件...')
+      pathElement.setAttribute('placeholder', tOr('enrich.file.placeholder', '未选择文件...'))
       pathElement.removeAttribute('title')
     } else {
       const firstFile = state.batchFiles[0]
@@ -555,7 +581,11 @@ function renderBatchFileList(): void {
         pathElement.setAttribute('title', firstFile)
       } else if (firstFile !== undefined) {
         const firstName = extractFileName(firstFile)
-        pathElement.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
+        pathElement.textContent = tOr(
+          'enrich.page.selectedCount',
+          '已选 {count} 个文件（首个：{first}）',
+          { count: n, first: firstName },
+        )
         pathElement.setAttribute('title', state.batchFiles.join('\n'))
       }
     }
@@ -567,9 +597,12 @@ function renderBatchFileList(): void {
   if (singleEnrichButton) {
     singleEnrichButton.disabled = n !== 1
     if (n >= 2) {
-      singleEnrichButton.title = '已选多个文件，请使用「🚀 批量富化」'
+      singleEnrichButton.title = tOr(
+        'enrich.page.multiTitle',
+        '已选多个文件，请使用「🚀 批量富化」',
+      )
     } else if (n === 0) {
-      singleEnrichButton.title = '请先选择新番表文件'
+      singleEnrichButton.title = tOr('enrich.page.noneTitle', '请先选择新番表文件')
     } else {
       singleEnrichButton.title = ''
     }
@@ -648,7 +681,7 @@ function autoDetectHeaderFromFile(filePath: string): boolean {
   try {
     const opened = openSourceWorkbook(filePath)
     if (!opened) {
-      throw new Error('WPS 应用不可用，无法打开新番表文件')
+      throw new Error(tOr('enrich.page.errNoApp', 'WPS 应用不可用，无法打开新番表文件'))
     }
 
     const { wb, isOpenedByUs } = opened
@@ -661,7 +694,7 @@ function autoDetectHeaderFromFile(filePath: string): boolean {
     const worksheet = wb.Worksheets.Item(1) as WpsWorksheet | null
     if (!worksheet) {
       if (isOpenedByUs) closeWorkbook(wb)
-      throw new Error('文件中没有工作表')
+      throw new Error(tOr('enrich.page.errNoSheet', '文件中没有工作表'))
     }
 
     const mapping = detectHeaderOnSheet(worksheet, fileName)
@@ -684,7 +717,14 @@ function autoDetectHeaderFromFile(filePath: string): boolean {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[enrich] 自动识别表头失败: ${fileName} - ${message}`)
-    BGM.Dialog.alert('提示', `自动识别表头失败：${message}\n可手动点击「🔍 自动识别表头」重试`)
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr(
+        'enrich.page.dlgDetectFailed',
+        '自动识别表头失败：{reason}\n可手动点击「🔍 自动识别表头」重试',
+        { reason: message },
+      ),
+    )
     return false
   }
 }
@@ -883,7 +923,11 @@ function showAutoDetectNotice(paths: string[]): void {
   const notice = safeGetElement('autoDetectNotice')
   if (!notice) return
   const names = paths.map((path) => extractFileName(path)).join('、')
-  notice.textContent = `🔄 已自动识别已打开的新番表工作簿（${String(paths.length)} 个）：${names}`
+  notice.textContent = tOr(
+    'enrich.page.autoDetected',
+    '🔄 已自动识别已打开的新番表工作簿（{count} 个）：{names}',
+    { count: paths.length, names },
+  )
   notice.style.display = ''
 }
 
@@ -898,17 +942,23 @@ export function autoDetectHeader(): void {
   // 未选择文件时：回落到当前活动工作表
   const app = getApp()
   if (!app?.ActiveWorkbook) {
-    BGM.Dialog.alert('提示', '未连接到 Excel，请先打开包含新番表的工作簿')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNoExcel', '未连接到 Excel，请先打开包含新番表的工作簿'),
+    )
     return
   }
 
   const worksheet = app.ActiveWorkbook.ActiveSheet as WpsWorksheet | null
   if (!worksheet) {
-    BGM.Dialog.alert('提示', '请先打开新番表文件并激活其工作表')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNeedActive', '请先打开新番表文件并激活其工作表'),
+    )
     return
   }
 
-  detectHeaderOnSheet(worksheet, '活动工作表')
+  detectHeaderOnSheet(worksheet, tOr('enrich.page.activitySheet', '活动工作表'))
 }
 
 // ========== 目标工作表选择 ==========
@@ -1024,13 +1074,19 @@ export function startEnrichment(): void {
 
   // 多文件场景的源表归批量流程所有，单文件富化不可用
   if (state.batchFiles.length >= 2) {
-    BGM.Dialog.alert('提示', '已选择多个文件，请使用「🚀 批量富化」')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgMultiUseBatch', '已选择多个文件，请使用「🚀 批量富化」'),
+    )
     return
   }
 
   const animeSourceSheet = ensureSourceSheet()
   if (!animeSourceSheet) {
-    BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNeedFile', '请先选择新番表文件并识别表头'),
+    )
     return
   }
 
@@ -1045,11 +1101,17 @@ export function startEnrichment(): void {
   }
 
   if (!state.bangumiSheet) {
-    BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNeedTarget', '请先选择目标 Bangumi 工作表'),
+    )
     return
   }
   if (!state.columnMapping || state.columnMapping.nameColumn === 0) {
-    BGM.Dialog.alert('提示', '列映射未正确识别')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNeedMapping', '列映射未正确识别'),
+    )
     return
   }
 
@@ -1059,7 +1121,10 @@ export function startEnrichment(): void {
     // 重新读取（previewMatch 可能已更新 state.matches）
     const recheckedMatches = state.matches
     if (recheckedMatches.length === 0) {
-      BGM.Dialog.alert('提示', '未匹配到任何条目，无法开始富化')
+      BGM.Dialog.alert(
+        tOr('enrich.page.hintTitle', '提示'),
+        tOr('enrich.page.dlgNoMatch', '未匹配到任何条目，无法开始富化'),
+      )
       return
     }
   }
@@ -1105,7 +1170,10 @@ export function startEnrichment(): void {
         LOG_LEVELS.WARN,
         `[enrich] 已按用户请求停止，保留 ${String(results.length)} 条已完成结果`,
       )
-      showToast(`已停止富化，保留已完成（含未解决冲突）的部分结果`, 'warning')
+      showToast(
+        tOr('enrich.page.stopped', '已停止富化，保留已完成（含未解决冲突）的部分结果'),
+        'warning',
+      )
       renderEnrichSummary(results)
     } else if (allConflicts.length > 0) {
       state.pendingConflicts = allConflicts
@@ -1126,8 +1194,10 @@ export function startEnrichment(): void {
       context: 'startEnrichment',
     })
     BGM.Dialog.error(
-      '错误',
-      `富化执行失败: ${error instanceof Error ? error.message : String(error)}`,
+      tOr('enrich.page.errorTitle', '错误'),
+      tOr('enrich.page.enrichFailed', '富化执行失败: {reason}', {
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     )
   } finally {
     state.isEnriching = false
@@ -1165,7 +1235,7 @@ function showProgressUI(isVisible: boolean): void {
   if (isVisible) {
     progressHosts.enrich = createInlineProgress(
       'enrichProgressHost',
-      '富化进度',
+      tOr('enrich.page.progressTitle', '富化进度'),
       '✨',
       cancelEnrichment,
     )
@@ -1180,7 +1250,9 @@ function showProgressUI(isVisible: boolean): void {
   if (startButton) {
     // 富化结束恢复时也要尊重"仅 N===1 可用"的约束（N>=2 走批量富化）
     startButton.disabled = isVisible || state.batchFiles.length !== 1
-    startButton.textContent = isVisible ? '⏳️ 富化中...' : '🚀 开始富化'
+    startButton.textContent = isVisible
+      ? tOr('enrich.page.running', '⏳️ 富化中...')
+      : tOr('enrich.strategy.start', '🚀 开始富化')
   }
 }
 
@@ -1280,10 +1352,14 @@ function showBatchProgress(): void {
   // 上一轮的完成态卡片可能还挂在右下角，先回收再建，避免 dock 泄漏
   progressHosts.batch?.hide()
   // 「停止」按钮把此前不可达的批量取消路径接上（state.batchCancelRequested 原先无人置位）
-  progressHosts.batch = createFloatingProgress('批量富化进度', '📦', () => {
-    state.batchCancelRequested = true
-    bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户请求取消批量富化，将在当前文件处理完成后停止')
-  })
+  progressHosts.batch = createFloatingProgress(
+    tOr('enrich.page.batchTitle', '批量富化进度'),
+    '📦',
+    () => {
+      state.batchCancelRequested = true
+      bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户请求取消批量富化，将在当前文件处理完成后停止')
+    },
+  )
 }
 
 /**
@@ -1301,12 +1377,18 @@ function finishBatchProgress(wasCancelled: boolean, total: number): void {
   const failCount = done - successCount
   const matched = state.batchResults.reduce((sum, result) => sum + result.matched, 0)
   const scope = wasCancelled
-    ? `已停止（${String(done)}/${String(total)}）`
-    : `${String(done)}/${String(total)} 个文件`
+    ? tOr('enrich.page.batchStoppedCount', '已停止（{done}/{total}）', { done, total })
+    : tOr('enrich.page.batchRunning', '{done}/{total} 个文件', { done, total })
   controller.complete({
-    summary: `${scope} · 成功 ${String(successCount)} · 失败 ${String(failCount)} · 匹配 ${String(matched)}`,
+    summary: tOr(
+      'enrich.page.batchSummaryLine',
+      '{scope} · 成功 {success} · 失败 {fail} · 匹配 {matched}',
+      { scope, success: successCount, fail: failCount, matched },
+    ),
     ok: !wasCancelled,
-    doneTitle: wasCancelled ? '批量富化已停止' : '批量富化完成',
+    doneTitle: wasCancelled
+      ? tOr('enrich.page.batchStoppedTitle', '批量富化已停止')
+      : tOr('enrich.page.batchDoneTitle', '批量富化完成'),
   })
 }
 
@@ -1321,19 +1403,21 @@ function openBatchSourceWorkbook(
   fileName: string,
 ): { wb: WpsWorkbook; worksheet: WpsWorksheet } {
   const app = getApp()
-  if (!app?.Workbooks) throw new Error('WPS 应用不可用')
+  if (!app?.Workbooks) throw new Error(tOr('enrich.page.errWpsUnavailable', 'WPS 应用不可用'))
 
   const workbooks = app.Workbooks as unknown as {
     Open?: (path: string) => WpsWorkbook | null
   }
   bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 打开文件: ${fileName}`)
-  if (typeof workbooks.Open !== 'function') throw new TypeError('WPS Workbooks.Open 不可用')
+  if (typeof workbooks.Open !== 'function') {
+    throw new TypeError(tOr('enrich.page.errWorkbooksOpen', 'WPS Workbooks.Open 不可用'))
+  }
 
   const wb = workbooks.Open(filePath)
-  if (!wb) throw new Error('无法打开文件：WPS 返回了 null')
+  if (!wb) throw new Error(tOr('enrich.page.errOpenNull', '无法打开文件：WPS 返回了 null'))
 
   const worksheet = wb.Worksheets.Item(1) as WpsWorksheet | null
-  if (!worksheet) throw new Error('文件中没有工作表')
+  if (!worksheet) throw new Error(tOr('enrich.page.errNoSheet', '文件中没有工作表'))
   return { wb, worksheet }
 }
 
@@ -1348,7 +1432,7 @@ function enrichSingleBatchSource(
   const sourceLayout = detectAnimeSourceLayout(worksheet)
   const headerRow = sourceLayout?.headerRow ?? findHeaderRow(worksheet)
   if (headerRow === 0) {
-    result.error = '未检测到有效的表头行'
+    result.error = tOr('enrich.page.batchNoHeader', '未检测到有效的表头行')
     bgmLog(
       LOG_LEVELS.ERROR,
       `[enrich-batch] ${fileName}: 表头识别失败 - 未检测到有效的表头行（请确认表头在前 10 行内）`,
@@ -1359,7 +1443,7 @@ function enrichSingleBatchSource(
   const dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
   const columnMapping = sourceLayout?.columnMapping ?? detectColumns(worksheet, headerRow)
   if (columnMapping.nameColumn === 0) {
-    result.error = '已找到字段行，但未找到名称列'
+    result.error = tOr('enrich.page.batchNoNameColumn', '已找到字段行，但未找到名称列')
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName}: 表头识别失败 - 未找到名称列`)
     return
   }
@@ -1473,7 +1557,10 @@ export function batchStartEnrichment(): void {
   }
 
   if (state.batchFiles.length === 0) {
-    BGM.Dialog.alert('提示', '请先选择至少一个新番表文件')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr('enrich.page.dlgNoFileBatch', '请先选择至少一个新番表文件'),
+    )
     return
   }
 
@@ -1490,7 +1577,13 @@ export function batchStartEnrichment(): void {
   }
 
   if (!bangumiSheet) {
-    BGM.Dialog.alert('提示', '请先选择并锁定目标 Bangumi 工作表（在上方"🎯 目标工作表"区域）')
+    BGM.Dialog.alert(
+      tOr('enrich.page.hintTitle', '提示'),
+      tOr(
+        'enrich.page.dlgNeedLock',
+        '请先选择并锁定目标 Bangumi 工作表（在上方"🎯 目标工作表"区域）',
+      ),
+    )
     return
   }
 
@@ -1513,11 +1606,15 @@ export function batchStartEnrichment(): void {
   // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
   let isConfirmed = false as boolean
   BGM.Dialog.confirm(
-    `将依次对 ${String(state.batchFiles.length)} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
+    tOr(
+      'enrich.page.dlgBatchConfirm',
+      '将依次对 {count} 个文件执行富化。\n目标工作表：{sheet}\n是否继续？',
+      { count: state.batchFiles.length, sheet: bangumiSheet.Name },
+    ),
     (isOk: boolean) => {
       isConfirmed = isOk
     },
-    '开始批量富化',
+    tOr('enrich.page.dlgBatchConfirmTitle', '开始批量富化'),
   )
   if (isConfirmed) {
     void runBatchEnrichment(bangumiSheet)
@@ -1566,7 +1663,10 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
       `[enrich-batch] 已按用户请求停止：完成 ${String(state.batchResults.length)}/${String(total)} 个文件`,
     )
     showToast(
-      `已停止批量富化，完成 ${String(state.batchResults.length)}/${String(total)} 个文件`,
+      tOr('enrich.page.batchStoppedToast', '已停止批量富化，完成 {done}/{total} 个文件', {
+        done: state.batchResults.length,
+        total,
+      }),
       'warning',
     )
   }
@@ -1617,8 +1717,19 @@ function renderBatchSummary(): void {
     .map((r, index) => {
       const statusIcon = r.success ? '✅' : '❌'
       const detail = r.success
-        ? `表头行 ${String(r.headerRow)} · 匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
-        : `失败：${escapeHtml(r.error || '未知错误')}`
+        ? tOr(
+            'enrich.page.batchRowDetail',
+            '表头行 {headerRow} · 匹配 {matched} / 更新 {updated} / 未匹配 {unmatched}',
+            {
+              headerRow: r.headerRow,
+              matched: r.matched,
+              updated: r.updatedEntries,
+              unmatched: r.unmatched,
+            },
+          )
+        : tOr('enrich.page.batchRowFailed', '失败：{reason}', {
+            reason: escapeHtml(r.error || tOr('enrich.page.unknownError', '未知错误')),
+          })
       return `
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
           <span style="color:#ddd;">${statusIcon} #${String(index + 1)} ${escapeHtml(r.fileName)}</span>
@@ -1630,14 +1741,14 @@ function renderBatchSummary(): void {
 
   const html = `
     <div style="display:flex;gap:16px;margin-bottom:8px;font-size:13px;">
-      <span>📄 <b>${String(total)}</b> 个文件</span>
-      <span style="color:#a6e3a1;">✅ ${String(successCount)} 成功</span>
-      ${failCount > 0 ? `<span style="color:#f38ba8;">❌ ${String(failCount)} 失败</span>` : ''}
+      <span>${tOr('enrich.page.sumFiles', '📄 <b>{count}</b> 个文件', { count: total })}</span>
+      <span style="color:#a6e3a1;">${tOr('enrich.page.sumSuccess', '✅ {count} 成功', { count: successCount })}</span>
+      ${failCount > 0 ? `<span style="color:#f38ba8;">${tOr('enrich.page.batchFailCount', '❌ {count} 失败', { count: failCount })}</span>` : ''}
     </div>
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--text-2);">
-      <span>匹配总数 <b style="color:#a6e3a1;">${String(totalMatched)}</b></span>
-      <span>已更新 <b style="color:#89b4fa;">${String(totalUpdated)}</b></span>
-      <span>未匹配 <b style="color:#f9e2af;">${String(totalUnmatched)}</b></span>
+      <span>${tOr('enrich.page.sumMatchedLabel', '匹配总数')} <b style="color:#a6e3a1;">${String(totalMatched)}</b></span>
+      <span>${tOr('enrich.page.sumUpdatedLabel', '已更新')} <b style="color:#89b4fa;">${String(totalUpdated)}</b></span>
+      <span>${tOr('enrich.page.sumUnmatchedLabel', '未匹配')} <b style="color:#f9e2af;">${String(totalUnmatched)}</b></span>
     </div>
     <div style="max-height:200px;overflow-y:auto;">${fileRows}</div>
   `

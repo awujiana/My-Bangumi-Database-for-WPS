@@ -26,6 +26,8 @@ import {
   readWorkbookSignature,
   saveTargetCache,
 } from '../tools/target-detect-cache.js'
+// 直接从 locale-store 取 tOr，不要走 i18n 桶（桶会连带 ts/index，node 单测没有 window）
+import { tOr } from '../i18n/locale-store.js'
 
 /** 富化页面的锁定工作表引用解析（委托共享实现，保持向后兼容） */
 export { findBangumiTargetSheets, findWorkbookByName } from '../tools/locked-sheet.js'
@@ -53,7 +55,10 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
   select.textContent = ''
   const defaultOption = document.createElement('option')
   defaultOption.value = ''
-  defaultOption.textContent = '-- 请选择 Bangumi 追踪表工作簿 --'
+  defaultOption.textContent = tOr(
+    'enrich.lock.workbookDefault',
+    '-- 请选择 Bangumi 追踪表工作簿 --',
+  )
   select.appendChild(defaultOption)
 
   const activeWbName = app.ActiveWorkbook?.Name ?? ''
@@ -121,7 +126,7 @@ export function refreshEnrichSheets(
     select.textContent = ''
     const defaultOption = document.createElement('option')
     defaultOption.value = ''
-    defaultOption.textContent = '-- 请先选择工作簿 --'
+    defaultOption.textContent = tOr('enrich.lock.sheetDefaultWorkbook', '-- 请先选择工作簿 --')
     select.appendChild(defaultOption)
     return
   }
@@ -140,7 +145,7 @@ export function refreshEnrichSheets(
   select.textContent = ''
   const defaultOption = document.createElement('option')
   defaultOption.value = ''
-  defaultOption.textContent = '-- 请选择工作表 --'
+  defaultOption.textContent = tOr('enrich.lock.sheetDefault', '-- 请选择工作表 --')
   select.appendChild(defaultOption)
 
   for (let index = 1; index <= sheetCount; index += 1) {
@@ -182,27 +187,33 @@ export function toggleEnrichWorkbookLock(
 
   const sheetIndex = Number(sheetSelect.value)
   if (Number.isNaN(sheetIndex) || sheetIndex <= 0) {
-    showToast('请先选择一个有效的 Bangumi 追踪表工作表', 'warn')
+    showToast(tOr('enrich.lock.needSheet', '请先选择一个有效的 Bangumi 追踪表工作表'), 'warn')
     return
   }
 
   const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
   const wbName = wbSelect?.value ?? ''
   if (!wbName) {
-    showToast('请先选择一个有效的工作簿', 'warn')
+    showToast(tOr('enrich.lock.needWorkbook', '请先选择一个有效的工作簿'), 'warn')
     return
   }
 
   if (isLockedAt(sheetIndex, wbName)) {
     // §5.6 C4：解锁走共享清位实现（applyLockedSheet(null) + 持久化）
     clearLockedSheet('enrich')
-    showToast('已解锁目标工作表', 'info')
+    showToast(tOr('enrich.lock.unlocked', '已解锁目标工作表'), 'info')
   } else {
     const sheetName = sheetSelect.options[sheetSelect.selectedIndex]?.text ?? ''
     const info: LockedSheetInfo = { index: sheetIndex, name: sheetName, workbookName: wbName }
     applyLockedSheet(info)
     saveLockedSheet(info, 'enrich')
-    showToast(`已锁定: ${wbName} → ${sheetName}`, 'info')
+    showToast(
+      tOr('enrich.lock.locked', '已锁定: {workbook} → {sheet}', {
+        workbook: wbName,
+        sheet: sheetName,
+      }),
+      'info',
+    )
   }
 
   updateEnrichLockButton(lockButtonId, statusId)
@@ -403,7 +414,10 @@ export function autoSelectEnrichTarget(
   if (sheetSelect) sheetSelect.value = String(best.sheetIndex)
 
   showToast(
-    `检测到 ${String(candidates.length)} 个候选追踪表，已预选 ${best.sheetName}，请确认后锁定`,
+    tOr('enrich.lock.candidates', '检测到 {count} 个候选追踪表，已预选 {sheet}，请确认后锁定', {
+      count: candidates.length,
+      sheet: best.sheetName,
+    }),
     'warn',
   )
   return 'preselected'
@@ -428,7 +442,13 @@ function applyAutoSelectedTarget(
 
   const isLocked = lockEnrichWorkbookByName(target.workbookName, target.sheetIndex)
   if (isLocked) {
-    showToast(`已自动锁定: ${target.workbookName} → ${target.sheetName}`, 'success')
+    showToast(
+      tOr('enrich.lock.autoLocked', '已自动锁定: {workbook} → {sheet}', {
+        workbook: target.workbookName,
+        sheet: target.sheetName,
+      }),
+      'success',
+    )
     updateEnrichLockButton(lockButtonId, statusId)
     return 'locked'
   }

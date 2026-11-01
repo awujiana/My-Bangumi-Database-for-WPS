@@ -6,6 +6,7 @@
  *   本块只依赖共享上下文（`enrich-page-context.js`）与外部模块，**不反向依赖源文件**。
  */
 import { LOG_LEVELS } from '../core/constants.js';
+import { tOr } from '../i18n/locale-store.js';
 import { buildIntroSheetContext, findIntroSheetInWorkbook } from '../sync/enrich-intro.js';
 import { detectAnimeSourceLayout, detectColumns, readPlatformValues, } from '../sync/enrich-layout.js';
 import { matchEntries } from '../sync/enrich-matching.js';
@@ -32,7 +33,7 @@ export function detectHeaderOnSheet(worksheet, label) {
         const sourceLayout = detectAnimeSourceLayout(worksheet);
         const headerRow = sourceLayout?.headerRow ?? findHeaderRow(worksheet);
         if (headerRow === 0) {
-            BGM.Dialog.alert('提示', '未检测到有效的表头行，请检查表头是否在前 10 行内');
+            BGM.Dialog.alert(tOr('enrich.page.hintTitle', '提示'), tOr('enrich.preview.noHeaderRow', '未检测到有效的表头行，请检查表头是否在前 10 行内'));
             bgmLog(LOG_LEVELS.ERROR, `[enrich] 表头识别失败: ${label} 未检测到有效的表头行`);
             return null;
         }
@@ -58,7 +59,9 @@ export function detectHeaderOnSheet(worksheet, label) {
             level: BGM.ErrorLevel.ERROR,
             context: 'detectHeaderOnSheet',
         });
-        BGM.Dialog.error('错误', `识别表头失败: ${error instanceof Error ? error.message : String(error)}`);
+        BGM.Dialog.error(tOr('enrich.page.errorTitle', '错误'), tOr('enrich.preview.detectFailed', '识别表头失败: {reason}', {
+            reason: error instanceof Error ? error.message : String(error),
+        }));
         return null;
     }
 }
@@ -66,7 +69,7 @@ function renderDetectResult(worksheet, _mapping) {
     const resultArea = safeGetElement('detectResult');
     if (!resultArea)
         return;
-    const sheetName = worksheet.Name || '未知';
+    const sheetName = worksheet.Name || tOr('enrich.preview.unknown', '未知');
     const sheetNameElement = safeGetElement('detectSheetName');
     if (sheetNameElement)
         sheetNameElement.textContent = sheetName;
@@ -95,11 +98,15 @@ function renderColumnMappingEditor(worksheet, mapping) {
     for (const field of COLUMN_MAPPING_FIELDS) {
         const currentColumn = mapping[field.key];
         const selectedValue = currentColumn ? String(currentColumn) : '';
-        const optionsHtml = `<option value="">-- 未映射 --</option>${columnOptions
+        const unmappedOption = `<option value="">${escapeHtml(tOr('enrich.preview.unmapped', '-- 未映射 --'))}</option>`;
+        const optionsHtml = `${unmappedOption}${columnOptions
             .map((o) => {
             const optionLabel = o.header
-                ? `${escapeHtml(o.header)} (列${String(o.column)})`
-                : `(列${String(o.column)}，无表头)`;
+                ? tOr('enrich.preview.columnWithHeader', '{header} (列{column})', {
+                    header: o.header,
+                    column: o.column,
+                })
+                : tOr('enrich.preview.columnNoHeader', '(列{column}，无表头)', { column: o.column });
             return `<option value="${String(o.column)}" ${String(o.column) === selectedValue ? 'selected' : ''}>${optionLabel}</option>`;
         })
             .join('')}`;
@@ -274,7 +281,9 @@ function renderWorkbookTabs() {
 function switchSourceWorkbook(wb) {
     const sheet = findAnimeSourceSheetInWorkbook(wb);
     if (!sheet) {
-        BGM.Dialog.alert('提示', `工作簿「${wb.Name}」中未识别到新番表布局`);
+        BGM.Dialog.alert(tOr('enrich.page.hintTitle', '提示'), tOr('enrich.preview.layoutNotFound', '工作簿「{name}」中未识别到新番表布局', {
+            name: wb.Name,
+        }));
         return;
     }
     // 释放旧源工作簿（仅回收本插件自动打开的；closeOpenedSourceWorkbook 会清空源表状态）
@@ -353,7 +362,7 @@ function renderSourcePreview(worksheet, mapping) {
         state.hasSourcePreview = false;
         const hintElement = safeGetElement('sourcePreviewHint');
         if (hintElement) {
-            hintElement.textContent = '尚未识别到映射列，请先在「新番表文件」中识别表头';
+            hintElement.textContent = tOr('enrich.preview.mappingMissing', '尚未识别到映射列，请先在「新番表文件」中识别表头');
             hintElement.style.display = '';
         }
         // 源表不可用：旧的匹配结果已失效
@@ -413,17 +422,23 @@ function renderSourcePreview(worksheet, mapping) {
     tbody.innerHTML = sanitizeTableRows(rowsHtml.join(''));
     // 源数据统计：预览只画前 20 行，但用户需要知道表里到底有多少行
     renderStatCards(safeGetElement('sourceStats'), [
-        { label: '数据总行', value: Math.max(0, sourceLastRow - dataStartRow + 1) },
-        { label: '已映射字段', value: fieldColumns.length + introFields.length },
-        { label: '本次预览', value: rowsHtml.length },
-        { label: '数据起始行', value: dataStartRow },
+        {
+            label: tOr('enrich.preview.statTotalRows', '数据总行'),
+            value: Math.max(0, sourceLastRow - dataStartRow + 1),
+        },
+        {
+            label: tOr('enrich.preview.statMappedFields', '已映射字段'),
+            value: fieldColumns.length + introFields.length,
+        },
+        { label: tOr('enrich.preview.statPreviewRows', '本次预览'), value: rowsHtml.length },
+        { label: tOr('enrich.preview.statStartRow', '数据起始行'), value: dataStartRow },
     ]);
     // 预览提示：仅展示前 maxRows 行
     const hintElement = safeGetElement('sourcePreviewHint');
     if (hintElement) {
         hintElement.textContent =
             rowsHtml.length >= maxRows
-                ? `仅显示前 ${String(maxRows)} 行，可点击「查看详细数据表格」查看完整数据`
+                ? tOr('enrich.preview.limitHint', '仅显示前 {count} 行，可点击「查看详细数据表格」查看完整数据', { count: maxRows })
                 : '';
     }
     // 「查看详细数据表格」按钮与提示的显示由 applyPreviewTabVisibility 统一控制
@@ -439,15 +454,15 @@ function renderSourcePreview(worksheet, mapping) {
 export function previewMatch(options) {
     const animeSourceSheet = ensureSourceSheet();
     if (!animeSourceSheet) {
-        BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头');
+        BGM.Dialog.alert(tOr('enrich.page.hintTitle', '提示'), tOr('enrich.page.dlgNeedFile', '请先选择新番表文件并识别表头'));
         return;
     }
     if (!state.bangumiSheet) {
-        BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表');
+        BGM.Dialog.alert(tOr('enrich.page.hintTitle', '提示'), tOr('enrich.page.dlgNeedTarget', '请先选择目标 Bangumi 工作表'));
         return;
     }
     if (!state.columnMapping || state.columnMapping.nameColumn === 0) {
-        BGM.Dialog.alert('提示', '列映射未正确识别，缺少名称列');
+        BGM.Dialog.alert(tOr('enrich.page.hintTitle', '提示'), tOr('enrich.preview.needMappingName', '列映射未正确识别，缺少名称列'));
         return;
     }
     try {
@@ -473,7 +488,9 @@ export function previewMatch(options) {
             level: BGM.ErrorLevel.ERROR,
             context: 'previewMatch',
         });
-        BGM.Dialog.error('错误', `匹配预览失败: ${error instanceof Error ? error.message : String(error)}`);
+        BGM.Dialog.error(tOr('enrich.page.errorTitle', '错误'), tOr('enrich.preview.matchFailed', '匹配预览失败: {reason}', {
+            reason: error instanceof Error ? error.message : String(error),
+        }));
     }
     finally {
         // 可选开关：预览时重开了源工作簿，预览结束同样回收（仅关闭本插件打开的）
@@ -522,16 +539,16 @@ function matchStatusClass(matchType) {
 function matchStatusText(matchType) {
     switch (matchType) {
         case 'exact': {
-            return '✅ 精确';
+            return tOr('enrich.preview.statusExact', '✅ 精确');
         }
         case 'alias': {
-            return '🔄 别名';
+            return tOr('enrich.preview.statusAlias', '🔄 别名');
         }
         case 'error': {
-            return '⚠️ 错误';
+            return tOr('enrich.preview.statusError', '⚠️ 错误');
         }
         default: {
-            return '❌ 未匹配';
+            return tOr('enrich.preview.statusUnmatched', '❌ 未匹配');
         }
     }
 }
@@ -585,7 +602,7 @@ function buildSourceCmpTags(sourceSheet, match) {
 /** 读取 Bangumi 目标行对比字段（按目标表表头动态读取） */
 function buildTargetCmpTags(targetSheet, targetColumnMap, match) {
     if (!targetSheet || !targetColumnMap || match.bangumiRow === undefined) {
-        return '<div class="cmp-empty">未匹配到目标行</div>';
+        return `<div class="cmp-empty">${escapeHtml(tOr('enrich.preview.noTargetRow', '未匹配到目标行'))}</div>`;
     }
     const items = [];
     for (const field of TARGET_CMP_FIELDS) {
@@ -597,8 +614,9 @@ function buildTargetCmpTags(targetSheet, targetColumnMap, match) {
                 items.push({ label: field.label, value });
         }
     }
-    if (items.length === 0)
-        return '<div class="cmp-empty">目标行无对比数据</div>';
+    if (items.length === 0) {
+        return `<div class="cmp-empty">${escapeHtml(tOr('enrich.preview.noCompareData', '目标行无对比数据'))}</div>`;
+    }
     return renderCmpTags(items);
 }
 // ========== 匹配详情弹窗 ==========
@@ -640,7 +658,7 @@ function renderMatchResultsToTable(matches) {
             : '';
         const targetMetaHtml = match.bangumiRow === undefined
             ? ''
-            : `<div class="cmp-meta">目标行 ${String(match.bangumiRow)}</div>`;
+            : `<div class="cmp-meta">${escapeHtml(tOr('enrich.preview.targetRow', '目标行 {row}', { row: match.bangumiRow }))}</div>`;
         const targetTags = buildTargetCmpTags(targetSheet, targetColumnMap, match);
         return `
       <tr class="match-row match-${match.matchType}">
@@ -696,7 +714,7 @@ function injectAllMatchesDetailButton(matches) {
         // 最后一列（详情）表头加一个全详情按钮
         detailTh = document.createElement('th');
         detailTh.className = 'all-detail-cell';
-        detailTh.textContent = '详情';
+        detailTh.textContent = tOr('enrich.preview.thDetail', '详情');
         thead.appendChild(detailTh);
     }
     const cell = detailTh;
@@ -704,7 +722,9 @@ function injectAllMatchesDetailButton(matches) {
     const button = document.createElement('button');
     button.className = 'bgm-btn small primary';
     button.type = 'button';
-    button.textContent = `📋 查看全部 (${String(matches.length)})`;
+    button.textContent = tOr('enrich.preview.viewAll', '📋 查看全部 ({count})', {
+        count: matches.length,
+    });
     button.addEventListener('click', () => {
         showAllMatchesDetail(matches);
     });
@@ -717,7 +737,7 @@ function showAllMatchesDetail(matches) {
     if (!modalElement || !bodyElement)
         return;
     if (matches.length === 0) {
-        bodyElement.innerHTML = sanitizeHtml('<p class="hint">暂无匹配结果</p>');
+        bodyElement.innerHTML = sanitizeHtml(`<p class="hint">${escapeHtml(tOr('enrich.preview.noMatchResult', '暂无匹配结果'))}</p>`);
         modalElement.style.display = 'flex';
         return;
     }
@@ -734,10 +754,10 @@ function showAllMatchesDetail(matches) {
     }
     const groupHtml = [];
     const labels = [
-        ['exact', '✅ 精确匹配', 'status-exact'],
-        ['alias', '🔄 别名匹配', 'status-alias'],
-        ['error', '⚠️ 错误', 'status-error'],
-        ['unmatched', '❌ 未匹配', 'status-unmatched'],
+        ['exact', tOr('enrich.preview.exactMatch', '✅ 精确匹配'), 'status-exact'],
+        ['alias', tOr('enrich.preview.aliasMatch', '🔄 别名匹配'), 'status-alias'],
+        ['error', tOr('enrich.preview.statusError', '⚠️ 错误'), 'status-error'],
+        ['unmatched', tOr('enrich.preview.statusUnmatched', '❌ 未匹配'), 'status-unmatched'],
     ];
     for (const label of labels) {
         const [key, title, cssClass] = label;
@@ -745,7 +765,9 @@ function showAllMatchesDetail(matches) {
         if (items && items.length > 0) {
             const listHtml = items
                 .map((m, index) => {
-                const bangumi = m.bangumiRow === undefined ? '—' : `目标行 ${String(m.bangumiRow)}`;
+                const bangumi = m.bangumiRow === undefined
+                    ? '—'
+                    : tOr('enrich.preview.targetRow', '目标行 {row}', { row: m.bangumiRow });
                 const bangumiName = m.bangumiName ? ` · ${escapeHtml(m.bangumiName)}` : '';
                 const error = m.errorMessage
                     ? `<div class="match-detail-error">${escapeHtml(m.errorMessage)}</div>`
@@ -792,49 +814,70 @@ function renderMatchDetail(match) {
     switch (match.matchType) {
         case 'exact': {
             statusClass += ' status-exact';
-            statusText = '✅ 精确匹配';
+            statusText = tOr('enrich.preview.exactMatch', '✅ 精确匹配');
             break;
         }
         case 'alias': {
             statusClass += ' status-alias';
-            statusText = '🔄 别名匹配';
+            statusText = tOr('enrich.preview.aliasMatch', '🔄 别名匹配');
             break;
         }
         case 'unmatched': {
             statusClass += ' status-unmatched';
-            statusText = '❌ 未匹配';
+            statusText = tOr('enrich.preview.statusUnmatched', '❌ 未匹配');
             break;
         }
         case 'error': {
             statusClass += ' status-error';
-            statusText = '⚠️ 错误';
+            statusText = tOr('enrich.preview.statusError', '⚠️ 错误');
             break;
         }
         default: {
             statusClass += ' status-unmatched';
-            statusText = '未知';
+            statusText = tOr('enrich.preview.unknown', '未知');
             break;
         }
     }
     const items = [
-        { label: '新番名称', valueHtml: escapeHtml(match.matchedAnimeName) },
-        { label: '源表行号', valueHtml: String(match.animeRow) },
-        { label: '匹配方式', valueHtml: `<span class="${statusClass}">${statusText}</span>` },
+        {
+            label: tOr('enrich.preview.detailName', '新番名称'),
+            valueHtml: escapeHtml(match.matchedAnimeName),
+        },
+        {
+            label: tOr('enrich.preview.detailSourceRow', '源表行号'),
+            valueHtml: String(match.animeRow),
+        },
+        {
+            label: tOr('enrich.preview.detailMethod', '匹配方式'),
+            valueHtml: `<span class="${statusClass}">${statusText}</span>`,
+        },
     ];
     if (match.bangumiRow !== undefined) {
-        items.push({ label: 'Bangumi行号', valueHtml: String(match.bangumiRow) });
+        items.push({
+            label: tOr('enrich.preview.detailBangumiRow', 'Bangumi行号'),
+            valueHtml: String(match.bangumiRow),
+        });
     }
     if (match.bangumiName !== undefined) {
-        items.push({ label: 'Bangumi名称', valueHtml: escapeHtml(match.bangumiName) });
+        items.push({
+            label: tOr('enrich.preview.detailBangumiName', 'Bangumi名称'),
+            valueHtml: escapeHtml(match.bangumiName),
+        });
     }
     if (match.aliases && match.aliases.length > 0) {
         const aliasHtml = match.aliases
             .map((a) => `<span class="match-detail-alias">${escapeHtml(a)}</span>`)
             .join('');
-        items.push({ label: '别名', valueHtml: `<div class="match-detail-aliases">${aliasHtml}</div>` });
+        items.push({
+            label: tOr('enrich.preview.detailAlias', '别名'),
+            valueHtml: `<div class="match-detail-aliases">${aliasHtml}</div>`,
+        });
     }
     if (match.errorMessage) {
-        items.push({ label: '错误信息', valueHtml: escapeHtml(match.errorMessage) });
+        items.push({
+            label: tOr('enrich.preview.detailError', '错误信息'),
+            valueHtml: escapeHtml(match.errorMessage),
+        });
     }
     // 详情弹窗额外展示源/目标对比字段（与内联表格同源数据），方便用户在不滚动小表格的情况下看清
     const sourceSheet = state.animeSourceSheet;
@@ -843,13 +886,13 @@ function renderMatchDetail(match) {
     const targetColumnMap = targetSheet && targetHeaderRow > 0 ? getColumnMap(targetSheet, targetHeaderRow) : null;
     if (sourceSheet && state.columnMapping) {
         items.push({
-            label: '源表对比字段',
+            label: tOr('enrich.preview.detailSourceCompare', '源表对比字段'),
             valueHtml: buildSourceCmpTags(sourceSheet, match),
         });
     }
     if (targetSheet && targetColumnMap && match.bangumiRow !== undefined) {
         items.push({
-            label: '目标表对比字段',
+            label: tOr('enrich.preview.detailTargetCompare', '目标表对比字段'),
             valueHtml: buildTargetCmpTags(targetSheet, targetColumnMap, match),
         });
     }

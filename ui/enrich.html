@@ -28,33 +28,41 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-text">
-            <span class="brand-title">✨ 新番表富化工具</span>
-            <span class="brand-sub">将新番表数据富化到 Bangumi 追踪表</span>
+            <span class="brand-title" data-i18n="enrich.header.title">✨ 新番表富化工具</span>
+            <span class="brand-sub" data-i18n="enrich.header.subtitle"
+              >将新番表数据富化到 Bangumi 追踪表</span
+            >
           </div>
         </div>
       </header>
 
       <!-- ===================== 侧栏（功能导航） ===================== -->
       <aside class="sidebar">
-        <nav class="nav" aria-label="功能导航">
-          <div class="nav-label">功能导航</div>
-          <a href="#sec-file" title="新番表文件"
-            ><span class="nav-ico">📁</span><span class="nav-text">新番表文件</span></a
+        <nav class="nav" data-i18n-aria-label="common.navLabel" aria-label="功能导航">
+          <div class="nav-label" data-i18n="common.navLabel">功能导航</div>
+          <a href="#sec-file" data-i18n-title="enrich.nav.file" title="新番表文件"
+            ><span class="nav-ico">📁</span
+            ><span class="nav-text" data-i18n="enrich.nav.file">新番表文件</span></a
           >
-          <a href="#sec-target" title="目标工作表"
-            ><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a
+          <a href="#sec-target" data-i18n-title="enrich.nav.target" title="目标工作表"
+            ><span class="nav-ico">🎯</span
+            ><span class="nav-text" data-i18n="enrich.nav.target">目标工作表</span></a
           >
-          <a href="#sec-preview" title="数据预览"
-            ><span class="nav-ico">👁️</span><span class="nav-text">数据预览</span></a
+          <a href="#sec-preview" data-i18n-title="enrich.nav.preview" title="数据预览"
+            ><span class="nav-ico">👁️</span
+            ><span class="nav-text" data-i18n="enrich.nav.preview">数据预览</span></a
           >
-          <a href="#sec-enrich" title="富化执行"
-            ><span class="nav-ico">⚡️</span><span class="nav-text">富化执行</span></a
+          <a href="#sec-enrich" data-i18n-title="enrich.nav.enrich" title="富化执行"
+            ><span class="nav-ico">⚡️</span
+            ><span class="nav-text" data-i18n="enrich.nav.enrich">富化执行</span></a
           >
-          <a href="#sec-records" title="富化记录"
-            ><span class="nav-ico">📊</span><span class="nav-text">富化记录</span></a
+          <a href="#sec-records" data-i18n-title="enrich.nav.records" title="富化记录"
+            ><span class="nav-ico">📊</span
+            ><span class="nav-text" data-i18n="enrich.nav.records">富化记录</span></a
           >
-          <a href="#sec-tips" title="使用提示"
-            ><span class="nav-ico">💡</span><span class="nav-text">使用提示</span></a
+          <a href="#sec-tips" data-i18n-title="enrich.nav.tips" title="使用提示"
+            ><span class="nav-ico">💡</span
+            ><span class="nav-text" data-i18n="enrich.nav.tips">使用提示</span></a
           >
         </nav>
       </aside>
@@ -63,7 +71,8 @@
       <main class="main">
         <div class="enrich-section" id="sec-file" data-detachable>
           <h3>
-            📁 新番表文件<button
+            <span data-i18n="enrich.section.file">📁 新番表文件</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-file"
@@ -78,6 +87,7 @@
               class="file-path-display"
               id="filePathDisplay"
               readonly
+              data-i18n-placeholder="enrich.file.placeholder"
               placeholder="未选择文件..."
             ></div>
             <!-- 自动识别已打开新番表工作簿的提示（打开页面时检查发现后显示） -->
@@ -90,7 +100,7 @@
                 data-action="selectFile"
                 style="flex: 1"
               >
-                📂 选择文件
+                <span data-i18n="enrich.file.select">📂 选择文件</span>
               </button>
               <button
                 class="bgm-btn small"
@@ -98,7 +108,7 @@
                 data-action="detectHeader"
                 style="flex: 1"
               >
-                🔍 自动识别表头
+                <span data-i18n="enrich.file.detectHeader">🔍 自动识别表头</span>
               </button>
             </div>
             <label
@@ -114,7 +124,9 @@
               "
             >
               <input type="checkbox" id="closeSourceAfterDetectChk" />
-              <span>识别后关闭文件（点「开始富化」时自动重开）</span>
+              <span data-i18n="enrich.file.closeAfterDetect"
+                >识别后关闭文件（点「开始富化」时自动重开）</span
+              >
             </label>
             <!-- 批量行内控件：选择文件后显示；
                      「🚀 批量富化」在 N≥2 时显示，「🗑️ 清空列表」在 N≥1 时显示。
@@ -126,7 +138,7 @@
                 data-action="batchStartEnrich"
                 style="flex: 1; display: none"
               >
-                🚀 批量富化
+                <span data-i18n="enrich.file.batchStart">🚀 批量富化</span>
               </button>
               <button
                 class="bgm-btn small"
@@ -134,7 +146,7 @@
                 data-action="batchClear"
                 style="flex: 1; display: none"
               >
-                🗑️ 清空列表
+                <span data-i18n="enrich.file.batchClear">🗑️ 清空列表</span>
               </button>
             </div>
 
@@ -167,7 +179,7 @@
               "
             >
               <div style="font-weight: 600; margin-bottom: 8px; color: var(--success)">
-                📊 批量富化汇总
+                <span data-i18n="enrich.file.batchSummary">📊 批量富化汇总</span>
               </div>
               <div id="batchSummaryContent"></div>
             </div>
@@ -175,17 +187,22 @@
           <div class="detect-result" id="detectResult" style="display: none">
             <div class="result-info">
               <div class="result-item">
-                <span class="result-label">工作表：</span><span id="detectSheetName">-</span>
+                <span class="result-label" data-i18n="enrich.detect.sheet">工作表：</span
+                ><span id="detectSheetName">-</span>
               </div>
               <div class="result-item">
-                <span class="result-label">表头行号：</span><span id="detectHeaderRow">-</span>
+                <span class="result-label" data-i18n="enrich.detect.headerRow">表头行号：</span
+                ><span id="detectHeaderRow">-</span>
               </div>
               <div class="result-item">
-                <span class="result-label">数据起始行：</span><span id="detectDataRow">-</span>
+                <span class="result-label" data-i18n="enrich.detect.dataRow">数据起始行：</span
+                ><span id="detectDataRow">-</span>
               </div>
             </div>
             <div class="column-mapping" id="columnMapping">
-              <div class="mapping-header">列映射（可修正）</div>
+              <div class="mapping-header" data-i18n="enrich.detect.columnMapping">
+                列映射（可修正）
+              </div>
               <div class="mapping-list" id="mappingList"></div>
             </div>
           </div>
@@ -193,7 +210,8 @@
 
         <div class="enrich-section" id="sec-target" data-detachable>
           <h3>
-            🎯 目标工作表<button
+            <span data-i18n="enrich.section.target">🎯 目标工作表</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-target"
@@ -204,22 +222,24 @@
             </button>
           </h3>
           <div class="form-group">
-            <label>选择工作簿：</label>
+            <label data-i18n="enrich.target.workbook">选择工作簿：</label>
             <select id="workbookSelect" class="input">
-              <option value="">-- 当前活动工作簿 --</option>
+              <option value="" data-i18n="enrich.target.workbookDefault">
+                -- 当前活动工作簿 --
+              </option>
             </select>
           </div>
           <div class="form-group">
-            <label>选择工作表：</label>
+            <label data-i18n="enrich.target.sheet">选择工作表：</label>
             <div style="display: flex; gap: 6px">
               <select id="sheetSelect" class="input" style="flex: 1">
-                <option value="">-- 请选择 --</option>
+                <option value="" data-i18n="enrich.target.sheetDefault">-- 请选择 --</option>
               </select>
             </div>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small" data-action="refreshSheets" style="flex: 1">
-              🔄 刷新
+              <span data-i18n="enrich.target.refresh">🔄 刷新</span>
             </button>
             <button
               class="bgm-btn small"
@@ -235,7 +255,8 @@
 
         <div class="enrich-section section-wide" id="sec-preview" data-detachable>
           <h3>
-            👁️ 数据预览<button
+            <span data-i18n="enrich.section.preview">👁️ 数据预览</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-preview"
@@ -248,13 +269,21 @@
           <!-- 多新番表工作簿切换按钮（26年4月 / 26年7月 …，横向滚动） -->
           <div class="workbook-tabs" id="workbookTabs" style="display: none"></div>
           <div class="preview-tabs">
-            <button class="preview-tab active" data-tab="source">新番表数据</button>
-            <button class="preview-tab" data-tab="match">匹配结果</button>
+            <button
+              class="preview-tab active"
+              data-tab="source"
+              data-i18n="enrich.preview.tabSource"
+            >
+              新番表数据
+            </button>
+            <button class="preview-tab" data-tab="match" data-i18n="enrich.preview.tabMatch">
+              匹配结果
+            </button>
           </div>
           <!-- 「预览匹配」按钮仅在切换到「匹配结果」页签时显示（见 applyPreviewTabVisibility） -->
           <div class="preview-actions" id="matchPreviewAction" style="display: none">
             <button class="bgm-btn small" id="previewMatchBtn" data-action="previewMatch">
-              🔍 预览匹配
+              <span data-i18n="enrich.preview.previewMatch">🔍 预览匹配</span>
             </button>
           </div>
           <div id="sourceStats"></div>
@@ -267,21 +296,21 @@
           <div class="preview-hint" id="sourcePreviewHint"></div>
           <div class="preview-actions" id="sourceDetailAction" style="display: none">
             <button class="bgm-btn small" id="viewSourceDetailBtn" data-action="viewSourceDetail">
-              📄 查看详细数据表格
+              <span data-i18n="enrich.preview.viewSourceDetail">📄 查看详细数据表格</span>
             </button>
           </div>
           <div class="stat-grid" id="matchStats" style="display: none">
             <div class="stat-card stat-card-accent">
               <div class="stat-value" id="exactMatchCount">0</div>
-              <div class="stat-label">精确匹配</div>
+              <div class="stat-label" data-i18n="enrich.preview.exact">精确匹配</div>
             </div>
             <div class="stat-card stat-card-warning">
               <div class="stat-value" id="aliasMatchCount">0</div>
-              <div class="stat-label">别名匹配</div>
+              <div class="stat-label" data-i18n="enrich.preview.alias">别名匹配</div>
             </div>
             <div class="stat-card stat-card-error">
               <div class="stat-value" id="unmatchedCount">0</div>
-              <div class="stat-label">未匹配</div>
+              <div class="stat-label" data-i18n="enrich.preview.unmatched">未匹配</div>
             </div>
           </div>
           <div class="preview-hint" id="matchEmptyHint" style="display: none"></div>
@@ -289,10 +318,10 @@
             <table id="matchTable">
               <thead>
                 <tr>
-                  <th>新番表源数据</th>
-                  <th>匹配方式</th>
-                  <th>目标表数据</th>
-                  <th>详情</th>
+                  <th data-i18n="enrich.preview.thSource">新番表源数据</th>
+                  <th data-i18n="enrich.preview.thMethod">匹配方式</th>
+                  <th data-i18n="enrich.preview.thTarget">目标表数据</th>
+                  <th data-i18n="enrich.preview.thDetail">详情</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -302,7 +331,8 @@
 
         <div class="enrich-section" id="sec-enrich" data-detachable>
           <h3>
-            ⚡️ 富化执行<button
+            <span data-i18n="enrich.section.enrich">⚡️ 富化执行</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-enrich"
@@ -313,11 +343,19 @@
             </button>
           </h3>
           <div class="strategy-desc">
-            <div class="strategy-item">🏷️ <strong>标签追加</strong>：将新番表标签追加到目标表</div>
-            <div class="strategy-item">📅 <strong>首播填充</strong>：填充/更新首播日期</div>
-            <div class="strategy-item">📺 <strong>集数填充</strong>：填充/更新集数信息</div>
-            <div class="strategy-item">✨ <strong>特点追加</strong>：追加播放平台、独播等信息</div>
-            <div class="strategy-item">
+            <div class="strategy-item" data-i18n-html="enrich.strategy.tags">
+              🏷️ <strong>标签追加</strong>：将新番表标签追加到目标表
+            </div>
+            <div class="strategy-item" data-i18n-html="enrich.strategy.premiere">
+              📅 <strong>首播填充</strong>：填充/更新首播日期
+            </div>
+            <div class="strategy-item" data-i18n-html="enrich.strategy.episodes">
+              📺 <strong>集数填充</strong>：填充/更新集数信息
+            </div>
+            <div class="strategy-item" data-i18n-html="enrich.strategy.features">
+              ✨ <strong>特点追加</strong>：追加播放平台、独播等信息
+            </div>
+            <div class="strategy-item" data-i18n-html="enrich.strategy.alias">
               🔗 <strong>别名富化</strong>：新番表名称与 Bangumi 不一致时补充到别名列
             </div>
           </div>
@@ -326,22 +364,33 @@
             style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--text-1)"
           >
             <div class="strategy-item" style="color: var(--text-3); font-size: 12px">
-              📖 <strong>简介工作表映射</strong>： 导演→导演 | 编剧→脚本 | 人设→人物设定 |
-              CG导演→演出 | 音乐→音乐 | 动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 |
-              原作→原作
+              <span data-i18n-html="enrich.strategy.introLabel"
+                >📖 <strong>简介工作表映射</strong>：</span
+              >
+              <span
+                >导演→导演 | 编剧→脚本 | 人设→人物设定 | CG导演→演出 | 音乐→音乐 |
+                动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 | 原作→原作</span
+              >
             </div>
             <div
               class="strategy-item"
               style="color: var(--text-3); font-size: 11px; margin-top: 4px"
             >
-              ⚡️ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
-              <span style="color: var(--text-link)">🔗 全部增量更新</span>（追加 | 分隔符）|
-              <span style="color: var(--text-3)">🛡️ 保留原名</span>（跳过）|
-              <span style="color: var(--text-danger)">✏️ 使用新番表名</span>（覆盖）
+              <span data-i18n-html="enrich.strategy.conflictLabel"
+                >⚡️ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：</span
+              >
+              <span style="color: var(--text-link)" data-i18n="enrich.conflict.append"
+                >🔗 全部增量更新</span
+              ><span data-i18n="enrich.conflict.appendHint">（追加 | 分隔符）</span>|
+              <span style="color: var(--text-3)" data-i18n="enrich.conflict.keep">🛡️ 保留原名</span
+              ><span data-i18n="enrich.conflict.keepHint">（跳过）</span>|
+              <span style="color: var(--text-danger)" data-i18n="enrich.conflict.overwrite"
+                >✏️ 使用新番表名</span
+              ><span data-i18n="enrich.conflict.overwriteHint">（覆盖）</span>
             </div>
           </div>
           <button class="bgm-btn primary" id="startEnrichBtn" data-action="startEnrich">
-            🚀 开始富化
+            <span data-i18n="enrich.strategy.start">🚀 开始富化</span>
           </button>
           <div class="enrich-progress" id="enrichProgress" style="display: none">
             <!-- 进度条宿主：内容由通用进度组件 inline 模式渲染 -->
@@ -350,15 +399,15 @@
               <div class="stat-grid">
                 <div class="stat-card stat-card-success">
                   <div class="stat-value" id="enrichedCount">0</div>
-                  <div class="stat-label">已富化</div>
+                  <div class="stat-label" data-i18n="enrich.progress.enriched">已富化</div>
                 </div>
                 <div class="stat-card stat-card-warning">
                   <div class="stat-value" id="skippedCount">0</div>
-                  <div class="stat-label">跳过</div>
+                  <div class="stat-label" data-i18n="enrich.progress.skipped">跳过</div>
                 </div>
                 <div class="stat-card stat-card-error">
                   <div class="stat-value" id="failedCount">0</div>
-                  <div class="stat-label">失败</div>
+                  <div class="stat-label" data-i18n="enrich.progress.failed">失败</div>
                 </div>
               </div>
             </div>
@@ -374,14 +423,15 @@
               data-action="viewEnrichDetail"
               style="flex: 1"
             >
-              📋 查看详细结果
+              <span data-i18n="enrich.progress.viewDetail">📋 查看详细结果</span>
             </button>
           </div>
         </div>
 
         <div class="enrich-section" id="sec-records" data-detachable>
           <h3>
-            📊 富化记录<button
+            <span data-i18n="enrich.section.records">📊 富化记录</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-records"
@@ -394,27 +444,27 @@
           <div class="stat-grid">
             <div class="stat-card">
               <div class="stat-value" id="totalRecordCount">0</div>
-              <div class="stat-label">总记录</div>
+              <div class="stat-label" data-i18n="enrich.records.total">总记录</div>
             </div>
             <div class="stat-card stat-card-success">
               <div class="stat-value" id="successRecordCount">0</div>
-              <div class="stat-label">成功</div>
+              <div class="stat-label" data-i18n="enrich.records.success">成功</div>
             </div>
             <div class="stat-card stat-card-warning">
               <div class="stat-value" id="skipRecordCount">0</div>
-              <div class="stat-label">跳过</div>
+              <div class="stat-label" data-i18n="enrich.records.skip">跳过</div>
             </div>
             <div class="stat-card stat-card-error">
               <div class="stat-value" id="errorRecordCount">0</div>
-              <div class="stat-label">错误</div>
+              <div class="stat-label" data-i18n="enrich.records.error">错误</div>
             </div>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small" data-action="openRecordSheet" style="flex: 1">
-              📊 打开记录表
+              <span data-i18n="enrich.records.openSheet">📊 打开记录表</span>
             </button>
             <button class="bgm-btn small" data-action="clearRecords" style="flex: 1">
-              🗑️ 清除记录
+              <span data-i18n="enrich.records.clear">🗑️ 清除记录</span>
             </button>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
@@ -424,7 +474,7 @@
               data-args='["enrichRecords","csv"]'
               style="flex: 1"
             >
-              📄 导出 CSV
+              <span data-i18n="common.exportCsv">📄 导出 CSV</span>
             </button>
             <button
               class="bgm-btn small"
@@ -432,17 +482,18 @@
               data-args='["enrichRecords","txt"]'
               style="flex: 1"
             >
-              📝 导出 TXT
+              <span data-i18n="common.exportTxt">📝 导出 TXT</span>
             </button>
           </div>
           <div class="record-list" id="recentRecords">
-            <div class="record-empty">暂无记录</div>
+            <div class="record-empty" data-i18n="enrich.records.empty">暂无记录</div>
           </div>
         </div>
 
         <div class="enrich-section tips-section" id="sec-tips" data-detachable>
           <h3>
-            💡 使用提示<button
+            <span data-i18n="enrich.section.tips">💡 使用提示</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-tips"
@@ -455,27 +506,29 @@
           <div class="tips-list">
             <div class="tip-item">
               <span class="tip-num">1</span>
-              <span>选择新番表文件（支持 .xlsx / .xls / .csv 格式）</span>
+              <span data-i18n="enrich.tips.step1"
+                >选择新番表文件（支持 .xlsx / .xls / .csv 格式）</span
+              >
             </div>
             <div class="tip-item">
               <span class="tip-num">2</span>
-              <span>点击"自动识别表头"，检查并修正列映射</span>
+              <span data-i18n="enrich.tips.step2">点击"自动识别表头"，检查并修正列映射</span>
             </div>
             <div class="tip-item">
               <span class="tip-num">3</span>
-              <span>选择目标 Bangumi 追踪表工作表</span>
+              <span data-i18n="enrich.tips.step3">选择目标 Bangumi 追踪表工作表</span>
             </div>
             <div class="tip-item">
               <span class="tip-num">4</span>
-              <span>预览匹配结果，确认无误后点击"开始富化"</span>
+              <span data-i18n="enrich.tips.step4">预览匹配结果，确认无误后点击"开始富化"</span>
             </div>
             <div class="tip-item">
               <span class="tip-num">5</span>
-              <span>简介工作表富化时，字段冲突会弹出确认对话框</span>
+              <span data-i18n="enrich.tips.step5">简介工作表富化时，字段冲突会弹出确认对话框</span>
             </div>
             <div class="tip-item">
               <span class="tip-num">6</span>
-              <span>富化完成后查看记录，验证数据正确性</span>
+              <span data-i18n="enrich.tips.step6">富化完成后查看记录，验证数据正确性</span>
             </div>
           </div>
         </div>
@@ -486,17 +539,31 @@
           class="modal"
           role="dialog"
           aria-modal="true"
+          data-i18n-aria-label="enrich.modal.sourceDetailAria"
           aria-label="新番数据完整表格"
           style="display: none"
         >
           <div class="modal-content source-detail-modal">
             <div class="modal-header">
-              <h3>📄 新番数据完整表格</h3>
-              <button class="modal-close-btn" id="sourceDetailCloseBtn" aria-label="关闭">×</button>
+              <h3 data-i18n="enrich.modal.sourceDetailTitle">📄 新番数据完整表格</h3>
+              <button
+                class="modal-close-btn"
+                id="sourceDetailCloseBtn"
+                data-i18n-aria-label="common.close"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             <div class="modal-body" id="sourceDetailBody"></div>
             <div class="modal-footer">
-              <button class="bgm-btn small primary" id="sourceDetailDoneBtn">关闭</button>
+              <button
+                class="bgm-btn small primary"
+                id="sourceDetailDoneBtn"
+                data-i18n="common.close"
+              >
+                关闭
+              </button>
             </div>
           </div>
         </div>
@@ -507,17 +574,31 @@
           class="modal"
           role="dialog"
           aria-modal="true"
+          data-i18n-aria-label="enrich.modal.matchDetailAria"
           aria-label="匹配详情"
           style="display: none"
         >
           <div class="modal-content match-detail-modal">
             <div class="modal-header">
-              <h3>🔍 匹配详情</h3>
-              <button class="modal-close-btn" id="matchDetailCloseBtn" aria-label="关闭">×</button>
+              <h3 data-i18n="enrich.modal.matchDetailTitle">🔍 匹配详情</h3>
+              <button
+                class="modal-close-btn"
+                id="matchDetailCloseBtn"
+                data-i18n-aria-label="common.close"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             <div class="modal-body" id="matchDetailBody"></div>
             <div class="modal-footer">
-              <button class="bgm-btn small primary" id="matchDetailDoneBtn">关闭</button>
+              <button
+                class="bgm-btn small primary"
+                id="matchDetailDoneBtn"
+                data-i18n="common.close"
+              >
+                关闭
+              </button>
             </div>
           </div>
         </div>
@@ -528,17 +609,31 @@
           class="modal"
           role="dialog"
           aria-modal="true"
+          data-i18n-aria-label="enrich.modal.enrichDetailAria"
           aria-label="富化详细结果"
           style="display: none"
         >
           <div class="modal-content enrich-detail-modal">
             <div class="modal-header">
-              <h3>📋 富化详细结果</h3>
-              <button class="modal-close-btn" id="enrichDetailCloseBtn" aria-label="关闭">×</button>
+              <h3 data-i18n="enrich.modal.enrichDetailTitle">📋 富化详细结果</h3>
+              <button
+                class="modal-close-btn"
+                id="enrichDetailCloseBtn"
+                data-i18n-aria-label="common.close"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             <div class="modal-body" id="enrichDetailBody"></div>
             <div class="modal-footer">
-              <button class="bgm-btn small primary" id="enrichDetailDoneBtn">关闭</button>
+              <button
+                class="bgm-btn small primary"
+                id="enrichDetailDoneBtn"
+                data-i18n="common.close"
+              >
+                关闭
+              </button>
             </div>
           </div>
         </div>
@@ -546,33 +641,51 @@
         <!-- 冲突对话框（静态模板：JS 只更新文本值并切换显隐，避免运行时注入 HTML） -->
         <div id="conflictDialog" class="conflict-dialog" style="display: none">
           <div class="conflict-header">
-            <span class="conflict-title" id="conflictTitle">⚡️ 字段冲突确认</span>
+            <span class="conflict-title" id="conflictTitle" data-i18n="enrich.conflict.title"
+              >⚡️ 字段冲突确认</span
+            >
             <!-- 冲突进度宿主：通用进度组件 inline 模式；由 .conflict-progress 压缩为细线 -->
             <div class="conflict-progress" id="conflictProgressHost"></div>
           </div>
           <div class="conflict-body">
             <div class="conflict-row">
-              <span class="conflict-label">条目：</span>
+              <span class="conflict-label" data-i18n="enrich.conflict.item">条目：</span>
               <span class="conflict-name" id="conflictName"></span>
             </div>
             <div class="conflict-row">
-              <span class="conflict-label">字段：</span>
+              <span class="conflict-label" data-i18n="enrich.conflict.field">字段：</span>
               <span class="conflict-field" id="conflictField"></span>
             </div>
             <div class="conflict-row">
-              <span class="conflict-label">现有值：</span>
+              <span class="conflict-label" data-i18n="enrich.conflict.oldValue">现有值：</span>
               <span class="conflict-old" id="conflictOld"></span>
             </div>
             <div class="conflict-row">
-              <span class="conflict-label">新番表值：</span>
+              <span class="conflict-label" data-i18n="enrich.conflict.newValue">新番表值：</span>
               <span class="conflict-new" id="conflictNew"></span>
             </div>
-            <div class="conflict-hint">💡 选择如何处理此冲突</div>
+            <div class="conflict-hint" data-i18n="enrich.conflict.hint">💡 选择如何处理此冲突</div>
           </div>
           <div class="conflict-footer">
-            <button class="btn conflict-btn-btn" data-resolution="append">🔗 全部增量更新</button>
-            <button class="btn conflict-btn-keep" data-resolution="keep">🛡️ 保留原名</button>
-            <button class="btn conflict-btn-overwrite" data-resolution="overwrite">
+            <button
+              class="btn conflict-btn-btn"
+              data-resolution="append"
+              data-i18n="enrich.conflict.append"
+            >
+              🔗 全部增量更新
+            </button>
+            <button
+              class="btn conflict-btn-keep"
+              data-resolution="keep"
+              data-i18n="enrich.conflict.keep"
+            >
+              🛡️ 保留原名
+            </button>
+            <button
+              class="btn conflict-btn-overwrite"
+              data-resolution="overwrite"
+              data-i18n="enrich.conflict.overwrite"
+            >
               ✏️ 使用新番表名
             </button>
           </div>

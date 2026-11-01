@@ -4,22 +4,23 @@
  * @description 从 enrich-page.ts 抽出的纯函数簇：匹配方式/字段操作枚举→中文标记映射，
  * 以及「分组 → 条目 → 字段」三级 HTML 渲染。全部无 DOM 副作用，便于单测。
  */
+import { tOr } from '../i18n/locale-store.js';
 import { sanitizeHtml } from '../tools/sanitize.js';
 import { escapeHtml } from '../tools/string-utilities.js';
 /** 把匹配方式枚举映射为用户可读的中文标记 */
 export function matchTypeLabel(matchType) {
     switch (matchType) {
         case 'exact': {
-            return { text: '精确命中', badge: 'exact' };
+            return { text: tOr('enrich.detail.badgeExact', '精确命中'), badge: 'exact' };
         }
         case 'alias': {
-            return { text: '别名匹配', badge: 'alias' };
+            return { text: tOr('enrich.detail.badgeAlias', '别名匹配'), badge: 'alias' };
         }
         case 'error': {
-            return { text: '错误', badge: 'error' };
+            return { text: tOr('enrich.detail.badgeError', '错误'), badge: 'error' };
         }
         default: {
-            return { text: '新增/未匹配', badge: 'unmatched' };
+            return { text: tOr('enrich.detail.badgeUnmatched', '新增/未匹配'), badge: 'unmatched' };
         }
     }
 }
@@ -27,19 +28,19 @@ export function matchTypeLabel(matchType) {
 export function fieldActionLabel(action) {
     switch (action) {
         case 'fill': {
-            return { text: '填充', cssClass: 'fill' };
+            return { text: tOr('enrich.detail.actionFill', '填充'), cssClass: 'fill' };
         }
         case 'append': {
-            return { text: '追加', cssClass: 'append' };
+            return { text: tOr('enrich.detail.actionAppend', '追加'), cssClass: 'append' };
         }
         default: {
-            return { text: '跳过', cssClass: 'skip' };
+            return { text: tOr('enrich.detail.actionSkip', '跳过'), cssClass: 'skip' };
         }
     }
 }
 export function renderEnrichDetailHtml(groups) {
     if (groups.length === 0) {
-        return '暂无富化数据，请先执行富化';
+        return tOr('enrich.detail.empty', '暂无富化数据，请先执行富化');
     }
     const totalMatched = groups.reduce((sum, group) => sum + group.items.filter((r) => r.kind === 'matched').length, 0);
     const totalUnmatched = groups.reduce((sum, group) => sum + group.items.filter((r) => r.kind === 'unmatched').length, 0);
@@ -50,19 +51,19 @@ export function renderEnrichDetailHtml(groups) {
     <div class="enrich-detail-summary">
       <div class="enrich-detail-stat matched">
         <div class="enrich-detail-stat-num">${String(totalMatched)}</div>
-        <div class="enrich-detail-stat-label">已匹配</div>
+        <div class="enrich-detail-stat-label">${escapeHtml(tOr('enrich.detail.statMatched', '已匹配'))}</div>
       </div>
       <div class="enrich-detail-stat unmatched">
         <div class="enrich-detail-stat-num">${String(totalUnmatched)}</div>
-        <div class="enrich-detail-stat-label">未匹配</div>
+        <div class="enrich-detail-stat-label">${escapeHtml(tOr('enrich.preview.unmatched', '未匹配'))}</div>
       </div>
       <div class="enrich-detail-stat error">
         <div class="enrich-detail-stat-num">${String(totalErrors)}</div>
-        <div class="enrich-detail-stat-label">错误</div>
+        <div class="enrich-detail-stat-label">${escapeHtml(tOr('enrich.detail.badgeError', '错误'))}</div>
       </div>
       <div class="enrich-detail-stat field">
         <div class="enrich-detail-stat-num">${String(totalFields)}</div>
-        <div class="enrich-detail-stat-label">字段更新</div>
+        <div class="enrich-detail-stat-label">${escapeHtml(tOr('enrich.detail.statField', '字段更新'))}</div>
       </div>
     </div>
   `;
@@ -71,7 +72,8 @@ export function renderEnrichDetailHtml(groups) {
 }
 function renderEnrichDetailGroup(group) {
     if (group.items.length === 0) {
-        return `<div class="enrich-detail-group empty">${escapeHtml(group.fileName)}：无条目</div>`;
+        const emptyText = tOr('enrich.detail.groupEmpty', '{name}：无条目', { name: group.fileName });
+        return `<div class="enrich-detail-group empty">${escapeHtml(emptyText)}</div>`;
     }
     const entries = group.items.map((item) => renderEnrichDetailEntry(item)).join('');
     return `
@@ -86,7 +88,7 @@ function renderEnrichDetailEntry(item) {
     const headBadge = item.matchType ? matchTypeLabel(item.matchType) : null;
     if (item.kind === 'error') {
         const badge = headBadge ?? matchTypeLabel('error');
-        const errorMessage = escapeHtml(item.errorMessage ?? '未知错误');
+        const errorMessage = escapeHtml(item.errorMessage ?? tOr('enrich.detail.unknownError', '未知错误'));
         return `
       <div class="enrich-detail-entry">
         <div class="enrich-detail-entry-head">
@@ -115,11 +117,11 @@ function renderEnrichDetailEntry(item) {
       <table class="enrich-detail-fields">
         <thead>
           <tr>
-            <th>字段</th>
-            <th>原值</th>
+            <th>${escapeHtml(tOr('enrich.detail.thField', '字段'))}</th>
+            <th>${escapeHtml(tOr('enrich.detail.thOld', '原值'))}</th>
             <th></th>
-            <th>新值</th>
-            <th>操作</th>
+            <th>${escapeHtml(tOr('enrich.detail.thNew', '新值'))}</th>
+            <th>${escapeHtml(tOr('enrich.detail.thAction', '操作'))}</th>
           </tr>
         </thead>
         <tbody>
@@ -127,7 +129,7 @@ function renderEnrichDetailEntry(item) {
         </tbody>
       </table>
     `
-        : `<div class="enrich-detail-entry-error enrich-detail-empty">该条目无字段变更</div>`;
+        : `<div class="enrich-detail-entry-error enrich-detail-empty">${escapeHtml(tOr('enrich.detail.noFieldChange', '该条目无字段变更'))}</div>`;
     return `
     <div class="enrich-detail-entry">
       <div class="enrich-detail-entry-head">
@@ -140,8 +142,8 @@ function renderEnrichDetailEntry(item) {
 }
 function renderEnrichDetailField(field) {
     const fieldName = escapeHtml(field.fieldName);
-    const oldValue = escapeHtml(field.oldValue ?? '（空）');
-    const updatedValue = escapeHtml(field.updatedValue || '（空）');
+    const oldValue = escapeHtml(field.oldValue ?? tOr('enrich.detail.blank', '（空）'));
+    const updatedValue = escapeHtml(field.updatedValue || tOr('enrich.detail.blank', '（空）'));
     const action = fieldActionLabel(field.action);
     return `
     <tr>

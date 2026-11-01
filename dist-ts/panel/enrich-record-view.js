@@ -7,6 +7,7 @@
  */
 import { LOG_LEVELS } from '../core/constants.js';
 import { getAllEnrichRecords, getOrCreateEnrichRecordSheet, clearEnrichRecords, } from '../sync/enrich-record.js';
+import { tOr } from '../i18n/locale-store.js';
 import { sanitizeHtml } from '../tools/sanitize.js';
 import { escapeHtml } from '../tools/string-utilities.js';
 import { bgmLog, BGM, getApp } from '../tools/util/index.js';
@@ -27,11 +28,11 @@ export function openEnrichRecordSheet() {
             level: BGM.ErrorLevel.ERROR,
             context: 'openEnrichRecordSheet',
         });
-        BGM.Dialog.error('错误', '无法打开富化记录工作表');
+        BGM.Dialog.error(tOr('enrich.page.errorTitle', '错误'), tOr('enrich.records.openFailed', '无法打开富化记录工作表'));
     }
 }
 export function clearRecords() {
-    BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (isConfirmed) => {
+    BGM.Dialog.confirm(tOr('enrich.records.clearConfirm', '确定要清除所有富化记录吗？此操作不可撤销。'), (isConfirmed) => {
         if (!isConfirmed)
             return;
         try {
@@ -71,7 +72,8 @@ export function loadRecentRecords() {
             return;
         const recentRecords = records.slice(-10).reverse();
         if (recentRecords.length === 0) {
-            recordsContainer.innerHTML = sanitizeHtml('<div class="record-empty">暂无记录</div>');
+            const emptyHtml = `<div class="record-empty">${escapeHtml(tOr('enrich.records.empty', '暂无记录'))}</div>`;
+            recordsContainer.innerHTML = sanitizeHtml(emptyHtml);
             return;
         }
         const recordsHtml = recentRecords
@@ -80,19 +82,19 @@ export function loadRecentRecords() {
             let actionText;
             switch (r.action) {
                 case 'fill': {
-                    actionText = '填充';
+                    actionText = tOr('enrich.detail.actionFill', '填充');
                     break;
                 }
                 case 'append': {
-                    actionText = '追加';
+                    actionText = tOr('enrich.detail.actionAppend', '追加');
                     break;
                 }
                 case 'skip': {
-                    actionText = '跳过';
+                    actionText = tOr('enrich.detail.actionSkip', '跳过');
                     break;
                 }
                 default: {
-                    actionText = '错误';
+                    actionText = tOr('enrich.detail.badgeError', '错误');
                     break;
                 }
             }

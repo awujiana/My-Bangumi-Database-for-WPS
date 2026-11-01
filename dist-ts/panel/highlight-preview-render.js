@@ -18,8 +18,14 @@
  * 兜底原文既是「语言包没就绪」时的正确表现，也让单测不必伪造一份 570+ key 的包。
  * 漏翻在这里不会静默——`check:i18n` 规则 ⑧ 保证非源语言 100% 覆盖，运行期不存在
  * 「某个 key 只有简体」这种状态。
+ *
+ * **从 `i18n/locale-store` 直接取，不走 `i18n/index` 桶**：桶会连带引入
+ * `locale-install` → `tools/save-file` → `ts/index`，而 `ts/index` 在模块顶层就写
+ * `window.initializePanelCore`。本模块的单测跑在 node 环境（没有 `window`），
+ * 走桶会让一个纯函数模块必须套 jsdom 才能测——这正是本文件当初「自带 escapeHtml、
+ * 不依赖 tools 层」想避免的事。
  */
-import { tOr } from '../i18n/index.js';
+import { tOr } from '../i18n/locale-store.js';
 /**
  * 详情区最多渲染多少行
  *
