@@ -65,7 +65,6 @@ export default {
     "settings.nav.about": "About",
 
     "settings.appearance.title": "🎨 Appearance & Navigation",
-    "settings.appearance.collapseAria": "Collapse / expand Appearance & Navigation",
     "settings.appearance.themeLabel": "Theme",
     "settings.appearance.themeDark": "Dark",
     "settings.appearance.themeLight": "Light",
@@ -88,24 +87,20 @@ export default {
     "settings.appearance.languageHint": "Takes effect immediately, no WPS restart. Task panes switch right away; ribbon button labels change on the next WPS start (WPS only refreshes the tab title at runtime).",
 
     "settings.modules.title": "🧩 Module Order",
-    "settings.modules.collapseAria": "Collapse / expand Module Order",
     "settings.modules.hint": "Reorder the modules on each panel. The sidebar navigation and the main area reorder together; changes are saved immediately and pushed to the matching panel. Both ↑↓ buttons (keyboard accessible) and drag-and-drop work.",
     "settings.modules.sidebarHint": "The 🧭 Navigation (sidebar) header at the top of each group can be hidden with 👁️ too — that collapses the whole sidebar and lets the main area use the full width, which suits a narrow task pane. To bring it back, click 🚫 here (remembered per panel).",
 
     "settings.shortcuts.title": "⌨️ Shortcuts",
-    "settings.shortcuts.collapseAria": "Collapse / expand Shortcuts",
     "settings.shortcuts.enableLabel": "Enable global shortcuts (key combos + sidebar mouse gestures)",
     "settings.shortcuts.hint": "Keyboard shortcuts work on every panel and don't steal keys while focus is in an input or dropdown. Click the combo button on the right and press the new keys to rebind; Esc cancels. A combo already used by another action won't be saved, and the action that owns it is shown below.",
     "settings.shortcuts.resetAll": "↩️ Reset all to defaults",
 
     "settings.accounts.title": "👤 Accounts",
-    "settings.accounts.collapseAria": "Collapse / expand Accounts",
     "settings.accounts.hint": "Store tokens for several Bangumi accounts, then <strong>long-press the avatar in the top-right</strong> to switch. Switching only rewrites the active token / user ID; sheet data and already-synced content are untouched.",
     "settings.accounts.recordCurrent": "➕ Save current account",
     "settings.accounts.recordHint": "“Save current account” stores the active token and the detected user ID as one entry (saving the same account again updates it instead of duplicating). Up to 8 entries are kept.",
 
     "settings.syncPref.title": "🔄 Sync Preferences",
-    "settings.syncPref.collapseAria": "Collapse / expand Sync Preferences",
     "settings.syncPref.incremental": "Changed only (incremental sync)",
     "settings.syncPref.skipConflicts": "Skip conflicts (keep Bangumi data)",
     "settings.syncPref.enableRecord": "Enable sync log",
@@ -129,7 +124,6 @@ export default {
     "settings.syncPref.operationParamsHint": "Per-run parameters — conflict handling, remote repository, token — stay on their own panels, so you can confirm and edit them in place while syncing.",
 
     "settings.enrichPreview.title": "✨ Enrich Preview",
-    "settings.enrichPreview.collapseAria": "Collapse / expand Enrich Preview",
     "settings.enrichPreview.hint": "Controls how the preview on the Anime Enrich panel looks: weekday colours, episode-threshold badge colours, tag / air-date / platform colouring, and which noise keywords to filter out.",
     "settings.enrichPreview.tagsColored": "Colour TAGS labels (each label gets its own colour, identical labels share a colour, no / separator)",
     "settings.enrichPreview.airDateColored": "Colour air dates (same date, same colour)",
@@ -147,7 +141,6 @@ export default {
     "settings.common.discard": "↩️ Discard changes",
 
     "settings.featureToggles.title": "⚙️ Feature Toggles",
-    "settings.featureToggles.collapseAria": "Collapse / expand Feature Toggles",
     "settings.featureToggles.hint": "Global switches that used to be scattered across the tool panels are gathered here. Each panel re-reads this config before loading a sheet, so saving and then switching to the panel is enough.",
     "settings.featureToggles.highlightAutoFollow": "Highlight · Auto-follow (recompute and follow the highlight when the sheet changes; off by default)",
     "settings.featureToggles.highlightModeLabel": "Highlight · Mode",
@@ -156,7 +149,6 @@ export default {
     "settings.featureToggles.highlightModeHint": "Auto detects the latest season from the date source; manual lets you pick the year and month on the Highlight panel.",
 
     "settings.cfPref.title": "🎨 Conditional Format",
-    "settings.cfPref.collapseAria": "Collapse / expand Conditional Format",
     "settings.cfPref.hint": "The Conditional Format panel groups rules under Sheet Rules → Auto-cluster using these settings. After changing them, go back and click Auto-cluster again to regroup (clustering only changes the grouping in this view, never the rules on the sheet).",
     "settings.cfPref.clusterModeLabel": "Auto-cluster key",
     "settings.cfPref.clusterByFormula": "By formula",
@@ -170,7 +162,6 @@ export default {
     "settings.cfPref.mergeModeHint": "Sheet Rules → 🔗 Merge duplicates uses these settings: single-row rules with the same formula and column become one. “Contiguous rows only” merges just an unbroken run (2,3,4 → J2:J4) and leaves gaps alone; “force into one block” covers everything from the lowest to the highest row, <strong>including the blank rows in between</strong> — watch out when the gap is large.",
 
     "settings.paths.title": "📁 Default Paths",
-    "settings.paths.collapseAria": "Collapse / expand Default Paths",
     "settings.paths.hint": "These two paths are memory aids only: exporting settings mentions the save location in the prompt, and importing shows the folder in the file-picker title. The WPS task pane downloads through the browser and the file picker can't be given a starting folder, so neither path is ever written to or opened automatically.",
     "settings.paths.exportLabel": "Default export location",
     "settings.paths.exportPlaceholder": "Not set (only shown as a hint when exporting)",
@@ -180,7 +171,6 @@ export default {
     "settings.paths.importPlaceholder": "Not set (no location shown when importing)",
 
     "settings.logPref.title": "📜 Log Preferences",
-    "settings.logPref.collapseAria": "Collapse / expand Log Preferences",
     "settings.logPref.levelLabel": "Log level",
     "settings.logPref.levelDebug": "DEBUG · Everything (for troubleshooting)",
     "settings.logPref.levelInfo": "INFO · Normal messages (default)",
@@ -190,7 +180,6 @@ export default {
     "settings.logPref.clearLogs": "🗑️ Clear recorded logs",
 
     "settings.data.title": "📦 Settings Management",
-    "settings.data.collapseAria": "Collapse / expand Settings Management",
     "settings.data.saveAll": "💾 Save all settings",
     "settings.data.export": "📤 Export settings",
     "settings.data.import": "📥 Import settings",
@@ -201,7 +190,6 @@ export default {
     "settings.data.updateHint": "<strong>Will updating lose my settings?</strong> Everything lives in WPS PluginStorage (keyed by add-in ID), so <strong>updating the add-in (replacing the folder / overwriting dist) does not clear it</strong> — rule library, anchors and pinned records, accounts and preferences all survive. Only uninstalling the add-in, clearing the WPS cache, or moving to another machine loses them; use export / import above to cover those cases. Each tool's run records (sync / enrich / cleanup logs) are exported separately as CSV / TXT under Data Export.",
 
     "settings.export.title": "📤 Data Export",
-    "settings.export.collapseAria": "Collapse / expand Data Export",
     "settings.export.hint": "Export each tool's logs and records to a file: CSV opens straight in Excel (with BOM, so Chinese text isn't garbled), TXT is handy for a quick look in Notepad. The three tool panels also have their own export buttons.",
     "settings.export.syncRecords": "Sync records",
     "settings.export.systemLogs": "System logs",
@@ -210,7 +198,6 @@ export default {
     "settings.export.cleanLogsHint": "Cleanup logs only cover the current visit to the Cleanup panel; switching panels doesn't keep them.",
 
     "settings.about.title": "ℹ️ About",
-    "settings.about.collapseAria": "Collapse / expand About",
     "settings.about.description": "Manages Bangumi anime data in WPS Spreadsheets. Supports:<br /> • Upload sync (WPS sheet → Bangumi)<br /> • Data sync (remote repository → WPS sheet)<br /> • Collection download (Bangumi → WPS sheet)<br /> • Anime enrich / data cleanup / anime highlight / conditional format<br /> <br /> This page keeps only long-lived preferences that apply across sessions; token, remote repository, conflict strategy and other per-run parameters live on their own panels.",
     "settings.about.checkUpdate": "🔄 Check for updates",
     "settings.about.checkUpdateHint": "Check GitHub Releases for a new version; after downloading, overwrite the install as described in the log.",
@@ -249,7 +236,6 @@ export default {
     "syncPanel.command.preview": "👁️ Preview Sync",
 
     "syncPanel.account.title": "🔑 Account & Credentials",
-    "syncPanel.account.collapseAria": "Collapse / expand Account & Credentials",
     "syncPanel.account.tokenLabel": "Token",
     "syncPanel.account.tokenSet": "Set / change",
     "syncPanel.account.copyAria": "Copy token to clipboard",
@@ -265,7 +251,6 @@ export default {
     "syncPanel.account.userIdHint": "User ID: the number / letters in your Bangumi profile URL",
 
     "syncPanel.scope.title": "🎯 Range & Selection",
-    "syncPanel.scope.collapseAria": "Collapse / expand Range & Selection",
     "syncPanel.scope.dataLabel": "Data selection",
     "syncPanel.scope.autoMode": "🤖 Auto",
     "syncPanel.scope.autoModeHint": "Detect the visible rows after filtering",
@@ -289,7 +274,6 @@ export default {
     "syncPanel.scope.refreshData": "🔄 Refresh Data",
 
     "syncPanel.strategy.title": "⚖️ Sync Strategy",
-    "syncPanel.strategy.collapseAria": "Collapse / expand Sync Strategy",
     "syncPanel.strategy.conflictLabel": "Conflict handling",
     "syncPanel.strategy.conflictSkip": "Skip conflicts (keep Bangumi data)",
     "syncPanel.strategy.conflictOverwrite": "Excel wins (overwrite with Excel data)",
@@ -297,7 +281,6 @@ export default {
     "syncPanel.strategy.incrementalMovedHint": "“Changed only (incremental sync)” is a long-lived preference and now lives under Settings → Sync Preferences; it is no longer duplicated here.",
 
     "syncPanel.remote.title": "🗄️ Data Sync (remote repository → local)",
-    "syncPanel.remote.collapseAria": "Collapse / expand Remote Data Sync",
     "syncPanel.remote.hint": "Downloads Bangumi metadata (name, tags, episode count, …) from a remote repository and merges it into the current sheet by SID (add + update, never delete).<br /> Opposite direction to 📤 Upload Sync: upload goes Excel → Bangumi, data sync goes repository → Excel.",
     "syncPanel.remote.sourceTypeLabel": "Source type",
     "syncPanel.remote.sourceTypeTitle": "Choose a data source",
@@ -371,13 +354,11 @@ export default {
     "syncPanel.remote.shardFormatHint": "<strong>Shard manifest</strong>: <code>data/anime.manifest.json</code> lists 6 shards (base / meta / relations / stats / summary / infobox); the add-in downloads only the ones your headers need<br /> <strong>Shard format</strong>: each shard is gzipped JSONL — line 1 is the header (field names), every following line is a value array of the same length; all shards carry <code>subjectId</code> and keep row order, so the add-in joins them by row number<br /> <code >[\"sid\",\"name\",\"updatedAt\",\"date\",\"meta_tags\",\"nsfw\",\"话数\",\"导演\",\"动画制作公司\",\"系列构成\"]</code><br /> <code >[\"8\",\"Code Geass R2\",\"2026-09-08\",\"2008-04-06\",[\"机战\",\"TV\",\"日本\"],false,\"25\",\"谷口悟朗\",\"サンライズ\",\"大河内一楼\"]</code><br /> Base fields: <code>subjectId</code> (required), <code>name</code>, <code>updatedAt</code> (YYYY-MM-DD)<br /> Extended fields: <code>date</code>, <code>meta_tags</code>, <code>nsfw</code>, <code>话数</code>, <code>导演</code>, <code>音乐</code>, <code>动画制作公司</code>, <code >系列构成</code> and more<br /> Default repository: <code >awujiana/Bangumi-Archive-Anime-Excel/main/data/anime.manifest.json</code>",
 
     "syncPanel.preview.title": "👁️ Data Preview",
-    "syncPanel.preview.collapseAria": "Collapse / expand Data Preview",
     "syncPanel.preview.empty": "Click “Refresh Data” to load the preview (filtered data included)",
     "syncPanel.preview.enlarge": "Enlarge preview",
     "syncPanel.preview.detail": "Preview details",
 
     "syncPanel.records.title": "📊 Records & Logs",
-    "syncPanel.records.collapseAria": "Collapse / expand Records & Logs",
     "syncPanel.records.syncRecordLabel": "Sync records",
     "syncPanel.records.viewSync": "View sync records",
     "syncPanel.records.clearSync": "Clear records",
@@ -393,7 +374,6 @@ export default {
     "syncPanel.records.logHint": "Show the last 1000 system log lines — handy for tracking down sync failures",
 
     "syncPanel.help.title": "📖 Help & Format",
-    "syncPanel.help.collapseAria": "Collapse / expand Help & Format",
     "syncPanel.help.templateLabel": "Template",
     "syncPanel.help.templateDownloadTitle": "Open the template download link from the data repository's latest release (42-column sheet, headers included)",
     "syncPanel.help.templateDownload": "📥 Download Template",
@@ -1446,6 +1426,7 @@ export default {
     "nav.page.highlight": "Highlight panel",
     "nav.page.conditionalFormat": "Conditional formatting panel",
     "nav.page.settings": "Settings page",
-    "conditionalFormat.toast.autoClustered": "Grouped into {count} groups by “{mode}” (existing groups replaced)"
+    "conditionalFormat.toast.autoClustered": "Grouped into {count} groups by “{mode}” (existing groups replaced)",
+    "common.collapseToggle": "Collapse / expand “{title}”"
   }
 };

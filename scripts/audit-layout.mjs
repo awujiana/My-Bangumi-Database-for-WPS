@@ -211,9 +211,10 @@ function readLocaleMessages(code) {
  * 在空白页能过，但在带多个样式表的真实页面上同样卡死。语言包本来就是纯数据，
  * 内联没有信息损失。
  *
- * 替换逻辑与 `ts/i18n/dom.ts` 的 `applyI18n()` 逐条对应（同样两个循环 + 5 个属性绑定），
- * **改那边的选择器时这里要跟着改**。末尾断言「至少替换到一个节点」——静默空转会量出
- * 一份没套语言包的页面，然后报告「无异常」，那比不量更危险。
+ * 替换逻辑与 `ts/i18n/dom.ts` 的 `applyI18n()` 逐条对应（同样两个循环 + 5 个属性绑定
+ * + `{title}` 从所在标题取值），**改那边的选择器 / 占位符规则时这里要跟着改**。
+ * 末尾断言「至少替换到一个节点」——静默空转会量出一份没套语言包的页面，
+ * 然后报告「无异常」，那比不量更危险。
  */
 function buildLocaleProbe(locale) {
   const messages = readLocaleMessages(locale)
@@ -223,6 +224,18 @@ function buildLocaleProbe(locale) {
   const FALLBACK = ${JSON.stringify(fallback)}
   const t = (key) => MESSAGES[key] ?? FALLBACK[key] ?? key
   let touched = 0
+  // {title} 取所在标题的可见文本，剥掉开头的 emoji 图标（与 ts/i18n/dom.ts 同规则）
+  const headingTitleOf = (node) => {
+    const heading = node.closest('h2, h3')
+    if (heading === null) return ''
+    const clone = heading.cloneNode(true)
+    for (const button of clone.querySelectorAll('button')) button.remove()
+    const raw = (clone.textContent || '').replace(/\\s+/gu, ' ').trim()
+    const stripped = raw.replace(/^[^\\p{Script=Han}\\p{Script=Latin}\\p{N}]+/u, '')
+    return stripped === '' ? raw : stripped
+  }
+  const fillTitle = (node, text) =>
+    text.includes('{title}') ? text.replaceAll('{title}', headingTitleOf(node)) : text
   for (const node of document.querySelectorAll('[data-i18n]')) {
     const key = node.dataset.i18n
     if (key !== undefined && key !== '') { node.textContent = t(key); touched += 1 }
@@ -240,7 +253,10 @@ function buildLocaleProbe(locale) {
   ]) {
     for (const node of document.querySelectorAll(selector)) {
       const key = node.getAttribute(dataAttribute)
-      if (key !== null && key !== '') { node.setAttribute(targetAttribute, t(key)); touched += 1 }
+      if (key !== null && key !== '') {
+        node.setAttribute(targetAttribute, fillTitle(node, t(key)))
+        touched += 1
+      }
     }
   }
   if (touched === 0) {

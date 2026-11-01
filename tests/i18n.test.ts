@@ -273,6 +273,7 @@ describe('applyI18n：DOM 替换', () => {
         'a.value': '确定',
         'a.alt': '用户头像',
         'a.html': '带 <code>标记</code> 的文案',
+        'a.collapse': '折叠 / 展开「{title}」',
       }),
     )
     useLocale('zh-CN')
@@ -306,6 +307,29 @@ describe('applyI18n：DOM 替换', () => {
     const paragraph = document.querySelector('p')
     expect(paragraph?.textContent).toBe('带 标记 的文案')
     expect(paragraph?.querySelector('code')?.textContent).toBe('标记')
+  })
+
+  it('aria-label 里的 {title} 取所在标题的文本（标题已先翻成当前语言）', () => {
+    document.body.innerHTML = `
+      <h3>
+        <span data-i18n="a.text">旧标题</span>
+        <button data-i18n-aria-label="a.collapse" aria-label="旧"></button>
+      </h3>
+    `
+    applyI18n(document)
+    expect(document.querySelector('button')?.getAttribute('aria-label')).toBe(
+      '折叠 / 展开「中文文本」',
+    )
+  })
+
+  it('{title} 剥掉标题开头的 emoji 图标（屏幕阅读器不该念图标）', () => {
+    document.body.innerHTML = `
+      <h3><span>🎯 选择清理的表格</span><button data-i18n-aria-label="a.collapse"></button></h3>
+    `
+    applyI18n(document)
+    expect(document.querySelector('button')?.getAttribute('aria-label')).toBe(
+      '折叠 / 展开「选择清理的表格」',
+    )
   })
 
   it('可以只刷一个子树（不碰文档其它地方）', () => {
