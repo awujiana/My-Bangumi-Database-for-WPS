@@ -30,30 +30,45 @@
       <header class="topbar">
         <div class="brand">
           <div class="brand-text">
-            <span class="brand-title">🎨 条件格式管理</span>
-            <span class="brand-sub">规则存本地 · 应用幂等 · 删除行不怕乱</span>
+            <span class="brand-title" data-i18n="conditionalFormat.header.title"
+              >🎨 条件格式管理</span
+            >
+            <span class="brand-sub" data-i18n="conditionalFormat.header.subtitle"
+              >规则存本地 · 应用幂等 · 删除行不怕乱</span
+            >
           </div>
         </div>
       </header>
 
       <!-- ===================== 侧栏（功能导航） ===================== -->
       <aside class="sidebar">
-        <nav class="nav" aria-label="功能导航">
-          <div class="nav-label">功能导航</div>
-          <a href="#sec-target" title="目标工作表"
-            ><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a
+        <nav class="nav" aria-label="功能导航" data-i18n-aria-label="conditionalFormat.nav.label">
+          <div class="nav-label" data-i18n="conditionalFormat.nav.label">功能导航</div>
+          <a href="#sec-target" title="目标工作表" data-i18n-title="conditionalFormat.nav.target"
+            ><span class="nav-ico">🎯</span
+            ><span class="nav-text" data-i18n="conditionalFormat.nav.target">目标工作表</span></a
           >
-          <a href="#sec-existing" title="工作表规则"
-            ><span class="nav-ico">👀</span><span class="nav-text">工作表规则</span></a
+          <a
+            href="#sec-existing"
+            title="工作表规则"
+            data-i18n-title="conditionalFormat.nav.existing"
+            ><span class="nav-ico">👀</span
+            ><span class="nav-text" data-i18n="conditionalFormat.nav.existing">工作表规则</span></a
           >
-          <a href="#sec-rules" title="我的规则"
-            ><span class="nav-ico">☑️</span><span class="nav-text">我的规则</span></a
+          <a href="#sec-rules" title="我的规则" data-i18n-title="conditionalFormat.nav.rules"
+            ><span class="nav-ico">☑️</span
+            ><span class="nav-text" data-i18n="conditionalFormat.nav.rules">我的规则</span></a
           >
-          <a href="#sec-defaults" title="默认规则集"
-            ><span class="nav-ico">📦</span><span class="nav-text">默认规则集</span></a
+          <a
+            href="#sec-defaults"
+            title="默认规则集"
+            data-i18n-title="conditionalFormat.nav.defaults"
+            ><span class="nav-ico">📦</span
+            ><span class="nav-text" data-i18n="conditionalFormat.nav.defaults">默认规则集</span></a
           >
-          <a href="#sec-apply" title="应用与修复"
-            ><span class="nav-ico">🖌️</span><span class="nav-text">应用与修复</span></a
+          <a href="#sec-apply" title="应用与修复" data-i18n-title="conditionalFormat.nav.apply"
+            ><span class="nav-ico">🖌️</span
+            ><span class="nav-text" data-i18n="conditionalFormat.nav.apply">应用与修复</span></a
           >
         </nav>
       </aside>
@@ -63,7 +78,8 @@
         <!-- 目标工作表 -->
         <section class="section" id="sec-target" data-detachable>
           <h3>
-            🎯 目标工作表<button
+            <span data-i18n="conditionalFormat.section.target">🎯 目标工作表</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-target"
@@ -73,7 +89,7 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p class="hint" data-i18n="conditionalFormat.target.hint">
             规则库是全局的，这里选「应用到哪张表、从哪张表读既有规则」：
             先选目标工作簿，再在二级菜单里选该工作簿下的工作表。
           </p>
@@ -82,9 +98,16 @@
             <div id="conditionalFormatSheetPicker" class="conditional-format-picker"></div>
             <label class="conditional-format-lock-row">
               <input type="checkbox" id="conditionalFormatSheetLock" />
-              <span>锁定目标工作表（原表失效时不自动改选别的表）</span>
+              <span data-i18n="conditionalFormat.target.lock"
+                >锁定目标工作表（原表失效时不自动改选别的表）</span
+              >
             </label>
-            <button type="button" class="bgm-btn small" id="conditionalFormatReloadSheetsBtn">
+            <button
+              type="button"
+              class="bgm-btn small"
+              id="conditionalFormatReloadSheetsBtn"
+              data-i18n="conditionalFormat.target.reload"
+            >
               🔄 刷新列表
             </button>
           </div>
@@ -103,7 +126,8 @@
         -->
         <section class="section section-wide" id="sec-existing">
           <h3>
-            👀 工作表规则<button
+            <span data-i18n="conditionalFormat.section.existing">👀 工作表规则</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-existing"
@@ -113,14 +137,15 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p class="hint" data-i18n-html="conditionalFormat.existing.hint">
             目标工作表<strong>现在就有</strong>的条件格式，按优先级排列（靠前先生效）。
             可以直接管理：勾选后批量导入 /
             删除，拖动行调整优先级，右键还有「如果为真则停止」等操作； 每条都能
             <strong>✎ 编辑</strong>（范围 / 公式 / 颜色）和
             <strong>⧉ 复制</strong>成新规则，改完立刻写回工作表。 数据条 / 色阶 /
             图标集等类型插件无法重建——「应用条件格式」不会碰它们，「清空整表后应用」才会清掉。
-            <br />点「⛶ 只显示此模块」进入**专注模式**：本页只显示这一块（顶栏收起、占满窗口），
+            <br />点「⛶
+            只显示此模块」进入<strong>专注模式</strong>：本页只显示这一块（顶栏收起、占满窗口），
             底部控制条可上下切换模块或退出；任务窗格在侧边，不挡表格主区。 <br />📌（组标题上）=
             <strong>锚定整列</strong>：把该组规则的应用范围改写成 <code>$J:$J</code>（多列
             <code>$J:$L</code>），公式不变，行增删不再影响；📎 固定单元格 = 钉到单个
@@ -134,6 +159,7 @@
               id="conditionalFormatExistingSearch"
               class="conditional-format-search"
               placeholder="搜索类型 / 范围 / 公式 / 颜色"
+              data-i18n-placeholder="conditionalFormat.existing.searchPlaceholder"
             />
             <span class="conditional-format-rule-count" id="conditionalFormatExistingCount">—</span>
             <button
@@ -141,6 +167,8 @@
               class="bgm-btn small"
               id="conditionalFormatClusterBtn"
               title="按公式模式自动聚类成组（会覆盖现有分组）"
+              data-i18n-title="conditionalFormat.existing.clusterTitle"
+              data-i18n="conditionalFormat.existing.cluster"
             >
               ✨ 自动聚类
             </button>
@@ -149,6 +177,8 @@
               class="bgm-btn small"
               id="conditionalFormatMergeBtn"
               title="把同公式、同列的多条单行规则合并成一条（口径见设置页「条件格式」）"
+              data-i18n-title="conditionalFormat.existing.mergeTitle"
+              data-i18n="conditionalFormat.existing.merge"
             >
               🔗 合并重复项
             </button>
@@ -157,6 +187,8 @@
               class="bgm-btn small"
               id="conditionalFormatFixCellBtn"
               title="把选中规则（未选则全部）固定到一个单元格，删行删列后仍只作用于该单元格"
+              data-i18n-title="conditionalFormat.existing.fixCellTitle"
+              data-i18n="conditionalFormat.existing.fixCell"
             >
               📎 固定单元格
             </button>
@@ -165,6 +197,8 @@
               class="bgm-btn small"
               id="conditionalFormatRepairAnchorBtn"
               title="按锚定范围恢复所有已锚定规则（删除行列后点一下即可修回）"
+              data-i18n-title="conditionalFormat.existing.repairAnchorTitle"
+              data-i18n="conditionalFormat.existing.repairAnchor"
             >
               🔧 恢复锚定
             </button>
@@ -173,10 +207,17 @@
               class="bgm-btn small"
               id="conditionalFormatClearGroupsBtn"
               title="清除所有分组，回到平铺列表"
+              data-i18n-title="conditionalFormat.existing.clearGroupsTitle"
+              data-i18n="conditionalFormat.existing.clearGroups"
             >
               🧹 清除分组
             </button>
-            <button type="button" class="bgm-btn small" id="conditionalFormatRefreshExistingBtn">
+            <button
+              type="button"
+              class="bgm-btn small"
+              id="conditionalFormatRefreshExistingBtn"
+              data-i18n="conditionalFormat.existing.reload"
+            >
               🔄 重新读取
             </button>
             <button
@@ -184,6 +225,8 @@
               class="bgm-btn small"
               id="conditionalFormatFitExistingBtn"
               title="按内容自动分配列宽、行高改为按内容（拖列分隔线可再手调，双击分隔线回到自动）"
+              data-i18n-title="conditionalFormat.fitTitle"
+              data-i18n="conditionalFormat.fit"
             >
               📐 自适行列
             </button>
@@ -215,7 +258,8 @@
           data-detachable-toolbar="conditionalFormatFloatToolbar"
         >
           <h3>
-            ☑️ 我的规则<button
+            <span data-i18n="conditionalFormat.section.rules">☑️ 我的规则</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-rules"
@@ -225,7 +269,7 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p class="hint" data-i18n-html="conditionalFormat.rules.hint">
             这里是<strong>存在本地、可复用的规则库</strong>（不在这张表上）。
             <strong>拖动行即可调整顺序</strong>，顺序即优先级（靠前先生效）。 取消勾选 =
             隐藏（留在库里不应用）。⧉ 复制会把规则写进系统剪贴板，同时可在本页「粘贴」出副本。
@@ -244,13 +288,18 @@
               id="conditionalFormatSearch"
               class="conditional-format-search"
               placeholder="搜索名称 / 公式 / 范围 / 分组"
+              data-i18n-placeholder="conditionalFormat.rules.searchPlaceholder"
             />
             <span class="conditional-format-rule-count" id="conditionalFormatRuleCount"
               >0 条规则</span
             >
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="conditionalFormatNewRuleBtn">
+            <button
+              class="bgm-btn small primary"
+              id="conditionalFormatNewRuleBtn"
+              data-i18n="conditionalFormat.rules.new"
+            >
               ➕ 新建规则
             </button>
             <!-- 粘贴：主按钮 = 插件内剪贴板（本次复制过的规则）；▾ 展开其它来源
@@ -261,6 +310,8 @@
                 class="bgm-btn small"
                 id="conditionalFormatPasteBtn"
                 title="把插件内复制过的规则粘成副本（进「我的规则」，点「应用条件格式」才写表）"
+                data-i18n-title="conditionalFormat.rules.pasteTitle"
+                data-i18n="conditionalFormat.rules.paste"
               >
                 📋 粘贴
               </button>
@@ -270,6 +321,7 @@
                 aria-haspopup="menu"
                 aria-expanded="false"
                 title="其它粘贴来源：系统剪贴板 / 手写或编辑 JSON"
+                data-i18n-title="conditionalFormat.rules.pasteMenuTitle"
               >
                 ▾
               </button>
@@ -281,6 +333,8 @@
                 class="bgm-btn small"
                 id="conditionalFormatImportBtn"
                 title="把当前工作表已有的条件格式导入到「我的规则」"
+                data-i18n-title="conditionalFormat.rules.importTitle"
+                data-i18n="conditionalFormat.rules.import"
               >
                 📥 导入工作表规则
               </button>
@@ -290,6 +344,7 @@
                 aria-haspopup="menu"
                 aria-expanded="false"
                 title="其它导入方式：从文件导入（项目导出的规则文件）"
+                data-i18n-title="conditionalFormat.rules.importMenuTitle"
               >
                 ▾
               </button>
@@ -307,6 +362,8 @@
               class="bgm-btn small"
               id="conditionalFormatExportBtn"
               title="导出规则：导出到文件 / 复制到剪贴板"
+              data-i18n-title="conditionalFormat.rules.exportTitle"
+              data-i18n="conditionalFormat.rules.export"
             >
               📤 导出规则 ▾
             </button>
@@ -314,6 +371,8 @@
               class="bgm-btn small"
               id="conditionalFormatPickAllBtn"
               title="全选 / 取消全部规则（配合删除所选 / 导出所选使用）"
+              data-i18n-title="conditionalFormat.rules.pickAllTitle"
+              data-i18n="conditionalFormat.rules.pickAll"
             >
               ☑ 全选
             </button>
@@ -321,6 +380,8 @@
               class="bgm-btn small"
               id="conditionalFormatFitLibraryBtn"
               title="按内容自动分配列宽、行高改为按内容（拖列分隔线可再手调，双击分隔线回到自动）"
+              data-i18n-title="conditionalFormat.fitTitle"
+              data-i18n="conditionalFormat.fit"
             >
               📐 自适行列
             </button>
@@ -349,14 +410,17 @@
                  一点「收起」连标题栏一起藏掉 → 只剩一个空白框，拖不动也展不开
                  （2026-10-27 用户截图）。tests/conditional-format-modal-structure.test.ts 锁住这条不变量。 -->
             <h4 id="conditionalFormatEditorTitle" class="conditional-format-modal-grip">
-              <span id="conditionalFormatEditorLabel">编辑规则</span
+              <span id="conditionalFormatEditorLabel" data-i18n="conditionalFormat.editor.title"
+                >编辑规则</span
               ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatEditorMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「编辑规则」"
+                data-i18n-aria-label="conditionalFormat.editor.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -366,7 +430,9 @@
                 id="conditionalFormatEditorCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「编辑规则」"
+                data-i18n-aria-label="conditionalFormat.editor.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
@@ -375,7 +441,10 @@
               <!-- 名称 / 分组只属于「我的规则」（规则库条目）；编辑工作表上的既有规则时
                    这两项没有对应概念（COM 的 FormatCondition 没有名字与分组），整块隐藏 -->
               <div id="conditionalFormatEditLibraryFields">
-                <label class="conditional-format-field-label" for="conditionalFormatEditName"
+                <label
+                  class="conditional-format-field-label"
+                  for="conditionalFormatEditName"
+                  data-i18n="conditionalFormat.field.name"
                   >名称</label
                 >
                 <input
@@ -383,7 +452,10 @@
                   id="conditionalFormatEditName"
                   class="conditional-format-input"
                 />
-                <label class="conditional-format-field-label" for="conditionalFormatEditGroup"
+                <label
+                  class="conditional-format-field-label"
+                  for="conditionalFormatEditGroup"
+                  data-i18n="conditionalFormat.field.group"
                   >分组</label
                 >
                 <input
@@ -392,7 +464,10 @@
                   class="conditional-format-input"
                 />
               </div>
-              <label class="conditional-format-field-label" for="conditionalFormatEditRange"
+              <label
+                class="conditional-format-field-label"
+                for="conditionalFormatEditRange"
+                data-i18n="conditionalFormat.field.range"
                 >应用范围（A1 风格）</label
               >
               <input
@@ -400,8 +475,12 @@
                 id="conditionalFormatEditRange"
                 class="conditional-format-input"
                 placeholder="如 B3:B1048576"
+                data-i18n-placeholder="conditionalFormat.field.rangePlaceholder"
               />
-              <label class="conditional-format-field-label" for="conditionalFormatEditFormula"
+              <label
+                class="conditional-format-field-label"
+                for="conditionalFormatEditFormula"
+                data-i18n="conditionalFormat.field.formula"
                 >公式（xlExpression，锚定范围首行）</label
               >
               <textarea
@@ -409,10 +488,14 @@
                 class="conditional-format-textarea"
                 rows="4"
                 placeholder='如 =$R3="26年10月"'
+                data-i18n-placeholder="conditionalFormat.field.formulaPlaceholder"
               ></textarea>
               <div class="conditional-format-color-row">
                 <div class="conditional-format-color-field">
-                  <label class="conditional-format-field-label" for="conditionalFormatEditFillText"
+                  <label
+                    class="conditional-format-field-label"
+                    for="conditionalFormatEditFillText"
+                    data-i18n="conditionalFormat.field.fill"
                     >填充色</label
                   >
                   <div class="conditional-format-color-input">
@@ -422,6 +505,7 @@
                       class="conditional-format-color-picker"
                       value="#00B050"
                       aria-label="填充色选择器"
+                      data-i18n-aria-label="conditionalFormat.field.fillPickerAria"
                     />
                     <input
                       type="text"
@@ -432,11 +516,15 @@
                       spellcheck="false"
                       autocomplete="off"
                       aria-label="填充色十六进制码，如 #00B050"
+                      data-i18n-aria-label="conditionalFormat.field.fillHexAria"
                     />
                   </div>
                 </div>
                 <div class="conditional-format-color-field">
-                  <label class="conditional-format-field-label" for="conditionalFormatEditFontText"
+                  <label
+                    class="conditional-format-field-label"
+                    for="conditionalFormatEditFontText"
+                    data-i18n="conditionalFormat.field.font"
                     >字体色</label
                   >
                   <div class="conditional-format-color-input">
@@ -446,6 +534,7 @@
                       class="conditional-format-color-picker"
                       value="#000000"
                       aria-label="字体色选择器"
+                      data-i18n-aria-label="conditionalFormat.field.fontPickerAria"
                     />
                     <input
                       type="text"
@@ -456,28 +545,41 @@
                       spellcheck="false"
                       autocomplete="off"
                       aria-label="字体色十六进制码，如 #000000"
+                      data-i18n-aria-label="conditionalFormat.field.fontHexAria"
                     />
                   </div>
                 </div>
                 <div class="conditional-format-bold-box">
                   <label>
                     <input type="checkbox" id="conditionalFormatEditBold" />
-                    <span>加粗</span>
+                    <span data-i18n="conditionalFormat.field.bold">加粗</span>
                   </label>
                 </div>
               </div>
               <div class="bgm-btn-group bgm-btn-row">
-                <button class="bgm-btn small primary" id="conditionalFormatEditorSave">
+                <button
+                  class="bgm-btn small primary"
+                  id="conditionalFormatEditorSave"
+                  data-i18n="conditionalFormat.editor.save"
+                >
                   💾 保存
                 </button>
-                <button class="bgm-btn small" id="conditionalFormatEditorCancel">取消</button>
+                <button
+                  class="bgm-btn small"
+                  id="conditionalFormatEditorCancel"
+                  data-i18n="common.cancel"
+                >
+                  取消
+                </button>
               </div>
             </div>
             <div
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -495,13 +597,16 @@
             aria-labelledby="conditionalFormatImportTitle"
           >
             <h4 id="conditionalFormatImportTitle" class="conditional-format-modal-grip">
-              选择要导入的规则<button
+              <span data-i18n="conditionalFormat.import.title">选择要导入的规则</span>
+              <button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatImportMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「选择要导入的规则」"
+                data-i18n-aria-label="conditionalFormat.import.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -511,31 +616,52 @@
                 id="conditionalFormatImportCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「选择要导入的规则」"
+                data-i18n-aria-label="conditionalFormat.import.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
             </h4>
             <p class="conditional-format-import-hint">
-              工作表「<span id="conditionalFormatImportSheet"></span
-              >」的既有规则。公式类可导入（插件可原样重建）；数据条 / 色阶等类型暂不支持。
+              <span data-i18n="conditionalFormat.import.hintPrefix">工作表「</span
+              ><span id="conditionalFormatImportSheet"></span
+              ><span data-i18n="conditionalFormat.import.hintSuffix"
+                >」的既有规则。公式类可导入（插件可原样重建）；数据条 / 色阶等类型暂不支持。</span
+              >
             </p>
             <div id="conditionalFormatImportList" class="conditional-format-import-list"></div>
             <div class="conditional-format-modal-actions">
-              <button type="button" class="bgm-btn small" id="conditionalFormatImportAll">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatImportAll"
+                data-i18n="conditionalFormat.import.all"
+              >
                 全选
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatImportNone">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatImportNone"
+                data-i18n="conditionalFormat.import.none"
+              >
                 全不选
               </button>
               <button
                 type="button"
                 class="bgm-btn small primary"
                 id="conditionalFormatImportConfirm"
+                data-i18n="conditionalFormat.import.confirm"
               >
                 导入所选
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatImportCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatImportCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -543,7 +669,9 @@
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -563,13 +691,16 @@
             aria-labelledby="conditionalFormatDoctorTitle"
           >
             <h4 id="conditionalFormatDoctorTitle" class="conditional-format-modal-grip">
-              🩺 规则体检<button
+              <span data-i18n="conditionalFormat.doctor.title">🩺 规则体检</span>
+              <button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatDoctorMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「规则体检」"
+                data-i18n-aria-label="conditionalFormat.doctor.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -579,7 +710,9 @@
                 id="conditionalFormatDoctorCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「规则体检」"
+                data-i18n-aria-label="conditionalFormat.doctor.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
@@ -592,6 +725,8 @@
                 class="bgm-btn small"
                 id="conditionalFormatDoctorFixAll"
                 title="把能自动修的问题一次性修掉（范围去表名前缀、越界收敛、补齐引号、非法颜色兜底）"
+                data-i18n-title="conditionalFormat.doctor.fixAllTitle"
+                data-i18n="conditionalFormat.doctor.fixAll"
               >
                 🩺 全部自动修复
               </button>
@@ -599,10 +734,16 @@
                 type="button"
                 class="bgm-btn small primary"
                 id="conditionalFormatDoctorConfirm"
+                data-i18n="conditionalFormat.doctor.confirm"
               >
                 修复并继续
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatDoctorCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatDoctorCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -611,7 +752,9 @@
               id="conditionalFormatDoctorResize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -631,13 +774,16 @@
             aria-labelledby="conditionalFormatTextImportTitle"
           >
             <h4 id="conditionalFormatTextImportTitle" class="conditional-format-modal-grip">
-              粘贴规则 JSON<button
+              <span data-i18n="conditionalFormat.textImport.title">粘贴规则 JSON</span>
+              <button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatTextImportMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「粘贴规则 JSON」"
+                data-i18n-aria-label="conditionalFormat.textImport.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -647,12 +793,18 @@
                 id="conditionalFormatTextImportCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「粘贴规则 JSON」"
+                data-i18n-aria-label="conditionalFormat.textImport.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
             </h4>
-            <p class="conditional-format-import-hint" id="conditionalFormatTextImportHint">
+            <p
+              class="conditional-format-import-hint"
+              id="conditionalFormatTextImportHint"
+              data-i18n-html="conditionalFormat.textImport.hint"
+            >
               粘贴「导出规则 → 复制到剪贴板」得到的内容，或任何同格式的规则 JSON （<code
                 >{"format":"bgm-conditional-format-rules",…,"rules":[…]}</code
               >
@@ -670,10 +822,16 @@
                 type="button"
                 class="bgm-btn small primary"
                 id="conditionalFormatTextImportOk"
+                data-i18n="conditionalFormat.textImport.ok"
               >
                 导入
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatTextImportCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatTextImportCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -681,7 +839,9 @@
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -701,14 +861,17 @@
             aria-labelledby="conditionalFormatBatchTitle"
           >
             <h4 id="conditionalFormatBatchTitle" class="conditional-format-modal-grip">
-              <span id="conditionalFormatBatchLabel">✎ 批量修改</span
+              <span id="conditionalFormatBatchLabel" data-i18n="conditionalFormat.batch.title"
+                >✎ 批量修改</span
               ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatBatchMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「批量修改」"
+                data-i18n-aria-label="conditionalFormat.batch.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -718,14 +881,20 @@
                 id="conditionalFormatBatchCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「批量修改」"
+                data-i18n-aria-label="conditionalFormat.batch.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
             </h4>
             <p id="conditionalFormatBatchHint" class="conditional-format-import-hint"></p>
 
-            <label class="conditional-format-field-label" for="conditionalFormatBatchRange">
+            <label
+              class="conditional-format-field-label"
+              for="conditionalFormatBatchRange"
+              data-i18n="conditionalFormat.field.rangeShort"
+            >
               应用范围
             </label>
             <div class="conditional-format-batch-row">
@@ -733,16 +902,22 @@
                 id="conditionalFormatBatchRangePick"
                 class="conditional-format-select"
                 aria-label="应用范围：选一个已有的值，或选「自定义」"
+                data-i18n-aria-label="conditionalFormat.batch.rangeAria"
               ></select>
               <input
                 type="text"
                 id="conditionalFormatBatchRange"
                 class="conditional-format-input"
                 placeholder="如 B3:B1048576"
+                data-i18n-placeholder="conditionalFormat.field.rangePlaceholder"
               />
             </div>
 
-            <label class="conditional-format-field-label" for="conditionalFormatBatchFormula">
+            <label
+              class="conditional-format-field-label"
+              for="conditionalFormatBatchFormula"
+              data-i18n="conditionalFormat.field.formulaShort"
+            >
               公式
             </label>
             <div class="conditional-format-batch-row">
@@ -750,16 +925,22 @@
                 id="conditionalFormatBatchFormulaPick"
                 class="conditional-format-select"
                 aria-label="公式：选一个已有的值，或选「自定义」"
+                data-i18n-aria-label="conditionalFormat.batch.formulaAria"
               ></select>
               <input
                 type="text"
                 id="conditionalFormatBatchFormula"
                 class="conditional-format-input"
                 placeholder='如 =$R3="26年10月"'
+                data-i18n-placeholder="conditionalFormat.field.formulaPlaceholder"
               />
             </div>
 
-            <label class="conditional-format-field-label" for="conditionalFormatBatchFill">
+            <label
+              class="conditional-format-field-label"
+              for="conditionalFormatBatchFill"
+              data-i18n="conditionalFormat.field.fill"
+            >
               填充色
             </label>
             <div class="conditional-format-batch-row">
@@ -767,6 +948,7 @@
                 id="conditionalFormatBatchFillPick"
                 class="conditional-format-select"
                 aria-label="填充色：选一个已有的颜色，或选「自定义」"
+                data-i18n-aria-label="conditionalFormat.batch.fillAria"
               ></select>
               <input
                 type="color"
@@ -775,7 +957,11 @@
               />
             </div>
 
-            <label class="conditional-format-field-label" for="conditionalFormatBatchFont">
+            <label
+              class="conditional-format-field-label"
+              for="conditionalFormatBatchFont"
+              data-i18n="conditionalFormat.field.font"
+            >
               字体色
             </label>
             <div class="conditional-format-batch-row">
@@ -783,6 +969,7 @@
                 id="conditionalFormatBatchFontPick"
                 class="conditional-format-select"
                 aria-label="字体色：选一个已有的颜色，或选「自定义」"
+                data-i18n-aria-label="conditionalFormat.batch.fontAria"
               ></select>
               <input
                 type="color"
@@ -791,24 +978,39 @@
               />
             </div>
 
-            <label class="conditional-format-field-label" for="conditionalFormatBatchBold">
+            <label
+              class="conditional-format-field-label"
+              for="conditionalFormatBatchBold"
+              data-i18n="conditionalFormat.field.bold"
+            >
               加粗
             </label>
             <select
               id="conditionalFormatBatchBold"
               class="conditional-format-select"
               aria-label="加粗：保持不变 / 加粗 / 不加粗"
+              data-i18n-aria-label="conditionalFormat.batch.boldAria"
             >
-              <option value="keep">保持不变</option>
-              <option value="bold">加粗</option>
-              <option value="normal">不加粗</option>
+              <option value="keep" data-i18n="conditionalFormat.batch.boldKeep">保持不变</option>
+              <option value="bold" data-i18n="conditionalFormat.field.bold">加粗</option>
+              <option value="normal" data-i18n="conditionalFormat.batch.boldNormal">不加粗</option>
             </select>
 
             <div class="conditional-format-modal-actions">
-              <button type="button" class="bgm-btn small primary" id="conditionalFormatBatchOk">
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatBatchOk"
+                data-i18n="conditionalFormat.batch.ok"
+              >
                 应用到所选
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatBatchCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatBatchCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -816,7 +1018,9 @@
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -834,14 +1038,17 @@
             aria-labelledby="conditionalFormatGroupTitle"
           >
             <h4 id="conditionalFormatGroupTitle" class="conditional-format-modal-grip">
-              <span id="conditionalFormatGroupLabel">归入分组</span
+              <span id="conditionalFormatGroupLabel" data-i18n="conditionalFormat.group.title"
+                >归入分组</span
               ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatGroupMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「归入分组」"
+                data-i18n-aria-label="conditionalFormat.group.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -851,7 +1058,9 @@
                 id="conditionalFormatGroupCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「归入分组」"
+                data-i18n-aria-label="conditionalFormat.group.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
@@ -863,16 +1072,23 @@
               id="conditionalFormatGroupName"
               class="conditional-format-input"
               placeholder="分组名，如：饮品相关"
+              data-i18n-placeholder="conditionalFormat.group.placeholder"
             />
             <div class="conditional-format-modal-actions">
               <button
                 type="button"
                 class="bgm-btn small primary"
                 id="conditionalFormatGroupConfirm"
+                data-i18n="common.ok"
               >
                 确定
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatGroupCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatGroupCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -880,7 +1096,9 @@
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -909,14 +1127,17 @@
             aria-labelledby="conditionalFormatPasteTitle"
           >
             <h4 id="conditionalFormatPasteTitle" class="conditional-format-modal-grip">
-              <span id="conditionalFormatPasteLabel">📋 粘贴规则</span
+              <span id="conditionalFormatPasteLabel" data-i18n="conditionalFormat.paste.title"
+                >📋 粘贴规则</span
               ><button
                 type="button"
                 class="conditional-format-modal-max"
                 id="conditionalFormatPasteMax"
                 aria-pressed="false"
                 aria-label="最大化 / 还原「粘贴规则」"
+                data-i18n-aria-label="conditionalFormat.paste.maxAria"
                 title="最大化 / 还原"
+                data-i18n-title="conditionalFormat.modal.maxTitle"
               >
                 ⛶
               </button>
@@ -926,7 +1147,9 @@
                 id="conditionalFormatPasteCollapse"
                 aria-expanded="true"
                 aria-label="收起 / 展开「粘贴规则」"
+                data-i18n-aria-label="conditionalFormat.paste.collapseAria"
                 title="收起 / 展开"
+                data-i18n-title="conditionalFormat.modal.collapseTitle"
               >
                 ▾
               </button>
@@ -938,6 +1161,7 @@
               id="conditionalFormatPasteRange"
               class="conditional-format-input"
               placeholder="如 B3:B1048576"
+              data-i18n-placeholder="conditionalFormat.field.rangePlaceholder"
             />
             <!-- 多条规则：改成表格——逐条看公式/配色、逐条改范围，并可批量统一
                  （用户：粘贴一批规则时要用表格展示条件格式与应用范围，且能批量管理范围） -->
@@ -948,8 +1172,14 @@
                   id="conditionalFormatPasteUniformRange"
                   class="conditional-format-input"
                   placeholder="统一应用范围（留空则不改）"
+                  data-i18n-placeholder="conditionalFormat.paste.uniformRangePlaceholder"
                 />
-                <button type="button" class="bgm-btn small" id="conditionalFormatPasteApplyRange">
+                <button
+                  type="button"
+                  class="bgm-btn small"
+                  id="conditionalFormatPasteApplyRange"
+                  data-i18n="conditionalFormat.paste.applyAll"
+                >
                   应用到全部
                 </button>
                 <button
@@ -957,6 +1187,8 @@
                   class="bgm-btn small"
                   id="conditionalFormatPasteBatchEdit"
                   title="批量修改这批规则的应用范围 / 公式 / 颜色（可选「统一为某一条已有的值」或自己填）"
+                  data-i18n-title="conditionalFormat.paste.batchEditTitle"
+                  data-i18n="conditionalFormat.batch.title"
                 >
                   ✎ 批量修改
                 </button>
@@ -964,10 +1196,20 @@
               <div class="conditional-format-paste-table" id="conditionalFormatPasteTable"></div>
             </div>
             <div class="conditional-format-modal-actions">
-              <button type="button" class="bgm-btn small primary" id="conditionalFormatPasteOk">
+              <button
+                type="button"
+                class="bgm-btn small primary"
+                id="conditionalFormatPasteOk"
+                data-i18n="common.ok"
+              >
                 确定
               </button>
-              <button type="button" class="bgm-btn small" id="conditionalFormatPasteCancel">
+              <button
+                type="button"
+                class="bgm-btn small"
+                id="conditionalFormatPasteCancel"
+                data-i18n="common.cancel"
+              >
                 取消
               </button>
             </div>
@@ -975,7 +1217,9 @@
               class="conditional-format-modal-resize"
               role="separator"
               aria-label="拖动缩放窗口"
+              data-i18n-aria-label="conditionalFormat.modal.resizeAria"
               title="拖动缩放"
+              data-i18n-title="conditionalFormat.modal.resizeTitle"
             ></div>
           </div>
         </div>
@@ -983,7 +1227,8 @@
         <!-- 默认规则集 -->
         <section class="section" id="sec-defaults" data-detachable>
           <h3>
-            📦 默认规则集<button
+            <span data-i18n="conditionalFormat.section.defaults">📦 默认规则集</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-defaults"
@@ -993,12 +1238,16 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p class="hint" data-i18n="conditionalFormat.defaults.hint">
             一键生成 6 条：当前季名称填绿（自维护 TODAY 公式，跨季度不用改）+ 日期格式错误标红 +
             四季分色。依赖目标表识别到「开播季度」与「名称」列，公式锚定表头行下一行。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="conditionalFormatDefaultsBtn">
+            <button
+              class="bgm-btn small primary"
+              id="conditionalFormatDefaultsBtn"
+              data-i18n="conditionalFormat.defaults.generate"
+            >
               📦 生成默认规则集
             </button>
           </div>
@@ -1007,7 +1256,8 @@
         <!-- 应用与修复 -->
         <section class="section" id="sec-apply" data-detachable>
           <h3>
-            🖌️ 应用与修复<button
+            <span data-i18n="conditionalFormat.section.apply">🖌️ 应用与修复</span>
+            <button
               type="button"
               class="mod-collapse-btn"
               data-mod-collapse="sec-apply"
@@ -1017,7 +1267,7 @@
               ▾
             </button>
           </h3>
-          <p class="hint">
+          <p class="hint" data-i18n-html="conditionalFormat.apply.hint">
             应用 =
             把「我的规则」+「默认规则集」写进目标工作表。<strong>不会清除任何既有规则</strong>：
             表上已有的同「范围 + 公式」规则只刷新颜色，缺的补上；只有本插件上一轮写过、
@@ -1026,13 +1276,19 @@
             删行搞乱范围后重点一次即修复。真要重来，用下面的「清空整表后应用」。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" id="conditionalFormatApplyBtn">
+            <button
+              class="bgm-btn small primary"
+              id="conditionalFormatApplyBtn"
+              data-i18n="conditionalFormat.apply.run"
+            >
               🖌️ 应用条件格式
             </button>
             <button
               class="bgm-btn small danger"
               id="conditionalFormatApplyReplaceBtn"
               title="先清空目标工作表上的全部条件格式规则（含手工规则），再按规则库重建"
+              data-i18n-title="conditionalFormat.apply.replaceTitle"
+              data-i18n="conditionalFormat.apply.replace"
             >
               🧹 清空整表后应用
             </button>
@@ -1048,10 +1304,12 @@
          编辑与 ↑↓ 需要「有选中行」才有意义，故默认禁用，选中后由 JS 放开。 -->
     <div id="conditionalFormatFloatToolbar" class="conditional-format-float-toolbar" hidden>
       <label class="conditional-format-float-field" for="conditionalFormatFloatScope">
-        显示其格式规则
+        <span data-i18n="conditionalFormat.float.scope">显示其格式规则</span>
         <select id="conditionalFormatFloatScope" class="conditional-format-select">
-          <option value="all">整张工作表</option>
-          <option value="selection">当前选择</option>
+          <option value="all" data-i18n="conditionalFormat.float.scopeAll">整张工作表</option>
+          <option value="selection" data-i18n="conditionalFormat.float.scopeSelection">
+            当前选择
+          </option>
         </select>
       </label>
       <span class="conditional-format-float-spacer"></span>
@@ -1061,6 +1319,7 @@
         id="conditionalFormatFloatUp"
         disabled
         title="上移所选规则（提高优先级）"
+        data-i18n-title="conditionalFormat.float.upTitle"
       >
         ↑
       </button>
@@ -1070,6 +1329,7 @@
         id="conditionalFormatFloatDown"
         disabled
         title="下移所选规则（降低优先级）"
+        data-i18n-title="conditionalFormat.float.downTitle"
       >
         ↓
       </button>
@@ -1079,6 +1339,8 @@
         id="conditionalFormatFloatDelete"
         disabled
         title="删除所选规则"
+        data-i18n-title="conditionalFormat.float.deleteTitle"
+        data-i18n="conditionalFormat.float.delete"
       >
         ✕ 删除
       </button>
@@ -1100,13 +1362,16 @@
         aria-labelledby="conditionalFormatConfirmTitle"
       >
         <h4 id="conditionalFormatConfirmTitle" class="conditional-format-modal-grip">
-          清空整表后应用<button
+          <span data-i18n="conditionalFormat.confirm.title">清空整表后应用</span>
+          <button
             type="button"
             class="conditional-format-modal-max"
             id="conditionalFormatConfirmMax"
             aria-pressed="false"
             aria-label="最大化 / 还原「清空整表后应用」"
+            data-i18n-aria-label="conditionalFormat.confirm.maxAria"
             title="最大化 / 还原"
+            data-i18n-title="conditionalFormat.modal.maxTitle"
           >
             ⛶
           </button>
@@ -1116,17 +1381,29 @@
             id="conditionalFormatConfirmCollapse"
             aria-expanded="true"
             aria-label="收起 / 展开「清空整表后应用」"
+            data-i18n-aria-label="conditionalFormat.confirm.collapseAria"
             title="收起 / 展开"
+            data-i18n-title="conditionalFormat.modal.collapseTitle"
           >
             ▾
           </button>
         </h4>
         <div class="conditional-format-modal-body" id="conditionalFormatConfirmBody"></div>
         <div class="conditional-format-modal-actions">
-          <button type="button" class="bgm-btn small danger" id="conditionalFormatConfirmClear">
+          <button
+            type="button"
+            class="bgm-btn small danger"
+            id="conditionalFormatConfirmClear"
+            data-i18n="conditionalFormat.confirm.clear"
+          >
             确认清空整表后应用
           </button>
-          <button type="button" class="bgm-btn small primary" id="conditionalFormatConfirmCancel">
+          <button
+            type="button"
+            class="bgm-btn small primary"
+            id="conditionalFormatConfirmCancel"
+            data-i18n="common.cancel"
+          >
             取消
           </button>
         </div>
@@ -1134,7 +1411,9 @@
           class="conditional-format-modal-resize"
           role="separator"
           aria-label="拖动缩放窗口"
+          data-i18n-aria-label="conditionalFormat.modal.resizeAria"
           title="拖动缩放"
+          data-i18n-title="conditionalFormat.modal.resizeTitle"
         ></div>
       </div>
     </div>
