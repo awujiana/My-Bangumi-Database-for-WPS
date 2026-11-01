@@ -16,7 +16,7 @@
  *      （注册表有而 HTML 无 → 拖了没反应；HTML 有而注册表无 → 永远排在最后且无法排序）；
  *   2. 每个注册表 id 都能在对应页面侧栏找到 `href="#<id>"` 锚点 —— 否则滚动高亮与
  *      锚点跳转会错位；
- *   3. `ORDERABLE_PAGES` 与 `PAGE_MODULES` / `PAGE_LABELS` 的键集合完全一致
+ *   3. `ORDERABLE_PAGES` 与 `PAGE_MODULES` / `PAGE_LABEL_KEYS` 的键集合完全一致
  *      （设置页按 ORDERABLE_PAGES 渲染编辑器，漏一个页面就少一组却没人发现）；
  *   4. 四个页面的启动入口都调用了 `startNavOrderSync('<page>')` 与 `startNavModeSync()`
  *      —— 少任何一个都会让该页静默地不参与跨页同步；
@@ -57,10 +57,13 @@ function readPageModules(source) {
   //
   // 锚点必须带 `export const` 前缀：文件头部的 JSDoc 里也提到了 `PAGE_MODULES`，
   // 只匹配裸标识符会锚到注释上，`[^{]*` 随后跨越 import 段落到错误的 `{`。
-  // 结尾用 `\n\}`（顶层对象以零缩进的 `}` 收束）并取**最后一个**匹配 ——
-  // 惰性匹配会在第一个 `\n}`（如某个页面块之后的行）就停下。
+  // 结尾用 `\n\}`（顶层对象以零缩进的 `}` 收束）并取**第一个**匹配 ——
+  // 惰性匹配在这里才是对的：对象内部没有任何零缩进的 `}`（页面块以 `],` 收尾），
+  // 第一个 `\n}` 就是本对象的收尾。用贪婪会把文件后面**同形状的兄弟对象**
+  // 一起吞进来（`PAGE_LABEL_KEYS` 的页面条目也是 `  'x': [`，被误当成页面块后
+  // 覆盖成空 id 列表 → 报「<main> 内未定位到任何模块」）。
   const declaration = new RegExp(
-    String.raw`export const PAGE_MODULES\b[^{]*\{([\s\S]*)\n\}`,
+    String.raw`export const PAGE_MODULES\b[^{]*\{([\s\S]*?)\n\}`,
     'u',
   ).exec(source)
   if (declaration === null || declaration[1] === undefined) {
@@ -91,21 +94,26 @@ function readPageModules(source) {
 }
 
 /**
- * 解析 `ts/tools/nav-order.ts` 里的 `PAGE_LABELS`，得到页面键集合
+ * 解析 `ts/tools/nav-order.ts` 里的 `PAGE_LABEL_KEYS`，得到页面键集合
  * @returns {string[]}
  */
 function readPageLabels(source) {
   // 同 readPageModules：锚点必须带 `export const` 前缀，否则会锚到文件头部 JSDoc
-  // 里提到 `PAGE_LABELS` 的那一行，`[^{]*` 随即跨越正文抓到错误的 `{`。
-  // 值都是无嵌套的字符串字面量，故 `[^}]*` 到第一个 `}` 即可。
-  const body = new RegExp(String.raw`export const PAGE_LABELS\b[^{]*\{([^}]*)\}`, 'u').exec(source)
+  // 里提到 `PAGE_LABEL_KEYS` 的那一行，`[^{]*` 随即跨越正文抓到错误的 `{`。
+  // 值形如 `[key, 中文兜底]`（i18n 迁移后不再是无嵌套字符串），但元组里没有 `}`，
+  // 故 `[^}]*` 仍然只到对象收尾的那个 `}`。
+  const body = new RegExp(String.raw`export const PAGE_LABEL_KEYS\b[^{]*\{([^}]*)\}`, 'u').exec(
+    source,
+  )
   if (body === null || body[1] === undefined) {
-    throw new Error('无法从 ts/tools/nav-order.ts 解析 PAGE_LABELS（脚本解析可能已失效）')
+    throw new Error('无法从 ts/tools/nav-order.ts 解析 PAGE_LABEL_KEYS（脚本解析可能已失效）')
   }
-  // 同 readPageModules：键可能是带连字符的字符串字面量
-  const pages = [...body[1].matchAll(/(?:'([^']+)'|(\w+))\s*:\s*'/gu)].map((m) => m[1] ?? m[2])
+  // 同 readPageModules：键可能是带连字符的字符串字面量；值可能是字符串或元组
+  const pages = [...body[1].matchAll(/(?:'([^']+)'|(\w+))\s*:\s*(?:'|\[)/gu)].map(
+    (m) => m[1] ?? m[2],
+  )
   if (pages.length === 0) {
-    throw new Error('PAGE_LABELS 解析结果为空（脚本解析可能已失效）')
+    throw new Error('PAGE_LABEL_KEYS 解析结果为空（脚本解析可能已失效）')
   }
   return pages
 }

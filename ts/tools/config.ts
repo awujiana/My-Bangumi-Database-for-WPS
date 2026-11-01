@@ -6,6 +6,9 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js'
 
 import { BGM_EVENTS, eventBus } from './events.js'
 import { BGM, getApp, bgmLog } from './util/index.js'
@@ -383,12 +386,31 @@ const CLUSTER_MODES = ['formula', 'range-formula', 'column', 'row'] as const
  */
 export type ClusterMode = (typeof CLUSTER_MODES)[number]
 
-/** 口径的中文名（设置页按钮、toast 共用，避免两处各写一份） */
-export const CLUSTER_MODE_LABELS: Readonly<Record<ClusterMode, string>> = {
-  formula: '按公式',
-  'range-formula': '按范围 + 公式',
-  column: '按列',
-  row: '按行',
+/**
+ * 口径的展示名（设置页按钮、toast 共用）。
+ *
+ * 直接复用设置页按钮的 key（`settings.cfPref.clusterBy*`）：按钮文案与 toast 里的口径名
+ * 必须永远一致，各写一份就会出现「按钮改了、提示没改」。
+ * 写成函数而不是常量表 —— 常量表在模块加载那一刻就把译文定死，而语言包是异步加载的。
+ */
+export function clusterModeLabel(mode: string): string {
+  switch (mode) {
+    case 'formula': {
+      return tOr('settings.cfPref.clusterByFormula', '按公式')
+    }
+    case 'range-formula': {
+      return tOr('settings.cfPref.clusterByRangeFormula', '按范围 + 公式')
+    }
+    case 'column': {
+      return tOr('settings.cfPref.clusterByColumn', '按列')
+    }
+    case 'row': {
+      return tOr('settings.cfPref.clusterByRow', '按行')
+    }
+    default: {
+      return mode
+    }
+  }
 }
 
 export function setClusterMode(mode: string): boolean {
@@ -407,14 +429,6 @@ export function getClusterMode(isSilent = false): ClusterMode {
   return result
 }
 
-/**
- * 口径的中文名；未知取值原样返回（UI 提示用，避免在调用处再写一次类型断言）
- */
-export function clusterModeLabel(mode: string): string {
-  const labels: Readonly<Record<string, string>> = CLUSTER_MODE_LABELS
-  return labels[mode] ?? mode
-}
-
 // ========== 条件格式「合并重复项」口径 ==========
 
 const MERGE_MODES = ['adjacent', 'union'] as const
@@ -426,10 +440,24 @@ const MERGE_MODES = ['adjacent', 'union'] as const
  */
 export type MergeMode = (typeof MERGE_MODES)[number]
 
-/** 口径中文名（设置页按钮与 toast 共用） */
-export const MERGE_MODE_LABELS: Readonly<Record<MergeMode, string>> = {
-  adjacent: '仅连续行',
-  union: '强行并成一块',
+/**
+ * 合并口径的展示名。
+ *
+ * 不复用设置页按钮的 key：按钮写的是「仅连续行（安全）」，括号是给**选择时**看的提示，
+ * 塞进 toast 里会变成「按『仅连续行（安全）』合并」——口径名不该带营销词。
+ */
+export function mergeModeLabel(mode: string): string {
+  switch (mode) {
+    case 'adjacent': {
+      return tOr('config.mergeMode.adjacent', '仅连续行')
+    }
+    case 'union': {
+      return tOr('config.mergeMode.union', '强行并成一块')
+    }
+    default: {
+      return mode
+    }
+  }
 }
 
 export function setMergeMode(mode: string): boolean {
@@ -446,12 +474,6 @@ export function getMergeMode(isSilent = false): MergeMode {
   const result = MERGE_MODES.includes(value as MergeMode) ? (value as MergeMode) : 'adjacent'
   if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取合并重复项口径: ${result}`)
   return result
-}
-
-/** 口径中文名；未知取值原样返回 */
-export function mergeModeLabel(mode: string): string {
-  const labels: Readonly<Record<string, string>> = MERGE_MODE_LABELS
-  return labels[mode] ?? mode
 }
 
 // ========== 默认收藏列表类型 ==========

@@ -12,18 +12,42 @@
 
 import { getApp, bgmLog, getColumnMap, getLastRow } from './util/index.js'
 import { LOG_LEVELS } from '../core/constants.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js'
 import type { WpsWorksheet } from './wps.js'
 
 /** 存储键（单一最新快照，后写覆盖先写 —— 用户只关心「最近拿到的是什么」） */
 const DATA_CONTEXT_KEY = 'bgm_data_context'
 
-/** 页面标识 → 展示名 */
-const PAGE_LABELS: Record<string, string> = {
-  'sync-panel': '同步面板',
-  enrich: '富化',
-  highlight: '高亮',
-  clean: '清理',
-  settings: '设置',
+/**
+ * 页面标识 → 展示名。
+ *
+ * 用函数而不是常量表：这里是**短名**（`富化`），要嵌进「{from}页已获取」这句话里；
+ * 而 `nav-order.ts` 的 `PAGE_LABELS` 是长名（`富化面板`），给设置页模块排序当标题用 ——
+ * 两处语境不同，各用各的 key，不能合并。
+ */
+function pageLabel(page: string): string {
+  switch (page) {
+    case 'sync-panel': {
+      return tOr('dataContext.from.syncPanel', '同步面板')
+    }
+    case 'enrich': {
+      return tOr('dataContext.from.enrich', '富化')
+    }
+    case 'highlight': {
+      return tOr('dataContext.from.highlight', '高亮')
+    }
+    case 'clean': {
+      return tOr('dataContext.from.clean', '清理')
+    }
+    case 'settings': {
+      return tOr('dataContext.from.settings', '设置')
+    }
+    default: {
+      return page
+    }
+  }
 }
 
 export interface DataContextSnapshot {
@@ -141,13 +165,19 @@ export function mountDataContextNotice(page: string): void {
   const main = document.querySelector('main.main')
   if (!main || document.getElementById('bgmDataContextNotice')) return
 
-  const from = PAGE_LABELS[snap.fromPage] ?? snap.fromPage
+  const from = pageLabel(snap.fromPage)
   const time = new Date(snap.savedAt)
   const at = Number.isNaN(time.getTime())
     ? ''
     : ` · ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`
-  const columnPart = snap.columns.length > 0 ? ` · ${String(snap.columns.length)} 列` : ''
-  const rowPart = snap.rowCount > 0 ? ` · ${String(snap.rowCount)} 行` : ''
+  const columnPart =
+    snap.columns.length > 0
+      ? tOr('dataContext.colSuffix', ' · {count} 列', { count: String(snap.columns.length) })
+      : ''
+  const rowPart =
+    snap.rowCount > 0
+      ? tOr('dataContext.rowSuffix', ' · {count} 行', { count: String(snap.rowCount) })
+      : ''
 
   const bar = document.createElement('div')
   bar.id = 'bgmDataContextNotice'
@@ -157,7 +187,18 @@ export function mountDataContextNotice(page: string): void {
     'font-size:12px;color:var(--text-2,#bac2de);background:var(--bg-surface-2,#313244);' +
     'border-radius:6px;'
   const text = document.createElement('span')
-  text.textContent = `📋 ${from}页已获取：${snap.workbook || '—'} / ${snap.sheet || '—'}${columnPart}${rowPart}${at}`
+  text.textContent = tOr(
+    'dataContext.loaded',
+    '📋 {from}页已获取：{workbook} / {sheet}{columns}{rows}{at}',
+    {
+      from,
+      workbook: snap.workbook || '—',
+      sheet: snap.sheet || '—',
+      columns: columnPart,
+      rows: rowPart,
+      at,
+    },
+  )
 
   const actions = document.createElement('span')
   actions.style.cssText = 'margin-left:auto;display:flex;align-items:center;gap:6px;'
@@ -168,15 +209,27 @@ export function mountDataContextNotice(page: string): void {
     const applyButton = document.createElement('button')
     applyButton.type = 'button'
     applyButton.className = 'bgm-btn small'
-    applyButton.textContent = '↧ 套用到本页'
-    applyButton.setAttribute('aria-label', `把${from}页选中的工作簿与工作表套用到本页`)
+    applyButton.textContent = tOr('dataContext.apply', '↧ 套用到本页')
+    applyButton.setAttribute(
+      'aria-label',
+      tOr('dataContext.applyAria', '把{from}页选中的工作簿与工作表套用到本页', { from }),
+    )
     applyButton.addEventListener('click', () => {
       const isApplied = applyDataContextToPage(page)
-      applyButton.textContent = isApplied ? '✓ 已套用' : '✗ 套用失败'
+      applyButton.textContent = isApplied
+        ? tOr('dataContext.applied', '✓ 已套用')
+        : tOr('dataContext.applyFailed', '✗ 套用失败')
       applyButton.disabled = true
       applyButton.style.opacity = isApplied ? '0.75' : '1'
       if (!isApplied) {
-        text.textContent = `📋 套用失败：${snap.workbook || '—'} / ${snap.sheet || '—'} 当前不可用（工作簿或工作表可能已关闭）`
+        text.textContent = tOr(
+          'dataContext.failedText',
+          '📋 套用失败：{workbook} / {sheet} 当前不可用（工作簿或工作表可能已关闭）',
+          {
+            workbook: snap.workbook || '—',
+            sheet: snap.sheet || '—',
+          },
+        )
       }
     })
     actions.append(applyButton)
@@ -185,7 +238,7 @@ export function mountDataContextNotice(page: string): void {
   const close = document.createElement('button')
   close.type = 'button'
   close.textContent = '✕'
-  close.setAttribute('aria-label', '关闭数据同步提示')
+  close.setAttribute('aria-label', tOr('dataContext.closeAria', '关闭数据同步提示'))
   close.style.cssText =
     'border:none;background:transparent;color:inherit;cursor:pointer;font-size:12px;'
   close.addEventListener('click', () => {

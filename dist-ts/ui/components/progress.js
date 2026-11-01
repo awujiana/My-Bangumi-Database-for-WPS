@@ -14,25 +14,40 @@
  *  3. 所有外部注入的 HTML 一律经 `sanitizeHtml` 净化，防 XSS。
  */
 import { sanitizeHtml } from '../../tools/sanitize.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 import { formatDuration } from '../../tools/util/duration.js';
 import { scrollToBottomCoalesced } from '../dom-scroll.js';
 /** 日志区最大行数，超出后丢弃最旧行，避免长任务撑爆内存 */
 const LOG_MAX_LINES = 500;
-/** 组件 DOM 模板（三模式共用，靠外层修饰类切换布局） */
-const PROGRESS_TEMPLATE = `
+/**
+ * 组件 DOM 模板（三模式共用，靠外层修饰类切换布局）。
+ *
+ * 写成函数而不是常量：进度框是**运行时按需创建**的，页面加载时那一遍
+ * `applyI18n()` 早已跑完，`data-i18n` 属性对它不生效 —— 只能在建模板这一刻
+ * 用 `tOr` 取一次译文。
+ */
+function buildProgressTemplate() {
+    const closeWord = tOr('common.close', '关闭');
+    const pauseWord = tOr('progress.btn.pause', '暂停');
+    const stopWord = tOr('progress.btn.stop', '停止');
+    const detailsWord = tOr('progress.btn.showDetails', '显示详情');
+    const nextWord = tOr('progress.btn.next', '下一步 →');
+    return `
   <div data-el="head" class="bgm-progress__head">
     <div class="bgm-progress__head-left">
       <span data-el="icon" class="bgm-progress__icon">🔄</span>
       <span data-el="title" class="bgm-progress__title"></span>
     </div>
-    <button data-el="closeTop" type="button" class="bgm-progress__close" aria-label="关闭" title="关闭">✕</button>
+    <button data-el="closeTop" type="button" class="bgm-progress__close" aria-label="${closeWord}" title="${closeWord}">✕</button>
   </div>
   <div data-el="body" class="bgm-progress__body">
     <div data-el="config" class="bgm-progress__config" style="display:none;"></div>
     <ol data-el="phases" class="bgm-progress__phases" style="display:none;"></ol>
     <div data-el="section" class="bgm-progress__section">
       <div class="bgm-progress__meta" aria-live="polite" aria-atomic="true">
-        <span data-el="label" class="bgm-progress__label">进度: 准备中...</span>
+        <span data-el="label" class="bgm-progress__label">${tOr('progress.label.preparing', '进度: 准备中...')}</span>
         <span data-el="percent" class="bgm-progress__percent">--%</span>
         <span data-el="eta" class="bgm-progress__eta" style="display:none;"></span>
         <span data-el="globalEta" class="bgm-progress__global-eta" style="display:none;"></span>
@@ -42,7 +57,7 @@ const PROGRESS_TEMPLATE = `
       </div>
       <div data-el="current" class="bgm-progress__current"></div>
       <div data-el="logWrap" class="bgm-progress__log-wrap" style="display:none;">
-        <div class="bgm-progress__log-label">实时日志:</div>
+        <div class="bgm-progress__log-label">${tOr('progress.logLabel', '实时日志:')}</div>
         <div data-el="log" class="bgm-progress__log" role="log" aria-live="polite"></div>
       </div>
     </div>
@@ -54,16 +69,17 @@ const PROGRESS_TEMPLATE = `
   </div>
   <div data-el="footer" class="bgm-progress__footer">
     <div data-el="runningBtns" class="bgm-progress__btns">
-      <button data-el="pauseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="暂停">⏸️ 暂停</button>
-      <button data-el="stopBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-danger" aria-label="停止">⏹️ 停止</button>
+      <button data-el="pauseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="${pauseWord}">⏸️ ${pauseWord}</button>
+      <button data-el="stopBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-danger" aria-label="${stopWord}">⏹️ ${stopWord}</button>
     </div>
     <div data-el="doneBtns" class="bgm-progress__btns" style="display:none;">
-      <button data-el="toggleDetails" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="显示详情">显示详情</button>
-      <button data-el="closeBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="关闭">关闭</button>
-      <button data-el="nextBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-primary" aria-label="下一步">下一步 →</button>
+      <button data-el="toggleDetails" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="${detailsWord}">${detailsWord}</button>
+      <button data-el="closeBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="${closeWord}">${closeWord}</button>
+      <button data-el="nextBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-primary" aria-label="${nextWord}">${nextWord}</button>
     </div>
   </div>
 `;
+}
 /** 查询模板内的必需元素 */
 function requireElement(root, selector) {
     const element = root.querySelector(selector);
@@ -133,13 +149,19 @@ function renderGlobalEta(element, current, total, elapsedMs) {
         return;
     }
     if (current <= 0) {
-        element.textContent = `⏱ 已用${formatDuration(elapsedMs)} · 计算中...`;
+        element.textContent = tOr('progress.eta.calculating', '⏱ 已用{elapsed} · 计算中...', {
+            elapsed: formatDuration(elapsedMs),
+        });
         element.style.display = '';
         return;
     }
     const rate = current / elapsedMs;
     const remainingMs = (total - current) / rate;
-    element.textContent = `⏱ 已用${formatDuration(elapsedMs)} · 预计剩余${formatDuration(remainingMs)} · 总计${formatDuration(elapsedMs + remainingMs)}`;
+    element.textContent = tOr('progress.eta.estimate', '⏱ 已用{elapsed} · 预计剩余{remaining} · 总计{total}', {
+        elapsed: formatDuration(elapsedMs),
+        remaining: formatDuration(remainingMs),
+        total: formatDuration(elapsedMs + remainingMs),
+    });
     element.style.display = '';
 }
 /**
@@ -191,7 +213,7 @@ export function createProgress(options) {
         return null;
     const content = document.createElement('div');
     content.className = `bgm-progress bgm-progress--${options.mode}`;
-    content.innerHTML = sanitizeHtml(PROGRESS_TEMPLATE);
+    content.innerHTML = sanitizeHtml(buildProgressTemplate());
     const els = collectElements(content);
     // 外层容器：modal 需要包一层 .bgm-modal-content 才能复用弹窗样式
     if (options.mode === 'modal') {
@@ -326,7 +348,7 @@ export function createProgress(options) {
     els.bar.style.width = '0%';
     els.bar.textContent = '';
     els.bar.setAttribute('aria-valuenow', '0');
-    els.label.textContent = '进度: 准备中...';
+    els.label.textContent = tOr('progress.label.preparing', '进度: 准备中...');
     els.percent.textContent = '--%';
     els.current.textContent = '';
     els.log.textContent = '';
@@ -339,8 +361,11 @@ export function createProgress(options) {
     els.doneBtns.style.display = 'none';
     /** 同步暂停按钮外观（不触发回调） */
     const syncPauseButton = () => {
-        els.pauseBtn.textContent = isPaused ? '▶️ 继续' : '⏸️ 暂停';
-        els.pauseBtn.setAttribute('aria-label', isPaused ? '继续' : '暂停');
+        const pauseWord = tOr('progress.btn.pause', '暂停');
+        els.pauseBtn.textContent = isPaused
+            ? `▶️ ${tOr('progress.btn.resume', '继续')}`
+            : `⏸️ ${pauseWord}`;
+        els.pauseBtn.setAttribute('aria-label', isPaused ? tOr('progress.btn.resume', '继续') : pauseWord);
         if (isPaused) {
             els.pauseBtn.classList.remove('bgm-dialog-btn-default');
             els.pauseBtn.classList.add('bgm-dialog-btn-success');
@@ -397,8 +422,10 @@ export function createProgress(options) {
     els.toggleDetails.addEventListener('click', () => {
         const isExpanded = els.details.style.display !== 'none';
         els.details.style.display = isExpanded ? 'none' : '';
-        els.toggleDetails.textContent = isExpanded ? '显示详情' : '收起详情';
-        els.toggleDetails.setAttribute('aria-label', isExpanded ? '显示详情' : '收起详情');
+        const detailsWord = tOr('progress.btn.showDetails', '显示详情');
+        const collapseWord = tOr('progress.btn.hideDetails', '收起详情');
+        els.toggleDetails.textContent = isExpanded ? detailsWord : collapseWord;
+        els.toggleDetails.setAttribute('aria-label', isExpanded ? detailsWord : collapseWord);
     });
     // ---- 显示 ----
     if (options.mode === 'modal') {
@@ -422,7 +449,10 @@ export function createProgress(options) {
             els.bar.style.width = `${String(pct)}%`;
             els.bar.textContent = `${String(pct)}%`;
             els.bar.setAttribute('aria-valuenow', String(pct));
-            els.label.textContent = `进度: ${String(current)}/${String(total)}`;
+            els.label.textContent = tOr('progress.label.count', '进度: {current}/{total}', {
+                current: String(current),
+                total: String(total),
+            });
             els.percent.textContent = `${String(pct)}%`;
             if (message !== undefined)
                 els.current.textContent = message;
@@ -472,7 +502,9 @@ export function createProgress(options) {
             }
             const isOk = completeOptions.ok ?? true;
             els.icon.textContent = completeOptions.icon ?? (isOk ? '✅' : '⏹️');
-            els.title.textContent = completeOptions.doneTitle ?? (isOk ? '执行完成' : '已停止');
+            els.title.textContent =
+                completeOptions.doneTitle ??
+                    (isOk ? tOr('progress.doneTitle', '执行完成') : tOr('progress.stoppedTitle', '已停止'));
             els.section.style.display = 'none';
             els.result.style.display = '';
             els.runningBtns.style.display = 'none';

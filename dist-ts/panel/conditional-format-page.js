@@ -15,7 +15,7 @@ import { showToast } from '../ui/dialog.js';
 import { tOr } from '../i18n/locale-store.js';
 import { escapeHtml, columnNumberToLetter } from '../tools/string-utilities.js';
 import { BGM, bgmLog, copyTextWithResult, findHeaderRow, getApp, getColumnMap, markConditionalFormatPaneLoaded, } from '../tools/util/index.js';
-import { CLUSTER_MODE_LABELS, getClusterMode, getMergeMode, getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
+import { clusterModeLabel, getClusterMode, getMergeMode, getConfig, getExportPath, getModalButtonsPosition, setConfig, setExportPath, } from '../tools/config.js';
 import { APPLIED_RULES_STORE_KEY, CONDITIONAL_FORMAT_GROUP_HIGHLIGHT, CONDITIONAL_FORMAT_STORE_KEY, EXISTING_GROUPS_STORE_KEY, EXISTING_ANCHORS_STORE_KEY, anchorKeyOf, parseAnchors, parseAppliedRules, planAnchorRepair, serializeAnchors, serializeAppliedRules, toAbsoluteCell, toFullColumnRange, toFullRowRange, IMPORTED_RULE_GROUP, autoClusterGroups, buildDefaultRules, dissolveGroupMapping, filterRules, firstRowOfRange, foreignSnapshotToRule, groupRules, mergeDuplicateRules, moveGroupNear, moveItemNear, normalizeHexColor, parseExistingGroups, parseRules, parseRulesPayload, planApply, renameGroupMapping, reorderGroups, serializeExistingGroups, serializeRules, shiftFormulaRows, snapshotGroupKey, UNGROUPED_LABEL, } from './conditional-format-rules.js';
 import { FOREIGN_RULE_PAGE_SIZE, buildForeignRuleGroupsHtml, buildForeignRuleHeadHtml, buildForeignRuleRowHtml, filterForeignRuleRows, filterRowsByScope, fcTypeLabel, paginate, selectionSummary, toForeignRuleRows, toggleSelection, } from './conditional-format-table.js';
 import { directoryNameOf, saveTextFileWithDialog } from '../tools/save-file.js';
@@ -941,7 +941,10 @@ function autoClusterExistingGroups() {
     state.existingGroupCollapsed = new Set();
     renderExistingRules();
     const groupCount = new Set(Object.values(state.existingGroups)).size;
-    showToast(`已按「${CLUSTER_MODE_LABELS[mode]}」聚成 ${String(groupCount)} 组（覆盖了原分组）`, 'success');
+    showToast(tOr('conditionalFormat.toast.autoClustered', '已按「{mode}」聚成 {count} 组（覆盖了原分组）', {
+        mode: clusterModeLabel(mode),
+        count: String(groupCount),
+    }), 'success');
 }
 /**
  * 合并重复项：把「同公式 + 同列」的多条单行既有规则并成一条

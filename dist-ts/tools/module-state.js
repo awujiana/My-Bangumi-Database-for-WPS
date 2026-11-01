@@ -33,8 +33,11 @@ import { LOG_LEVELS } from '../core/constants.js';
 import { runBeforeEnterSolo } from '../core/solo-hooks.js';
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js';
 import { subscribeConfigPoll } from './config-poll.js';
-import { PAGE_MODULES } from './nav-order.js';
+import { PAGE_MODULES, navModuleLabel } from './nav-order.js';
 import { applyPageKeyAliases } from './page-key.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js';
 import { bgmLog, showSettingsPanel } from './util/index.js';
 /** 折叠按钮的类名（同时是样式与查询用的唯一标识） */
 const COLLAPSE_BUTTON_CLASS = 'mod-collapse-btn';
@@ -48,9 +51,13 @@ const EMPTY_HINT_ID = 'module-empty-hint';
 /** 占位块里「打开设置」按钮的类名（供样式与测试定位） */
 const EMPTY_HINT_BUTTON_CLASS = 'module-empty-hint-btn';
 /** 全隐藏时的 toast 文案（占位块里的说明更详细，这里只做瞬时提醒） */
-const EMPTY_HINT_TOAST = '本页模块已全部隐藏，请到「设置 → 模块排序」重新开启';
+function emptyHintToast() {
+    return tOr('moduleState.emptyToast', '本页模块已全部隐藏，请到「设置 → 模块排序」重新开启');
+}
 /** 占位块里的说明文案 */
-const EMPTY_HINT_TEXT = '本页模块已全部隐藏。请打开设置页，在「模块排序」中开启需要显示的功能模块。';
+function emptyHintText() {
+    return tOr('moduleState.emptyText', '本页模块已全部隐藏。请打开设置页，在「模块排序」中开启需要显示的功能模块。');
+}
 /** 设置页「模块排序」编辑器自身所在模块：禁止隐藏，否则无法恢复其它模块 */
 const UNHIDEABLE = { page: 'settings', id: 'sec-modules' };
 /**
@@ -182,7 +189,7 @@ function renderSoloBar() {
     bar.id = SOLO_BAR_ID;
     bar.className = 'solo-mode-bar solo-mode-bar--inline';
     bar.setAttribute('role', 'toolbar');
-    bar.setAttribute('aria-label', '专注模式：只显示单个模块，可上下切换或退出');
+    bar.setAttribute('aria-label', tOr('moduleState.soloBarAria', '专注模式：只显示单个模块，可上下切换或退出'));
     const makeStep = (icon, ariaLabel, delta) => {
         const button = document.createElement('button');
         button.type = 'button';
@@ -198,14 +205,14 @@ function renderSoloBar() {
     const exit = document.createElement('button');
     exit.type = 'button';
     exit.className = 'solo-mode-bar-btn solo-mode-bar-btn--exit';
-    exit.textContent = '✕ 退出专注';
-    exit.title = '退出专注模式，恢复全部模块';
+    exit.textContent = tOr('moduleState.exitSolo', '✕ 退出专注');
+    exit.title = tOr('moduleState.exitSoloTitle', '退出专注模式，恢复全部模块');
     exit.setAttribute('aria-label', exit.title);
     exit.addEventListener('click', () => {
         exitSoloMode();
     });
     // 不显示当前组件名（用户：不需要表示当前的组件名字）—— 控制条只留 切换 / 退出。
-    bar.append(makeStep('↑', '上一个模块', -1), makeStep('↓', '下一个模块', 1), exit);
+    bar.append(makeStep('↑', tOr('moduleState.prevModule', '上一个模块'), -1), makeStep('↓', tOr('moduleState.nextModule', '下一个模块'), 1), exit);
     // 放进专注模块的标题：接替被隐藏的折叠按钮的位置（标题是 flex，margin-left:auto 顶到最右）。
     // 折叠按钮本身只是 display:none，仍在 DOM，before 永远有可靠落点。
     const section = document.getElementById(soloMode.moduleId);
@@ -230,7 +237,9 @@ function makeSoloButton(module) {
     button.className = SOLO_BUTTON_CLASS;
     button.textContent = '⛶';
     button.dataset.modSolo = module.id;
-    const label = `只显示「${module.label}」，其余模块暂时隐藏（可上下切换）`;
+    const label = tOr('moduleState.soloTitle', '只显示「{module}」，其余模块暂时隐藏（可上下切换）', {
+        module: navModuleLabel(module),
+    });
     button.title = label;
     button.setAttribute('aria-label', label);
     return button;
@@ -549,7 +558,7 @@ function syncEmptyHint(page, modules, hidden, soloId) {
     // 只在「刚变成全隐藏」时提示一次：applyModuleState 每次轮询命中都会跑，无脑提示会刷屏
     if (!warnedEmptyPages.has(page)) {
         warnedEmptyPages.add(page);
-        getNotifyApi().toast(EMPTY_HINT_TOAST, 'warn');
+        getNotifyApi().toast(emptyHintToast(), 'warn');
     }
 }
 /** 渲染常驻占位块（主区被藏空后，这是页面上唯一的可见内容） */
@@ -562,11 +571,11 @@ function renderEmptyHint() {
     hint.className = 'module-empty-hint';
     const text = document.createElement('p');
     text.className = 'module-empty-hint-text';
-    text.textContent = EMPTY_HINT_TEXT;
+    text.textContent = emptyHintText();
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `bgm-btn small ${EMPTY_HINT_BUTTON_CLASS}`;
-    button.textContent = '⚙️ 打开设置';
+    button.textContent = tOr('moduleState.openSettings', '⚙️ 打开设置');
     button.addEventListener('click', () => {
         showSettingsPanel();
     });

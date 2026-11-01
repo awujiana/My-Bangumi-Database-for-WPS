@@ -134,14 +134,16 @@ declare const CLUSTER_MODES: readonly ["formula", "range-formula", "column", "ro
  * - `row`：按应用范围的**起始行**分组（`行 2`），适合按行铺开的模板。
  */
 export type ClusterMode = (typeof CLUSTER_MODES)[number];
-/** 口径的中文名（设置页按钮、toast 共用，避免两处各写一份） */
-export declare const CLUSTER_MODE_LABELS: Readonly<Record<ClusterMode, string>>;
-export declare function setClusterMode(mode: string): boolean;
-export declare function getClusterMode(isSilent?: boolean): ClusterMode;
 /**
- * 口径的中文名；未知取值原样返回（UI 提示用，避免在调用处再写一次类型断言）
+ * 口径的展示名（设置页按钮、toast 共用）。
+ *
+ * 直接复用设置页按钮的 key（`settings.cfPref.clusterBy*`）：按钮文案与 toast 里的口径名
+ * 必须永远一致，各写一份就会出现「按钮改了、提示没改」。
+ * 写成函数而不是常量表 —— 常量表在模块加载那一刻就把译文定死，而语言包是异步加载的。
  */
 export declare function clusterModeLabel(mode: string): string;
+export declare function setClusterMode(mode: string): boolean;
+export declare function getClusterMode(isSilent?: boolean): ClusterMode;
 declare const MERGE_MODES: readonly ["adjacent", "union"];
 /**
  * 合并重复项的口径：
@@ -149,12 +151,15 @@ declare const MERGE_MODES: readonly ["adjacent", "union"];
  * - `union`：同组内取 min..max **强行并成一块**，中间空行也会被覆盖。
  */
 export type MergeMode = (typeof MERGE_MODES)[number];
-/** 口径中文名（设置页按钮与 toast 共用） */
-export declare const MERGE_MODE_LABELS: Readonly<Record<MergeMode, string>>;
+/**
+ * 合并口径的展示名。
+ *
+ * 不复用设置页按钮的 key：按钮写的是「仅连续行（安全）」，括号是给**选择时**看的提示，
+ * 塞进 toast 里会变成「按『仅连续行（安全）』合并」——口径名不该带营销词。
+ */
+export declare function mergeModeLabel(mode: string): string;
 export declare function setMergeMode(mode: string): boolean;
 export declare function getMergeMode(isSilent?: boolean): MergeMode;
-/** 口径中文名；未知取值原样返回 */
-export declare function mergeModeLabel(mode: string): string;
 declare const LIST_TYPES: readonly ["all", "collect", "wish", "do"];
 export type ListType = (typeof LIST_TYPES)[number];
 export declare function setListType(type: string): boolean;

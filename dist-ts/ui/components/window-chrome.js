@@ -17,6 +17,9 @@
  *   detachable-panel 自身的拖动/缩放暂未迁入：它带 transform 合成层与几何记忆，
  *   迁移是独立的重构，见模块尾注。
  */
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 /** 拖拽/缩放结束后吞掉那一次 click
  *
  * 模态框拖离遮罩中心后，松手时浏览器补发的 click 落在**遮罩空白处**
@@ -221,13 +224,13 @@ export function bindModalMaximize(options) {
             modal.style.setProperty('height', `${String(Math.max(MIN_MODAL_HEIGHT, layer.height))}px`);
             modal.classList.add(MODAL_MAXIMIZED_CLASS);
             button.textContent = '🗗';
-            button.setAttribute('aria-label', '还原窗口大小');
+            button.setAttribute('aria-label', tOr('windowChrome.restore', '还原窗口大小'));
             button.setAttribute('aria-pressed', 'true');
             ensureModalVisible(modal, () => {
                 restoreFromSnapshot(modal, snapshot);
                 modal.classList.remove(MODAL_MAXIMIZED_CLASS);
                 button.textContent = '⛶';
-                button.setAttribute('aria-label', '最大化窗口');
+                button.setAttribute('aria-label', tOr('windowChrome.maximize', '最大化窗口'));
                 button.setAttribute('aria-pressed', 'false');
             });
             return;
@@ -236,7 +239,7 @@ export function bindModalMaximize(options) {
         restoreFromSnapshot(modal, snapshot);
         modal.classList.remove(MODAL_MAXIMIZED_CLASS);
         button.textContent = '⛶';
-        button.setAttribute('aria-label', '最大化窗口');
+        button.setAttribute('aria-label', tOr('windowChrome.maximize', '最大化窗口'));
         button.setAttribute('aria-pressed', 'false');
     });
 }

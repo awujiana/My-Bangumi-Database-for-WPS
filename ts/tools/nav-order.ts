@@ -25,14 +25,19 @@ import { LOG_LEVELS } from '../core/constants.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
 import { subscribeConfigPoll } from './config-poll.js'
 import { applyPageKeyAliases } from './page-key.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js'
 import { bgmLog } from './util/index.js'
 
 /** 单个可排序模块的定义 */
 export interface NavModule {
   /** 模块根元素 id（同时是导航锚点 `#id`） */
   id: string
-  /** 展示名称（导航文案） */
+  /** 展示名称兜底（源语言原文；实际展示走 `navModuleLabel()`） */
   label: string
+  /** 展示名称的译文 key（与侧栏导航项同一个 key，避免两处各写一份） */
+  labelKey: string
   /** 导航图标（emoji） */
   icon: string
 }
@@ -40,68 +45,105 @@ export interface NavModule {
 /** 页面键 → 该页可排序模块的默认顺序 */
 export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
   'sync-panel': [
-    { id: 'sec-command', label: '同步操作', icon: '🚀' },
-    { id: 'sec-account', label: '账户与凭证', icon: '🔑' },
-    { id: 'sec-scope', label: '同步范围与选择', icon: '🎯' },
-    { id: 'sec-strategy', label: '同步策略', icon: '⚖️' },
-    { id: 'sec-remote', label: '远程数据同步', icon: '🗄️' },
-    { id: 'sec-preview', label: '数据预览', icon: '👁️' },
-    { id: 'sec-records', label: '记录与日志', icon: '📊' },
-    { id: 'sec-help', label: '帮助与格式', icon: '📖' },
+    { id: 'sec-command', label: '同步操作', labelKey: 'syncPanel.nav.command', icon: '🚀' },
+    { id: 'sec-account', label: '账户与凭证', labelKey: 'syncPanel.nav.account', icon: '🔑' },
+    { id: 'sec-scope', label: '同步范围与选择', labelKey: 'syncPanel.nav.scope', icon: '🎯' },
+    { id: 'sec-strategy', label: '同步策略', labelKey: 'syncPanel.nav.strategy', icon: '⚖️' },
+    { id: 'sec-remote', label: '远程数据同步', labelKey: 'syncPanel.nav.remote', icon: '🗄️' },
+    { id: 'sec-preview', label: '数据预览', labelKey: 'syncPanel.nav.preview', icon: '👁️' },
+    { id: 'sec-records', label: '记录与日志', labelKey: 'syncPanel.nav.records', icon: '📊' },
+    { id: 'sec-help', label: '帮助与格式', labelKey: 'syncPanel.nav.help', icon: '📖' },
   ],
   enrich: [
-    { id: 'sec-file', label: '新番表文件', icon: '📁' },
-    { id: 'sec-target', label: '目标工作表', icon: '🎯' },
-    { id: 'sec-preview', label: '数据预览', icon: '👁️' },
-    { id: 'sec-enrich', label: '富化执行', icon: '⚡️' },
-    { id: 'sec-records', label: '富化记录', icon: '📊' },
-    { id: 'sec-tips', label: '使用提示', icon: '💡' },
+    { id: 'sec-file', label: '新番表文件', labelKey: 'enrich.nav.file', icon: '📁' },
+    { id: 'sec-target', label: '目标工作表', labelKey: 'enrich.nav.target', icon: '🎯' },
+    { id: 'sec-preview', label: '数据预览', labelKey: 'enrich.nav.preview', icon: '👁️' },
+    { id: 'sec-enrich', label: '富化执行', labelKey: 'enrich.nav.enrich', icon: '⚡️' },
+    { id: 'sec-records', label: '富化记录', labelKey: 'enrich.nav.records', icon: '📊' },
+    { id: 'sec-tips', label: '使用提示', labelKey: 'enrich.nav.tips', icon: '💡' },
   ],
   clean: [
-    { id: 'sec-targets', label: '选择清理的表格', icon: '🎯' },
-    { id: 'sec-items', label: '可清理项', icon: '☑️' },
-    { id: 'sec-preview', label: '执行前预览', icon: '🔍' },
-    { id: 'sec-run', label: '执行清理', icon: '🧹' },
-    { id: 'sec-log', label: '结果日志', icon: '📜' },
+    { id: 'sec-targets', label: '选择清理的表格', labelKey: 'clean.nav.targets', icon: '🎯' },
+    { id: 'sec-items', label: '可清理项', labelKey: 'clean.nav.items', icon: '☑️' },
+    { id: 'sec-preview', label: '执行前预览', labelKey: 'clean.nav.preview', icon: '🔍' },
+    { id: 'sec-run', label: '执行清理', labelKey: 'clean.nav.run', icon: '🧹' },
+    { id: 'sec-log', label: '结果日志', labelKey: 'clean.nav.log', icon: '📜' },
   ],
   highlight: [
-    { id: 'sec-condition', label: '匹配条件', icon: '🎯' },
-    { id: 'sec-columns', label: '高亮列', icon: '☑️' },
-    { id: 'sec-preview', label: '实时预览', icon: '👁️' },
-    { id: 'sec-run', label: '应用与清除', icon: '🖌️' },
+    { id: 'sec-condition', label: '匹配条件', labelKey: 'highlight.nav.condition', icon: '🎯' },
+    { id: 'sec-columns', label: '高亮列', labelKey: 'highlight.nav.columns', icon: '☑️' },
+    { id: 'sec-preview', label: '实时预览', labelKey: 'highlight.nav.preview', icon: '👁️' },
+    { id: 'sec-run', label: '应用与清除', labelKey: 'highlight.nav.run', icon: '🖌️' },
   ],
   'conditional-format': [
-    { id: 'sec-target', label: '目标工作表', icon: '🎯' },
-    { id: 'sec-existing', label: '工作表规则', icon: '👀' },
-    { id: 'sec-rules', label: '我的规则', icon: '☑️' },
-    { id: 'sec-defaults', label: '默认规则集', icon: '📦' },
-    { id: 'sec-apply', label: '应用与修复', icon: '🖌️' },
+    { id: 'sec-target', label: '目标工作表', labelKey: 'conditionalFormat.nav.target', icon: '🎯' },
+    {
+      id: 'sec-existing',
+      label: '工作表规则',
+      labelKey: 'conditionalFormat.nav.existing',
+      icon: '👀',
+    },
+    { id: 'sec-rules', label: '我的规则', labelKey: 'conditionalFormat.nav.rules', icon: '☑️' },
+    {
+      id: 'sec-defaults',
+      label: '默认规则集',
+      labelKey: 'conditionalFormat.nav.defaults',
+      icon: '📦',
+    },
+    { id: 'sec-apply', label: '应用与修复', labelKey: 'conditionalFormat.nav.apply', icon: '🖌️' },
   ],
   settings: [
-    { id: 'sec-appearance', label: '外观与导航', icon: '🎨' },
-    { id: 'sec-modules', label: '模块排序', icon: '🧩' },
-    { id: 'sec-shortcuts', label: '快捷键', icon: '⌨️' },
-    { id: 'sec-accounts', label: '账号', icon: '👤' },
-    { id: 'sec-sync-pref', label: '同步偏好', icon: '🔄' },
-    { id: 'sec-enrich-preview', label: '富化预览', icon: '⚡️' },
-    { id: 'sec-feature-toggles', label: '功能开关', icon: '⚙️' },
-    { id: 'sec-cf-pref', label: '条件格式', icon: '🎨' },
-    { id: 'sec-paths', label: '默认路径', icon: '📁' },
-    { id: 'sec-log-pref', label: '日志偏好', icon: '📜' },
-    { id: 'sec-data', label: '配置管理', icon: '📦' },
-    { id: 'sec-export', label: '数据导出', icon: '📤' },
-    { id: 'sec-about', label: '关于', icon: 'ℹ️' },
+    { id: 'sec-appearance', label: '外观与导航', labelKey: 'settings.nav.appearance', icon: '🎨' },
+    { id: 'sec-modules', label: '模块排序', labelKey: 'settings.nav.modules', icon: '🧩' },
+    { id: 'sec-shortcuts', label: '快捷键', labelKey: 'settings.nav.shortcuts', icon: '⌨️' },
+    { id: 'sec-accounts', label: '账号', labelKey: 'settings.nav.accounts', icon: '👤' },
+    { id: 'sec-sync-pref', label: '同步偏好', labelKey: 'settings.nav.syncPref', icon: '🔄' },
+    {
+      id: 'sec-enrich-preview',
+      label: '富化预览',
+      labelKey: 'settings.nav.enrichPreview',
+      icon: '⚡️',
+    },
+    {
+      id: 'sec-feature-toggles',
+      label: '功能开关',
+      labelKey: 'settings.nav.featureToggles',
+      icon: '⚙️',
+    },
+    { id: 'sec-cf-pref', label: '条件格式', labelKey: 'settings.nav.cfPref', icon: '🎨' },
+    { id: 'sec-paths', label: '默认路径', labelKey: 'settings.nav.paths', icon: '📁' },
+    { id: 'sec-log-pref', label: '日志偏好', labelKey: 'settings.nav.logPref', icon: '📜' },
+    { id: 'sec-data', label: '配置管理', labelKey: 'settings.nav.data', icon: '📦' },
+    { id: 'sec-export', label: '数据导出', labelKey: 'settings.nav.export', icon: '📤' },
+    { id: 'sec-about', label: '关于', labelKey: 'settings.nav.about', icon: 'ℹ️' },
   ],
 }
 
-/** 页面键 → 页面中文名（供设置页展示） */
-export const PAGE_LABELS: Readonly<Record<string, string>> = {
-  'sync-panel': '同步面板',
-  enrich: '富化面板',
-  clean: '清理面板',
-  highlight: '高亮面板',
-  'conditional-format': '条件格式面板',
-  settings: '设置页',
+/** 页面键 → [译文 key, 中文兜底]（供设置页展示；门禁按本表的键集合校验页面清单） */
+export const PAGE_LABEL_KEYS: Readonly<Record<string, readonly [string, string]>> = {
+  'sync-panel': ['nav.page.syncPanel', '同步面板'],
+  enrich: ['nav.page.enrich', '富化面板'],
+  clean: ['nav.page.clean', '清理面板'],
+  highlight: ['nav.page.highlight', '高亮面板'],
+  'conditional-format': ['nav.page.conditionalFormat', '条件格式面板'],
+  settings: ['nav.page.settings', '设置页'],
+}
+
+/**
+ * 页面展示名（长名，给设置页模块排序当分组标题）。
+ *
+ * 保留 `PAGE_LABELS` 这个名字但改成 getter 型函数：门禁 `check-nav-order.mjs`
+ * 只校验**页面键集合**，不读文案值，所以改成函数不影响它；而常量表会在模块
+ * 加载那一刻就把译文定死（那时语言包还没加载）。
+ */
+export function pageLabel(page: string): string {
+  const entry = PAGE_LABEL_KEYS[page]
+  return entry === undefined ? page : tOr(entry[0], entry[1])
+}
+
+/** 模块展示名（与侧栏导航项同一份文案，改一处两边都变） */
+export function navModuleLabel(module: NavModule): string {
+  return tOr(module.labelKey, module.label)
 }
 
 /** 设置页中可配置排序的页面键（顺序即展示顺序） */

@@ -15,9 +15,10 @@ import { LOG_LEVELS, bgmLog, showToast } from '../../index.js'
 import { CONFIG_KEYS, getConfig } from '../../tools/config.js'
 import {
   ORDERABLE_PAGES,
-  PAGE_LABELS,
   PAGE_MODULES,
   getNavOrder,
+  navModuleLabel,
+  pageLabel,
   moveModuleBy,
   notifyNavOrderChanged,
   resetNavOrder,
@@ -59,7 +60,7 @@ function buildGroupHtml(page: string): string {
   if (!modules || modules.length === 0) return ''
   const order = getNavOrder(page)
   const byId = new Map(modules.map((module) => [module.id, module]))
-  const label = PAGE_LABELS[page] ?? page
+  const label = pageLabel(page)
   const hidden = new Set(getHiddenModules(page))
 
   const items = order
@@ -68,7 +69,7 @@ function buildGroupHtml(page: string): string {
       if (!module) return ''
       const isFirst = index === 0
       const isLast = index === order.length - 1
-      const name = escapeHtml(module.label)
+      const name = escapeHtml(navModuleLabel(module))
       const isHidden = hidden.has(id)
       // 编辑器所在模块禁止隐藏：隐藏后就没有入口能把任何模块恢复了
       const hideDisabled = canHideModule(page, id) ? '' : ' disabled'
@@ -118,7 +119,7 @@ function afterOrderChanged(page: string, message: string): void {
   // 若被调整的正是当前页（如设置页自身），立刻重排，不等跨页轮询
   if (page === getCurrentPageKey()) notifyNavOrderChanged(page)
   showToast(message, 'success')
-  bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[page] ?? page} 排序已更新`)
+  bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${pageLabel(page)} 排序已更新`)
 }
 
 /** 当前页面的排序键（取自 `body[data-page]`，与 nav-order 的推断口径一致） */
@@ -137,7 +138,7 @@ function onEditorClick(event: Event): void {
   const resetPage = button.dataset.modReset
   if (resetPage) {
     if (resetNavOrder(resetPage)) {
-      afterOrderChanged(resetPage, `已恢复「${PAGE_LABELS[resetPage] ?? resetPage}」默认顺序`)
+      afterOrderChanged(resetPage, `已恢复「${pageLabel(resetPage)}」默认顺序`)
     } else {
       showToast('恢复默认顺序失败', 'error')
     }
@@ -166,7 +167,7 @@ function onEditorClick(event: Event): void {
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`,
+      `[moduleOrder] ${pageLabel(hidePage)} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`,
     )
     return
   }

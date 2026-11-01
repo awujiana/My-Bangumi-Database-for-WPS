@@ -12,7 +12,7 @@
  */
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js';
 import { CONFIG_KEYS, getConfig } from '../../tools/config.js';
-import { ORDERABLE_PAGES, PAGE_LABELS, PAGE_MODULES, getNavOrder, moveModuleBy, notifyNavOrderChanged, resetNavOrder, setNavOrder, } from '../../tools/nav-order.js';
+import { ORDERABLE_PAGES, PAGE_MODULES, getNavOrder, navModuleLabel, pageLabel, moveModuleBy, notifyNavOrderChanged, resetNavOrder, setNavOrder, } from '../../tools/nav-order.js';
 import { applyModuleState, canHideModule, getHiddenModules, NAV_MODULE_ID, toggleModuleHidden, } from '../../tools/module-state.js';
 import { escapeHtml } from '../../tools/string-utilities.js';
 import { createSortable, moveInArray } from '../components/sortable-list.js';
@@ -41,7 +41,7 @@ function buildGroupHtml(page) {
         return '';
     const order = getNavOrder(page);
     const byId = new Map(modules.map((module) => [module.id, module]));
-    const label = PAGE_LABELS[page] ?? page;
+    const label = pageLabel(page);
     const hidden = new Set(getHiddenModules(page));
     const items = order
         .map((id, index) => {
@@ -50,7 +50,7 @@ function buildGroupHtml(page) {
             return '';
         const isFirst = index === 0;
         const isLast = index === order.length - 1;
-        const name = escapeHtml(module.label);
+        const name = escapeHtml(navModuleLabel(module));
         const isHidden = hidden.has(id);
         // 编辑器所在模块禁止隐藏：隐藏后就没有入口能把任何模块恢复了
         const hideDisabled = canHideModule(page, id) ? '' : ' disabled';
@@ -101,7 +101,7 @@ function afterOrderChanged(page, message) {
     if (page === getCurrentPageKey())
         notifyNavOrderChanged(page);
     showToast(message, 'success');
-    bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[page] ?? page} 排序已更新`);
+    bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${pageLabel(page)} 排序已更新`);
 }
 /** 当前页面的排序键（取自 `body[data-page]`，与 nav-order 的推断口径一致） */
 function getCurrentPageKey() {
@@ -119,7 +119,7 @@ function onEditorClick(event) {
     const resetPage = button.dataset.modReset;
     if (resetPage) {
         if (resetNavOrder(resetPage)) {
-            afterOrderChanged(resetPage, `已恢复「${PAGE_LABELS[resetPage] ?? resetPage}」默认顺序`);
+            afterOrderChanged(resetPage, `已恢复「${pageLabel(resetPage)}」默认顺序`);
         }
         else {
             showToast('恢复默认顺序失败', 'error');
@@ -143,7 +143,7 @@ function onEditorClick(event) {
         const isNavRow = hideId === NAV_MODULE_ID;
         const targetName = isNavRow ? '功能导航' : '模块';
         showToast(isNowHidden ? `${targetName}已隐藏，可在设置页恢复` : `${targetName}已恢复显示`, 'success');
-        bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`);
+        bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${pageLabel(hidePage)} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`);
         return;
     }
     const direction = button.dataset.modMove;

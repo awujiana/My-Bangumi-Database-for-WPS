@@ -25,7 +25,7 @@ import {
   markConditionalFormatPaneLoaded,
 } from '../tools/util/index.js'
 import {
-  CLUSTER_MODE_LABELS,
+  clusterModeLabel,
   getClusterMode,
   getMergeMode,
   getConfig,
@@ -1297,7 +1297,10 @@ function autoClusterExistingGroups(): void {
   renderExistingRules()
   const groupCount = new Set(Object.values(state.existingGroups)).size
   showToast(
-    `已按「${CLUSTER_MODE_LABELS[mode]}」聚成 ${String(groupCount)} 组（覆盖了原分组）`,
+    tOr('conditionalFormat.toast.autoClustered', '已按「{mode}」聚成 {count} 组（覆盖了原分组）', {
+      mode: clusterModeLabel(mode),
+      count: String(groupCount),
+    }),
     'success',
   )
 }

@@ -451,12 +451,11 @@ export {
   // 条件格式自动聚类口径（按公式 / 范围+公式 / 列 / 行）
   setClusterMode,
   getClusterMode,
-  CLUSTER_MODE_LABELS,
+  clusterModeLabel,
   type ClusterMode,
   // 条件格式合并重复项口径（仅连续行 / 强行并成一块）
   setMergeMode,
   getMergeMode,
-  MERGE_MODE_LABELS,
   mergeModeLabel,
   type MergeMode,
   // 默认收藏列表类型

@@ -12,7 +12,9 @@ import {
   startNavOrderSync,
   PAGE_MODULES,
   ORDERABLE_PAGES,
-  PAGE_LABELS,
+  PAGE_LABEL_KEYS,
+  navModuleLabel,
+  pageLabel,
 } from '../ts/tools/nav-order.js'
 import { CONFIG_KEYS } from '../ts/tools/config.js'
 
@@ -276,9 +278,24 @@ describe('nav-order 页面注册表', () => {
     )
   })
 
-  it('每个可排序页面都有中文名', () => {
+  it('每个可排序页面都有展示名（译文 key + 中文兜底）', () => {
     for (const page of ORDERABLE_PAGES) {
-      expect(PAGE_LABELS[page]).toBeTruthy()
+      const entry = PAGE_LABEL_KEYS[page]
+      expect(entry?.[0]).toBeTruthy()
+      expect(entry?.[1]).toBeTruthy()
+      // 没有语言包时 tOr 返回兜底原文，所以这条断言等价于「兜底不为空」
+      expect(pageLabel(page)).toBeTruthy()
+    }
+  })
+
+  it('每个模块都带译文 key，且与侧栏导航项同一命名空间', () => {
+    // 模块名与导航项是同一份文案（改一处两边都变），key 必须落在 <page>.nav.* 下。
+    // 漏写 labelKey 的表现是「设置页模块排序里这一行显示中文原文」，不会报错。
+    const allModules = ORDERABLE_PAGES.flatMap((page) => PAGE_MODULES[page] ?? [])
+    expect(allModules.length).toBeGreaterThan(0)
+    for (const module of allModules) {
+      expect(module.labelKey).toMatch(/\.nav\./u)
+      expect(navModuleLabel(module)).toBeTruthy()
     }
   })
 

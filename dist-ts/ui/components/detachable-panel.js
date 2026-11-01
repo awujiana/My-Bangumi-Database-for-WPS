@@ -42,6 +42,9 @@
  */
 import { isWebDialogSupported, openWebDialog, resolveDialogUrl, } from '../../tools/wps-web-dialog.js';
 import { onBeforeEnterSolo } from '../../core/solo-hooks.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 /** 面板尺寸下限（再小内容就被裁没了） */
 export const MIN_PANEL_WIDTH = 360;
 export const MIN_PANEL_HEIGHT = 200;
@@ -230,8 +233,8 @@ function makePlaceholder(message, onRecall) {
     recall.className = 'bgm-btn small detachable-placeholder-recall';
     // 文案用「还原」而非「关闭」：用户要的是「把内容放回原位」这个语义，
     // 「关闭」容易被理解成把内容丢掉（区块其实一直在，只是搬去了窗口里）。
-    recall.textContent = '还原';
-    recall.title = '把区块收回本页面原位';
+    recall.textContent = tOr('detachable.recall', '还原');
+    recall.title = tOr('detachable.recallTitle', '把区块收回本页面原位');
     recall.setAttribute('aria-label', recall.title);
     recall.addEventListener('click', onRecall);
     placeholder.append(icon, text, recall);
@@ -311,10 +314,10 @@ function measureSectionSize(section) {
  *    否则占位块会永久卡在「已拖出」，而窗口早没了（比塌陷更难发现）。
  */
 function createNativeDetachable(section, resolved) {
-    const title = resolved.title ?? '浮动窗口';
+    const title = resolved.title ?? tOr('detachable.titleFallback', '浮动窗口');
     const homeParent = section.parentElement;
     const homeNextSibling = section.nextElementSibling;
-    const placeholder = makePlaceholder(`「${title}」已拖出为独立窗口`, attach);
+    const placeholder = makePlaceholder(tOr('detachable.placeholder.native', '「{title}」已拖出为独立窗口', { title }), attach);
     let session = null;
     let pollTimer = null;
     let isDetached = false;
@@ -461,13 +464,14 @@ function readSectionTitle(section) {
     // 只找 h3/h2 会退化成「浮动窗口」——窗口标题与内容标题对不上（momo 反馈）。
     const heading = section.querySelector('h3, h2, .command-title');
     if (!heading)
-        return '浮动窗口';
+        return tOr('detachable.titleFallback', '浮动窗口');
     const clone = heading.cloneNode(true);
     clone.querySelectorAll('button').forEach((button) => {
         button.remove();
     });
     // 去掉内嵌按钮的字（折叠按钮、拖出按钮都会污染标题）
-    return (clone.textContent || '').replace(/\s+/g, ' ').trim() || '浮动窗口';
+    return ((clone.textContent || '').replace(/\s+/g, ' ').trim() ||
+        tOr('detachable.titleFallback', '浮动窗口'));
 }
 /** 读 HTML 上的数字属性，缺省或非法值返回 undefined */
 function readNumberAttribute(section, name) {
@@ -533,7 +537,7 @@ export function createDetachablePanel(section, options = {}) {
         return createNativeDetachable(section, resolved);
     }
     const panelId = section.id || `detachable-${String(geometryMemory.size + 1)}`;
-    const title = resolved.title ?? '浮动窗口';
+    const title = resolved.title ?? tOr('detachable.titleFallback', '浮动窗口');
     // ---- 浮动窗口骨架（追加到 body：position fixed 相对视口，可宽于任务窗格）----
     const root = makeDiv(PANEL_CLASS);
     root.dataset.detachableFor = panelId;
@@ -595,18 +599,20 @@ export function createDetachablePanel(section, options = {}) {
     titleNode.textContent = title;
     const toolbarSlot = makeDiv('detachable-panel-toolbar');
     const actions = makeDiv('detachable-panel-actions');
-    const buttonCollapse = makeIconButton('▾', '收起 / 展开', 'detachable-panel-icon-btn', () => {
+    const buttonCollapse = makeIconButton('▾', tOr('detachable.btn.collapse', '收起 / 展开'), 'detachable-panel-icon-btn', () => {
         const isCollapsed = root.classList.toggle(COLLAPSED_CLASS);
         // 最大化态一律不写内联高度：inset 的 96% 与收起高度都交给 CSS 规则
         // （.is-maximized / .is-maximized.is-collapsed），内联一写就顶掉它们
         if (!root.classList.contains(MAXIMIZED_CLASS)) {
-            root.style.height = isCollapsed ? `${String(COLLAPSED_HEIGHT)}px` : `${String(rect.height)}px`;
+            root.style.height = isCollapsed
+                ? `${String(COLLAPSED_HEIGHT)}px`
+                : `${String(rect.height)}px`;
         }
         buttonCollapse.textContent = isCollapsed ? '▸' : '▾';
         buttonCollapse.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
     });
     buttonCollapse.setAttribute('aria-expanded', 'true');
-    const buttonMaximize = makeIconButton('⤢', '最大化 / 还原', 'detachable-panel-icon-btn', () => {
+    const buttonMaximize = makeIconButton('⤢', tOr('detachable.btn.maximize', '最大化 / 还原'), 'detachable-panel-icon-btn', () => {
         const isMaximized = root.classList.toggle(MAXIMIZED_CLASS);
         if (isMaximized) {
             // 最大化靠 CSS 的 inset，必须清掉内联几何，否则内联优先级更高撑不开
@@ -624,7 +630,7 @@ export function createDetachablePanel(section, options = {}) {
     });
     // 还原按钮改用图标（⧉）而非文字：momo 要求与其它窗口按钮统一。
     // 图标语义弱于文字，故 tooltip / aria-label 写全「放回页面原位」。
-    const buttonRestore = makeIconButton('⧉', '还原：把模块放回页面原位', 'detachable-panel-icon-btn', () => {
+    const buttonRestore = makeIconButton('⧉', tOr('detachable.btn.restore', '还原：把模块放回页面原位'), 'detachable-panel-icon-btn', () => {
         attach();
     });
     actions.append(buttonCollapse, buttonMaximize, buttonRestore);
@@ -632,11 +638,11 @@ export function createDetachablePanel(section, options = {}) {
     const body = makeDiv('detachable-panel-body');
     const resizeHandle = makeDiv('detachable-panel-resize');
     resizeHandle.setAttribute('role', 'separator');
-    resizeHandle.setAttribute('aria-label', '拖动缩放窗口');
-    resizeHandle.title = '拖动缩放';
+    resizeHandle.setAttribute('aria-label', tOr('detachable.resize.aria', '拖动缩放窗口'));
+    resizeHandle.title = tOr('detachable.resize.title', '拖动缩放');
     root.append(header, body, resizeHandle);
     // ---- 占位块：拖出后顶在原位置，避免正文塌陷 ----
-    const placeholder = makePlaceholder(`「${title}」已拖出为浮动窗口`, attach);
+    const placeholder = makePlaceholder(tOr('detachable.placeholder.floating', '「{title}」已拖出为浮动窗口', { title }), attach);
     // 拖动 / 缩放期间的基准：起点几何 + 起点视口。
     // 视口只在 pointerdown 时读一次（`window.innerWidth/Height` 有挂起样式变更时会触发
     // 强制布局，逐帧读 = 逐帧重排）；几何用「基准 + 累计位移」算绝对位置 —— 若用
@@ -796,20 +802,27 @@ export function createDetachablePanel(section, options = {}) {
     trigger?.addEventListener('click', onTriggerClick);
     // ---- 右键菜单：绑标题栏（见 bindWindowMenu 的说明：不绑内容区）----
     bindWindowMenu(header, () => [
-        { label: '✕ 关闭窗口（内容还原到页面）', run: attach },
+        { label: tOr('detachable.menu.close', '✕ 关闭窗口（内容还原到页面）'), run: attach },
         {
-            label: root.classList.contains(COLLAPSED_CLASS) ? '▾ 展开' : '▸ 收起',
+            label: root.classList.contains(COLLAPSED_CLASS)
+                ? tOr('detachable.menu.expand', '▾ 展开')
+                : tOr('detachable.menu.collapse', '▸ 收起'),
             run: () => {
                 buttonCollapse.click();
             },
         },
         {
-            label: root.classList.contains(MAXIMIZED_CLASS) ? '⤡ 还原大小' : '⤢ 最大化',
+            label: root.classList.contains(MAXIMIZED_CLASS)
+                ? tOr('detachable.menu.restoreSize', '⤡ 还原大小')
+                : tOr('detachable.menu.maximize', '⤢ 最大化'),
             run: () => {
                 buttonMaximize.click();
             },
         },
-        { label: '⧉ 关闭所有浮动窗口', run: () => closeAllDetachedPanels() },
+        {
+            label: tOr('detachable.menu.closeAll', '⧉ 关闭所有浮动窗口'),
+            run: () => closeAllDetachedPanels(),
+        },
     ]);
     const handle = {
         detach,
@@ -841,7 +854,7 @@ function injectTrigger(section, title) {
     button.type = 'button';
     button.className = TRIGGER_BUTTON_CLASS;
     button.textContent = '⧉';
-    button.title = `把「${title}」拖出为浮动窗口（可拖动 / 缩放 / 最大化）`;
+    button.title = tOr('detachable.trigger.title', '把「{title}」拖出为浮动窗口（可拖动 / 缩放 / 最大化）', { title });
     button.setAttribute('aria-label', button.title);
     const heading = section.querySelector('h3, h2, .command-title');
     if (heading)

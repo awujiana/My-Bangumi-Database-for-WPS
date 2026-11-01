@@ -24,15 +24,27 @@
 export interface NavModule {
     /** 模块根元素 id（同时是导航锚点 `#id`） */
     id: string;
-    /** 展示名称（导航文案） */
+    /** 展示名称兜底（源语言原文；实际展示走 `navModuleLabel()`） */
     label: string;
+    /** 展示名称的译文 key（与侧栏导航项同一个 key，避免两处各写一份） */
+    labelKey: string;
     /** 导航图标（emoji） */
     icon: string;
 }
 /** 页面键 → 该页可排序模块的默认顺序 */
 export declare const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>>;
-/** 页面键 → 页面中文名（供设置页展示） */
-export declare const PAGE_LABELS: Readonly<Record<string, string>>;
+/** 页面键 → [译文 key, 中文兜底]（供设置页展示；门禁按本表的键集合校验页面清单） */
+export declare const PAGE_LABEL_KEYS: Readonly<Record<string, readonly [string, string]>>;
+/**
+ * 页面展示名（长名，给设置页模块排序当分组标题）。
+ *
+ * 保留 `PAGE_LABELS` 这个名字但改成 getter 型函数：门禁 `check-nav-order.mjs`
+ * 只校验**页面键集合**，不读文案值，所以改成函数不影响它；而常量表会在模块
+ * 加载那一刻就把译文定死（那时语言包还没加载）。
+ */
+export declare function pageLabel(page: string): string;
+/** 模块展示名（与侧栏导航项同一份文案，改一处两边都变） */
+export declare function navModuleLabel(module: NavModule): string;
 /** 设置页中可配置排序的页面键（顺序即展示顺序） */
 export declare const ORDERABLE_PAGES: readonly string[];
 /**
