@@ -1036,7 +1036,11 @@ function deleteExistingGroup(group: string): void {
   }
   // BGM.Dialog.confirm（项目范式，非 window.confirm）：不可撤销操作必须确认
   BGM.Dialog.confirm(
-    `将从工作表删除「${group}」分组的全部 ${String(indices.length)} 条规则，且不可撤销。确定？`,
+    tOr(
+      'conditionalFormat.groupDelete.confirm',
+      '将从工作表删除「{group}」分组的全部 {count} 条规则，且不可撤销。确定？',
+      { group, count: String(indices.length) },
+    ),
     (isConfirmed: boolean) => {
       if (!isConfirmed) return
       // 逆序删：删前面的行会让后面的 FormatConditions.Item 下标漂移
@@ -1083,7 +1087,7 @@ function deleteExistingGroup(group: string): void {
       }
       loadExistingRules()
     },
-    '删除整组规则？',
+    tOr('conditionalFormat.groupDelete.title', '删除整组规则？'),
   )
 }
 
@@ -1110,10 +1114,14 @@ function openGroupNameModal(): void {
     const onlyName = names.size === 1 ? names.values().next().value : undefined
     input.value = typeof onlyName === 'string' ? onlyName : ''
   }
-  setText('conditionalFormatGroupLabel', '归入分组')
+  setText('conditionalFormatGroupLabel', tOr('conditionalFormat.groupAssign.label', '归入分组'))
   setText(
     'conditionalFormatGroupHint',
-    `把所选的 ${String(indices.length)} 条规则归入同一分组。分组只影响本页展示（可收起展开），并会在导入规则库时作为组名带过去。`,
+    tOr(
+      'conditionalFormat.groupAssign.hint',
+      '把所选的 {count} 条规则归入同一分组。分组只影响本页展示（可收起展开），并会在导入规则库时作为组名带过去。',
+      { count: String(indices.length) },
+    ),
   )
   showGroupNameMask()
   input?.focus()
@@ -1134,10 +1142,14 @@ function openRenameGroupModal(group: string): void {
   state.renamingGroup = group
   const input = inputById('conditionalFormatGroupName')
   if (input) input.value = group
-  setText('conditionalFormatGroupLabel', '重命名分组')
+  setText('conditionalFormatGroupLabel', tOr('conditionalFormat.groupRename.label', '重命名分组'))
   setText(
     'conditionalFormatGroupHint',
-    `分组「${group}」下有 ${String(count)} 条规则，将全部改用新组名。分组只影响本页展示，不会改写工作表。`,
+    tOr(
+      'conditionalFormat.groupRename.hint',
+      '分组「{group}」下有 {count} 条规则，将全部改用新组名。分组只影响本页展示，不会改写工作表。',
+      { group, count: String(count) },
+    ),
   )
   showGroupNameMask()
   input?.focus()
@@ -1443,7 +1455,10 @@ function fixRulesToCell(): void {
     return
   }
   // eslint-disable-next-line no-alert -- 只有一个单元格地址要填，用原生 prompt 比再搭一个模态框更轻
-  const input = window.prompt('要固定到哪个单元格？（例如 J5）', '')
+  const input = window.prompt(
+    tOr('conditionalFormat.fixCell.prompt', '要固定到哪个单元格？（例如 J5）'),
+    '',
+  )
   if (input === null) return
   const cell = toAbsoluteCell(input)
   if (cell === null) {
@@ -1782,7 +1797,12 @@ function startCellEdit(cell: HTMLElement, index: number, kind: 'range' | 'formul
   input.className = 'conditional-format-cell-input'
   input.value = original
   input.spellcheck = false
-  input.setAttribute('aria-label', kind === 'range' ? '修改应用范围' : '修改公式')
+  input.setAttribute(
+    'aria-label',
+    kind === 'range'
+      ? tOr('conditionalFormat.editInline.rangeAria', '修改应用范围')
+      : tOr('conditionalFormat.editInline.formulaAria', '修改公式'),
+  )
   // replaceChildren 一次完成「清空 + 插入」：拆成 textContent='' + append 会踩
   // no-param-reassign（禁给参数属性赋值，方法调用不管）
   cell.replaceChildren(input)
@@ -1858,8 +1878,13 @@ function commitCellEdit(
   )
   showToast(
     kind === 'range'
-      ? `第 ${String(index)} 条范围已改为 ${next}`
-      : `第 ${String(index)} 条公式已更新`,
+      ? tOr('conditionalFormat.editInline.rangeChanged', '第 {index} 条范围已改为 {range}', {
+          index: String(index),
+          range: next,
+        })
+      : tOr('conditionalFormat.editInline.formulaUpdated', '第 {index} 条公式已更新', {
+          index: String(index),
+        }),
     'success',
   )
   if (synced > 0) {
@@ -2190,9 +2215,21 @@ function openPasteMenu(button: HTMLElement): void {
     items: [
       {
         id: 'paste-library',
-        label: count > 0 ? `📋 粘贴插件剪贴板（${String(count)} 条）` : '📋 粘贴插件剪贴板',
+        label:
+          count > 0
+            ? tOr(
+                'conditionalFormat.paste.pluginClipboardCount',
+                '📋 粘贴插件剪贴板（{count} 条）',
+                {
+                  count: String(count),
+                },
+              )
+            : tOr('conditionalFormat.paste.pluginClipboard', '📋 粘贴插件剪贴板'),
         disabled: count === 0,
-        disabledReason: '还没有在插件里复制过规则——用行尾的 ⧉，或从下面两条来源粘贴',
+        disabledReason: tOr(
+          'conditionalFormat.paste.pluginEmpty',
+          '还没有在插件里复制过规则——用行尾的 ⧉，或从下面两条来源粘贴',
+        ),
         onSelect: () => {
           pasteRules()
         },
@@ -2200,14 +2237,14 @@ function openPasteMenu(button: HTMLElement): void {
       { id: 'paste-sep', separator: true },
       {
         id: 'paste-system',
-        label: '🖥️ 从系统剪贴板粘贴',
+        label: tOr('conditionalFormat.paste.systemClipboard', '🖥️ 从系统剪贴板粘贴'),
         onSelect: () => {
           void pasteFromSystemClipboard()
         },
       },
       {
         id: 'paste-text',
-        label: '✍️ 从文本粘贴 / 编辑 JSON',
+        label: tOr('conditionalFormat.paste.text', '✍️ 从文本粘贴 / 编辑 JSON'),
         onSelect: () => {
           openTextImportModal()
         },
@@ -2244,7 +2281,10 @@ async function pasteFromSystemClipboard(): Promise<void> {
   const text = await readTextFromSystemClipboard()
   if (text.trim() === '') {
     openTextImportModal({
-      hint: '读不到系统剪贴板（宿主可能禁止网页读取）。按 Ctrl+V 粘到下面再点「导入」即可。',
+      hint: tOr(
+        'conditionalFormat.paste.systemUnreadable',
+        '读不到系统剪贴板（宿主可能禁止网页读取）。按 Ctrl+V 粘到下面再点「导入」即可。',
+      ),
     })
     return
   }
@@ -2284,7 +2324,7 @@ function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
   pasteSources = [...sources]
   pasteTarget = 'library'
   pasteWorksheetIndex = 0
-  setText('conditionalFormatPasteLabel', '📋 粘贴规则')
+  setText('conditionalFormatPasteLabel', tOr('conditionalFormat.paste.label', '📋 粘贴规则'))
   const hint = byId('conditionalFormatPasteHint')
   const isBatch = sources.length > 1
   // 两套视图：单条 = 一个范围输入框；多条 = 表格（逐条看公式/配色、逐条改范围）
@@ -2300,13 +2340,21 @@ function openPasteModal(sources: readonly ConditionalFormatRule[]): void {
       fontBold: rule.fontBold === true,
     }))
     if (hint) {
-      hint.textContent = `将粘贴 ${String(sources.length)} 条规则。可在表格里逐条改应用范围，或用上面的输入框批量统一。`
+      hint.textContent = tOr(
+        'conditionalFormat.paste.hintEditable',
+        '将粘贴 {count} 条规则。可在表格里逐条改应用范围，或用上面的输入框批量统一。',
+        { count: String(sources.length) },
+      )
     }
     renderPasteTable()
   } else {
     pasteRows = []
     if (hint) {
-      hint.textContent = `将粘贴 ${String(sources.length)} 条规则。目标范围（留空保持原范围）：`
+      hint.textContent = tOr(
+        'conditionalFormat.paste.hintWithTarget',
+        '将粘贴 {count} 条规则。目标范围（留空保持原范围）：',
+        { count: String(sources.length) },
+      )
     }
     const input = inputById('conditionalFormatPasteRange')
     if (input) input.value = sources[0]?.appliesTo ?? ''
@@ -2330,7 +2378,7 @@ function renderPasteTable(): void {
   const container = byId('conditionalFormatPasteTable')
   if (!container) return
   const head = `<div class="conditional-format-paste-row conditional-format-paste-row--head conditional-format-table-head table-resize-head">
-      <span>#</span><span>规则名</span><span>公式</span><span>色</span><span>应用范围</span>
+      <span>${tOr('conditionalFormat.paste.colIndex', '#')}</span><span>${tOr('conditionalFormat.paste.colName', '规则名')}</span><span>${tOr('conditionalFormat.paste.colFormula', '公式')}</span><span>${tOr('conditionalFormat.paste.colColor', '色')}</span><span>${tOr('conditionalFormat.paste.colRange', '应用范围')}</span>
     </div>`
   const rows = pasteRows
     .map(
@@ -2345,8 +2393,8 @@ function renderPasteTable(): void {
         class="conditional-format-input"
         data-paste-range="${String(index + 1)}"
         value="${escapeHtml(row.range)}"
-        placeholder="如 B3:B1048576"
-        aria-label="第 ${String(index + 1)} 条的应用范围"
+        placeholder="${tOr('conditionalFormat.paste.rangePlaceholder', '如 B3:B1048576')}"
+        aria-label="${tOr('conditionalFormat.paste.rangeAria', '第 {index} 条的应用范围', { index: String(index + 1) })}"
       />
     </div>`,
     )
@@ -2410,10 +2458,17 @@ function openDuplicateModal(index: number): void {
   pasteSources = []
   pasteTarget = 'worksheet'
   pasteWorksheetIndex = index
-  setText('conditionalFormatPasteLabel', '⧉ 复制规则')
+  setText('conditionalFormatPasteLabel', tOr('conditionalFormat.copy.label', '⧉ 复制规则'))
   const hint = byId('conditionalFormatPasteHint')
   if (hint) {
-    hint.textContent = `将把第 ${String(index)} 条（${snapshot.range || '范围未知'}）复制成一条新规则，公式与格式照搬。目标范围（留空保持原范围）：`
+    hint.textContent = tOr(
+      'conditionalFormat.copy.hint',
+      '将把第 {index} 条（{range}）复制成一条新规则，公式与格式照搬。目标范围（留空保持原范围）：',
+      {
+        index: String(index),
+        range: snapshot.range || tOr('conditionalFormat.copy.unknownRange', '范围未知'),
+      },
+    )
   }
   const input = inputById('conditionalFormatPasteRange')
   if (input) input.value = snapshot.range
@@ -2487,7 +2542,7 @@ function confirmPaste(): void {
   const copies = sources.map((rule) => ({
     ...rule,
     id: nextId(),
-    name: `${rule.name} 副本`,
+    name: tOr('conditionalFormat.ruleCopy.suffix', '{name} 副本', { name: rule.name }),
     appliesTo: targetRange,
     formula: shiftFormulaRows(rule.formula, rowDelta),
   }))
@@ -2524,7 +2579,7 @@ function confirmBatchPaste(): void {
     return {
       ...row.source,
       id: nextId(),
-      name: `${row.source.name} 副本`,
+      name: tOr('conditionalFormat.ruleCopy.suffix', '{name} 副本', { name: row.source.name }),
       appliesTo: range,
       formula,
       interior: row.interior,
@@ -2537,7 +2592,12 @@ function confirmBatchPaste(): void {
   closePasteModal()
   renderRuleList()
   const ranges = new Set(copies.map((copy) => copy.appliesTo))
-  const target = ranges.size === 1 ? [...ranges][0] : `${String(ranges.size)} 个范围`
+  const target =
+    ranges.size === 1
+      ? [...ranges][0]
+      : tOr('conditionalFormat.ruleCopy.rangeCount', '{count} 个范围', {
+          count: String(ranges.size),
+        })
   showToast(
     tOr('conditionalFormat.toast.pastedRules', '已粘贴 {count} 条规则到 {range}', {
       count: String(copies.length),
@@ -2562,9 +2622,9 @@ let batchTarget: BatchTarget = 'library'
 
 /** 弹窗标题里显示的目标名 */
 const BATCH_TARGET_LABELS: Record<BatchTarget, string> = {
-  library: '我的规则',
-  worksheet: '工作表规则',
-  paste: '待粘贴的规则',
+  library: tOr('conditionalFormat.batchTarget.library', '我的规则'),
+  worksheet: tOr('conditionalFormat.batchTarget.worksheet', '工作表规则'),
+  paste: tOr('conditionalFormat.batchTarget.paste', '待粘贴的规则'),
 }
 
 /** 下拉里「统一为某个已有值」的前缀（避免与 keep / custom 撞） */
@@ -2654,13 +2714,17 @@ function fillBatchValueFields(rows: readonly BatchRowValues[]): void {
     const pick = selectById(field.pickId)
     if (pick) {
       const values = [...new Set(rows.map((row) => row[field.key]).filter((value) => value !== ''))]
-      const options = ['<option value="keep">保持不变</option>']
+      const options = [
+        `<option value="keep">${tOr('conditionalFormat.batchEdit.keep', '保持不变')}</option>`,
+      ]
       for (const value of values) {
         options.push(
           `<option value="${BATCH_VALUE_PREFIX}${escapeHtml(value)}">${escapeHtml(value)}</option>`,
         )
       }
-      options.push('<option value="custom">自定义…</option>')
+      options.push(
+        `<option value="custom">${tOr('conditionalFormat.batchEdit.custom', '自定义…')}</option>`,
+      )
       pick.innerHTML = options.join('')
       const input = byId(field.inputId)
       if (input instanceof HTMLInputElement) input.value = values[0] ?? ''
@@ -2694,10 +2758,19 @@ function openBatchEdit(target: BatchTarget): void {
     return
   }
   batchTarget = target
-  setText('conditionalFormatBatchLabel', `✎ 批量修改（${BATCH_TARGET_LABELS[target]}）`)
+  setText(
+    'conditionalFormatBatchLabel',
+    tOr('conditionalFormat.batchEdit.label', '✎ 批量修改（{target}）', {
+      target: BATCH_TARGET_LABELS[target],
+    }),
+  )
   setText(
     'conditionalFormatBatchHint',
-    `将对 ${String(rows.length)} 条生效；「保持不变」的项不动。下拉里列的是这些规则现有的值——选它即统一成那一条，选「自定义…」才用右边的输入框。`,
+    tOr(
+      'conditionalFormat.batchEdit.hint',
+      '将对 {count} 条生效；「保持不变」的项不动。下拉里列的是这些规则现有的值——选它即统一成那一条，选「自定义…」才用右边的输入框。',
+      { count: String(rows.length) },
+    ),
   )
   fillBatchValueFields(rows)
   const bold = selectById('conditionalFormatBatchBold')
@@ -3401,7 +3474,14 @@ function openEditor(id: string | null, isNew: boolean): void {
   setColorField(COLOR_FIELD_FONT, normalizeHexColor(rule.fontColor ?? '') ?? '#000000')
   if (boldInput) boldInput.checked = rule.fontBold === true
   openEditorMask()
-  setText('conditionalFormatEditorLabel', isNew ? '新建规则' : `编辑：${rule.name || '未命名'}`)
+  setText(
+    'conditionalFormatEditorLabel',
+    isNew
+      ? tOr('conditionalFormat.editor.newRule', '新建规则')
+      : tOr('conditionalFormat.editor.editRule', '编辑：{name}', {
+          name: rule.name || tOr('conditionalFormat.editor.untitled', '未命名'),
+        }),
+  )
 }
 
 /**
@@ -3441,7 +3521,12 @@ function openExistingRuleEditor(index: number): void {
     bold: false,
   }
   openEditorMask()
-  setText('conditionalFormatEditorLabel', `编辑工作表规则 #${String(index)}`)
+  setText(
+    'conditionalFormatEditorLabel',
+    tOr('conditionalFormat.editor.editSheetRule', '编辑工作表规则 #{index}', {
+      index: String(index),
+    }),
+  )
 }
 
 function closeEditor(): void {
@@ -3692,7 +3777,10 @@ function openFailureDoctor(
         key: String(index),
         rule: found,
         issues: inspectRule(found),
-        reason: '写入后回读不到：宿主可能丢掉了这条，或把范围改写成了别的写法',
+        reason: tOr(
+          'conditionalFormat.doctor.hostDropped',
+          '写入后回读不到：宿主可能丢掉了这条，或把范围改写成了别的写法',
+        ),
       })
     }
   }
@@ -3700,7 +3788,11 @@ function openFailureDoctor(
   openRuleDoctor({
     mode: 'apply',
     entries,
-    hint: `这 ${String(entries.length)} 条没写进工作表。带「宿主原因」的是 WPS 返回的真实报错；改完点「修复并应用」重跑。`,
+    hint: tOr(
+      'conditionalFormat.doctor.applyHint',
+      '这 {count} 条没写进工作表。带「宿主原因」的是 WPS 返回的真实报错；改完点「修复并应用」重跑。',
+      { count: String(entries.length) },
+    ),
     onConfirm: (fixed) => {
       writeBackDoctorFixes(visible, fixed)
       runApply(strategy)
@@ -3767,7 +3859,14 @@ function runApply(strategy: ApplyStrategy): void {
     openRuleDoctor({
       mode: 'apply',
       entries: blocked,
-      hint: `这 ${String(blocked.length)} 条的范围 / 公式不合法，宿主会直接拒绝。改完点「修复并应用」继续，其余 ${String(visible.length - blocked.length)} 条不受影响。`,
+      hint: tOr(
+        'conditionalFormat.doctor.blockedHintApply',
+        '这 {count} 条的范围 / 公式不合法，宿主会直接拒绝。改完点「修复并应用」继续，其余 {rest} 条不受影响。',
+        {
+          count: String(blocked.length),
+          rest: String(visible.length - blocked.length),
+        },
+      ),
       onConfirm: (fixed) => {
         writeBackDoctorFixes(visible, fixed)
         runApply(strategy)
@@ -3925,19 +4024,33 @@ function openConfirmModal(foreign: readonly ForeignRuleSnapshot[]): void {
       (rule) =>
         `<li><code>${escapeHtml(rule.range)}</code> — ${escapeHtml(
           rule.formula ||
-            `（${rule.kind === 'expression' ? '公式类' : '非公式类'}规则，公式未读到）`,
+            tOr('conditionalFormat.confirm.formulaUnread', '（{kind}规则，公式未读到）', {
+              kind:
+                rule.kind === 'expression'
+                  ? tOr('conditionalFormat.confirm.kindExpression', '公式类')
+                  : tOr('conditionalFormat.confirm.kindOther', '非公式类'),
+            }),
         )}</li>`,
     )
     .join('')
   body.innerHTML = `
-    <p>这一步会<strong>清空目标工作表上的全部 ${String(foreign.length)} 条条件格式规则</strong>，再按规则库重建。</p>
-    <p class="conditional-format-modal-label">将被清掉的规则：</p>
+    ${tOr(
+      'conditionalFormat.confirm.clearBody',
+      '<p>这一步会<strong>清空目标工作表上的全部 {count} 条条件格式规则</strong>，再按规则库重建。</p>',
+      { count: String(foreign.length) },
+    )}
+    <p class="conditional-format-modal-label">${tOr('conditionalFormat.confirm.clearListLabel', '将被清掉的规则：')}</p>
     <ul class="conditional-format-modal-list">${rows}</ul>
     <p class="conditional-format-modal-label">
-      只想把规则库写进表、保留这些规则？关掉本框，点「🖌️ 应用条件格式」即可——它不会清除任何既有规则。
+      ${tOr(
+        'conditionalFormat.confirm.clearKeepHint',
+        '只想把规则库写进表、保留这些规则？关掉本框，点「🖌️ 应用条件格式」即可——它不会清除任何既有规则。',
+      )}
     </p>`
   const clearButton = byId('conditionalFormatConfirmClear')
-  if (clearButton) clearButton.textContent = '确认清空整表后应用'
+  if (clearButton) {
+    clearButton.textContent = tOr('conditionalFormat.confirm.clearButton', '确认清空整表后应用')
+  }
   // mask 在函数入口已判非 null（!mask || !body 早退），直接用
   const modal = mask.querySelector<HTMLElement>('.conditional-format-modal')
   if (modal) {
@@ -4048,14 +4161,14 @@ function openImportMenu(button: HTMLElement): void {
     items: [
       {
         id: 'import-worksheet',
-        label: '📥 导入工作表规则（当前表）',
+        label: tOr('conditionalFormat.import.fromSheet', '📥 导入工作表规则（当前表）'),
         onSelect: () => {
           importForeign()
         },
       },
       {
         id: 'import-file',
-        label: '📂 从文件导入（.json 规则文件）',
+        label: tOr('conditionalFormat.import.fromFile', '📂 从文件导入（.json 规则文件）'),
         onSelect: () => {
           importRulesFromFile()
         },
@@ -4167,8 +4280,14 @@ function importRulesFromText(text: string, source: string): void {
   if (rules.length === 0) {
     showToast(
       dropped > 0
-        ? `「${source}」里没有可识别的规则（不是规则 JSON？）`
-        : `「${source}」是空的，没有可导入的规则`,
+        ? tOr(
+            'conditionalFormat.import.noRecognizable',
+            '「{source}」里没有可识别的规则（不是规则 JSON？）',
+            { source },
+          )
+        : tOr('conditionalFormat.import.sourceEmpty', '「{source}」是空的，没有可导入的规则', {
+            source,
+          }),
       'warn',
     )
     return
@@ -4178,7 +4297,11 @@ function importRulesFromText(text: string, source: string): void {
     openRuleDoctor({
       mode: 'import',
       entries: blocked,
-      hint: `「${source}」里有 ${String(blocked.length)} 条范围 / 公式不合法，宿主会拒绝写入。改完点「修复并导入」继续（其余条目不受影响）。`,
+      hint: tOr(
+        'conditionalFormat.doctor.importBlockedHint',
+        '「{source}」里有 {count} 条范围 / 公式不合法，宿主会拒绝写入。改完点「修复并导入」继续（其余条目不受影响）。',
+        { source, count: String(blocked.length) },
+      ),
       onConfirm: (fixed) => {
         finishImportFromText(patchRulesByKey(rules, fixed), source, dropped)
       },
@@ -4290,7 +4413,7 @@ function confirmTextImport(): void {
     return
   }
   closeTextImportModal()
-  importRulesFromText(text, '粘贴的文本')
+  importRulesFromText(text, tOr('conditionalFormat.import.pastedText', '粘贴的文本'))
 }
 
 /** 快照是否可导入（与 foreignSnapshotToRule 的判据一致：公式类且有公式） */
@@ -4308,7 +4431,12 @@ function isSnapshotImportable(snapshot: ForeignRuleSnapshot): boolean {
 function syncImportSelectionViews(): void {
   renderImportList()
   renderExistingRules()
-  setText('conditionalFormatImportConfirm', `导入所选（${String(state.existingSelection.size)}）`)
+  setText(
+    'conditionalFormatImportConfirm',
+    tOr('conditionalFormat.import.confirmCount', '导入所选（{count}）', {
+      count: String(state.existingSelection.size),
+    }),
+  )
 }
 
 /** 弹框里可导入项的 1 基序号（全选用） */
@@ -4397,8 +4525,8 @@ function renderImportList(): void {
   const head = `<div class="conditional-format-import-row conditional-format-import-row--head conditional-format-table-head table-resize-head">
         <span></span>
         <span>#</span>
-        <span>应用范围</span>
-        <span>公式</span>
+        <span>${tOr('conditionalFormat.import.colRange', '应用范围')}</span>
+        <span>${tOr('conditionalFormat.import.colFormula', '公式')}</span>
         <span></span>
       </div>`
   container.innerHTML =
@@ -4413,11 +4541,11 @@ function renderImportList(): void {
               snapshot.formula.length > 40 ? `${snapshot.formula.slice(0, 40)}…` : snapshot.formula
             return `
       <label class="conditional-format-import-row${canImport ? '' : ' is-disabled'}" data-import-index="${String(index)}">
-        <input type="checkbox" data-import-check="${String(index)}" ${selection.has(index) ? 'checked' : ''} ${canImport ? '' : 'disabled'} aria-label="选择第 ${String(index)} 条规则" />
+        <input type="checkbox" data-import-check="${String(index)}" ${selection.has(index) ? 'checked' : ''} ${canImport ? '' : 'disabled'} aria-label="${tOr('conditionalFormat.import.rowAria', '选择第 {index} 条规则', { index: String(index) })}" />
         <span class="conditional-format-import-index">${String(index)}</span>
-        <span class="conditional-format-import-range" title="${escapeHtml(snapshot.range)}">${escapeHtml(snapshot.range || '（未读到范围）')}</span>
+        <span class="conditional-format-import-range" title="${escapeHtml(snapshot.range)}">${escapeHtml(snapshot.range || tOr('conditionalFormat.import.rangeUnread', '（未读到范围）'))}</span>
         <code class="conditional-format-import-formula" title="${escapeHtml(snapshot.formula)}">${escapeHtml(formulaPreview)}</code>
-        ${canImport ? '' : '<em class="conditional-format-tag-warn">类型不支持</em>'}
+        ${canImport ? '' : `<em class="conditional-format-tag-warn">${tOr('conditionalFormat.import.typeUnsupported', '类型不支持')}</em>`}
       </label>`
           })
           .join('')
@@ -4427,13 +4555,18 @@ function renderImportList(): void {
           <button type="button" class="conditional-format-group-toggle" data-action="toggle-import-group" data-import-group="${escapeHtml(group)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? tOr('conditionalFormat.group.expand', '展开分组') : tOr('conditionalFormat.group.collapse', '收起分组')}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(entries.length)}</span>
-          <button type="button" class="conditional-format-group-pick" data-action="pick-import-group" data-import-group="${escapeHtml(group)}" title="全选 / 取消本组可导入的规则">☑</button>
+          <button type="button" class="conditional-format-group-pick" data-action="pick-import-group" data-import-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.import.pickGroup', '全选 / 取消本组可导入的规则')}">☑</button>
         </div>
         ${rows}
       </div>`
       })
       .join('')
-  setText('conditionalFormatImportConfirm', `导入所选（${String(selection.size)}）`)
+  setText(
+    'conditionalFormatImportConfirm',
+    tOr('conditionalFormat.import.confirmCount', '导入所选（{count}）', {
+      count: String(selection.size),
+    }),
+  )
   // 表头是新节点，重插列宽/行高把手（decorate 幂等）
   state.tableResize.importDialog?.decorate()
   maybeAutoFitTable('importDialog')
@@ -4510,7 +4643,11 @@ function importSnapshots(
     openRuleDoctor({
       mode: 'import',
       entries: blocked,
-      hint: `这 ${String(blocked.length)} 条的范围 / 公式不合法，宿主一定会拒绝写入。修好再导入，免得进库后「应用」时才报错。`,
+      hint: tOr(
+        'conditionalFormat.doctor.blockedHintImport',
+        '这 {count} 条的范围 / 公式不合法，宿主一定会拒绝写入。修好再导入，免得进库后「应用」时才报错。',
+        { count: String(blocked.length) },
+      ),
       onConfirm: (fixed) => {
         commitImportedSnapshots(patchRulesByKey(imported, fixed), skipped)
       },
@@ -4609,7 +4746,12 @@ function openRuleDoctor(options: {
   doctorEntries = [...options.entries]
   doctorOnConfirm = options.onConfirm
   setText('conditionalFormatDoctorHint', options.hint)
-  setText('conditionalFormatDoctorConfirm', options.mode === 'import' ? '修复并导入' : '修复并应用')
+  setText(
+    'conditionalFormatDoctorConfirm',
+    options.mode === 'import'
+      ? tOr('conditionalFormat.doctor.confirmImport', '修复并导入')
+      : tOr('conditionalFormat.doctor.confirmApply', '修复并应用'),
+  )
   renderDoctorList()
   const mask = byId('conditionalFormatDoctorMask')
   const modal = mask?.querySelector<HTMLElement>('.conditional-format-modal')
@@ -4641,21 +4783,27 @@ function renderDoctorList(): void {
     .map((entry) => {
       const isBlocking = hasBlockingIssue(entry.issues)
       const flag = isBlocking
-        ? '<span class="conditional-format-doctor-flag">必须修</span>'
-        : '<span class="conditional-format-doctor-flag conditional-format-doctor-flag--warn">可能不生效</span>'
+        ? `<span class="conditional-format-doctor-flag">${tOr('conditionalFormat.doctor.flagMustFix', '必须修')}</span>`
+        : `<span class="conditional-format-doctor-flag conditional-format-doctor-flag--warn">${tOr('conditionalFormat.doctor.flagMayFail', '可能不生效')}</span>`
       const issueLines = entry.issues
         .map((issue) => {
           const fix =
             issue.fixed === undefined
               ? ''
-              : ` <em>→ 可自动改成 <code>${escapeHtml(issue.fixed)}</code></em>`
+              : ` <em>${tOr(
+                  'conditionalFormat.doctor.autoFixable',
+                  ' → 可自动改成 <code>{fixed}</code>',
+                  {
+                    fixed: escapeHtml(issue.fixed),
+                  },
+                )}</em>`
           return `<li class="conditional-format-doctor-issue">${escapeHtml(issue.message)}${fix}</li>`
         })
         .join('')
       const reasonLine =
         entry.reason === undefined
           ? ''
-          : `<li class="conditional-format-doctor-issue"><em>宿主原因：</em><code>${escapeHtml(entry.reason)}</code></li>`
+          : `<li class="conditional-format-doctor-issue"><em>${tOr('conditionalFormat.doctor.hostReason', '宿主原因：')}</em><code>${escapeHtml(entry.reason)}</code></li>`
       return `
       <div class="conditional-format-doctor-card">
         <div class="conditional-format-doctor-name">
@@ -4663,8 +4811,8 @@ function renderDoctorList(): void {
         </div>
         <ul class="conditional-format-doctor-issues">${issueLines}${reasonLine}</ul>
         <div class="conditional-format-doctor-fields">
-          <label>应用于<input type="text" class="conditional-format-doctor-range" value="${escapeHtml(entry.rule.appliesTo)}" aria-label="${escapeHtml(entry.rule.name)} 的应用范围" /></label>
-          <label>公式<input type="text" class="conditional-format-doctor-formula" value="${escapeHtml(entry.rule.formula)}" aria-label="${escapeHtml(entry.rule.name)} 的公式" /></label>
+          <label>${tOr('conditionalFormat.doctor.rangeLabel', '应用于')}<input type="text" class="conditional-format-doctor-range" value="${escapeHtml(entry.rule.appliesTo)}" aria-label="${tOr('conditionalFormat.doctor.rangeAria', '{name} 的应用范围', { name: escapeHtml(entry.rule.name) })}" /></label>
+          <label>${tOr('conditionalFormat.doctor.formulaLabel', '公式')}<input type="text" class="conditional-format-doctor-formula" value="${escapeHtml(entry.rule.formula)}" aria-label="${tOr('conditionalFormat.doctor.formulaAria', '{name} 的公式', { name: escapeHtml(entry.rule.name) })}" /></label>
         </div>
       </div>`
     })
@@ -4707,8 +4855,17 @@ function fixAllDoctor(): void {
   const remaining = doctorEntries.filter((entry) => hasBlockingIssue(entry.issues)).length
   showToast(
     remaining === 0
-      ? '已自动修复（仍标黄的条目只是「可能不生效」，不影响写入）'
-      : `已自动修复一部分，还剩 ${String(remaining)} 条必须手工改（看红色标记）`,
+      ? tOr(
+          'conditionalFormat.doctor.fixedAll',
+          '已自动修复（仍标黄的条目只是「可能不生效」，不影响写入）',
+        )
+      : tOr(
+          'conditionalFormat.doctor.fixedPartial',
+          '已自动修复一部分，还剩 {count} 条必须手工改（看红色标记）',
+          {
+            count: String(remaining),
+          },
+        ),
     remaining === 0 ? 'success' : 'warn',
   )
 }
@@ -5150,14 +5307,14 @@ export function initializeConditionalFormatPage(): void {
       items: [
         {
           id: 'export-file',
-          label: '📄 导出到文件',
+          label: tOr('conditionalFormat.export.toFile', '📄 导出到文件'),
           onSelect: () => {
             exportRules()
           },
         },
         {
           id: 'export-clipboard',
-          label: '📋 复制到剪贴板',
+          label: tOr('conditionalFormat.export.toClipboard', '📋 复制到剪贴板'),
           onSelect: () =>
             copyRulesJson(
               state.rules,
@@ -5451,7 +5608,12 @@ export function initializeConditionalFormatPage(): void {
     // 联动：弹框里勾一条，表格与批量条同步亮起（不重建弹框列表——保住焦点，
     // 用户连勾十几条时不用每次重新点）
     renderExistingRules()
-    setText('conditionalFormatImportConfirm', `导入所选（${String(next.size)}）`)
+    setText(
+      'conditionalFormatImportConfirm',
+      tOr('conditionalFormat.import.confirmCount', '导入所选（{count}）', {
+        count: String(next.size),
+      }),
+    )
   })
 
   // 确认模态框（只服务「清空整表后应用」这一个危险操作）
@@ -5633,14 +5795,14 @@ function setupSortablesAndMenus(): void {
       return [
         {
           id: 'edit',
-          label: '✎ 编辑',
+          label: tOr('conditionalFormat.menu.edit', '✎ 编辑'),
           onSelect: () => {
             openEditor(id, false)
           },
         },
         {
           id: 'copy',
-          label: '⧉ 复制',
+          label: tOr('conditionalFormat.menu.copy', '⧉ 复制'),
           onSelect: () => {
             copyRules([id])
           },
@@ -5648,18 +5810,18 @@ function setupSortablesAndMenus(): void {
         { id: 'sep1', separator: true },
         {
           id: 'up',
-          label: '↑ 上移（提高优先级）',
+          label: tOr('conditionalFormat.menu.moveUp', '↑ 上移（提高优先级）'),
           disabled: index <= 0,
-          disabledReason: '已经是最高优先级',
+          disabledReason: tOr('conditionalFormat.menu.alreadyTop', '已经是最高优先级'),
           onSelect: () => {
             moveRule(id, -1)
           },
         },
         {
           id: 'down',
-          label: '↓ 下移（降低优先级）',
+          label: tOr('conditionalFormat.menu.moveDown', '↓ 下移（降低优先级）'),
           disabled: index >= state.rules.length - 1,
-          disabledReason: '已经是最低优先级',
+          disabledReason: tOr('conditionalFormat.menu.alreadyBottom', '已经是最低优先级'),
           onSelect: () => {
             moveRule(id, 1)
           },
@@ -5667,7 +5829,9 @@ function setupSortablesAndMenus(): void {
         { id: 'sep2', separator: true },
         {
           id: 'hide',
-          label: isHidden ? '👁 取消隐藏' : '👁 隐藏（留在库内不应用）',
+          label: isHidden
+            ? tOr('conditionalFormat.menu.unhide', '👁 取消隐藏')
+            : tOr('conditionalFormat.menu.hide', '👁 隐藏（留在库内不应用）'),
           onSelect: () => {
             toggleHidden(id, !isHidden)
           },
@@ -5675,7 +5839,7 @@ function setupSortablesAndMenus(): void {
         { id: 'sep3', separator: true },
         {
           id: 'delete',
-          label: '✕ 删除',
+          label: tOr('conditionalFormat.menu.delete', '✕ 删除'),
           danger: true,
           onSelect: () => {
             deleteRule(id)
@@ -5708,32 +5872,38 @@ function setupSortablesAndMenus(): void {
       return [
         {
           id: 'import',
-          label: '⤵ 导入规则库',
+          label: tOr('conditionalFormat.menu.importToLibrary', '⤵ 导入规则库'),
           disabled: !canImport,
-          disabledReason: '该类型插件无法重建，不能导入',
+          disabledReason: tOr(
+            'conditionalFormat.menu.importDisabled',
+            '该类型插件无法重建，不能导入',
+          ),
           onSelect: () => {
             importForeignRule(index)
           },
         },
         {
           id: 'edit',
-          label: '✎ 编辑（范围 / 公式 / 颜色）',
+          label: tOr('conditionalFormat.menu.editFull', '✎ 编辑（范围 / 公式 / 颜色）'),
           onSelect: () => {
             openExistingRuleEditor(index)
           },
         },
         {
           id: 'duplicate',
-          label: '⧉ 复制成新规则',
+          label: tOr('conditionalFormat.menu.duplicate', '⧉ 复制成新规则'),
           disabled: !canImport,
-          disabledReason: '该类型读不到公式，无法复制',
+          disabledReason: tOr(
+            'conditionalFormat.menu.duplicateDisabled',
+            '该类型读不到公式，无法复制',
+          ),
           onSelect: () => {
             openDuplicateModal(index)
           },
         },
         {
           id: 'group',
-          label: '🏷 归入分组',
+          label: tOr('conditionalFormat.menu.assignGroup', '🏷 归入分组'),
           onSelect: () => {
             state.existingSelection = new Set<number>([index])
             renderExistingRules()
@@ -5742,9 +5912,12 @@ function setupSortablesAndMenus(): void {
         },
         {
           id: 'stop',
-          label: snapshot.stopIfTrue === true ? '🚦 取消「如果为真则停」' : '🚦 如果为真则停',
+          label:
+            snapshot.stopIfTrue === true
+              ? tOr('conditionalFormat.menu.clearStopIfTrue', '🚦 取消「如果为真则停」')
+              : tOr('conditionalFormat.menu.stopIfTrue', '🚦 如果为真则停'),
           disabled: !isStopKnown,
-          disabledReason: '当前 WPS 未暴露该属性',
+          disabledReason: tOr('conditionalFormat.menu.stopUnknown', '当前 WPS 未暴露该属性'),
           onSelect: () => {
             const entry = selectedSheet()
             if (!entry) return
@@ -5766,18 +5939,18 @@ function setupSortablesAndMenus(): void {
         { id: 'sep1', separator: true },
         {
           id: 'up',
-          label: '↑ 上移（提高优先级）',
+          label: tOr('conditionalFormat.menu.moveUp', '↑ 上移（提高优先级）'),
           disabled: index <= 1,
-          disabledReason: '已经是最高优先级',
+          disabledReason: tOr('conditionalFormat.menu.alreadyTop', '已经是最高优先级'),
           onSelect: () => {
             moveForeignRuleRow(index, -1)
           },
         },
         {
           id: 'down',
-          label: '↓ 下移（降低优先级）',
+          label: tOr('conditionalFormat.menu.moveDown', '↓ 下移（降低优先级）'),
           disabled: index >= state.existing.length,
-          disabledReason: '已经是最低优先级',
+          disabledReason: tOr('conditionalFormat.menu.alreadyBottom', '已经是最低优先级'),
           onSelect: () => {
             moveForeignRuleRow(index, 1)
           },
@@ -5785,7 +5958,7 @@ function setupSortablesAndMenus(): void {
         { id: 'sep2', separator: true },
         {
           id: 'delete',
-          label: '✕ 从工作表删除',
+          label: tOr('conditionalFormat.menu.deleteFromSheet', '✕ 从工作表删除'),
           danger: true,
           onSelect: () => {
             deleteForeignRuleRow(index)
