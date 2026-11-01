@@ -15,6 +15,6 @@
 export { applyI18n, canApplyI18n } from './dom.js';
 export { describeInstalledPacks, installLocalePacks, isAsciiRoundTripSafe, openLocaleDirectory, toAsciiModule, } from './locale-install.js';
 export { comparePackState, findManifestEntry, loadLocaleManifest, remoteManifestUrl, } from './locale-manifest.js';
-export { getLocaleBundle, getLocaleCoverage, localeUrl, onLocaleChange, preloadLocales, t, } from './locale-store.js';
+export { getLocaleBundle, getLocaleCoverage, localeUrl, onLocaleChange, preloadLocales, t, tOr, } from './locale-store.js';
 export { detectSystemLocale, getLanguage, getLocale, getLocaleLabel, initializeI18n, resetI18nForTest, setLanguage, setLocale, startI18nSync, } from './runtime.js';
 export { LOCALE_CODES, LOCALE_LABELS, SOURCE_LOCALE, isLocaleCode } from './translate.js';

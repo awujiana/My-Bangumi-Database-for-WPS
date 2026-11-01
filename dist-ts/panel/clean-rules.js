@@ -190,6 +190,8 @@ export const CLEAN_RULES = [
     // ── 重复数据 ──
     {
         id: 'dup-name',
+        nameKey: 'clean.rule.dupName.name',
+        descKey: 'clean.rule.dupName.desc',
         name: '重复名称行',
         desc: '按「名称」分组，保留含 Bangumi_URL 的行，把被删行的标签合并进保留行后删除重复行。',
         group: '重复数据',
@@ -200,6 +202,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'dup-url',
+        nameKey: 'clean.rule.dupUrl.name',
+        descKey: 'clean.rule.dupUrl.desc',
         name: '同 URL 重复行',
         desc: '同一 Bangumi_URL 出现在多行（含跨名称）时，保留行号最大的一行，合并标签后删除其余行。',
         group: '重复数据',
@@ -210,6 +214,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'empty-name',
+        nameKey: 'clean.rule.emptyName.name',
+        descKey: 'clean.rule.emptyName.desc',
         name: '空白数据行',
         desc: '删除数据区内部的空白行（名称为空且其余列均无数据）。行号会上移，默认关闭。',
         group: '重复数据',
@@ -220,6 +226,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'noise-rows',
+        nameKey: 'clean.rule.noiseRows.name',
+        descKey: 'clean.rule.noiseRows.desc',
         name: '噪声行（水印 / 汇总 / 说明）',
         desc: '整行删除命中噪声词表的行：合计、小计、总计、示例、「新番表 by Hazx」水印行、版权平台标注。',
         group: '重复数据',
@@ -231,6 +239,8 @@ export const CLEAN_RULES = [
     // ── 单元格清洗 ──
     {
         id: 'noise-tags',
+        nameKey: 'clean.rule.noiseTags.name',
+        descKey: 'clean.rule.noiseTags.desc',
         name: '噪声标签',
         desc: '移除「标签/分级」列中的平台 / 状态 / 主观类噪声标签（B站、已看、待定档…）。',
         group: '单元格清洗',
@@ -243,6 +253,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'tag-format',
+        nameKey: 'clean.rule.tagFormat.name',
+        descKey: 'clean.rule.tagFormat.desc',
         name: '标签格式统一',
         desc: '把「标签/分级」的分隔符统一为 " | "，并移除重复标签。',
         group: '单元格清洗',
@@ -255,6 +267,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'category-prefix',
+        nameKey: 'clean.rule.categoryPrefix.name',
+        descKey: 'clean.rule.categoryPrefix.desc',
         name: '类别数字前缀',
         desc: '去除「类别」列的 "数字|" 前缀（如 12|TV → TV）。',
         group: '单元格清洗',
@@ -267,6 +281,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'alias-dedup',
+        nameKey: 'clean.rule.aliasDedup.name',
+        descKey: 'clean.rule.aliasDedup.desc',
         name: '别名重复项',
         desc: '移除「别名」列中与「名称」重复的条目，并去除重复别名。',
         group: '单元格清洗',
@@ -279,6 +295,8 @@ export const CLEAN_RULES = [
     },
     {
         id: 'original-tag',
+        nameKey: 'clean.rule.originalTag.name',
+        descKey: 'clean.rule.originalTag.desc',
         name: '原作标签归一化',
         desc: '统一「原作标签」列的变体（漫改→漫画改）并按优先级去重（轻小说改 > 小说改）。',
         group: '单元格清洗',
@@ -299,4 +317,20 @@ export const RISK_LABELS = {
     low: '低风险',
     medium: '中风险',
     high: '高风险',
+};
+/** 风险等级的展示文案 key（`RISK_LABELS` 是语言包没加载时的兜底原文） */
+export const RISK_LABEL_KEYS = {
+    low: 'clean.risk.low',
+    medium: 'clean.risk.medium',
+    high: 'clean.risk.high',
+};
+/**
+ * 分组名的展示文案 key
+ *
+ * 以**中文分组名**为键：分组本身（`CLEAN_RULES[i].group`）继续用中文当标识，
+ * 这样分组逻辑与持久化都不受翻译影响，只有渲染那一刻去查文案。
+ */
+export const CLEAN_GROUP_KEYS = {
+    重复数据: 'clean.group.duplicates',
+    单元格清洗: 'clean.group.cells',
 };

@@ -16,7 +16,7 @@ import '../core/result.js';
 import '../tools/wps.js';
 import { showToast } from '../ui/dialog.js';
 import { initializeTheme } from '../tools/theme.js';
-import { initializeI18n } from '../i18n/index.js';
+import { initializeI18n, t } from '../i18n/index.js';
 import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js';
 /**
  * 绑定联系方式按钮：点击复制到剪贴板并弹出 Toast。
@@ -33,10 +33,10 @@ function bindCopyButtons() {
                 return;
             const result = copyTextWithResult(text);
             if (result.ok) {
-                showToast('复制成功', 'success');
+                showToast(t('common.copySuccess'), 'success');
             }
             else {
-                showToast('复制失败，请手动选择复制', 'error');
+                showToast(t('common.copyFailedManual'), 'error');
             }
         });
     }

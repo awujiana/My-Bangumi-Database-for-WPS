@@ -157,9 +157,13 @@ export declare const ROW_BYTES_FALLBACK = 96;
 export interface CleanRule {
     /** 唯一标识（同时作为勾选状态持久化键） */
     id: string;
-    /** 展示名 */
+    /** 展示名的语言包 key */
+    nameKey: string;
+    /** 说明文案的语言包 key */
+    descKey: string;
+    /** 展示名（简体原文；语言包没加载时兜底） */
     name: string;
-    /** 说明文案 */
+    /** 说明文案（简体原文；语言包没加载时兜底） */
     desc: string;
     /** 分组名（页面按 group 分组渲染，保持首次出现顺序） */
     group: string;
@@ -185,4 +189,13 @@ export declare const CLEAN_RULES: readonly CleanRule[];
 export declare function findCleanRule(id: string): CleanRule | undefined;
 /** 风险等级 → 展示文案 */
 export declare const RISK_LABELS: Record<CleanRisk, string>;
+/** 风险等级的展示文案 key（`RISK_LABELS` 是语言包没加载时的兜底原文） */
+export declare const RISK_LABEL_KEYS: Record<CleanRisk, string>;
+/**
+ * 分组名的展示文案 key
+ *
+ * 以**中文分组名**为键：分组本身（`CLEAN_RULES[i].group`）继续用中文当标识，
+ * 这样分组逻辑与持久化都不受翻译影响，只有渲染那一刻去查文案。
+ */
+export declare const CLEAN_GROUP_KEYS: Record<string, string>;
 //# sourceMappingURL=clean-rules.d.ts.map

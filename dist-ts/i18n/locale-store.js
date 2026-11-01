@@ -13,7 +13,7 @@
  */
 import { LOG_LEVELS } from '../core/constants.js';
 import { bgmLog } from '../tools/util/index.js';
-import { SOURCE_LOCALE, computeCoverage, interpolate, isLocaleCode, } from './translate.js';
+import { SOURCE_LOCALE, computeCoverage, interpolate, isLocaleCode } from './translate.js';
 /** 当前支持的结构版本 */
 export const LOCALE_SCHEMA_VERSION = 1;
 /** 已加载的语言包（含源语言；源语言也走同一套加载，保证覆盖率有基准） */
@@ -193,6 +193,20 @@ export function t(key, variables) {
     }
     warnOnce(key, `[i18n] 未知 key「${key}」（简体也没有），已原样输出`);
     return key;
+}
+/**
+ * 取译文；语言包没加载 / 缺 key 时退回调用方给的原文
+ *
+ * `t()` 在未知 key 时**原样返回 key**。对「文案来自配置数据」的场景（清理规则名、
+ * 风险等级这类）这不可接受：数据里本来就存着中文原文，显示 `clean.rule.x.name`
+ * 比显示中文更糟。所以这类地方用 `tOr`，把原文当兜底。
+ *
+ * 注意别拿它替代 `t()` 写普通文案——那样漏翻时会**静默**显示中文，
+ * 而 `t()` 至少会把 key 暴露出来。
+ */
+export function tOr(key, fallback) {
+    const text = t(key);
+    return text === key ? fallback : text;
 }
 /** 每个 key 只告警一次 */
 function warnOnce(key, message) {

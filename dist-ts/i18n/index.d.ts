@@ -17,7 +17,7 @@ export { describeInstalledPacks, installLocalePacks, isAsciiRoundTripSafe, openL
 export type { InstallLocalePacksOptions, LocaleInstallOutcome, LocaleInstallReport, } from './locale-install.js';
 export { comparePackState, findManifestEntry, loadLocaleManifest, remoteManifestUrl, } from './locale-manifest.js';
 export type { LocaleManifest, LocaleManifestEntry, ManifestLoadResult, ManifestOrigin, PackState, } from './locale-manifest.js';
-export { getLocaleBundle, getLocaleCoverage, localeUrl, onLocaleChange, preloadLocales, t, } from './locale-store.js';
+export { getLocaleBundle, getLocaleCoverage, localeUrl, onLocaleChange, preloadLocales, t, tOr, } from './locale-store.js';
 export { detectSystemLocale, getLanguage, getLocale, getLocaleLabel, initializeI18n, resetI18nForTest, setLanguage, setLocale, startI18nSync, } from './runtime.js';
 export type { SetLocaleOptions } from './runtime.js';
 export { LOCALE_CODES, LOCALE_LABELS, SOURCE_LOCALE, isLocaleCode } from './translate.js';

@@ -46,6 +46,7 @@ export {
   onLocaleChange,
   preloadLocales,
   t,
+  tOr,
 } from './locale-store.js'
 export {
   detectSystemLocale,

@@ -10,7 +10,7 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { showToast } from '../ui/dialog.js';
 import { BGM, bgmLog, getApp, markCleanPaneLoaded } from '../tools/util/index.js';
-import { CLEAN_EXCLUDES, CLEAN_RULES, RISK_LABELS } from './clean-rules.js';
+import { CLEAN_EXCLUDES, CLEAN_GROUP_KEYS, CLEAN_RULES, RISK_LABEL_KEYS, RISK_LABELS, } from './clean-rules.js';
 import { formatBytes, inspectWorksheet, isWorkbookAllowed, runCleanPlans, scanCleanRules, } from './clean-engine.js';
 import { renderDiffSections } from '../ui/diff-view.js';
 import { escapeHtml } from '../tools/string-utilities.js';
@@ -20,7 +20,7 @@ import { appendOperationLog, clearOperationLogs, CLEAN_LOG_SCOPE } from '../tool
 import { renderStatCards } from '../ui/stat-cards.js';
 import { initializeShellNav } from './shell-nav.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { initializeI18n } from '../i18n/index.js';
+import { initializeI18n, tOr } from '../i18n/index.js';
 import { mountDataContextNotice } from '../tools/data-context.js';
 import { createProgress } from '../ui/components/progress.js';
 import { scrollToBottomCoalesced } from '../ui/dom-scroll.js';
@@ -491,15 +491,15 @@ function renderCleanItems() {
             <span class="clean-item-body">
               <span class="clean-item-title">
                 <span class="clean-item-icon" aria-hidden="true">${escapeHtml(rule.icon)}</span>
-                <span class="clean-item-name">${escapeHtml(rule.name)}</span>
-                <span class="clean-risk clean-risk-${rule.risk}">${escapeHtml(RISK_LABELS[rule.risk])}</span>
+                <span class="clean-item-name">${escapeHtml(tOr(rule.nameKey, rule.name))}</span>
+                <span class="clean-risk clean-risk-${rule.risk}">${escapeHtml(tOr(RISK_LABEL_KEYS[rule.risk], RISK_LABELS[rule.risk]))}</span>
               </span>
-              <span class="clean-item-desc">${escapeHtml(rule.desc)}</span>
+              <span class="clean-item-desc">${escapeHtml(tOr(rule.descKey, rule.desc))}</span>
             </span>
           </label>`;
         })
             .join('');
-        return `<div class="clean-group"><div class="clean-group-title">${escapeHtml(entry.group)}</div>${items}</div>`;
+        return `<div class="clean-group"><div class="clean-group-title">${escapeHtml(tOr(CLEAN_GROUP_KEYS[entry.group] ?? '', entry.group))}</div>${items}</div>`;
     })
         .join('');
     container.innerHTML = sanitizeHtml(blocks);
