@@ -113,8 +113,8 @@ function renderWorkbookPicker() {
     }
     renderOptionPicker(container, workbookNames.map((name) => ({ value: name, label: name })), {
         value: currentWorkbookName(),
-        ariaLabel: '目标工作簿',
-        emptyText: '（无已打开的工作簿）',
+        ariaLabel: tOr('conditionalFormat.target.workbookAria', '目标工作簿'),
+        emptyText: tOr('conditionalFormat.target.noWorkbook', '（无已打开的工作簿）'),
         onChange: (workbook) => {
             onWorkbookChange(workbook);
         },
@@ -129,8 +129,8 @@ function renderSheetPicker() {
     const visible = state.sheets.filter((entry) => entry.workbook === workbook);
     renderOptionPicker(container, visible.map((entry) => ({ value: entry.key, label: entry.sheet })), {
         value: state.selectedKey,
-        ariaLabel: '目标工作表',
-        emptyText: '（该工作簿下没有可显示的工作表）',
+        ariaLabel: tOr('conditionalFormat.target.sheetAria', '目标工作表'),
+        emptyText: tOr('conditionalFormat.target.noSheet', '（该工作簿下没有可显示的工作表）'),
         onChange: (key) => {
             onSheetChange(key);
         },
@@ -142,7 +142,9 @@ function renderSheetPicker() {
         notice.textContent =
             state.selectionMissing === ''
                 ? ''
-                : `⚠️ 原目标表 ${state.selectionMissing} 已不存在，请重新选择`;
+                : tOr('conditionalFormat.target.missing', '⚠️ 原目标表 {sheet} 已不存在，请重新选择', {
+                    sheet: state.selectionMissing,
+                });
     }
 }
 /** 第一级：切换工作簿（原选中表仍属于新簿则保留，否则选该簿第一张） */
@@ -182,7 +184,10 @@ function reloadSheets() {
         if (!isSelectionValid && state.sheets.length > 0) {
             if (isSheetLocked()) {
                 // 锁定：记住失效前选的是哪张表，供下拉里提示「原目标表 X 已不存在」
-                state.selectionMissing = state.selectedKey || getConfig(KEY_SHEET, '', true) || '（未知）';
+                state.selectionMissing =
+                    state.selectedKey ||
+                        getConfig(KEY_SHEET, '', true) ||
+                        tOr('conditionalFormat.target.unknownSheet', '（未知）');
                 state.selectedKey = '';
             }
             else {
@@ -249,14 +254,14 @@ function loadExistingRules() {
     const entry = selectedSheet();
     if (!entry) {
         state.existing = [];
-        state.existingError = '尚未选择目标工作表';
+        state.existingError = tOr('conditionalFormat.existing.noTarget', '尚未选择目标工作表');
         renderExistingRules();
         return;
     }
     const unreadable = checkFormatConditionsReadable(entry.worksheet);
     if (unreadable !== null) {
         state.existing = [];
-        state.existingError = `${unreadable}（既有规则读不到）`;
+        state.existingError = tOr('conditionalFormat.existing.unreadable', '{reason}（既有规则读不到）', { reason: unreadable });
         renderExistingRules();
         return;
     }
@@ -272,7 +277,9 @@ function loadExistingRules() {
     }
     catch (error) {
         state.existing = [];
-        state.existingError = `读取失败：${error.message}`;
+        state.existingError = tOr('conditionalFormat.existing.readFailed', '读取失败：{error}', {
+            error: error.message,
+        });
     }
     // 换表 / 重读后：选中集合作废（序号是「那张表」的序号，换表即失效），
     // 不停留在越界页码（否则看到空列表，用户会以为规则没了）
@@ -297,7 +304,7 @@ function renderExistingRules() {
         renderExistingRulesInner(container);
     }
     catch (error) {
-        container.innerHTML = `<p class="conditional-format-empty">既有规则渲染失败：${escapeHtml(error.message)}<br>请点「重新读取」重试；持续失败请把此信息反馈给开发者。</p>`;
+        container.innerHTML = `<p class="conditional-format-empty">${tOr('conditionalFormat.existing.renderFailed', '既有规则渲染失败：{error}<br>请点「重新读取」重试；持续失败请把此信息反馈给开发者。', { error: escapeHtml(error.message) })}</p>`;
         setText('conditionalFormatExistingCount', '—');
         renderExistingPagination(1, 1);
     }
@@ -313,9 +320,11 @@ function renderExistingRulesInner(container) {
         // 带上工作表名：默认选中漂移时（选中了另一张表）用户能立刻看出选错了表，
         // 而不是以为「我的规则丢了」
         const selected = selectedSheet();
-        const sheetLabel = selected ? `「${selected.sheet}」` : '当前选中的工作表';
-        container.innerHTML = `<p class="conditional-format-empty">${escapeHtml(sheetLabel)}上没有条件格式规则。<br>若你正在看的表上有规则，请在上方「目标工作表」里切换到它。</p>`;
-        setText('conditionalFormatExistingCount', '0 条');
+        const sheetLabel = selected
+            ? `「${selected.sheet}」`
+            : tOr('conditionalFormat.existing.currentSheet', '当前选中的工作表');
+        container.innerHTML = `<p class="conditional-format-empty">${tOr('conditionalFormat.existing.emptySheet', '{sheet}上没有条件格式规则。<br>若你正在看的表上有规则，请在上方「目标工作表」里切换到它。', { sheet: escapeHtml(sheetLabel) })}</p>`;
+        setText('conditionalFormatExistingCount', tOr('conditionalFormat.existing.countZero', '0 条'));
         renderExistingPagination(1, 1);
         return;
     }
@@ -335,11 +344,20 @@ function renderExistingRulesInner(container) {
     // 分页后页码可能被收敛（删掉一页里的全部规则后），回写 state 让翻页按钮用同一页
     state.existingPage = page.page;
     const hiddenByFilter = state.existing.length - scoped.length;
-    setText('conditionalFormatExistingCount', `${String(state.existing.length)} 条${hiddenByFilter > 0
-        ? `（筛出 ${String(scoped.length)} 条${selectionRange === '' && state.existingScope === 'selection'
-            ? '，未读到选区，已按整表显示'
-            : ''}）`
-        : ''}`);
+    // 拆成三步算：tOr 套 tOr 套 tOr 会触发 unicorn/max-nested-calls（上限 3 层）
+    const noSelectionNote = selectionRange === '' && state.existingScope === 'selection'
+        ? tOr('conditionalFormat.existing.noSelection', '，未读到选区，已按整表显示')
+        : '';
+    const filteredNote = hiddenByFilter > 0
+        ? tOr('conditionalFormat.existing.countFiltered', '（筛出 {shown} 条{note}）', {
+            shown: String(scoped.length),
+            note: noSelectionNote,
+        })
+        : '';
+    setText('conditionalFormatExistingCount', tOr('conditionalFormat.existing.count', '{total} 条{filtered}', {
+        total: String(state.existing.length),
+        filtered: filteredNote,
+    }));
     // 一次 innerHTML 写入（表头 + 本页行）；行内事件在容器上委托，见 handleExistingTableClick
     const summary = selectionSummary(page.items);
     const rowsHtml = hasGroups
@@ -397,13 +415,17 @@ function renderExistingBatchBar() {
         return snapshot?.kind === 'expression' && snapshot.formula !== '';
     }).length;
     bar.innerHTML = `
-    <span class="conditional-format-batch-count">已选 ${String(selectedCount)} 条</span>
-    <button type="button" class="bgm-btn small" data-batch-action="group" title="把所选规则归入一个分组（本地视图分组，可收起展开；导入时组名会带进规则库）">🏷 归入分组</button>
-    <button type="button" class="bgm-btn small" data-batch-action="edit" title="批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填；改完立刻写表）">✎ 批量修改</button>
-    <button type="button" class="bgm-btn small" data-batch-action="import" ${rebuildableCount === 0 ? 'disabled' : ''} title="${rebuildableCount === 0 ? tOr('conditionalFormat.toast.importNoFormulaSelected', '所选规则里没有可导入的公式类规则') : `导入 ${String(rebuildableCount)} 条到规则库`}">⤵ 导入规则库</button>
-    <button type="button" class="bgm-btn small" data-batch-action="export" title="把所选规则导出为 JSON 文件（另存为对话框选保存位置）">📤 导出所选</button>
-    <button type="button" class="bgm-btn small danger" data-batch-action="delete" title="从工作表删除所选规则">✕ 批量删除</button>
-    <button type="button" class="bgm-btn small" data-batch-action="clear" title="取消选择">取消选择</button>`;
+    <span class="conditional-format-batch-count">${tOr('conditionalFormat.batch.selected', '已选 {count} 条', { count: String(selectedCount) })}</span>
+    <button type="button" class="bgm-btn small" data-batch-action="group" title="${tOr('conditionalFormat.batch.groupTitle', '把所选规则归入一个分组（本地视图分组，可收起展开；导入时组名会带进规则库）')}">${tOr('conditionalFormat.batch.group', '🏷 归入分组')}</button>
+    <button type="button" class="bgm-btn small" data-batch-action="edit" title="${tOr('conditionalFormat.batch.editTitle', '批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填；改完立刻写表）')}">${tOr('conditionalFormat.batch.edit', '✎ 批量修改')}</button>
+    <button type="button" class="bgm-btn small" data-batch-action="import" ${rebuildableCount === 0 ? 'disabled' : ''} title="${rebuildableCount === 0
+        ? tOr('conditionalFormat.toast.importNoFormulaSelected', '所选规则里没有可导入的公式类规则')
+        : tOr('conditionalFormat.batch.importCount', '导入 {count} 条到规则库', {
+            count: String(rebuildableCount),
+        })}">${tOr('conditionalFormat.batch.importToLibrary', '⤵ 导入规则库')}</button>
+    <button type="button" class="bgm-btn small" data-batch-action="export" title="${tOr('conditionalFormat.batch.exportTitle', '把所选规则导出为 JSON 文件（另存为对话框选保存位置）')}">${tOr('conditionalFormat.batch.export', '📤 导出所选')}</button>
+    <button type="button" class="bgm-btn small danger" data-batch-action="delete" title="${tOr('conditionalFormat.batch.deleteTitle', '从工作表删除所选规则')}">${tOr('conditionalFormat.batch.delete', '✕ 批量删除')}</button>
+    <button type="button" class="bgm-btn small" data-batch-action="clear" title="${tOr('conditionalFormat.batch.clearTitle', '取消选择')}">${tOr('conditionalFormat.batch.clear', '取消选择')}</button>`;
 }
 /** 渲染既有规则表格的分页条（页码 + 上下页） */
 function renderExistingPagination(current, pageCount) {
@@ -415,9 +437,9 @@ function renderExistingPagination(current, pageCount) {
         return;
     }
     container.innerHTML = `
-    <button type="button" class="bgm-btn small" data-page-action="prev" ${current <= 1 ? 'disabled' : ''}>‹ 上一页</button>
-    <span class="conditional-format-pager-label">第 ${String(current)} / ${String(pageCount)} 页</span>
-    <button type="button" class="bgm-btn small" data-page-action="next" ${current >= pageCount ? 'disabled' : ''}>下一页 ›</button>`;
+    <button type="button" class="bgm-btn small" data-page-action="prev" ${current <= 1 ? 'disabled' : ''}>${tOr('conditionalFormat.pager.prev', '‹ 上一页')}</button>
+    <span class="conditional-format-pager-label">${tOr('conditionalFormat.pager.label', '第 {current} / {total} 页', { current: String(current), total: String(pageCount) })}</span>
+    <button type="button" class="bgm-btn small" data-page-action="next" ${current >= pageCount ? 'disabled' : ''}>${tOr('conditionalFormat.pager.next', '下一页 ›')}</button>`;
 }
 // ===== 既有规则的行内操作与批量操作 =====
 /**
@@ -2306,28 +2328,38 @@ function renderRuleList() {
         return;
     const visible = filterRules(state.rules, state.searchQuery);
     if (state.rules.length === 0) {
-        container.innerHTML =
-            '<p class="conditional-format-empty">规则库是空的。到「默认规则集」生成一套，或点「新建规则」手写。</p>';
-        setText('conditionalFormatRuleCount', '0 条规则');
+        container.innerHTML = `<p class="conditional-format-empty">${tOr('conditionalFormat.rule.empty', '规则库是空的。到「默认规则集」生成一套，或点「新建规则」手写。')}</p>`;
+        setText('conditionalFormatRuleCount', tOr('conditionalFormat.rule.countZero', '0 条规则'));
         return;
     }
     if (visible.length === 0) {
-        container.innerHTML = '<p class="conditional-format-empty">没有匹配当前搜索词的规则。</p>';
-        setText('conditionalFormatRuleCount', `0 / ${String(state.rules.length)} 条规则`);
+        container.innerHTML = `<p class="conditional-format-empty">${tOr('conditionalFormat.rule.noMatch', '没有匹配当前搜索词的规则。')}</p>`;
+        setText('conditionalFormatRuleCount', tOr('conditionalFormat.rule.countFilteredZero', '0 / {total} 条规则', {
+            total: String(state.rules.length),
+        }));
         return;
     }
     const hiddenCount = state.rules.filter((rule) => rule.hidden === true).length;
-    setText('conditionalFormatRuleCount', `${String(state.rules.length)} 条规则${hiddenCount > 0 ? `（${String(hiddenCount)} 条已隐藏）` : ''}`);
+    // 拆成两步：tOr 套 tOr 套 setText 会触发 unicorn/max-nested-calls（上限 3 层）
+    const hiddenNote = hiddenCount > 0
+        ? tOr('conditionalFormat.rule.countHidden', '（{count} 条已隐藏）', {
+            count: String(hiddenCount),
+        })
+        : '';
+    setText('conditionalFormatRuleCount', tOr('conditionalFormat.rule.count', '{total} 条规则{hidden}', {
+        total: String(state.rules.length),
+        hidden: hiddenNote,
+    }));
     const groups = groupRules(visible);
     // 表头：规则库原来一行标签都没有——「勾选」列（批量删除/导出）与「👁」列
     // （是否应用）长得一样，用户分不清哪个是哪个。顺带它也是行高把手的落点。
     const head = `<div class="conditional-format-rule conditional-format-rule--head conditional-format-table-head table-resize-head">
-          <span title="拖拽把手：按住上下拖可调整优先级"></span>
-          <span title="勾选以批量删除 / 导出 / 改颜色">选</span>
-          <span title="条件格式的填充色">色</span>
-          <span>规则 / 公式</span>
-          <span title="是否应用这条规则（取消勾选 = 留在规则库但不写进工作表）">显</span>
-          <span>操作</span>
+          <span title="${tOr('conditionalFormat.rule.headDrag', '拖拽把手：按住上下拖可调整优先级')}"></span>
+          <span title="${tOr('conditionalFormat.rule.headPick', '勾选以批量删除 / 导出 / 改颜色')}">选</span>
+          <span title="${tOr('conditionalFormat.rule.headFill', '条件格式的填充色')}">色</span>
+          <span>${tOr('conditionalFormat.rule.headName', '规则 / 公式')}</span>
+          <span title="${tOr('conditionalFormat.rule.headVisible', '是否应用这条规则（取消勾选 = 留在规则库但不写进工作表）')}">显</span>
+          <span>${tOr('conditionalFormat.rule.headActions', '操作')}</span>
         </div>`;
     container.innerHTML =
         head +
@@ -2339,37 +2371,37 @@ function renderRuleList() {
                     .map((rule) => {
                     const isHidden = rule.hidden === true;
                     return `
-        <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}" title="拖拽调整优先级 · 右键打开操作菜单">
-          <span class="conditional-format-rule-handle" title="拖拽调整优先级（也可用键盘：Space 拾起、↑↓ 移动）" aria-hidden="true">⋮⋮</span>
-          <label class="conditional-format-rule-pick" title="勾选以批量删除 / 导出">
-            <input type="checkbox" data-action="pick" ${state.ruleSelection.has(rule.id) ? 'checked' : ''} aria-label="勾选 ${escapeHtml(rule.name)}" />
+        <div class="conditional-format-rule${isHidden ? ' conditional-format-rule-hidden' : ''}" data-rule-id="${escapeHtml(rule.id)}" title="${tOr('conditionalFormat.rule.rowTitle', '拖拽调整优先级 · 右键打开操作菜单')}">
+          <span class="conditional-format-rule-handle" title="${tOr('conditionalFormat.rule.handleTitle', '拖拽调整优先级（也可用键盘：Space 拾起、↑↓ 移动）')}" aria-hidden="true">⋮⋮</span>
+          <label class="conditional-format-rule-pick" title="${tOr('conditionalFormat.rule.pickTitle', '勾选以批量删除 / 导出')}">
+            <input type="checkbox" data-action="pick" ${state.ruleSelection.has(rule.id) ? 'checked' : ''} aria-label="${tOr('conditionalFormat.rule.pickAria', '勾选 {name}', { name: escapeHtml(rule.name) })}" />
           </label>
-          <button type="button" class="conditional-format-swatch" data-action="edit-format" style="background:${escapeHtml(rule.interior)}" title="填充 ${escapeHtml(rule.interior)} · 点击编辑这条规则" aria-label="编辑规则「${escapeHtml(rule.name)}」"></button>
+          <button type="button" class="conditional-format-swatch" data-action="edit-format" style="background:${escapeHtml(rule.interior)}" title="${tOr('conditionalFormat.rule.swatchTitle', '填充 {color} · 点击编辑这条规则', { color: escapeHtml(rule.interior) })}" aria-label="${tOr('conditionalFormat.rule.swatchAria', '编辑规则「{name}」', { name: escapeHtml(rule.name) })}"></button>
           <div class="conditional-format-rule-main">
             <div class="conditional-format-rule-name">${escapeHtml(rule.name)}</div>
             <div class="conditional-format-rule-meta">${escapeHtml(rule.appliesTo)} · <code title="${escapeHtml(rule.formula)}">${escapeHtml(rule.formula.length > 60 ? `${rule.formula.slice(0, 60)}…` : rule.formula)}</code></div>
           </div>
-          <label class="conditional-format-rule-vis" title="${isHidden ? '已隐藏：留在规则库但不应用' : '应用中'}">
+          <label class="conditional-format-rule-vis" title="${isHidden ? tOr('conditionalFormat.rule.hiddenTitle', '已隐藏：留在规则库但不应用') : tOr('conditionalFormat.rule.appliedTitle', '应用中')}">
             <input type="checkbox" data-action="toggle" ${isHidden ? '' : 'checked'} />
           </label>
           <div class="conditional-format-rule-actions">
-            <button type="button" data-action="copy" title="复制">⧉</button>
-            <button type="button" data-action="edit" title="编辑">✎</button>
-            <button type="button" data-action="delete" title="删除">✕</button>
+            <button type="button" data-action="copy" title="${tOr('conditionalFormat.rule.copy', '复制')}">⧉</button>
+            <button type="button" data-action="edit" title="${tOr('conditionalFormat.rule.edit', '编辑')}">✎</button>
+            <button type="button" data-action="delete" title="${tOr('conditionalFormat.rule.delete', '删除')}">✕</button>
           </div>
         </div>`;
                 })
                     .join('');
                 return `
       <div class="conditional-format-group${isCollapsed ? ' is-collapsed' : ''}" data-group="${escapeHtml(group)}">
-        <div class="conditional-format-group-title" title="拖动调整分组顺序（整组一起动）">
-          <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+        <div class="conditional-format-group-title" title="${tOr('conditionalFormat.group.dragTitle', '拖动调整分组顺序（整组一起动）')}">
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-group" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? tOr('conditionalFormat.group.expand', '展开分组') : tOr('conditionalFormat.group.collapse', '收起分组')}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(rules.length)}</span>
           <span class="conditional-format-group-actions">
-            <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="全选 / 取消本组">☑</button>
-            <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="删除本组全部规则">🗑</button>
-            <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="导出本组所选规则">📤</button>
+            <button type="button" class="conditional-format-group-action" data-action="pick-group" data-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.group.pickTitle', '全选 / 取消本组')}">☑</button>
+            <button type="button" class="conditional-format-group-action" data-action="delete-group" data-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.group.deleteTitle', '删除本组全部规则')}">🗑</button>
+            <button type="button" class="conditional-format-group-action" data-action="export-group" data-group="${escapeHtml(group)}" title="${tOr('conditionalFormat.group.exportTitle', '导出本组所选规则')}">📤</button>
           </span>
         </div>
         ${rows}
@@ -2512,12 +2544,12 @@ function renderRuleBatchBar() {
     }
     bar.classList.add('is-visible');
     bar.innerHTML = `
-    <span class="conditional-format-batch-count">已选 ${String(count)} 条</span>
-    <button type="button" class="bgm-btn small" data-rule-batch="copy" title="把所选规则复制进剪贴板（多条一起复制后，「粘贴」会以表格列出，可批量改范围）">⧉ 复制所选</button>
-    <button type="button" class="bgm-btn small" data-rule-batch="edit" title="批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填）">✎ 批量修改</button>
-    <button type="button" class="bgm-btn small" data-rule-batch="delete" title="删除所选规则">🗑 删除所选</button>
-    <button type="button" class="bgm-btn small" data-rule-batch="export" title="导出所选规则为 JSON（选保存位置）">📤 导出所选</button>
-    <button type="button" class="bgm-btn small" data-rule-batch="clear" title="取消选择">取消选择</button>`;
+    <span class="conditional-format-batch-count">${tOr('conditionalFormat.batch.selected', '已选 {count} 条', { count: String(count) })}</span>
+    <button type="button" class="bgm-btn small" data-rule-batch="copy" title="${tOr('conditionalFormat.ruleBatch.copyTitle', '把所选规则复制进剪贴板（多条一起复制后，「粘贴」会以表格列出，可批量改范围）')}">${tOr('conditionalFormat.ruleBatch.copy', '⧉ 复制所选')}</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="edit" title="${tOr('conditionalFormat.ruleBatch.editTitle', '批量修改所选规则的应用范围 / 公式 / 颜色（可统一为某一条已有的值，也可自己填）')}">${tOr('conditionalFormat.ruleBatch.edit', '✎ 批量修改')}</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="delete" title="${tOr('conditionalFormat.ruleBatch.deleteTitle', '删除所选规则')}">${tOr('conditionalFormat.ruleBatch.delete', '🗑 删除所选')}</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="export" title="${tOr('conditionalFormat.ruleBatch.exportTitle', '导出所选规则为 JSON（选保存位置）')}">${tOr('conditionalFormat.ruleBatch.export', '📤 导出所选')}</button>
+    <button type="button" class="bgm-btn small" data-rule-batch="clear" title="${tOr('conditionalFormat.batch.clearTitle', '取消选择')}">${tOr('conditionalFormat.batch.clear', '取消选择')}</button>`;
 }
 /** 批量删除所选规则（全选 / 组内 / 顶部批量条共用） */
 function deleteSelectedRules(ids) {
@@ -3565,7 +3597,7 @@ function renderImportList() {
                 return `
       <div class="conditional-format-group conditional-format-existing-group${isCollapsed ? ' is-collapsed' : ''}" data-import-group="${escapeHtml(group)}">
         <div class="conditional-format-group-title">
-          <button type="button" class="conditional-format-group-toggle" data-action="toggle-import-group" data-import-group="${escapeHtml(group)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? '展开分组' : '收起分组'}">${isCollapsed ? '▸' : '▾'}</button>
+          <button type="button" class="conditional-format-group-toggle" data-action="toggle-import-group" data-import-group="${escapeHtml(group)}" aria-expanded="${isCollapsed ? 'false' : 'true'}" title="${isCollapsed ? tOr('conditionalFormat.group.expand', '展开分组') : tOr('conditionalFormat.group.collapse', '收起分组')}">${isCollapsed ? '▸' : '▾'}</button>
           <span class="conditional-format-group-name">${escapeHtml(group)}</span>
           <span class="conditional-format-group-count">${String(entries.length)}</span>
           <button type="button" class="conditional-format-group-pick" data-action="pick-import-group" data-import-group="${escapeHtml(group)}" title="全选 / 取消本组可导入的规则">☑</button>
