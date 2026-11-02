@@ -5,6 +5,9 @@
  */
 
 import { getRecentLogs } from '../../tools/logger.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 import type { LogLevel } from '../../tools/logger.js'
 
 /** 渲染日志条目到日志面板 */
@@ -16,7 +19,7 @@ export function renderLogEntries(): void {
   const logs = getRecentLogs(level as LogLevel | undefined, 100)
   body.replaceChildren()
   if (logs.length === 0) {
-    body.textContent = '暂无日志'
+    body.textContent = tOr('handlers.log.empty', '暂无日志')
     return
   }
   for (const entry of logs) {

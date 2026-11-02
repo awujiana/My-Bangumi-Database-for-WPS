@@ -5,6 +5,9 @@
  *              与设置页只读路径输入框回填。
  */
 import { getApp, getExportPath, getImportPath } from '../../index.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 /**
  * 弹出文件夹选择对话框并返回选中的文件夹绝对路径。
  * 优先使用 WPS Application.FileDialog(msoFileDialogFolderPicker=2)，
@@ -31,7 +34,8 @@ export function selectDefaultFolder(title) {
         }
         // 回退：GetOpenFilename 选择文件后取其所在目录作为默认文件夹
         if (typeof app.GetOpenFilename === 'function') {
-            const selected = app.GetOpenFilename('所有文件 (*.*),*.*', title);
+            const allFiles = tOr('handlers.path.allFilesFilter', '所有文件 (*.*)');
+            const selected = app.GetOpenFilename(`${allFiles},*.*`, title);
             if (typeof selected === 'boolean' || selected === false)
                 return null;
             const filePath = String(selected);

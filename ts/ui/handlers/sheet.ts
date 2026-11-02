@@ -16,6 +16,9 @@ import {
 } from '../../index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
 import { cleanSheetDuplicates } from '../../sync/sheet-cleaning.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 /**
  * 选中「上次同步失败的行」，供用户接着点「👆 选中行同步」只重发这几行。
@@ -31,24 +34,34 @@ import { cleanSheetDuplicates } from '../../sync/sheet-cleaning.js'
 export function selectFailedRowsFromLastSync(): void {
   const record = getLastFailedRows()
   if (!record || record.rows.length === 0) {
-    showToast('上次同步没有失败行', 'info')
+    showToast(tOr('handlers.sheet.noFailedRows', '上次同步没有失败行'), 'info')
     return
   }
 
   const app = getApp()
   const worksheet: WpsWorksheet | null = app?.ActiveWorkbook?.ActiveSheet ?? null
   if (!worksheet) {
-    showToast('无法获取当前工作表', 'error')
+    showToast(tOr('handlers.sheet.noWorksheet', '无法获取当前工作表'), 'error')
     return
   }
   if (record.sheetName && worksheet.Name !== record.sheetName) {
-    showToast(`失败行属于「${record.sheetName}」表，请先切回该表`, 'warn')
+    showToast(
+      tOr('handlers.sheet.wrongSheet', '失败行属于「{sheet}」表，请先切回该表', {
+        sheet: record.sheetName,
+      }),
+      'warn',
+    )
     return
   }
 
   const address = buildFailedRowsAddress(record.rows)
   if (!address) {
-    showToast(`失败行过多（${String(record.rows.length)} 行），请分批手动选择重试`, 'warn')
+    showToast(
+      tOr('handlers.sheet.tooManyRows', '失败行过多（{count} 行），请分批手动选择重试', {
+        count: String(record.rows.length),
+      }),
+      'warn',
+    )
     return
   }
 
@@ -57,7 +70,7 @@ export function selectFailedRowsFromLastSync(): void {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     BGM.handleError(error, { context: 'selectFailedRows', showAlert: false })
-    showToast(`选中失败行失败：${message}`, 'error')
+    showToast(tOr('handlers.sheet.selectFailed', '选中失败行失败：{message}', { message }), 'error')
     return
   }
 
@@ -65,7 +78,11 @@ export function selectFailedRowsFromLastSync(): void {
   const more = record.rows.length > 8 ? '…' : ''
   bgmLog(LOG_LEVELS.INFO, `[selectFailedRows] 已选中 ${String(record.rows.length)} 行: ${address}`)
   showToast(
-    `已选中 ${String(record.rows.length)} 个失败行（${preview}${more}），点「👆 选中行同步」重试`,
+    tOr(
+      'handlers.sheet.selected',
+      '已选中 {count} 个失败行（{preview}），点「👆 选中行同步」重试',
+      { count: String(record.rows.length), preview: `${preview}${more}` },
+    ),
     'success',
   )
 }
@@ -90,13 +107,13 @@ export function cleanLockedDataSheet(targetWorksheet?: WpsWorksheet): void {
     const app = getApp()
     if (!app?.ActiveWorkbook) {
       bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 无法获取工作簿，终止')
-      showToast('无法获取工作簿', 'error')
+      showToast(tOr('handlers.sheet.noWorkbook', '无法获取工作簿'), 'error')
       return
     }
 
     if (!BGM.sheet.isLocked || !BGM.sheet.lockedIndex) {
       bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未锁定数据表，终止')
-      showToast('请先锁定数据表', 'warn')
+      showToast(tOr('handlers.sheet.lockFirst', '请先锁定数据表'), 'warn')
       return
     }
 
@@ -104,7 +121,7 @@ export function cleanLockedDataSheet(targetWorksheet?: WpsWorksheet): void {
     worksheet = wb.Sheets.Item(BGM.sheet.lockedIndex)
   }
 
-  const sheetName = worksheet.Name || '未知'
+  const sheetName = worksheet.Name || tOr('handlers.sheet.unknownSheet', '未知')
   const lockedIndex = targetWorksheet ? '' : ` (索引: ${String(BGM.sheet.lockedIndex ?? '')})`
   bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 清洗工作表: "${sheetName}"${lockedIndex}`)
 
@@ -116,7 +133,10 @@ export function cleanLockedDataSheet(targetWorksheet?: WpsWorksheet): void {
   }
 
   showToast(
-    `清洗完成：删除 ${String(result.deletedRows)} 行，合并 ${String(result.mergedTagGroups)} 个名称组的标签`,
+    tOr('handlers.sheet.cleaned', '清洗完成：删除 {deleted} 行，合并 {merged} 个名称组的标签', {
+      deleted: String(result.deletedRows),
+      merged: String(result.mergedTagGroups),
+    }),
     'success',
   )
   bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 完成，耗时: ${String(Date.now() - startTime)}ms`)

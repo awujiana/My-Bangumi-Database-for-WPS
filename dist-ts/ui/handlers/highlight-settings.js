@@ -15,6 +15,9 @@
  */
 import { CONFIG_KEYS, getConfig, setConfig } from '../../tools/config.js';
 import { BGM } from '../../tools/util/index.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 /** 从配置读取并填充表单（页面加载 / 放弃修改共用） */
 export function loadHighlightSettingsIntoForm() {
     const modeSelect = document.getElementById('highlightMode');
@@ -45,7 +48,7 @@ export function saveHighlightSettings() {
         if (watchBox) {
             setConfig(CONFIG_KEYS.HIGHLIGHT_AUTO_WATCH, watchBox.checked ? '1' : '0');
         }
-        BGM.Dialog.alert('成功', '功能开关已保存，下次加载工作表即生效');
+        BGM.Dialog.alert(tOr('common.success', '成功'), tOr('handlers.highlight.saved', '功能开关已保存，下次加载工作表即生效'));
     }
     catch (error) {
         BGM.handleError(error, { context: 'saveHighlightSettings', showAlert: true });

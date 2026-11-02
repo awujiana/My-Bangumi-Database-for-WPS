@@ -216,6 +216,13 @@ function warnOnce(key, message) {
     if (warnedKeys.has(key))
         return;
     warnedKeys.add(key);
+    // 源语言都没加载时「未知 key」是**必然**的（每个 key 都未知），告警刷屏且没有信息量；
+    // 单元测试就运行在这个状态（没人去加载语言包），一条 tOr 就带出一堆 WARN。
+    // 真正要抓的是「简体已加载、但 key 拼错 / 漏加」—— 那种情况下面这行照常告警。
+    // 顺带避开一个坑：告警走 bgmLog → tools/util → logger，而部分单测把 logger 整个 mock 掉，
+    // 这里一调用就 `No "logger" export is defined on the mock`。
+    if (!bundles.has(SOURCE_LOCALE))
+        return;
     bgmLog(LOG_LEVELS.WARN, message);
 }
 /** 覆盖率（源语言为 100%；未加载的语言为 0%） */

@@ -6,6 +6,9 @@
  */
 
 import { getApp, getExportPath, getImportPath } from '../../index.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 /** WPS FileDialog 对象的能力子集（仅用到的成员） */
 interface WpsPathDialog {
@@ -46,7 +49,8 @@ export function selectDefaultFolder(title: string): string | null {
 
     // 回退：GetOpenFilename 选择文件后取其所在目录作为默认文件夹
     if (typeof app.GetOpenFilename === 'function') {
-      const selected = app.GetOpenFilename('所有文件 (*.*),*.*', title)
+      const allFiles = tOr('handlers.path.allFilesFilter', '所有文件 (*.*)')
+      const selected = app.GetOpenFilename(`${allFiles},*.*`, title)
       if (typeof selected === 'boolean' || selected === false) return null
       const filePath = String(selected)
       const normalized = filePath.replace(/\\+/g, '/')

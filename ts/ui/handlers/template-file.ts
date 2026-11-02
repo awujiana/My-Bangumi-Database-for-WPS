@@ -20,6 +20,9 @@ import {
 } from '../../tools/template-release.js'
 import type { TemplateReleaseInfo } from '../../tools/template-release.js'
 import { copyTextToClipboard } from './clipboard.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 /** 会话内缓存的模板信息（查不到时保持兜底值） */
 let latest: TemplateReleaseInfo = TEMPLATE_FALLBACK
@@ -81,14 +84,22 @@ export function downloadTemplateFile(): void {
   document.body.append(anchor)
   anchor.click()
   anchor.remove()
-  showToast('已打开下载链接；若没自动下载，用「复制链接」粘到浏览器', 'info')
+  showToast(
+    tOr('handlers.template.opened', '已打开下载链接；若没自动下载，用「复制链接」粘到浏览器'),
+    'info',
+  )
 }
 
 /** 复制下载链接（宿主拦截导航时的保底通路） */
 export function copyTemplateLink(): void {
   const isOk = copyTextToClipboard(latest.downloadUrl)
   bgmLog(LOG_LEVELS.INFO, `[templateFile] 复制下载链接: ${String(isOk)}`)
-  showToast(isOk ? '下载链接已复制' : '复制失败，请手动选择复制', isOk ? 'success' : 'error')
+  showToast(
+    isOk
+      ? tOr('handlers.template.copied', '下载链接已复制')
+      : tOr('common.copyFailedManual', '复制失败，请手动选择复制'),
+    isOk ? 'success' : 'error',
+  )
 }
 
 /** 打开 Release 页面（看历史版本 / 手动挑文件） */

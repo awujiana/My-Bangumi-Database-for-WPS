@@ -10,6 +10,9 @@ import { trackedEventBusOn } from './resource-tracking.js';
 import { ACTION_HANDLERS } from './action-handlers.js';
 import { updateTokenStatus, updateUserIdStatus } from './token.js';
 import { isPanelContext } from './sync-panel-context.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 import { tryUpdateEnableSyncRecordUI, tryUpdateIncrementalCheckbox, tryUpdateSkipConflictsUI, } from './incremental-bindings.js';
 // ========== 消息监听 ==========
 let _messageHandler = null;
@@ -156,7 +159,7 @@ const handleSyncCompletedEvent = (results) => {
 const handleSyncErrorEvent = (error) => {
     const message = error instanceof Error ? error.message : String(error);
     bgmLog(LOG_LEVELS.ERROR, `[handlers] 同步错误事件: ${message}`);
-    showToast(`同步失败: ${message}`, 'error');
+    showToast(tOr('handlers.sync.failed', '同步失败: {message}', { message }), 'error');
 };
 // ========== 事件监听（用于接收事件总线通知）==========
 export function setupEventListeners() {

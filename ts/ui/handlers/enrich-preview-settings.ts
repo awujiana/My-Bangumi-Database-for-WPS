@@ -19,6 +19,9 @@
 import { CONFIG_KEYS, getConfig, setConfig } from '../../tools/config.js'
 import { BGM } from '../../tools/util/index.js'
 import { resetNoiseKeywordCache } from '../../sync/enrich-normalize.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 /** 与 enrich-page 的 DEFAULT_ENRICH_PREVIEW_CONFIG 保持一致 */
 const DEFAULT_EP_SINGLE = 1
@@ -72,7 +75,13 @@ export function loadEnrichPreviewSettingsIntoForm(): void {
 function normalizeThreshold(raw: string, label: string, minimum: number): string | null {
   const value = Number(raw.trim())
   if (!Number.isSafeInteger(value) || value < minimum) {
-    BGM.Dialog.alert('提示', `${label}必须为不小于 ${String(minimum)} 的整数`)
+    BGM.Dialog.alert(
+      tOr('common.hint', '提示'),
+      tOr('handlers.enrichPreview.mustBeInteger', '{label}必须为不小于 {min} 的整数', {
+        label,
+        min: String(minimum),
+      }),
+    )
     return null
   }
   return String(value)
@@ -85,17 +94,28 @@ export function saveEnrichPreviewSettings(): void {
   const keywordsInput = safeGetInput('enrichFilterKeywords')
 
   const single = singleInput
-    ? normalizeThreshold(singleInput.value, '「单集」阈值', 1)
+    ? normalizeThreshold(
+        singleInput.value,
+        tOr('handlers.enrichPreview.singleLabel', '「单集」阈值'),
+        1,
+      )
     : String(DEFAULT_EP_SINGLE)
   if (single === null) return
   const full = fullInput
-    ? normalizeThreshold(fullInput.value, '「完结」阈值', 2)
+    ? normalizeThreshold(
+        fullInput.value,
+        tOr('handlers.enrichPreview.fullLabel', '「完结」阈值'),
+        2,
+      )
     : String(DEFAULT_EP_FULL)
   if (full === null) return
 
   // 完结阈值必须大于单集阈值，否则黄色区间为空、颜色语义混乱
   if (Number(full) <= Number(single)) {
-    BGM.Dialog.alert('提示', '「完结」阈值必须大于「单集」阈值')
+    BGM.Dialog.alert(
+      tOr('common.hint', '提示'),
+      tOr('handlers.enrichPreview.fullGreaterThanSingle', '「完结」阈值必须大于「单集」阈值'),
+    )
     return
   }
 
@@ -118,7 +138,10 @@ export function saveEnrichPreviewSettings(): void {
       resetNoiseKeywordCache()
     }
 
-    BGM.Dialog.alert('成功', '富化预览设置已保存，下次预览即生效')
+    BGM.Dialog.alert(
+      tOr('common.success', '成功'),
+      tOr('handlers.enrichPreview.saved', '富化预览设置已保存，下次预览即生效'),
+    )
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'saveEnrichPreviewSettings', showAlert: true })
   }
