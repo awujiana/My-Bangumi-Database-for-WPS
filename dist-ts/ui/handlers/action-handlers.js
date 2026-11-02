@@ -8,6 +8,9 @@ import { BGM, LOG_LEVELS, _getBgmUserId, bgmLog, buildRawUrl, clearBgToken, clea
 import { exportConfig, importConfig } from '../../services/config-service.js';
 import { executeUndoLastSync } from '../../services/ribbon-service.js';
 import { clearLogs } from '../../tools/logger.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 import { exportData } from './data-export.js';
 import { hideConnectionTestDialog, showConnectionTestDialog } from '../github-config-dialog.js';
 import { _T } from './_constants.js';
@@ -104,7 +107,7 @@ export const ACTION_HANDLERS = {
             }
             updateTokenStatus();
             updateUserIdStatus();
-            showToast('Token 已清除', 'info');
+            showToast(tOr('handlers.action.tokenCleared', 'Token 已清除'), 'info');
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 已清除');
         }
         catch (error) {
@@ -117,10 +120,10 @@ export const ACTION_HANDLERS = {
         try {
             const isOk = copyTokenToClipboard();
             if (isOk) {
-                showToast('Token 已复制到剪贴板', 'success');
+                showToast(tOr('handlers.action.tokenCopied', 'Token 已复制到剪贴板'), 'success');
             }
             else {
-                showToast('复制失败，可能未设置 Token 或浏览器不支持', 'error');
+                showToast(tOr('handlers.action.copyFailed', '复制失败，可能未设置 Token 或浏览器不支持'), 'error');
             }
         }
         catch (error) {
@@ -187,13 +190,13 @@ export const ACTION_HANDLERS = {
     deduplicateSyncRecords: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始去重同步记录');
         deduplicateSyncRecords();
-        showToast('去重完成', 'success');
+        showToast(tOr('handlers.action.dedupDone', '去重完成'), 'success');
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 同步记录去重已触发，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     formatSyncRecordSheet: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始设置同步记录表格式');
         formatSyncRecordSheet();
-        showToast('格式设置完成', 'success');
+        showToast(tOr('handlers.action.formatDone', '格式设置完成'), 'success');
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 同步记录表格式设置已触发，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     cleanLockedDataSheet: (context) => {
@@ -252,21 +255,21 @@ export const ACTION_HANDLERS = {
         const repoInput = document.getElementById('githubRepo');
         const pathInput = document.getElementById('githubPath');
         if (!ownerInput || !repoInput || !pathInput) {
-            showToast('UI 元素缺失', 'error');
+            showToast(tOr('handlers.action.uiElementMissing', 'UI 元素缺失'), 'error');
             return;
         }
         const form = readGithubConfigForm();
         const missing = findMissingConfigField(form);
         if (missing === 'path') {
-            showToast('本地文件路径不能为空', 'warn');
+            showToast(tOr('handlers.action.localPathEmpty', '本地文件路径不能为空'), 'warn');
             return;
         }
         if (missing === 'gistId') {
-            showToast('Gist ID 不能为空', 'warn');
+            showToast(tOr('handlers.action.gistIdEmpty', 'Gist ID 不能为空'), 'warn');
             return;
         }
         if (missing === 'ownerRepoPath') {
-            showToast('owner / repo / path 不能为空', 'warn');
+            showToast(tOr('handlers.action.ownerRepoPathEmpty', 'owner / repo / path 不能为空'), 'warn');
             return;
         }
         const isOkConfig = setGithubConfig({
@@ -280,11 +283,11 @@ export const ACTION_HANDLERS = {
         const isOkStrategy = setSyncStrategy(form.strategy);
         const isOkSourceType = setSyncSourceType(form.sourceType);
         if (isOkConfig && isOkStrategy && isOkSourceType) {
-            showToast(`配置已保存（策略：${form.strategy}，同步源：${form.sourceType}）`, 'success');
+            showToast(tOr('handlers.action.githubConfigSaved', '配置已保存（策略：{strategy}，同步源：{source}）', { strategy: form.strategy, source: form.sourceType }), 'success');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub 配置已保存: ${form.owner}/${form.repo}/${form.branch}/${form.path}, 策略: ${form.strategy}, 同步源: ${form.sourceType}${form.gistId ? `, gistId: ${form.gistId}` : ''}`);
         }
         else {
-            showToast('保存失败：PluginStorage 不可用', 'error');
+            showToast(tOr('handlers.action.saveFailedStorage', '保存失败：PluginStorage 不可用'), 'error');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 保存 GitHub 配置完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
@@ -300,7 +303,7 @@ export const ACTION_HANDLERS = {
     testGithubConfig: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试 GitHub 配置');
         if (!isGithubConfigComplete()) {
-            showToast('请先填写并保存 GitHub 配置', 'warn');
+            showToast(tOr('handlers.action.githubConfigIncomplete', '请先填写并保存 GitHub 配置'), 'warn');
             return;
         }
         let url;
@@ -309,7 +312,7 @@ export const ACTION_HANDLERS = {
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            showToast(`配置错误：${errorMessage}`, 'error');
+            showToast(tOr('handlers.action.configError', '配置错误：{message}', { message: errorMessage }), 'error');
             showConnectionTestDialog({
                 success: false,
                 statusCode: null,
@@ -321,7 +324,7 @@ export const ACTION_HANDLERS = {
             return;
         }
         // 显示测试中提示
-        showToast('正在测试连接...', 'info');
+        showToast(tOr('handlers.action.testingConnection', '正在测试连接...'), 'info');
         // 获取数据源类型
         const sourceType = getSyncSourceType();
         // 发送 HEAD 请求测试连接
@@ -352,7 +355,7 @@ export const ACTION_HANDLERS = {
                 responseTime,
                 url,
                 sourceType,
-                errorMessage: '网络错误：无法连接到服务器',
+                errorMessage: tOr('handlers.action.networkError', '网络错误：无法连接到服务器'),
             });
         });
         xhr.ontimeout = () => {
@@ -364,7 +367,7 @@ export const ACTION_HANDLERS = {
                 responseTime,
                 url,
                 sourceType,
-                errorMessage: '请求超时（10秒）',
+                errorMessage: tOr('handlers.action.requestTimeout', '请求超时（10秒）'),
             });
         };
         xhr.send();
@@ -382,13 +385,13 @@ export const ACTION_HANDLERS = {
                 const input = document.getElementById('localFilePath');
                 if (input) {
                     input.focus();
-                    input.placeholder = 'WPS 文件对话框不可用，请手动输入绝对路径';
+                    input.placeholder = tOr('handlers.action.dialogUnavailablePlaceholder', 'WPS 文件对话框不可用，请手动输入绝对路径');
                 }
-                showToast('WPS 文件对话框不可用，请手动输入路径', 'warn');
+                showToast(tOr('handlers.action.dialogUnavailable', 'WPS 文件对话框不可用，请手动输入路径'), 'warn');
                 return;
             }
             // 文件过滤器：分片清单（JSON）优先，其余为兼容手动选择
-            const selected = wpsApp.GetOpenFilename('分片清单 (*.json),*.json,JSONL 文件 (*.jsonlines;*.jsonl),*.jsonlines;*.jsonl,所有文件 (*.*),*.*', '选择分片清单（anime.manifest.json）');
+            const selected = wpsApp.GetOpenFilename(tOr('handlers.action.fileFilterManifest', '分片清单 (*.json),*.json,JSONL 文件 (*.jsonlines;*.jsonl),*.jsonlines;*.jsonl,所有文件 (*.*),*.*'), tOr('handlers.action.dialogTitleManifest', '选择分片清单（anime.manifest.json）'));
             // GetOpenFilename 返回 false 表示用户取消
             if (typeof selected === 'boolean' || selected === false) {
                 bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消文件选择');
@@ -401,12 +404,14 @@ export const ACTION_HANDLERS = {
                 // 触发 input 事件，激活防抖自动保存
                 input.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            showToast(`已选择：${filePath}`, 'success');
+            showToast(tOr('handlers.action.fileSelected', '已选择：{path}', { path: filePath }), 'success');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已选择本地文件: ${filePath}`);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            showToast(`选择文件失败：${errorMessage}`, 'error');
+            showToast(tOr('handlers.action.fileSelectFailed', '选择文件失败：{message}', {
+                message: errorMessage,
+            }), 'error');
             bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errorMessage}`);
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 选择本地文件完成，耗时: ${String(Date.now() - context.startTime)}ms`);
@@ -421,7 +426,7 @@ export const ACTION_HANDLERS = {
             catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errorMessage}`);
-                showToast(`撤销失败：${errorMessage}`, 'error');
+                showToast(tOr('handlers.action.undoFailed', '撤销失败：{message}', { message: errorMessage }), 'error');
             }
         })();
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`);
@@ -479,15 +484,15 @@ export const ACTION_HANDLERS = {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清空系统日志');
         clearLogs();
         renderLogEntries();
-        showToast('日志已清空', 'info');
+        showToast(tOr('handlers.action.logsCleared', '日志已清空'), 'info');
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     // 重置全部配置：清空所有已保存偏好（含 Token / 仓库配置 / 排序 / 各偏好键），仅保留会话态
     resetAllConfig: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 重置全部配置');
-        showConfirm('确定要清空所有已保存配置吗？此操作会清除 Token、仓库地址、模块排序等全部偏好，且不可撤销。', (confirmed) => {
+        showConfirm(tOr('handlers.action.resetConfirm', '确定要清空所有已保存配置吗？此操作会清除 Token、仓库地址、模块排序等全部偏好，且不可撤销。'), (confirmed) => {
             if (!confirmed) {
-                showToast('已取消重置', 'info');
+                showToast(tOr('handlers.action.resetCancelled', '已取消重置'), 'info');
                 return;
             }
             // 会话态键不参与重置：当前锁定的工作表/工作簿是用户的工作状态，
@@ -505,7 +510,9 @@ export const ACTION_HANDLERS = {
             // 内存中的日志级别回到默认（否则刷新前仍按旧级别过滤）
             applyLogLevel();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已重置 ${String(removed)} 项配置`);
-            showToast(`已重置 ${String(removed)} 项配置，正在重新加载…`, 'success');
+            showToast(tOr('handlers.action.resetDone', '已重置 {count} 项配置，正在重新加载…', {
+                count: removed,
+            }), 'success');
             // 重新加载页面，让所有表单回到默认值
             if (typeof window !== 'undefined') {
                 window.setTimeout(() => {
@@ -524,22 +531,25 @@ export const ACTION_HANDLERS = {
         if (note) {
             // 根据所选策略更新说明文案
             const strategyLabels = {
-                'add-update': '新增+更新：不删除本地数据，仅同步新增和有差异的条目。',
-                'add-only': '仅新增：不更新本地已有条目，仅同步远程新增的 SID。',
-                'update-only': '仅更新：不新增本地不存在的 SID，仅同步已有条目的变更。',
-                mirror: '镜像同步：新增+更新+删除本地多余行（建议先备份或使用「新工作簿」以完全与远程一致）。',
-                'force-overwrite': '强制覆盖：无视字段比对，远程值全部覆盖本地（含空值）。',
+                'add-update': tOr('handlers.action.guide.addUpdate', '新增+更新：不删除本地数据，仅同步新增和有差异的条目。'),
+                'add-only': tOr('handlers.action.guide.addOnly', '仅新增：不更新本地已有条目，仅同步远程新增的 SID。'),
+                'update-only': tOr('handlers.action.guide.updateOnly', '仅更新：不新增本地不存在的 SID，仅同步已有条目的变更。'),
+                mirror: tOr('handlers.action.guide.mirror', '镜像同步：新增+更新+删除本地多余行（建议先备份或使用「新工作簿」以完全与远程一致）。'),
+                'force-overwrite': tOr('handlers.action.guide.forceOverwrite', '强制覆盖：无视字段比对，远程值全部覆盖本地（含空值）。'),
             };
             const prefix = strategyLabels[strategy] ?? '';
-            note.innerHTML = `
-        <strong>📘 同步策略说明</strong><br>
-        ${prefix ? `<em>当前策略：</em>${prefix}<br><br>` : ''}
-        <strong>通用规则</strong><br>
-        • <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br>
-        • <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以 <code> | </code> 分隔），其他字段直接覆盖<br>
-        • <strong>制作公司/动画制作公司</strong>：远程「动画制作公司」字段会同步到本地「制作公司」和「动画制作公司」两列<br>
-        • <strong>完全镜像</strong>：要完全与远程一致，需先删除本地全部数据后再同步，或选择新建工作簿同步<br>
-      `;
+            const currentLine = prefix === ''
+                ? ''
+                : `<em>${tOr('handlers.action.guide.current', '当前策略：')}</em>${prefix}<br><br>`;
+            note.innerHTML = [
+                `<strong>${tOr('handlers.action.guide.title', '📘 同步策略说明')}</strong><br>`,
+                currentLine,
+                `<strong>${tOr('handlers.action.guide.rulesTitle', '通用规则')}</strong><br>`,
+                tOr('handlers.action.guide.ruleAdd', '• <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br>'),
+                tOr('handlers.action.guide.ruleUpdate', '• <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以 <code> | </code> 分隔），其他字段直接覆盖<br>'),
+                tOr('handlers.action.guide.ruleStudio', '• <strong>制作公司/动画制作公司</strong>：远程「动画制作公司」字段会同步到本地「制作公司」和「动画制作公司」两列<br>'),
+                tOr('handlers.action.guide.ruleMirror', '• <strong>完全镜像</strong>：要完全与远程一致，需先删除本地全部数据后再同步，或选择新建工作簿同步<br>'),
+            ].join('');
             note.style.display = note.style.display === 'block' ? 'none' : 'block';
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - context.startTime)}ms`);
@@ -566,7 +576,9 @@ export const ACTION_HANDLERS = {
         if (detail && button) {
             const isHidden = detail.style.display === 'none';
             detail.style.display = isHidden ? 'block' : 'none';
-            button.textContent = isHidden ? '📖 收起详细操作' : '📖 显示详细操作';
+            button.textContent = isHidden
+                ? tOr('handlers.action.usageGuideCollapse', '📖 收起详细操作')
+                : tOr('handlers.action.usageGuideExpand', '📖 显示详细操作');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
@@ -607,29 +619,29 @@ export const ACTION_HANDLERS = {
             setSyncStrategy(strategy);
             parts.push(`同步策略: ${strategy}`);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置已保存: ${parts.join('; ')}`);
-            showToast('所有配置已保存', 'success');
+            showToast(tOr('handlers.action.allSaved', '所有配置已保存'), 'success');
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errorMessage}`);
-            showToast(`保存失败：${errorMessage}`, 'error');
+            showToast(tOr('handlers.action.saveFailed', '保存失败：{message}', { message: errorMessage }), 'error');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 保存配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     // ===== 默认路径记忆：导出位置 / 导入文件夹 =====
     selectExportPath: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择默认导出位置');
-        const path = selectDefaultFolder('选择默认导出位置（文件夹）');
+        const path = selectDefaultFolder(tOr('handlers.action.selectExportPath', '选择默认导出位置（文件夹）'));
         if (path) {
             const isOk = setExportPath(path);
             updatePathDisplay('exportPathDisplay', path);
             if (isOk) {
-                showToast('已设置默认导出位置', 'success');
+                showToast(tOr('handlers.action.exportPathSet', '已设置默认导出位置'), 'success');
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已设置默认导出位置: ${path}`);
             }
         }
         else {
-            showToast('已取消选择导出位置', 'info');
+            showToast(tOr('handlers.action.exportPathCancelled', '已取消选择导出位置'), 'info');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 选择导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
@@ -640,22 +652,22 @@ export const ACTION_HANDLERS = {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 已清除默认导出位置');
         }
         updatePathDisplay('exportPathDisplay', '');
-        showToast('已清除默认导出位置', 'info');
+        showToast(tOr('handlers.action.exportPathCleared', '已清除默认导出位置'), 'info');
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 清除导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     selectImportPath: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择默认导入文件夹');
-        const path = selectDefaultFolder('选择默认导入文件夹');
+        const path = selectDefaultFolder(tOr('handlers.action.selectImportPath', '选择默认导入文件夹'));
         if (path) {
             const isOk = setImportPath(path);
             updatePathDisplay('importPathDisplay', path);
             if (isOk) {
-                showToast('已设置默认导入文件夹', 'success');
+                showToast(tOr('handlers.action.importPathSet', '已设置默认导入文件夹'), 'success');
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已设置默认导入文件夹: ${path}`);
             }
         }
         else {
-            showToast('已取消选择导入文件夹', 'info');
+            showToast(tOr('handlers.action.importPathCancelled', '已取消选择导入文件夹'), 'info');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 选择导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
@@ -666,7 +678,7 @@ export const ACTION_HANDLERS = {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 已清除默认导入文件夹');
         }
         updatePathDisplay('importPathDisplay', '');
-        showToast('已清除默认导入文件夹', 'info');
+        showToast(tOr('handlers.action.importPathCleared', '已清除默认导入文件夹'), 'info');
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 清除导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
     // 配置导入导出：导出全部配置为 JSON 文件并复制到剪贴板
@@ -689,14 +701,20 @@ export const ACTION_HANDLERS = {
             // 同时复制到剪贴板，便于直接粘贴到其他环境
             copyTextToClipboard(json);
             // 浏览器下载无法指定保存目录，这里只能把记忆的位置「提示」给用户
-            const suffix = defaultExportPath ? `默认位置：${defaultExportPath}` : '未设置默认位置';
-            showToast(`配置已导出，请手动保存到该位置（${suffix}）`, 'success');
+            const suffix = defaultExportPath
+                ? tOr('handlers.action.defaultExportPath', '默认位置：{path}', { path: defaultExportPath })
+                : tOr('handlers.action.defaultExportPathUnset', '未设置默认位置');
+            showToast(tOr('handlers.action.configExported', '配置已导出，请手动保存到该位置（{location}）', {
+                location: suffix,
+            }), 'success');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置导出完成（${suffix}）`);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errorMessage}`);
-            showToast(`配置导出失败：${errorMessage}`, 'error');
+            showToast(tOr('handlers.action.configExportFailed', '配置导出失败：{message}', {
+                message: errorMessage,
+            }), 'error');
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 导出配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`);
     },
@@ -707,7 +725,7 @@ export const ACTION_HANDLERS = {
         const performImport = (json) => {
             const result = importConfig(json);
             if (result.isOk()) {
-                showToast('配置导入成功', 'success');
+                showToast(tOr('handlers.action.configImported', '配置导入成功'), 'success');
                 bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导入成功');
                 // 导入可能带来新的日志级别；只写存储不会改变内存过滤阈值，须重新套用
                 applyLogLevel();
@@ -726,14 +744,16 @@ export const ACTION_HANDLERS = {
                     errorMessage = rawError;
                 }
                 else if (rawError == null) {
-                    errorMessage = '未知错误';
+                    errorMessage = tOr('handlers.action.unknownError', '未知错误');
                 }
                 else {
                     // 非 Error 非字符串的其余值：JSON 序列化展示（避免默认的 [object Object]）
                     errorMessage = JSON.stringify(rawError);
                 }
                 bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errorMessage}`);
-                showToast(`导入失败：${errorMessage}`, 'error');
+                showToast(tOr('handlers.action.configImportFailed', '导入失败：{message}', {
+                    message: errorMessage,
+                }), 'error');
             }
         };
         // 优先通过 WPS 对话框从文件导入（JSON 过滤器）；用户取消则回退到粘贴
@@ -742,9 +762,11 @@ export const ACTION_HANDLERS = {
         if (wpsApp && typeof wpsApp.GetOpenFilename === 'function') {
             // 文件选择框不支持指定初始目录，位置只能写进标题作提示
             const title = defaultImportPath
-                ? `选择配置文件 JSON（导入位置提示：${defaultImportPath}）`
-                : '选择配置文件 JSON';
-            const selected = wpsApp.GetOpenFilename('JSON 文件 (*.json),*.json,所有文件 (*.*),*.*', title);
+                ? tOr('handlers.action.importDialogTitle', '选择配置文件 JSON（导入位置提示：{path}）', {
+                    path: defaultImportPath,
+                })
+                : tOr('handlers.action.importDialogTitlePlain', '选择配置文件 JSON');
+            const selected = wpsApp.GetOpenFilename(tOr('handlers.action.fileFilterJson', 'JSON 文件 (*.json),*.json,所有文件 (*.*),*.*'), title);
             if (typeof selected === 'string' && selected !== '') {
                 const filePath = selected;
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 从文件导入配置: ${filePath}`);
@@ -756,7 +778,9 @@ export const ACTION_HANDLERS = {
                     catch (error) {
                         const errorMessage = error instanceof Error ? error.message : String(error);
                         bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 读取配置文件失败: ${errorMessage}`);
-                        showToast(`读取配置文件失败：${errorMessage}`, 'error');
+                        showToast(tOr('handlers.action.readConfigFailed', '读取配置文件失败：{message}', {
+                            message: errorMessage,
+                        }), 'error');
                     }
                 })();
                 bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 已选择配置文件，读取中，耗时: ${String(Date.now() - context.startTime)}ms`);
@@ -764,9 +788,9 @@ export const ACTION_HANDLERS = {
             }
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消文件选择，回退到粘贴');
         }
-        showInput('导入配置', '请粘贴配置 JSON（可从导出的 bgm-config.json 文件中复制）', '', (value) => {
+        showInput(tOr('handlers.action.importTitle', '导入配置'), tOr('handlers.action.importPrompt', '请粘贴配置 JSON（可从导出的 bgm-config.json 文件中复制）'), '', (value) => {
             if (!value || value.trim() === '') {
-                showToast('未提供配置 JSON，已取消导入', 'info');
+                showToast(tOr('handlers.action.importEmpty', '未提供配置 JSON，已取消导入'), 'info');
                 return;
             }
             performImport(value.trim());
@@ -787,7 +811,7 @@ export const ACTION_HANDLERS = {
             if (tskpane) {
                 tskpane.Visible = false;
                 bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 主面板已关闭');
-                showToast('面板已关闭', 'info');
+                showToast(tOr('handlers.action.panelClosed', '面板已关闭'), 'info');
             }
         }
         else {
@@ -812,7 +836,9 @@ export const ACTION_HANDLERS = {
         const checkbox = document.getElementById('checkboxIncrementalSync');
         const isEnabled = checkbox?.checked ?? false;
         setIncrementalSync(isEnabled);
-        showToast(`增量同步已${isEnabled ? '开启' : '关闭'}`, 'success');
+        showToast(isEnabled
+            ? tOr('handlers.action.incrementalOn', '增量同步已开启')
+            : tOr('handlers.action.incrementalOff', '增量同步已关闭'), 'success');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 增量同步: ${isEnabled ? '开启' : '关闭'}`);
     },
     // 设置页面：切换跳过冲突开关
@@ -820,7 +846,9 @@ export const ACTION_HANDLERS = {
         const checkbox = document.getElementById('checkboxSkipConflicts');
         const isEnabled = checkbox?.checked ?? false;
         setSkipConflicts(isEnabled);
-        showToast(`冲突处理: ${isEnabled ? '跳过冲突' : 'Excel覆盖'}`, 'success');
+        showToast(isEnabled
+            ? tOr('handlers.action.conflictSkip', '冲突处理: 跳过冲突')
+            : tOr('handlers.action.conflictOverwrite', '冲突处理: Excel覆盖'), 'success');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 跳过冲突: ${isEnabled ? '开启' : '关闭'}`);
     },
     // 设置页面：切换启用同步记录开关
@@ -828,14 +856,18 @@ export const ACTION_HANDLERS = {
         const checkbox = document.getElementById('checkboxEnableSyncRecord');
         const isEnabled = checkbox?.checked ?? false;
         setSyncRecordEnabled(isEnabled);
-        showToast(`同步记录已${isEnabled ? '开启' : '关闭'}`, 'success');
+        showToast(isEnabled
+            ? tOr('handlers.action.syncRecordOn', '同步记录已开启')
+            : tOr('handlers.action.syncRecordOff', '同步记录已关闭'), 'success');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${isEnabled ? '开启' : '关闭'}`);
     },
     toggleNavIconsOnly: (_context) => {
         const checkbox = document.getElementById('checkboxNavIconsOnly');
         const isEnabled = checkbox?.checked ?? false;
         setNavIconsOnly(isEnabled);
-        showToast(`导航模式: ${isEnabled ? '仅图标' : '图标+文字'}`, 'success');
+        showToast(isEnabled
+            ? tOr('handlers.action.navIconsOnly', '导航模式: 仅图标')
+            : tOr('handlers.action.navIconsText', '导航模式: 图标+文字'), 'success');
         if (typeof document !== 'undefined') {
             document.body.classList.toggle('nav-icons-only', isEnabled);
         }

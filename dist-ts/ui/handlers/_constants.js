@@ -1,76 +1,99 @@
 /**
- * UI 事件处理模块 - 共享中文常量
+ * UI 事件处理模块 - 共享文案（按当前界面语言取）
  * @module ui/handlers/_constants
- * @description handlers 子模块共用的中文文案常量，避免重复定义。
+ * @description handlers 子模块共用的界面文案。
+ *
+ * 每一项都是 **getter**：值在读取那一刻才从语言包取，所以切换语言后不需要
+ * 重建任何表，也不需要把 `_T` 改成函数、把几十处调用点全加括号。
+ * 兜底原文（第二参）保留为简体，与语言包里的 zh-CN 一致；语言包缺失时界面不会变空。
+ *
+ * 只放「真的会被显示」的条目。此前这里塞了 37 个从未被引用的条目
+ * （连接测试弹窗、头像加载、Token 续约等已迁移到别的模块），已删除。
  */
-// ========== 中文常量 ==========
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install → tools/save-file → ts/index
+// （模块顶层写 window），node 单测一 import 就 ReferenceError。
+import { tOr } from '../../i18n/locale-store.js';
 export const _T = {
-    setBgmToken: '\u{8BBE}\u{7F6E} Bangumi Access Token',
-    inputToken: '\u{8BF7}\u{8F93}\u{5165} Access Token',
-    tokenSaved: 'Token \u{5DF2}\u{4FDD}\u{5B58}',
-    setBgmUserId: '\u{8BBE}\u{7F6E} Bangumi \u{7528}\u{6237}ID',
-    inputUserId: '\u{8BF7}\u{8F93}\u{5165}\u{7528}\u{6237}ID\u{FF08}\u{6570}\u{5B57}\u{FF09}',
-    userIdSaved: '\u{7528}\u{6237}ID \u{5DF2}\u{4FDD}\u{5B58}',
-    set: '\u{5DF2}\u{8BBE}\u{7F6E}',
-    notSet: '\u{672A}\u{8BBE}\u{7F6E}',
-    pleaseSetUserIdFirst: '\u{8BF7}\u{5148}\u{8BBE}\u{7F6E}\u{7528}\u{6237}ID',
-    pleaseSetTokenFirst: '\u{8BF7}\u{5148}\u{8BBE}\u{7F6E} Token',
-    tokenValid: 'Token \u{6709}\u{6548}',
-    user: '\u{7528}\u{6237}: ',
-    unknownUser: '\u{672A}\u{77E5}\u{7528}\u{6237}',
-    parseFailed: '\u{89E3}\u{6790}\u{5931}\u{8D25}',
-    cannotParseResponse: '\u{65E0}\u{6CD5}\u{89E3}\u{6790}\u{54CD}\u{5E94}\u{6570}\u{636E}',
-    tokenInvalid: 'Token \u{65E0}\u{6548}',
-    tokenExpired: 'Access Token \u{5DF2}\u{8FC7}\u{671F}\u{6216}\u{65E0}\u{6548}',
-    networkError: '\u{7F51}\u{7EDC}\u{9519}\u{8BEF}',
-    cannotConnectBgm: '\u{65E0}\u{6CD5}\u{8FDE}\u{63A5}\u{5230} Bangumi API',
-    debugConnOk: '\u{8C03}\u{8BD5}\u{8FDE}\u{63A5}\u{6B63}\u{5E38}',
-    debugConnFail: '\u{8C03}\u{8BD5}\u{8FDE}\u{63A5}\u{5931}\u{8D25}',
-    confirmClearMarks: '\u{786E}\u{5B9A}\u{8981}\u{6E05}\u{9664}\u{6240}\u{6709}\u{6807}\u{8BB0}\u{5417}\u{FF1F}',
-    loadingWait: '\u{6B63}\u{5728}\u{52A0}\u{8F7D}\u{811A}\u{672C}\u{FF0C}\u{8BF7}\u{7A0D}\u{540E}\u{91CD}\u{8BD5}...',
-    pleaseSetBgmToken: '\u{8BF7}\u{5148}\u{8BBE}\u{7F6E} Bangumi Token\u{FF01}',
-    cannotActivateSyncSheet: '\u{65E0}\u{6CD5}\u{6FC0}\u{6D3B}\u{540C}\u{6B65}\u{8BB0}\u{5F55}\u{8868}: ',
-    syncToBgmError: 'SyncToBangumiAsync \u{51FA}\u{9519}: ',
-    execError: '\u{6267}\u{884C}\u{51FA}\u{9519}',
-    syncBgmMarksStart: '\u{5F00}\u{59CB}\u{4ECE}BGM\u{540C}\u{6B65}\u{6536}\u{85CF}\u{6807}\u{8BB0}\u{FF0C}\u{5DE5}\u{4F5C}\u{8868}\u{7D22}\u{5F15}: ',
-    noCollectionData: '\u{672A}\u{83B7}\u{53D6}\u{5230}\u{6536}\u{85CF}\u{6570}\u{636E}\u{FF0C}\u{8BF7}\u{68C0}\u{67E5} Token \u{548C}\u{7528}\u{6237}ID\u{FF01}',
-    syncComplete: '\u{540C}\u{6B65}\u{5B8C}\u{6210}',
-    fetchCollectionFailed: '\u{83B7}\u{53D6}\u{6536}\u{85CF}\u{5931}\u{8D25}',
-    syncFailed: '\u{540C}\u{6B65}\u{5931}\u{8D25}',
-    sheetNotFound: '\u{672A}\u{627E}\u{5230}\u{5DE5}\u{4F5C}\u{8868}: ',
-    marksToSheet: '\u{5DF2}\u{6807}\u{8BB0} ',
-    marksToSheetSuffix: ' \u{6761}\u{6536}\u{85CF}\u{5230} ',
-    // 头像相关
-    avatarLoading: '\u{52A0}\u{8F7D}\u{5934}\u{50CF}\u{4E2D}...',
-    avatarLoadFailed: '\u{5934}\u{50CF}\u{52A0}\u{8F7D}\u{5931}\u{8D25}',
-    avatarDefault: '\u{65E0}\u{5934}\u{50CF}',
-    tokenRenewed: 'Token \u{5DF2}\u{7EED}\u{7EA6}',
-    tokenRenewFailed: 'Token \u{7EED}\u{7EA6}\u{5931}\u{8D25}',
-    // 连接测试相关
-    testConnection: '\u{6D4B}\u{8BD5}\u{8FDE}\u{63A5}',
-    testingConnection: '\u{6B63}\u{5728}\u{6D4B}\u{8BD5}\u{8FDE}\u{63A5}...',
-    connectionSuccess: '\u{8FDE}\u{63A5}\u{6210}\u{529F}',
-    connectionFailed: '\u{8FDE}\u{63A5}\u{5931}\u{8D25}',
-    connectionTesting: '\u{6D4B}\u{8BD5}\u{4E2D}...',
-    testResult: '\u{6D4B}\u{8BD5}\u{7ED3}\u{679C}',
-    responseTime: '\u{54CD}\u{5E94}\u{65F6}\u{95F4}',
-    statusCode: '\u{72B6}\u{6001}\u{7801}',
-    testedUrl: '\u{6D4B}\u{8BD5}\u{5730}\u{5740}',
-    sourceTypeLabel: '\u{6570}\u{636E}\u{6E90}\u{7C7B}\u{578B}',
-    retryTest: '\u{91CD}\u{65B0}\u{6D4B}\u{8BD5}',
-    closeDialog: '\u{5173}\u{95ED}',
-    // Token 有效期相关
-    tokenExpiresLabel: 'Token 有效期',
-    tokenExpiresNormal: '状态良好',
-    tokenExpiresWarning: '即将到期',
-    tokenExpiresDanger: '即将过期',
-    tokenExpiresExpired: '已过期',
-    tokenExpiresUnknown: '未知',
-    tokenDaysUnit: '天',
-    tokenHoursUnit: '小时',
-    tokenStatusQuerying: '检查中...',
-    tokenStatusQueryFailed: '状态查询失败',
-    tokenExpiringSoon: 'Token 将在 {} 后过期，建议提前重新获取',
-    tokenExpiringCritical: 'Token 即将过期（{}），请尽快重新获取！',
-    tokenExpiredWarning: 'Token 已过期，请重新获取',
+    // ===== Token / 用户 ID =====
+    get setBgmToken() {
+        return tOr('handlers.token.dialogTitleToken', '设置 Bangumi Access Token');
+    },
+    get inputToken() {
+        return tOr('handlers.token.inputPlaceholderToken', '请输入 Access Token');
+    },
+    get tokenSaved() {
+        return tOr('handlers.token.saved', 'Token 已保存');
+    },
+    get setBgmUserId() {
+        return tOr('handlers.token.dialogTitleUserId', '设置 Bangumi 用户ID');
+    },
+    get inputUserId() {
+        return tOr('handlers.token.inputPlaceholderUserId', '请输入用户ID（数字）');
+    },
+    get userIdSaved() {
+        return tOr('handlers.token.userIdSaved', '用户ID 已保存');
+    },
+    get set() {
+        return tOr('handlers.token.stateSet', '已设置');
+    },
+    get notSet() {
+        return tOr('handlers.token.stateNotSet', '未设置');
+    },
+    get pleaseSetUserIdFirst() {
+        return tOr('handlers.token.needUserId', '请先设置用户ID');
+    },
+    get pleaseSetTokenFirst() {
+        return tOr('handlers.token.needToken', '请先设置 Token');
+    },
+    get unknownUser() {
+        return tOr('handlers.token.unknownUser', '未知用户');
+    },
+    get avatarDefault() {
+        return tOr('handlers.token.avatarDefault', '无头像');
+    },
+    // ===== Token 校验结果 =====
+    get parseFailed() {
+        return tOr('handlers.token.parseFailed', '解析失败');
+    },
+    get cannotParseResponse() {
+        return tOr('handlers.token.cannotParseResponse', '无法解析响应数据');
+    },
+    get tokenInvalid() {
+        return tOr('handlers.token.invalidTitle', 'Token 无效');
+    },
+    get tokenExpired() {
+        return tOr('handlers.token.expiredDetail', 'Access Token 已过期或无效');
+    },
+    get networkError() {
+        return tOr('handlers.token.networkErrorTitle', '网络错误');
+    },
+    get cannotConnectBgm() {
+        return tOr('handlers.token.cannotConnect', '无法连接到 Bangumi API');
+    },
+    get debugConnOk() {
+        return tOr('handlers.token.debugOk', '调试连接正常');
+    },
+    get debugConnFail() {
+        return tOr('handlers.token.debugFail', '调试连接失败');
+    },
+    // ===== Token 有效期 =====
+    get tokenExpiresLabel() {
+        return tOr('handlers.token.expiresLabel', 'Token 有效期');
+    },
+    get tokenExpiredWarning() {
+        return tOr('handlers.token.expiredWarning', 'Token 已过期，请重新获取');
+    },
+    // ===== 同步 =====
+    get confirmClearMarks() {
+        return tOr('handlers.sync.confirmRefresh', '确定要清除所有标记吗？');
+    },
+    get loadingWait() {
+        return tOr('handlers.sync.loadingWait', '正在加载脚本，请稍后重试...');
+    },
+    get pleaseSetBgmToken() {
+        return tOr('handlers.sync.needToken', '请先设置 Bangumi Token！');
+    },
+    get syncFailed() {
+        return tOr('handlers.sync.failedTitle', '同步失败');
+    },
 };

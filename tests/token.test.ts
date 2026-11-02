@@ -982,7 +982,7 @@ describe('token · checkTokenExpiryWarning', () => {
 
     token.checkTokenExpiryWarning(1)
 
-    const expected = _T.tokenExpiringCritical.split('{}').join('2 天')
+    const expected = 'Token 即将过期（2 天），请尽快重新获取！'
     expect(m.showToast).toHaveBeenCalledWith(expected, 'error')
   })
 
@@ -991,7 +991,7 @@ describe('token · checkTokenExpiryWarning', () => {
 
     token.checkTokenExpiryWarning(1)
 
-    const expected = _T.tokenExpiringSoon.split('{}').join('6 天')
+    const expected = 'Token 将在 6 天 后过期，建议提前重新获取'
     expect(m.showToast).toHaveBeenCalledWith(expected, 'warn')
   })
 

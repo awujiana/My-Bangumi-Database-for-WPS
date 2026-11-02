@@ -55,11 +55,27 @@ import { createStatusBarWriter } from '../../tools/util/status-bar.js'
 import { ensureSheetHeaders, readRangeCellValues } from '../../tools/util/index.js'
 import { columnNumberToLetter } from '../../tools/string-utilities.js'
 import type { WpsApp, WpsCellValue, WpsWorksheet } from '../../tools/wps.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 import { _T } from './_constants.js'
 import { showTokenDialog } from './token.js'
 
 // ========== 本地类型定义 ==========
+
+/**
+ * 收藏类型 → 当前语言的标签。
+ * 不能写成模块级常量表：那会在 import 那一刻把译文定死，切换语言后不生效。
+ */
+function collectionTypeLabel(type: 'collect' | 'wish' | 'do'): string {
+  const labels = {
+    collect: tOr('handlers.sync.typeCollect', '已看'),
+    wish: tOr('handlers.sync.typeWish', '想看'),
+    do: tOr('handlers.sync.typeDo', '在看'),
+  }
+  return labels[type]
+}
 
 /**
  * 构造并展示上传同步结果弹窗（从 syncFromPanel 步骤11 的 try 块抽出，降低 try-complexity）
@@ -72,23 +88,27 @@ function presentUploadResult(
   const totalProcessed = result.success + result.fail
   const avgSpeed =
     totalProcessed > 0 && totalElapsed > 0 ? Math.round((totalProcessed / totalElapsed) * 1000) : 0
-  const summary = `📊 同步 ${String(result.success + result.fail + result.skip)} 条 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 成功: ${String(result.success)}\n❌ 失败: ${String(result.fail)}\n⏭️ 跳过: ${String(result.skip)}`
-  const details: string[] = result.stopped
-    ? [
-        '⚠️ 同步被用户停止',
-        `成功 ${String(result.success)} 条`,
-        `失败 ${String(result.fail)} 条`,
-        `跳过 ${String(result.skip)} 条`,
-        `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-        `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-      ]
-    : [
-        `成功 ${String(result.success)} 条`,
-        `失败 ${String(result.fail)} 条`,
-        `跳过 ${String(result.skip)} 条`,
-        `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-        `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-      ]
+  const summary = tOr(
+    'handlers.sync.resultSummary',
+    '📊 同步 {total} 条 | 耗时 {duration}\n\n✅ 成功: {success}\n❌ 失败: {fail}\n⏭️ 跳过: {skip}',
+    {
+      total: result.success + result.fail + result.skip,
+      duration: formatDuration(totalElapsed),
+      success: result.success,
+      fail: result.fail,
+      skip: result.skip,
+    },
+  )
+  const speedText =
+    avgSpeed > 0 ? tOr('handlers.sync.rowsPerSecond', '{count} 行/秒', { count: avgSpeed }) : '--'
+  const details: string[] = [
+    ...(result.stopped ? [tOr('handlers.sync.stoppedByUser', '⚠️ 同步被用户停止')] : []),
+    tOr('handlers.sync.countSuccess', '成功 {count} 条', { count: result.success }),
+    tOr('handlers.sync.countFailed', '失败 {count} 条', { count: result.fail }),
+    tOr('handlers.sync.countSkipped', '跳过 {count} 条', { count: result.skip }),
+    tOr('handlers.sync.elapsed', '⏱️ 耗时: {duration}', { duration: formatDuration(totalElapsed) }),
+    tOr('handlers.sync.avgSpeed', '⚡️ 平均速度: {speed}', { speed: speedText }),
+  ]
   // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
   const stats: SyncProgressStats = {
     added: result.success,
@@ -100,7 +120,7 @@ function presentUploadResult(
     remoteTotal: result.success + result.fail + result.skip,
     elapsedMs: totalElapsed,
     avgSpeed,
-    strategyLabel: '同步到 Bangumi',
+    strategyLabel: tOr('handlers.sync.strategyUpload', '同步到 Bangumi'),
   }
   completeSyncProgressDialog(summary, details, result.stopped, undefined, stats)
 }
@@ -239,7 +259,13 @@ async function _fillSheetWithCollections(
 
     // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
     if ((index + 1) % 50 === 0) {
-      setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
+      setStatus(
+        tOr('handlers.sync.fillProgress', '正在填充收藏数据：{current}/{total}', {
+          current: index + 1,
+          total,
+        }),
+        'info',
+      )
       await new Promise((resolve) => {
         setTimeout(resolve, 0)
       })
@@ -318,7 +344,10 @@ async function _fillSheetWithCollections(
     batchStart = batchEnd + 1
   }
 
-  setStatus(`收藏数据填充完成：${String(written)}/${String(total)}`, 'info')
+  setStatus(
+    tOr('handlers.sync.fillDone', '收藏数据填充完成：{written}/{total}', { written, total }),
+    'info',
+  )
   return written
 }
 
@@ -368,7 +397,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   const app = getApp()
   if (!app?.ActiveWorkbook) {
     bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象')
-    showAlert('无法获取 Application 对象！')
+    showAlert(tOr('handlers.sync.noApplication', '无法获取 Application 对象！'))
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncFromPanel] 同步操作终止（无法获取Application），耗时: ${String(Date.now() - startTime)}ms`,
@@ -398,7 +427,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   const worksheet = getDataSheet()
   if (!worksheet) {
     bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表')
-    showAlert('未找到数据工作表，请先锁定工作表。')
+    showAlert(tOr('handlers.sync.noDataSheet', '未找到数据工作表，请先锁定工作表。'))
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncFromPanel] 同步操作终止（未找到数据工作表），耗时: ${String(Date.now() - startTime)}ms`,
@@ -427,7 +456,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
 
   if (!columnMap.has('Bangumi_URL')) {
     bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到 Bangumi_URL 列')
-    showAlert('未找到 "Bangumi URL" 列！')
+    showAlert(tOr('handlers.sync.noUrlColumn', '未找到 "Bangumi URL" 列！'))
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncFromPanel] 同步操作终止（缺少Bangumi_URL列），耗时: ${String(Date.now() - startTime)}ms`,
@@ -521,13 +550,21 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
       bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 检测到 ${String(conflictCount)} 条冲突`)
       if (conflictStrategy === 'skip') {
         conflictSubjectIds = new Set(conflicts.map((c) => c.subjectId))
-        conflictMessage = `检测到 ${String(conflictCount)} 条冲突，已选择【跳过冲突】。\n\n`
+        conflictMessage = tOr(
+          'handlers.sync.conflictSkip',
+          '检测到 {count} 条冲突，已选择【跳过冲突】。\n\n',
+          { count: conflictCount },
+        )
         bgmLog(
           LOG_LEVELS.INFO,
           `[syncFromPanel] 冲突处理策略: 跳过 ${String(conflictCount)} 条冲突条目`,
         )
       } else {
-        conflictMessage = `检测到 ${String(conflictCount)} 条冲突，将使用【Excel数据覆盖】。\n\n`
+        conflictMessage = tOr(
+          'handlers.sync.conflictOverwrite',
+          '检测到 {count} 条冲突，将使用【Excel数据覆盖】。\n\n',
+          { count: conflictCount },
+        )
         bgmLog(
           LOG_LEVELS.INFO,
           `[syncFromPanel] 冲突处理策略: 使用Excel数据覆盖 ${String(conflictCount)} 条冲突`,
@@ -547,15 +584,36 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
   // 9. 确认对话框
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤9: 显示确认对话框')
-  const message = `数据预览：
-            总行数：${String(preview.total)}
-            有效条目：${String(preview.valid)}
-            已上传（跳过）：${String(preview.alreadyUploaded)}
-            待同步：${String(preview.plannedSyncCount)}
-            不上传（状态跳过）：${String(preview.plannedSkipCount)}
-            无URL：${String(preview.noUrl)}
-            空状态：${String(preview.emptyStatus)}
-            ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMessage}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`
+  const previewLines = [
+    tOr('handlers.sync.previewTotal', '总行数：{count}', { count: preview.total }),
+    tOr('handlers.sync.previewValid', '有效条目：{count}', { count: preview.valid }),
+    tOr('handlers.sync.previewUploaded', '已上传（跳过）：{count}', {
+      count: preview.alreadyUploaded,
+    }),
+    tOr('handlers.sync.previewPlanned', '待同步：{count}', { count: preview.plannedSyncCount }),
+    tOr('handlers.sync.previewSkipped', '不上传（状态跳过）：{count}', {
+      count: preview.plannedSkipCount,
+    }),
+    tOr('handlers.sync.previewNoUrl', '无URL：{count}', { count: preview.noUrl }),
+    tOr('handlers.sync.previewEmptyStatus', '空状态：{count}', { count: preview.emptyStatus }),
+    ...(incremental
+      ? [
+          tOr('handlers.sync.previewIncremental', '增量跳过：{count}', {
+            count: preview.incrementalSkipped,
+          }),
+        ]
+      : []),
+  ]
+  const message = [
+    tOr('handlers.sync.previewTitle', '数据预览：'),
+    ...previewLines,
+    '',
+    conflictMessage +
+      tOr(
+        'handlers.sync.previewConfirm',
+        '是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。',
+      ),
+  ].join('\n')
 
   const isConfirmed = await confirmAsync(message)
   if (!isConfirmed) {
@@ -582,17 +640,34 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步')
   try {
     const syncFromPanelConfig: SyncConfigSummary = buildSyncConfig({
-      source: '当前工作表',
-      strategy: conflictStrategy === 'skip' ? '跳过冲突' : '覆盖冲突',
+      source: tOr('handlers.sync.sourceCurrentSheet', '当前工作表'),
+      strategy:
+        conflictStrategy === 'skip'
+          ? tOr('handlers.sync.strategySkipConflict', '跳过冲突')
+          : tOr('handlers.sync.strategyOverwriteConflict', '覆盖冲突'),
       direction: 'Excel → Bangumi',
       extra: [
-        { label: '数据范围', value: `第${String(headerRow + 1)}~${String(lastRow)}行` },
-        { label: '增量同步', value: incremental ? '开启' : '关闭' },
-        { label: '冲突数', value: conflictMessage ? String(conflictSubjectIds?.size ?? 0) : '0' },
+        {
+          label: tOr('handlers.sync.extraRange', '数据范围'),
+          value: tOr('handlers.sync.extraRangeValue', '第{start}~{end}行', {
+            start: headerRow + 1,
+            end: lastRow,
+          }),
+        },
+        {
+          label: tOr('handlers.sync.extraIncremental', '增量同步'),
+          value: incremental
+            ? tOr('handlers.sync.stateOn', '开启')
+            : tOr('handlers.sync.stateOff', '关闭'),
+        },
+        {
+          label: tOr('handlers.sync.extraConflictCount', '冲突数'),
+          value: conflictMessage ? String(conflictSubjectIds?.size ?? 0) : '0',
+        },
       ],
     })
     showSyncProgressDialog(
-      '正在同步 - 同步到 Bangumi',
+      tOr('handlers.sync.progressUploadTitle', '正在同步 - 同步到 Bangumi'),
       createSyncControlHandlers(BGM.sync),
       syncFromPanelConfig,
     )
@@ -642,7 +717,7 @@ export async function syncFromPanel(): Promise<void> {
   // 防重入检查：在执行任何耗时操作前就获取运行锁，避免预览/冲突检测期间用户重复点击
   if (!BGM.sync.enterRunningState()) {
     bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 同步正在进行中，拒绝重入')
-    showAlert('同步正在进行中，请稍后再试', '提示')
+    showAlert(tOr('handlers.sync.busy', '同步正在进行中，请稍后再试'), tOr('common.hint', '提示'))
     return
   }
   const prepared = prepareSyncFromPanel()
@@ -694,9 +769,9 @@ export function syncCollectionFromBgm(): void {
 
   // 默认收藏列表类型已收拢到设置页；直接读配置，避免主面板缺失该下拉时取不到值
   const listType = getListType()
-  const typeLabelMap = { collect: '已看', wish: '想看', do: '在看' }
   // 设置页「全部收藏」等价于不限定 type（syncFromBgmByAPI 以 null/undefined 表示全部）
-  const listTypeLabel = listType === 'all' ? '全部' : typeLabelMap[listType]
+  const listTypeLabel =
+    listType === 'all' ? tOr('handlers.sync.typeAll', '全部') : collectionTypeLabel(listType)
   bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 收藏类型: ${listTypeLabel}`)
 
   const token = loadBgToken()
@@ -739,10 +814,13 @@ export function syncFromBgmByAPI(
     showTokenDialog('')
     return
   }
-  const typeLabelMap = { collect: '已看', wish: '想看', do: '在看' }
-  const typeLabel = type ? typeLabelMap[type] : '全部'
+  const typeLabel = type ? collectionTypeLabel(type) : tOr('handlers.sync.typeAll', '全部')
   showConfirm(
-    `将 从 BGM API 获取你的${typeLabel}收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？`,
+    tOr(
+      'handlers.sync.confirmApiSync',
+      '将 从 BGM API 获取你的{type}收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？',
+      { type: typeLabel },
+    ),
     (confirmed) => {
       if (confirmed) {
         void _doAPISync(sheetIndex, token, type)
@@ -761,7 +839,7 @@ async function _doAPISync(
   // 记住原始活动工作表
   const app = getApp()
   if (!app?.ActiveWorkbook) {
-    showAlert('无法获取 Application')
+    showAlert(tOr('handlers.sync.noApplicationShort', '无法获取 Application'))
     return
   }
   let originalActiveSheet: WpsWorksheet | null = null
@@ -779,7 +857,7 @@ async function _doAPISync(
   const worksheet = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
   // 1. 验证 Token 并获取收藏列表
-  setStatus('正在验证 Token...', 'info')
+  setStatus(tOr('handlers.sync.verifyingToken', '正在验证 Token...'), 'info')
   const verifyResult = await verifyToken(token)
   if (!verifyResult.valid) {
     showAlert(`✘ ${verifyResult.message}`)
@@ -787,7 +865,7 @@ async function _doAPISync(
   }
   _setBgmUserId(verifyResult.userId ?? '')
 
-  setStatus('正在获取收藏列表...', 'info')
+  setStatus(tOr('handlers.sync.fetchingCollections', '正在获取收藏列表...'), 'info')
   const collectionOptions: {
     limit?: number
     maxTotal?: number
@@ -809,12 +887,21 @@ async function _doAPISync(
   if (headerRow === 0 || lastRow <= headerRow) {
     if (userCollections.length === 0) {
       bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 工作表为空且 Bangumi 账号无收藏数据')
-      showAlert('当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。')
+      showAlert(
+        tOr(
+          'handlers.sync.emptySheetNoCollection',
+          '当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。',
+        ),
+      )
       return
     }
 
     const isConfirmed = await confirmAsync(
-      `当前工作表为空，是否从 Bangumi 收藏列表自动填充 ${String(userCollections.length)} 条条目？`,
+      tOr(
+        'handlers.sync.confirmFillEmpty',
+        '当前工作表为空，是否从 Bangumi 收藏列表自动填充 {count} 条条目？',
+        { count: userCollections.length },
+      ),
     )
     if (!isConfirmed) {
       bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 用户取消空表填充')
@@ -824,19 +911,29 @@ async function _doAPISync(
     // 缺少表头时先写入标准表头
     if (headerRow === 0 || !columnMap.has('Bangumi_URL')) {
       if (!ensureSheetHeaders(worksheet)) {
-        showAlert('工作表为空且无法写入标准表头，请检查工作表状态。')
+        showAlert(
+          tOr(
+            'handlers.sync.headerWriteFailed',
+            '工作表为空且无法写入标准表头，请检查工作表状态。',
+          ),
+        )
         return
       }
       clearSheetCache(worksheet)
       headerRow = findHeaderRow(worksheet)
       columnMap = getColumnMap(worksheet, headerRow)
       if (headerRow === 0 || !columnMap.has('Bangumi_URL')) {
-        showAlert('写入标准表头后仍未找到 Bangumi URL 列，请检查模板。')
+        showAlert(
+          tOr(
+            'handlers.sync.headerStillNoUrl',
+            '写入标准表头后仍未找到 Bangumi URL 列，请检查模板。',
+          ),
+        )
         return
       }
     }
 
-    setStatus('正在填充收藏数据到 Excel...', 'info')
+    setStatus(tOr('handlers.sync.fillingToExcel', '正在填充收藏数据到 Excel...'), 'info')
     const filledCount = await _fillSheetWithCollections(
       worksheet,
       userCollections,
@@ -844,7 +941,9 @@ async function _doAPISync(
       columnMap,
     )
     if (filledCount === 0) {
-      showAlert('未能写入任何收藏数据，请检查工作表是否可编辑。')
+      showAlert(
+        tOr('handlers.sync.fillWroteNothing', '未能写入任何收藏数据，请检查工作表是否可编辑。'),
+      )
       return
     }
     bgmLog(
@@ -861,7 +960,7 @@ async function _doAPISync(
 
   // 3. 必须有 Bangumi_URL 列
   if (!columnMap.has('Bangumi_URL')) {
-    showAlert('未找到 Bangumi URL 列！')
+    showAlert(tOr('handlers.sync.noUrlColumnShort', '未找到 Bangumi URL 列！'))
     return
   }
 
@@ -869,7 +968,7 @@ async function _doAPISync(
   for (let r = headerRow + 1; r <= lastRow; r += 1) rowsToProcess.push(r)
 
   if (rowsToProcess.length === 0) {
-    showAlert('没有需要处理的数据行！')
+    showAlert(tOr('handlers.sync.noRows', '没有需要处理的数据行！'))
     return
   }
 
@@ -897,20 +996,30 @@ async function _doAPISync(
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
   if (!BGM.sync.enterRunningState()) {
     bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入')
-    showAlert('同步正在进行中，请稍后再试', '提示')
+    showAlert(tOr('handlers.sync.busy', '同步正在进行中，请稍后再试'), tOr('common.hint', '提示'))
     return
   }
   const runApiSyncFlow = async (): Promise<void> => {
     const collectionConfig: SyncConfigSummary = buildSyncConfig({
-      source: 'Bangumi 收藏列表',
-      strategy: '收藏下载',
+      source: tOr('handlers.sync.sourceBgmCollection', 'Bangumi 收藏列表'),
+      strategy: tOr('handlers.sync.strategyCollectionDownload', '收藏下载'),
       direction: 'Bangumi → Excel',
       extra: [
-        { label: '收藏条目', value: String(userCollections.length) },
-        { label: '待处理行', value: String(rowsToProcess.length) },
+        {
+          label: tOr('handlers.sync.extraCollectionCount', '收藏条目'),
+          value: String(userCollections.length),
+        },
+        {
+          label: tOr('handlers.sync.extraRowCount', '待处理行'),
+          value: String(rowsToProcess.length),
+        },
       ],
     })
-    showSyncProgressDialog('正在收藏下载', createSyncControlHandlers(BGM.sync), collectionConfig)
+    showSyncProgressDialog(
+      tOr('handlers.sync.progressCollectionTitle', '正在收藏下载'),
+      createSyncControlHandlers(BGM.sync),
+      collectionConfig,
+    )
 
     // 两阶段进度合并：累计 total，避免阶段切换时进度条从 100% 回退到 0%
     const totalCollect = userCollections.length
@@ -926,14 +1035,15 @@ async function _doAPISync(
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
 
-      const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
+      const itemName =
+        item.subject?.name_cn || item.subject?.name || tOr('handlers.sync.noName', '(无名称)')
       pendingSyncRecords.push({
         name: itemName,
         url: `https://bgm.tv/subject/${String(item.subject_id)}`,
         subjectId: String(item.subject_id),
         type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
-        content: '标记同步',
-        status: '成功',
+        content: tOr('handlers.sync.recordContent', '标记同步'),
+        status: tOr('handlers.sync.recordStatusOk', '成功'),
         count: 1,
         collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
       })
@@ -941,7 +1051,10 @@ async function _doAPISync(
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
-        `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
+        tOr('handlers.sync.stage1', '阶段1: 收藏写入同步记录 {current}/{total}', {
+          current: index + 1,
+          total: totalCollect,
+        }),
         `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
       )
     }
@@ -949,7 +1062,11 @@ async function _doAPISync(
     if (typeof addSyncRecords === 'function' && !addSyncRecords(pendingSyncRecords)) {
       // 失败必须让用户看见：收藏已同步到 Bangumi，但本地同步记录没落盘（P1-E）
       showToast(
-        `同步记录写入失败：${String(pendingSyncRecords.length)} 条收藏未登记，请检查「同步记录」工作表`,
+        tOr(
+          'handlers.sync.recordWriteFailed',
+          '同步记录写入失败：{count} 条收藏未登记，请检查「同步记录」工作表',
+          { count: pendingSyncRecords.length },
+        ),
         'error',
       )
     }
@@ -1013,10 +1130,23 @@ async function _doAPISync(
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
-        `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
+        tOr('handlers.sync.stage2', '阶段2: 标记数据表 {current}/{total}（匹配 {matched}）', {
+          current: index + 1,
+          total: totalRows,
+          matched: matchedCount,
+        }),
         isMatched
-          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${subjectId ?? ''}`
-          : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
+          ? tOr('handlers.sync.stage2Match', '✓ [{current}/{total}] 行{row} 匹配 SID={sid}', {
+              current: index + 1,
+              total: totalRows,
+              row,
+              sid: subjectId ?? '',
+            })
+          : tOr('handlers.sync.stage2NoMatch', '· [{current}/{total}] 行{row} 未匹配', {
+              current: index + 1,
+              total: totalRows,
+              row,
+            }),
       )
     }
 
@@ -1037,15 +1167,33 @@ async function _doAPISync(
       totalProcessed > 0 && totalElapsed > 0
         ? Math.round((totalProcessed / totalElapsed) * 1000)
         : 0
-    const summary = `📊 BGM 收藏 ${String(totalCollections)} 条 | 数据表 ${String(rowsToProcess.length)} 行 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 匹配标记: ${String(matchedCount)}\n📝 同步记录: ${String(syncRecords.length)}`
+    const apiSpeedText =
+      avgSpeed > 0 ? tOr('handlers.sync.rowsPerSecond', '{count} 行/秒', { count: avgSpeed }) : '--'
+    const summary = tOr(
+      'handlers.sync.apiSummary',
+      '📊 BGM 收藏 {collections} 条 | 数据表 {rows} 行 | 耗时 {duration}\n\n✅ 匹配标记: {matched}\n📝 同步记录: {records}',
+      {
+        collections: totalCollections,
+        rows: rowsToProcess.length,
+        duration: formatDuration(totalElapsed),
+        matched: matchedCount,
+        records: syncRecords.length,
+      },
+    )
     const detailsArray: string[] = [
-      ...(wasStopped ? ['⚠️ 同步被用户停止'] : []),
-      `BGM 收藏总数: ${String(totalCollections)}`,
-      `数据表总行数: ${String(rowsToProcess.length)}`,
-      `匹配标记数: ${String(matchedCount)}`,
-      `同步记录条数: ${String(syncRecords.length)}`,
-      `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-      `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+      ...(wasStopped ? [tOr('handlers.sync.stoppedByUser', '⚠️ 同步被用户停止')] : []),
+      tOr('handlers.sync.detailCollectionTotal', 'BGM 收藏总数: {count}', {
+        count: totalCollections,
+      }),
+      tOr('handlers.sync.detailRowTotal', '数据表总行数: {count}', { count: rowsToProcess.length }),
+      tOr('handlers.sync.detailMatched', '匹配标记数: {count}', { count: matchedCount }),
+      tOr('handlers.sync.detailRecordTotal', '同步记录条数: {count}', {
+        count: syncRecords.length,
+      }),
+      tOr('handlers.sync.elapsed', '⏱️ 耗时: {duration}', {
+        duration: formatDuration(totalElapsed),
+      }),
+      tOr('handlers.sync.avgSpeed', '⚡️ 平均速度: {speed}', { speed: apiSpeedText }),
     ]
     const stats: SyncProgressStats = {
       added: matchedCount,
@@ -1057,7 +1205,7 @@ async function _doAPISync(
       remoteTotal: totalCollections,
       elapsedMs: totalElapsed,
       avgSpeed,
-      strategyLabel: 'BGM 收藏同步',
+      strategyLabel: tOr('handlers.sync.strategyBgmCollection', 'BGM 收藏同步'),
     }
     completeSyncProgressDialog(summary, detailsArray, wasStopped, undefined, stats)
 

@@ -501,13 +501,13 @@ export function checkTokenExpiryWarning(expires) {
             break;
         }
         case 'danger': {
-            const message = _T.tokenExpiringCritical.split('{}').join(remaining.label);
+            const message = tOr('handlers.token.expiringCritical', 'Token 即将过期（{remaining}），请尽快重新获取！', { remaining: remaining.label });
             showToast(message, 'error');
             bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`);
             break;
         }
         case 'warning': {
-            const message = _T.tokenExpiringSoon.split('{}').join(remaining.label);
+            const message = tOr('handlers.token.expiringSoon', 'Token 将在 {remaining} 后过期，建议提前重新获取', { remaining: remaining.label });
             showToast(message, 'warn');
             bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`);
             break;
