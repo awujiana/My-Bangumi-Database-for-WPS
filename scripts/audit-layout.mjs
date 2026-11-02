@@ -33,6 +33,7 @@
  *   node scripts/audit-layout.mjs --json          # 输出 JSON
  *   node scripts/audit-layout.mjs --widths 400,500
  *   node scripts/audit-layout.mjs --locale en      # 先套上语言包再量（英文比中文长）
+ *   node scripts/audit-layout.mjs --locale en --screenshot .audit-shots   # 命中项出图
  *   CHROME_PATH=<chrome.exe> node scripts/audit-layout.mjs
  *
  * `--locale` 会在量之前把该语言包套到页面上：英文比中文长 30–50%，同样的容器
@@ -46,7 +47,15 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -282,7 +291,8 @@ function buildProbe(htmlPath, layoutWidth, locale) {
   html = html.replace(/(<link[^>]+href=")(\.\.\/[^"]+)(")/gu, (_m, head, href, tail) => {
     return `${head}${pathToFileURL(resolve(projectRoot, 'ui', href)).href}${tail}`
   })
-  const style = `<style>html { width: ${String(layoutWidth)}px; }</style>`
+  // `#audit` 是回填结果的 `<pre>`，只给 `--dump-dom` 读，截图时不该出现在画面里
+  const style = `<style>html { width: ${String(layoutWidth)}px; } #audit { display: none; }</style>`
   let script = `<script>${AUDIT}</script>`
   if (locale !== undefined) {
     if (/data-i18n(-[a-z-]+)?="/u.test(html)) {
@@ -324,6 +334,36 @@ function run(browser, pagePath) {
   return JSON.parse(decoded)
 }
 
+/**
+ * 给「有命中的页 × 宽」截一张图
+ *
+ * 判据 2（短文本折行）是启发式，报出来之后**必须**有人看一眼才能定性：同样两行，
+ * 可能是容器被挤窄（真 bug），也可能是 `flex-wrap` 网格的等高拉伸（设计如此）。
+ * 以前这里只在提示里写「需看截图」，工具本身不出图 —— 于是每次都靠手搓探针。
+ *
+ * 与 `run()` **分开跑**：`--dump-dom` 和 `--screenshot` 同时给时 Chrome 只做其中一件，
+ * 拿不到 DOM 就没法判定有没有问题。窗口宽固定 500（Chrome 的最小可用宽），
+ * 窄档靠探针里的 `html { width }` 模拟，与审计口径一致。
+ *
+ * 高度给 2400：默认视口只截一屏，而命中项常常在页面中部（工具栏、命令区都在
+ * 说明文字下面）——截不到就等于没截。2400 足够覆盖这些页面，代价是图大一点。
+ */
+function captureScreenshot(browser, pagePath, outputPath) {
+  execFileSync(
+    browser,
+    [
+      '--headless=new',
+      '--disable-gpu',
+      '--hide-scrollbars',
+      '--window-size=500,2400',
+      '--virtual-time-budget=4000',
+      `--screenshot=${outputPath}`,
+      pathToFileURL(pagePath).href,
+    ],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  )
+}
+
 function main() {
   const args = process.argv.slice(2)
   const jsonMode = args.includes('--json')
@@ -346,6 +386,13 @@ function main() {
     console.error(`✖ 找不到 locales/${locale}/locale.js`)
     return 2
   }
+  const shotArg = args.indexOf('--screenshot')
+  const shotDir = shotArg === -1 ? undefined : resolve(args[shotArg + 1] ?? '')
+  if (shotArg !== -1 && (args[shotArg + 1] ?? '') === '') {
+    console.error('✖ --screenshot 后面要跟输出目录，例如 `--screenshot .audit-shots`')
+    return 2
+  }
+  if (shotDir !== undefined) mkdirSync(shotDir, { recursive: true })
 
   const browser = findBrowser()
   if (browser === undefined) {
@@ -360,6 +407,7 @@ function main() {
 
   const dir = mkdtempSync(join(tmpdir(), 'bgm-layout-audit-'))
   const report = {}
+  const shots = []
   let total = 0
   try {
     for (const page of pages) {
@@ -371,6 +419,13 @@ function main() {
           const result = run(browser, file)
           report[page][width] = result.problems
           total += result.problems.length
+          // 只给命中项出图：7 页 × 2 宽 × 3 语言全截是 42 张，绝大多数页面是干净的
+          if (shotDir !== undefined && result.problems.length > 0) {
+            const suffix = locale === undefined ? '' : `.${locale}`
+            const shotPath = join(shotDir, `${page}.${String(width)}${suffix}.png`)
+            captureScreenshot(browser, file, shotPath)
+            shots.push(shotPath)
+          }
         } catch (error) {
           // 探针跑不起来同样是「这次没验成」，必须计入失败——否则「全部页面抛错」
           // 会打印成「✔ 未发现布局异常」并退出 0（踩过）
@@ -415,6 +470,12 @@ function main() {
       }
       console.log()
     }
+  }
+
+  if (shots.length > 0) {
+    console.log(`截图（${String(shots.length)} 张，逐张确认折行是设计还是真 bug）：`)
+    for (const shot of shots) console.log(`  ${shot}`)
+    console.log()
   }
 
   if (total === 0) {

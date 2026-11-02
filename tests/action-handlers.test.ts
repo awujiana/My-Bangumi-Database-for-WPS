@@ -256,7 +256,11 @@ vi.mock('../ts/ui/handlers/token.js', () => ({
   updateUserIdStatus: mocks.updateUserIdStatus,
 }))
 
-import { ACTION_HANDLERS, handleActionClick } from '../ts/ui/handlers/action-handlers.js'
+import {
+  ACTION_HANDLERS,
+  handleActionClick,
+  syncUsageGuideButton,
+} from '../ts/ui/handlers/action-handlers.js'
 
 // ========== helpers ==========
 
@@ -1372,6 +1376,28 @@ describe('ACTION_HANDLERS · 使用引导', () => {
   it('toggleUsageGuide → 元素缺失时静默', () => {
     expect(() => {
       runAction('toggleUsageGuide')
+    }).not.toThrow()
+  })
+
+  // 首屏专用：按钮文案是状态（展开 / 收起），没有 data-i18n，初始化时必须主动写一次，
+  // 否则英文界面会一直显示 HTML 里的中文初始值
+  it('syncUsageGuideButton → 按详情区当前状态写按钮文案', () => {
+    const detail = mountDiv('usageGuideDetail')
+    const button = mountButton('toggleUsageGuideBtn')
+
+    // display 为空串 = 正在显示
+    syncUsageGuideButton()
+    expect(button.textContent).toBe('📖 收起详细操作')
+
+    detail.style.display = 'none'
+    syncUsageGuideButton()
+    expect(button.textContent).toBe('📖 显示详细操作')
+  })
+
+  it('syncUsageGuideButton → 任一元素缺失时静默', () => {
+    mountButton('toggleUsageGuideBtn')
+    expect(() => {
+      syncUsageGuideButton()
     }).not.toThrow()
   })
 })

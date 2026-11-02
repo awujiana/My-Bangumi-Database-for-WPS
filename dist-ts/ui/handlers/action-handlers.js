@@ -27,6 +27,24 @@ import { runRemoteSyncAction } from './remote-sync-action.js';
 import { cleanLockedDataSheet, selectFailedRowsFromLastSync } from './sheet.js';
 import { syncCollectionFromBgm, syncFromPanel } from './sync.js';
 import { openUserCollection, showTokenDialog, showUserIdDialog, testDebugConnection, testTokenValidity, updateTokenStatus, updateUserIdStatus, } from './token.js';
+/**
+ * 把「使用引导」按钮的文案同步成详情区的当前状态
+ *
+ * 这个按钮**不能挂 `data-i18n`**：文案是状态（展开 / 收起），挂静态 key 会让
+ * `applyI18n()` 在切语言时把已经展开的按钮写回「显示详细操作」，下次点击就反了。
+ * 但初始化时必须写一次——否则英文界面首屏一直是 HTML 里的中文初始值，
+ * 直到用户点过这个按钮才会变（`toggleUsageGuide` 原来只在点击时设文案）。
+ */
+export function syncUsageGuideButton() {
+    const detail = document.getElementById('usageGuideDetail');
+    const button = document.getElementById('toggleUsageGuideBtn');
+    if (detail === null || button === null)
+        return;
+    const isHidden = detail.style.display === 'none';
+    button.textContent = isHidden
+        ? tOr('handlers.action.usageGuideExpand', '📖 显示详细操作')
+        : tOr('handlers.action.usageGuideCollapse', '📖 收起详细操作');
+}
 export const ACTION_HANDLERS = {
     // 核心操作
     sync: (context) => {
@@ -572,13 +590,9 @@ export const ACTION_HANDLERS = {
     toggleUsageGuide: (context) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换使用引导详情');
         const detail = document.getElementById('usageGuideDetail');
-        const button = document.getElementById('toggleUsageGuideBtn');
-        if (detail && button) {
-            const isHidden = detail.style.display === 'none';
-            detail.style.display = isHidden ? 'block' : 'none';
-            button.textContent = isHidden
-                ? tOr('handlers.action.usageGuideCollapse', '📖 收起详细操作')
-                : tOr('handlers.action.usageGuideExpand', '📖 显示详细操作');
+        if (detail) {
+            detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+            syncUsageGuideButton();
         }
         bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - context.startTime)}ms`);
     },

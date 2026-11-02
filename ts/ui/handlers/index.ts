@@ -34,7 +34,7 @@ import { clearTrackedListeners, trackedAddEventListener } from './resource-track
 
 // 子模块
 import { _T } from './_constants.js'
-import { handleActionClick } from './action-handlers.js'
+import { handleActionClick, syncUsageGuideButton } from './action-handlers.js'
 import { loadEnrichPreviewSettingsIntoForm } from './enrich-preview-settings.js'
 import { loadHighlightSettingsIntoForm } from './highlight-settings.js'
 import { initializeIncrementalSyncFromRibbon } from './incremental-bindings.js'
@@ -337,6 +337,9 @@ function startHandlers(): void {
   clearTrackedListeners()
   setupButtonListeners()
   setupTimeFilterControls()
+  // 首屏状态文案：这些节点没有 data-i18n（内容是状态），不主动写一次就会一直
+  // 停在 HTML 里的中文初始值上。`initializeI18n()` 已由入口在此之前调用。
+  syncUsageGuideButton()
   setupMessageListener()
   setupEventListeners()
   initializeIncrementalSyncFromRibbon()

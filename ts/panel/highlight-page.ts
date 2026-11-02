@@ -1132,6 +1132,12 @@ function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
   initializeTheme()
   initializeI18n()
+  // 预览计数是动态文案（`命中 N 行`），不能挂 `data-i18n`——否则切语言时
+  // `applyI18n()` 会把已算出的结果覆盖成「0 行」。而首屏按设计**不读数据**
+  // （见 highlight-bootstrap 的三条硬约束），这个节点就会一直停在 HTML 里的
+  // 中文初始值上：英文界面打开高亮页，直到点「加载并预览」前都是「命中 0 行」。
+  // 所以在 i18n 就绪后按当前语言写一次。
+  setText('highlightPreviewCount', t('highlight.preview.countZero'))
   startThemeSync()
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('highlight')
