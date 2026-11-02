@@ -17,7 +17,7 @@
 
 import { initializePanel } from '../panel/sync-panel-page.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
-import { initializeI18n } from '../i18n/index.js'
+import { initializeI18n } from '../i18n/runtime.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
 import { initializeHandlers } from '../ui/handlers/index.js'
 

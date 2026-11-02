@@ -18,7 +18,8 @@ import '../tools/wps.js'
 import { showToast } from '../ui/dialog.js'
 
 import { initializeTheme } from '../tools/theme.js'
-import { initializeI18n, t } from '../i18n/index.js'
+import { t } from '../i18n/locale-store.js'
+import { initializeI18n } from '../i18n/runtime.js'
 import { installComStartupFallback, openComGate, runComPhases } from '../tools/com-ready.js'
 
 /**

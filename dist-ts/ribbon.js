@@ -7,7 +7,9 @@ import { syncWithConfirmation, setTokenForRibbon, testTokenForRibbon, copyTokenF
 // 对话框走依赖反转桥：ribbon 属上层入口，不得直接 runtime-import UI 层
 import { getNotifyApi } from './core/ui-bridge.js';
 import { WPS_ENUM, showSyncPanel, showEnrichPanel, showSettingsPanel, showCleanPanel, showHighlightPanel, showConditionalFormatPanel, showDonatePanel, closeAllPanels, BGM, isIncrementalSyncEnabled, isSkipConflictsEnabled, setIncrementalSync, setSkipConflicts, isSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, CONFIG_KEYS, getConfig, } from './index.js';
-import { canApplyI18n, initializeI18n, onLocaleChange, t } from './i18n/index.js';
+import { canApplyI18n } from './i18n/dom.js';
+import { onLocaleChange, t } from './i18n/locale-store.js';
+import { initializeI18n } from './i18n/runtime.js';
 import { initializeWorkbookAutoDetection } from './sync/workbook-auto-detect.js';
 // 在 Ribbon 启动时通过 initializeRibbon() 显式注册（不在模块加载时自动执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI

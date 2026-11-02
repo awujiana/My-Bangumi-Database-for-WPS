@@ -9,7 +9,7 @@
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { initializeI18n } from '../i18n/index.js';
+import { initializeI18n } from '../i18n/runtime.js';
 import { startNavModeSync } from '../tools/nav-mode.js';
 import { startModuleStateSync } from '../tools/module-state.js';
 import { startNavOrderSync } from '../tools/nav-order.js';

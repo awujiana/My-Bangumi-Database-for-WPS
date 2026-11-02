@@ -25,7 +25,7 @@ import '../sync/sync-record.js';
 import '../sync/scraping.js';
 import '../sync/exceltobangumi/index.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { initializeI18n } from '../i18n/index.js';
+import { initializeI18n } from '../i18n/runtime.js';
 import { initializeShellNav } from './shell-nav.js';
 import { setupDetachablePanels } from '../ui/components/detachable-panel.js';
 import { startModuleStateSync } from '../tools/module-state.js';

@@ -1,7 +1,10 @@
 /**
- * @fileoverview i18n 对外入口（纯 barrel）
+ * @fileoverview i18n 公共出口（纯 barrel）
  * @module i18n
- * @description 业务代码统一从这里取：`import { t } from '../i18n/index.js'`。
+ * @description **生产代码已全部直连子模块，本文件当前零使用者**（2026-11-02 全仓统一），
+ *   保留作为「i18n 提供哪些能力」的单一清单与对外契约。新代码请按下表直连：
+ *   翻译取 `locale-store`、装配取 `runtime`、DOM 取 `dom`、语言代码取 `translate`；
+ *   在线安装器直连 `locale-install` / `locale-manifest`（见下方说明）。
  *   实现分六层，各自职责见对应模块：
  *   - {@link module:i18n/translate}：语言代码、占位符、覆盖率（纯函数）
  *   - {@link module:i18n/localeStore}：加载 / 缓存 / 回退链

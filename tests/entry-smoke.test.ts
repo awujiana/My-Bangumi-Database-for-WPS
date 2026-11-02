@@ -44,7 +44,7 @@ vi.mock('../ts/tools/theme.js', () => ({
 }))
 
 // i18n 只取装配时机：真正的翻译行为在 tests/i18n.test.ts
-vi.mock('../ts/i18n/index.js', () => ({
+vi.mock('../ts/i18n/runtime.js', () => ({
   initializeI18n: (): void => {
     calls.push('initializeI18n')
   },

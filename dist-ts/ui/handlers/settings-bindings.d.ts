@@ -3,7 +3,7 @@
  * @module ui/handlers/settings-bindings
  * @description 从 handlers/index.ts 抽出：各设置控件的 change 处理器与时间筛选控件初始化。
  */
-import type { LocaleCode } from '../../i18n/index.js';
+import type { LocaleCode } from '../../i18n/translate.js';
 export declare const handleEnableSyncRecordChange: () => void;
 export declare const handleLogLevelFilterChange: () => void;
 /** 设置页「📜 日志偏好」：全局日志记录级别（0=DEBUG … 3=ERROR） */

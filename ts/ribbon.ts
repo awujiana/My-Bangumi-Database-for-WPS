@@ -41,7 +41,9 @@ import {
   CONFIG_KEYS,
   getConfig,
 } from './index.js'
-import { canApplyI18n, initializeI18n, onLocaleChange, t } from './i18n/index.js'
+import { canApplyI18n } from './i18n/dom.js'
+import { onLocaleChange, t } from './i18n/locale-store.js'
+import { initializeI18n } from './i18n/runtime.js'
 import { initializeWorkbookAutoDetection } from './sync/workbook-auto-detect.js'
 
 /**

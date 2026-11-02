@@ -113,15 +113,19 @@ vi.mock('../ts/tools/theme.js', () => ({
 // `canApplyI18n` / `onLocaleChange` 也做成可控：生产里 `initializeI18n()` 是**异步**加载
 // 语言包的，配置阶段剩下的代码在同一个 tick 里跑完 —— 真实时序没法在单测里复现，
 // 所以把「语言是否就绪」做成开关，「语言变更通知」做成手动触发。
-vi.mock('../ts/i18n/index.js', () => ({
+vi.mock('../ts/i18n/dom.js', () => ({
   canApplyI18n: () => i18nState.isReady,
-  initializeI18n: mocks.initializeI18n,
+}))
+vi.mock('../ts/i18n/locale-store.js', () => ({
   // 退订函数在生产里给组件卸载用；页面生命周期与窗格一致，测试不需要，故不返回
   onLocaleChange: (listener: () => void) => {
     i18nState.listeners.push(listener)
   },
   t: translateForTest,
   tOr: translateOrForTest,
+}))
+vi.mock('../ts/i18n/runtime.js', () => ({
+  initializeI18n: mocks.initializeI18n,
 }))
 
 vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: mocks.initializeShellNav }))

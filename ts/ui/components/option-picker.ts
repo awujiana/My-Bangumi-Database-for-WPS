@@ -16,7 +16,7 @@
  * 这种 key 直接画到搜索框上。`tOr` 的兜底原文就是简体，正好是没加载时的正确表现。
  */
 
-import { tOr } from '../../i18n/index.js'
+import { tOr } from '../../i18n/locale-store.js'
 
 /** 一个可选项 */
 export interface OptionPickerItem {

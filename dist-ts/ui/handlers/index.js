@@ -5,7 +5,8 @@
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, showConfirm, refreshData, previewSyncContent, isSyncRecordEnabled, getTheme, getListType, getTimeFilter, getRefreshInterval, getLogLevel, getModalButtonsPosition, getThemeSchedule, getClusterMode, getMergeMode, } from '../../index.js';
-import { getLocale, onLocaleChange } from '../../i18n/index.js';
+import { onLocaleChange } from '../../i18n/locale-store.js';
+import { getLocale } from '../../i18n/runtime.js';
 import { loadGithubConfigIntoForm } from './github-settings.js';
 import { initializeAccountManager } from './accounts.js';
 import { initializeModuleOrderEditor } from './module-order.js';

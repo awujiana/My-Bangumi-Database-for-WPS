@@ -26,7 +26,9 @@ import { buildPreviewDetailHtml, normalizePreviewView } from './highlight-previe
 import { initializeShellNav } from './shell-nav.js';
 import { notifyModulesReady } from './action-buttons-gate.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { canApplyI18n, initializeI18n, onLocaleChange, t, tOr } from '../i18n/index.js';
+import { canApplyI18n } from '../i18n/dom.js';
+import { onLocaleChange, t, tOr } from '../i18n/locale-store.js';
+import { initializeI18n } from '../i18n/runtime.js';
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js';
 import { mountDataContextNotice, registerTargetSheetApplier, saveDataContext, snapshotFromWorksheet, } from '../tools/data-context.js';
 import { renderOptionPicker } from '../ui/components/option-picker.js';

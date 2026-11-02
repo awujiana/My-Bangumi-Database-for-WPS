@@ -105,7 +105,7 @@ vi.mock('../ts/tools/save-file.js', () => ({
 }))
 
 // i18n：页面装配时会初始化语言；翻译行为在 tests/i18n.test.ts 单独测
-vi.mock('../ts/i18n/index.js', () => ({
+vi.mock('../ts/i18n/runtime.js', () => ({
   initializeI18n: vi.fn(),
 }))
 

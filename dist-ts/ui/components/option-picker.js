@@ -15,7 +15,7 @@
  * 那时语言包可能还没 `import()` 完成，`t()` 会把 `common.searchPlaceholder`
  * 这种 key 直接画到搜索框上。`tOr` 的兜底原文就是简体，正好是没加载时的正确表现。
  */
-import { tOr } from '../../i18n/index.js';
+import { tOr } from '../../i18n/locale-store.js';
 /** 单选组 name 的唯一后缀（同页多个 picker 不互相串组） */
 let pickerSeed = 0;
 /**

@@ -88,10 +88,12 @@ vi.mock('../ts/tools/theme.js', () => ({
   startThemeSync: stubs.startThemeSync,
 }))
 // 语言初始化也是装配层职责：这里只钉「有没有调」，翻译行为在 tests/i18n.test.ts
-vi.mock('../ts/i18n/index.js', () => ({
-  initializeI18n: stubs.initializeI18n,
+vi.mock('../ts/i18n/locale-store.js', () => ({
   // 赞赏页的复制提示走 t()：回显 key，断言「用了哪个 key」比断言中文原文更防回归
   t: (key: string) => `[${key}]`,
+}))
+vi.mock('../ts/i18n/runtime.js', () => ({
+  initializeI18n: stubs.initializeI18n,
 }))
 vi.mock('../ts/tools/nav-mode.js', () => ({ startNavModeSync: stubs.startNavModeSync }))
 vi.mock('../ts/tools/module-state.js', () => ({

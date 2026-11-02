@@ -20,7 +20,8 @@ import { appendOperationLog, clearOperationLogs, CLEAN_LOG_SCOPE } from '../tool
 import { renderStatCards } from '../ui/stat-cards.js';
 import { initializeShellNav } from './shell-nav.js';
 import { initializeTheme, startThemeSync } from '../tools/theme.js';
-import { initializeI18n, tOr } from '../i18n/index.js';
+import { tOr } from '../i18n/locale-store.js';
+import { initializeI18n } from '../i18n/runtime.js';
 import { mountDataContextNotice } from '../tools/data-context.js';
 import { createProgress } from '../ui/components/progress.js';
 import { scrollToBottomCoalesced } from '../ui/dom-scroll.js';

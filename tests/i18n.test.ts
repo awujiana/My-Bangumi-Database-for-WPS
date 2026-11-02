@@ -37,7 +37,7 @@ import { bgmLog } from '../ts/tools/util/index.js'
 import { CONFIG_KEYS, getConfig, setConfig } from '../ts/tools/config.js'
 
 import { applyI18n, canApplyI18n } from '../ts/i18n/dom.js'
-import { detectSystemLocale, getLanguage, initializeI18n, setLocale } from '../ts/i18n/index.js'
+import { detectSystemLocale, getLanguage, initializeI18n, setLocale } from '../ts/i18n/runtime.js'
 import {
   LOCALE_SCHEMA_VERSION,
   loadLocale,

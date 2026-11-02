@@ -125,7 +125,7 @@ import type { ConditionalFormatApplyResult, ForeignRulePatch } from './condition
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
-import { initializeI18n } from '../i18n/index.js'
+import { initializeI18n } from '../i18n/runtime.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
 import type { SheetEntry } from '../tools/sheet-list.js'
 import { mountDataContextNotice, registerTargetSheetApplier } from '../tools/data-context.js'
