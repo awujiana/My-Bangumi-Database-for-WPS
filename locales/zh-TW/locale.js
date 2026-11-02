@@ -10,7 +10,7 @@ export default {
   "code": "zh-TW",
   "name": "Traditional Chinese",
   "nativeName": "繁體中文",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "updatedAt": "2026-11-02",
   "messages": {
     "ribbon.wpsAddinTab": "Bangumi同步",

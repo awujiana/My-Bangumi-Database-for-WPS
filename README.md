@@ -22,6 +22,19 @@
 > [!WARNING]
 > 本项目的相当一部分代码由 AI 辅助生成，并经过持续的人工作业、联调和重构，但它仍然可能存在遗漏、边界情况处理不足或行为与预期不完全一致的问题。如果你在使用过程中发现 Bug、兼容性问题、异常行为或文档缺失，欢迎积极提交 Issue。最好附上复现步骤、日志、截图和系统版本信息，这会非常有帮助。
 
+<p align="center">
+  <strong>语言 / Language</strong>：
+  <a href="README.md">简体中文</a> ·
+  <a href="README.zh-TW.md">繁體中文</a> ·
+  <a href="README.en.md">English</a>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <strong>文档 / Docs</strong>：
+  <a href="#sec-11">文档索引</a> ·
+  <a href="CONTRIBUTING.md">贡献指南</a> ·
+  <a href="CHANGELOG.md">更新日志</a> ·
+  <a href="文档/待办-多语言支持.md">多语言支持</a>
+</p>
+
 ## 📚 目录
 
 - [项目简介](#sec-1)
@@ -76,7 +89,7 @@
 | 🔄 **5 种同步策略**  | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ✅ **同步偏好**      | 增量同步、冲突跳过、同步记录开关、默认收藏列表类型、默认时间筛选范围、自动刷新间隔；基于同步记录的「撤销同步」。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 🎨 **外观主题**      | 深色 / 浅色 / 跟随系统 / 定时四种模式；设置页日夜开关（太阳 / 月亮滑块）点一下即从按钮中心向外扩散切换，可设深浅起止时间。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| 🌐 **多语言**        | 简体 / 繁体 / 英文三语，各 **407 key 全覆盖**；切语言即时生效（ribbon 按钮文案要下次启动）。语言包随插件发布，设置页可「更新语言包」（下载 → 校验 SHA-256 → 落盘，坏包一个字节都不写）或「打开语言包目录」手动放入。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 🌐 **多语言**        | 简体 / 繁体 / 英文三语，各 **1858 key 全覆盖**；切语言即时生效（ribbon 按钮文案要下次启动）。语言包随插件发布，设置页可「更新语言包」（下载 → 校验 SHA-256 → 落盘，坏包一个字节都不写）或「打开语言包目录」手动放入。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ⌨️ **快捷键**        | 六个面板跳转可自定义键盘组合（录制式改绑、重复组合拒绝保存并指出占用者）；侧栏导航支持中键 / Ctrl+左键手势（专注 / 隐藏）。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 🧩 **模块排序**      | 每页模块可拖拽或 ↑↓ 排序；眼睛按钮可逐模块隐藏，也能一键隐藏整条侧栏功能导航（窄任务窗格时主区铺满）。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 🎛️ **条件格式口径**  | **「应用条件格式」默认增量**：只把「我的规则 / 默认规则集」写进表，表上已有同「范围 + 公式」的只刷新颜色、缺的补上，**既有规则一条都不删**（手工建的、别的工具建的都留着）；只有本插件上一轮写过、规则库里已删掉的才会被移除（账本 `conditionalFormat.applied.v1` 按表记录）。真要重来用 `🧹 清空整表后应用`（危险按钮，先列清单再确认）。写后逐条回读，没落地的规则名会直接出现在提示里。「工作表规则」的「自动聚类」可按公式 / 范围+公式 / 列 / 行分组；「🔗 合并重复项」把同公式同列的多条单行规则合并（仅连续行 / 强行并成一块两种口径），均在设置页切换。工作表规则每行可 ✎ 编辑（范围 / 公式 / 颜色）与 ⧉ 复制；「导出规则」支持导出到文件 / 剪贴板；「我的规则」可 ⧉ 复制所选后一次粘贴多条（表格展示、可批量统一范围），三处都能「✎ 批量修改」范围 / 公式 / 颜色；「导入工作表规则」右侧 ▾ 还能从文件（项目导出的 .json）或文本导入；目标工作表选择器按数量自动切换单选 / 搜索。四张表（工作表规则 / 我的规则 / 导入弹框 / 粘贴表格）都能**拖表头改列宽、拖表头下沿改行高**（双击把手回到自动），尺寸按表记住；默认是随窗格宽度自适应的模板，没拖过的列不会变死。 |
@@ -147,10 +160,10 @@
 
 ## 📂 目录结构
 
-以下为发布包 **`My-Bangumi-Database-for-WPS-v2.3.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
+以下为发布包 **`My-Bangumi-Database-for-WPS-v2.4.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
 
 ```
-My-Bangumi-Database-for-WPS-v2.3.0/
+My-Bangumi-Database-for-WPS-v2.4.0/
 ├── index.html                  # 加载项入口（WPS 启动时加载）
 ├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
 ├── manifest.xml                # 加载项清单（ApiVersion / Name）
@@ -186,6 +199,11 @@ My-Bangumi-Database-for-WPS-v2.3.0/
 │   ├── tools/                  # 工具函数（http / wps / logger / sanitize / clipboard ...）
 │   └── ui/                     # 面板 UI 与 handlers/
 ├── images/                     # 功能区与面板图标（SVG）、赞赏二维码
+├── locales/                    # 语言包（简体 / 繁体 / 英语）
+│   ├── index.js                # 语言包清单（code / version / updatedAt / sha256 / 覆盖率）
+│   ├── zh-CN/locale.js         # 简体（源语言，由 ui/*.html 的 data-i18n* 反向提取）
+│   ├── zh-TW/locale.js         # 繁体
+│   └── en/locale.js            # 英语
 ├── libs/                       # 运行时第三方库
 │   ├── fit-viewport.js
 │   ├── purify.js               # DOMPurify UMD
@@ -287,13 +305,13 @@ npm run debug
    > Windows 上最快的到达方式：`Win + R` → 输入 `%appdata%` → 回车，再依次进入 `kingsoft\wps\jsaddons`。
    > 例：`C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
    - **(推荐) 安装器 / publish.html**：用 WPS 官方 `wpsjs` 工具链生成的 `publish.html`（离线模式）或 `wpsjs build --exe` 生成的安装器，浏览器打开后点「安装」，会自动写入上面的 `publish.xml`。
-   - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.1.0\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
+   - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.4.0\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
 
      ```xml
      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      <jsplugins>
        <jsplugin name="My Bangumi Database for WPS"
-                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.1.0/"
+                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.4.0/"
                  enable="true"/>
      </jsplugins>
      ```
@@ -305,7 +323,7 @@ npm run debug
    **操作前请务必先完全关闭 WPS**（含托盘里的 WPS 云服务进程），否则文件被占用会删不掉：
 
    1. 进入上表的加载项目录（Windows：`%APPDATA%\kingsoft\wps\jsaddons`）；
-   2. 找到本插件的文件夹 —— 名为 `My-Bangumi-Database-for-WPS_2.1.0`（或 `my-bangumi-database-for-wps_2.1.0`、以及带版本号后缀的类似名称），**整目录删除**；
+   2. 找到本插件的文件夹 —— 名为 `My-Bangumi-Database-for-WPS_2.4.0`（或 `my-bangumi-database-for-wps_2.4.0`、以及带版本号后缀的类似名称），**整目录删除**；
    3. 可选：编辑同目录的 `publish.xml`，删掉指向该目录的 `<jsplugin .../>` 那一行（只删这一行）。
 
    > ⚠️ 不要删除整个 `jsaddons` 文件夹，也不要删掉 `publish.xml` 本身 —— 里面可能还有其它加载项的注册信息，删了会一起失效。
@@ -372,9 +390,9 @@ npm run debug
 
 ```bash
 # Windows PowerShell
-Get-FileHash .\My-Bangumi-Database-for-WPS-v2.2.4.zip -Algorithm SHA256
+Get-FileHash .\My-Bangumi-Database-for-WPS-v2.4.0.zip -Algorithm SHA256
 # macOS / Linux
-shasum -a 256 My-Bangumi-Database-for-WPS-v2.2.4.zip
+shasum -a 256 My-Bangumi-Database-for-WPS-v2.4.0.zip
 ```
 
 两个值一致才说明这份包没被改过。
@@ -528,10 +546,10 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
    | owner  | `awujiana`                    |
    | repo   | `Bangumi-Archive-Anime-Excel` |
    | branch | `main`                        |
-   | path   | `data/bangumi.jsonlines.gz`   |
+   | path   | `data/anime.manifest.json`    |
 
 2. 选择同步策略（`add-update` 默认，保守）。
-3. 点击 **立即同步**（或功能区 **数据同步**）。插件下载 JSONL → 哈希比对缓存 → 按 SID 增量写入 Excel。
+3. 点击 **立即同步**（或功能区 **数据同步**）。插件先读分片清单，按表头挑需要的分片下载 JSONL → 哈希比对缓存 → 按 SID 增量写入 Excel。
 4. 可用 **撤销同步** 回滚上一次操作；**清缓存** 强制重新下载。
 
 > 数据源格式、清单字段与选片规则见[数据仓库 README](https://github.com/awujiana/Bangumi-Archive-Anime-Excel)。
@@ -595,7 +613,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 （详见 [`CHANGELOG.md`](CHANGELOG.md) 里对应的修复记录）。判据 2 是启发式，命中项需人工确认；
 命令支持 `--json` / `--widths 360,500` / 指定单个页面。
 
-当前基线：**5369 条测试 / 178 文件**。
+当前基线：**5525 条测试 / 183 文件**。
 
 > **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
 > 这部分只能真机逐项过：装上 WPS 后按「使用示例」一节把六条主流程走一遍，重点看长表格滚动、网络中断重试、多账号切换与更新安装。

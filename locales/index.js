@@ -19,33 +19,33 @@ export default {
       "code": "zh-CN",
       "name": "Simplified Chinese",
       "nativeName": "简体中文",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "updatedAt": "2026-11-02",
       "keyCount": 1858,
       "coverage": 100,
-      "sha256": "6b147f5e5dc60a9ef2fa45ac7cb19c3f57eb8312020479b7f084ed87fe9bb149",
+      "sha256": "b5bbcd13b56b32258055dce47f8fe219106ea1d5e57a1509086b0ae4926468c0",
       "bytes": 153681
     },
     {
       "code": "zh-TW",
       "name": "Traditional Chinese",
       "nativeName": "繁體中文",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "updatedAt": "2026-11-02",
       "keyCount": 1858,
       "coverage": 100,
-      "sha256": "03d3771f77a533179eec9af3c30af73ca8d90b7c21697d0204ed3217c0a7032b",
+      "sha256": "71e2d6e7ff586a3c9e3b2fefbf8ce6984a6d62e57704acedae4ba4cebedbbecf",
       "bytes": 154095
     },
     {
       "code": "en",
       "name": "English",
       "nativeName": "English",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "updatedAt": "2026-11-02",
       "keyCount": 1858,
       "coverage": 100,
-      "sha256": "1761edd26631e20a217faf86164a130230439073a149bf811880bf062bac0ed6",
+      "sha256": "36f18980213824bd0c57ed07006435083538400dd58925645f9dc3e4ab9aac8a",
       "bytes": 160077
     }
   ]

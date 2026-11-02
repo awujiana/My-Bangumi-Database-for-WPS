@@ -1,10 +1,83 @@
 # 更新日志（CHANGELOG）
 
-> 本文件按「内部功能版本」记录重大变更。注意：`package.json` 中的 `version` 字段（当前 `1.0.0`）为 npm 包发布版本，与本文档的 `v3.x` 内部功能版本相互独立，二者不要求一致。
+> 本文件按「功能版本」记录重大变更。`package.json` 的 `version` 与本文档标题里的版本号**现已对齐**（都从 `2.x` 递增，`2.4.0` 起语言包版本与插件版本同号）；历史上两者曾各自独立（`1.0.0` / `v3.x` 时期），看到旧条目里的版本差异不必当异常。
 
 本文档与 [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)（用户手册版本历史）、[`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md)（架构文档版本历史）互为补充：架构级变更以架构文档为准，操作级变更以用户手册为准，本文件提供跨文档的总览索引。
 
 ---
+
+## [2.4.0] - 2026-11-02
+
+### 三语界面（简体 / 繁體 / English，各 1858 key 全覆盖）+ 语言包独立分发（2026-11-01 ~ 11-02）
+
+界面文案原先**全部硬编码在 TS 与 HTML 里**（实测约 4,900 处中文字面量：TS 4,048 +
+HTML 954）。这一版把它抽成语言包，并做到「换语言不用重启 WPS」。整个工程按
+P0→P5 六个阶段推进，过程记录见 [`文档/待办-多语言支持.md`](文档/待办-多语言支持.md)。
+
+- **语言包格式**：`locales/<code>/locale.js`，`export default` + 纯 JSON，**不是 `.json`**
+  —— 安装态页面跑在 `file://` 下，CEF 会拦掉 `fetch` 读本地文件（真机实测
+  `Failed to fetch`），只有 ESM 的 `import()` 能读。清单同理是 `locales/index.js`。
+- **切语言立即生效**：设置 → 外观 → 界面语言，点一下即换。各任务窗格是独立 WebView，
+  `postMessage` 跨窗格不可靠，改走 `PluginStorage` + 轮询（`subscribeConfigPoll`，
+  空闲拍 ≤3 秒、变化后快拍 ≤0.6 秒）。
+- **Ribbon 只能半自动**：实测 WPS 12.1.0.29158 的 `getLabel` **仅对 `<tab>` 生效**，
+  group / button / checkBox 从未被调用（删掉静态 `label` 也不调），`InvalidateControl`
+  同样不触发。所以 tab 名运行时变，**按钮文案要等下次启动 WPS**；设置页的提示文案
+  已明写这一点，避免被当成 bug。
+- **繁体不是机翻**：`OpenCC s2twp` 只用来出初稿，术语按
+  [`locales/术语表.md`](locales/术语表.md) 校正（`设置→設定`、`文件→檔案`、
+  `导入/导出→匯入/匯出`、`用户→使用者`、`登录→登入`、`插件→外掛`、`刷新→重新整理`
+  等 17 条对照 + 14 条 `TERM_FIX`；`<code>` 里的字段名/存储键先挖掉再转，避免
+  `只` 被转成 `隻`）。
+- **英语要防溢出**：英文普遍比中文长 30–50%，ribbon 按钮与表格列宽会挤。用真浏览器
+  探针复测（`check:shard-layout` / `audit:layout --locale en`），已知 `400px` 下
+  「⬇️ Update language packs」折两行，与 `sync-panel` 核心按钮折行同性质，未造短版 key。
+- **语言包三种来源**：内置（随 zip 发布，三份合计约 111 KB）／设置页「⬇️ 更新语言包」
+  在线下载（raw CDN 单文件，不打包 zip）／「📂 打开语言包目录」手动拖入（重开页面生效，
+  ESM 按 URL 缓存模块，热替换没有可靠办法）。
+- **落盘前必须转纯 ASCII**：写盘唯一通道是 FSO 的 `CreateTextFile`，只能写 UTF-16 LE
+  或系统 ANSI，**写不了 UTF-8**，而 `.js` 模块必须是 UTF-8。绕法是把非 ASCII 全部转
+  `\uXXXX`（`toAsciiModule`），配套 `isAsciiRoundTripSafe` 转义后重新解析自证，
+  不过就放弃写入 —— 转义写错会让用户装上一个坏包，而界面只会退回中文，看不出是谁干的。
+- **哈希对 LF 归一**：工作区 `core.autocrlf=true`（检出 CRLF、提交 LF），直接哈希工作区
+  字节会算出一个永远对不上发布端的值。`gen-locale-index.mjs` 与门禁都先
+  `replaceAll('\r\n','\n')` 再算；另用 `git show HEAD:locales/<code>/locale.js` 的字节
+  （= raw CDN 将来提供的字节）复算，三份与清单里的 `sha256` 全部相等。
+- **校验只在「下载到写盘之间」**：落盘后的字节与仓库里的必然不同（UTF-8 → ASCII 转义），
+  拿清单的 `sha256` 比本地文件永远「不一致」。所以「要不要更新」看 `version` / `updatedAt`。
+
+### 语言包与门禁
+
+- 新增 `ts/i18n/`：`translate.ts`（key 表 + `t` / `tOr`）、`locale-store.ts`（包仓库）、
+  `locale-manifest.ts`（清单解析 + 在线获取 + `comparePackState`）、`locale-install.ts`
+  （下载 → 校验 → 转义 → 落盘）、`dom.ts`（`data-i18n*` 替换）、`runtime.ts`（切语言编排）。
+- `check:i18n` 扩到 5 条规则（含 16 个变异用例）：三语 key 集合与覆盖率必须 100%、
+  语言按钮与 `LOCALE_CODES` 严格一一对应（顺序也一致）、清单必须与实际语言包一致
+  （`check:i18n-index`）、`data-i18n` 节点里不能有子元素、`data-i18n-html` 里不能有
+  `data-action` / `id` / 表单控件。另加 `check:i18n-reverse` 反向扫描（源码级断言，
+  自身也有变异用例）：防止「key 存在但没接线」。
+- 新增 `scripts/gen-locale-index.mjs`、`tests/locale-install.test.ts`（39 条）等；
+  测试基线 178 文件 / 5369 条 → **183 文件 / 5525 条**。
+
+### 页面标识 `panel` → `sync-panel`（会动用户存储键，已带迁移）
+
+- 原名字看不出这是「同步面板」，与 `enrich` / `clean` / `highlight` 并列时尤其含糊。
+  改名连带 `bgm_locked_sheet_<page>`、`pane_alive_<page>`、`bgm_nav_order` /
+  `bgm_module_collapsed` / `bgm_module_hidden` 里的 `{页面: …}`。
+- **升级不会丢状态**：新增 `ts/tools/page-key.ts` 做别名归一（`panel` → `sync-panel`，
+  映射表只允许追加），读存储时按「当前键 → 历史键」依次回退，写回自然落到新键上；
+  迁移完成后旧键删除。`locked-sheet` / `pane-alive` / `nav-order` / `module-state`
+  四处都接了。
+- 顺带把控件 id 改成全拼（`btn` / `cb` 之类的缩写展开），便于 `data-i18n` key 与
+  `ribbon.xml` 的 `id` 一一对应。
+
+### 文档
+
+- 新增 [`README.en.md`](README.en.md) 与 [`README.zh-TW.md`](README.zh-TW.md) 两份**完整**
+  翻译（章节、锚点、表格与中文版一一对应，不是精简落地页）；中文 `README.md` 顶部加语言
+  切换与文档链接块。
+- 修正三份 README 里「数据同步」的路径示例为 `data/anime.manifest.json`（分片清单）——
+  中文版此前仍写 `data/bangumi.jsonlines.gz`，是分片化之前的旧口径。
 
 ## [2.3.0] - 2026-10-30
 
