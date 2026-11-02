@@ -23,12 +23,12 @@
 > A substantial part of this project was written with AI assistance and has since gone through continuous manual work, integration testing and refactoring. Even so, it may still contain omissions, insufficient edge-case handling, or behaviour that does not fully match expectations. If you run into a bug, a compatibility problem, unexpected behaviour or missing documentation, please open an Issue. Reproduction steps, logs, screenshots and your system version help a lot.
 
 <p align="center">
-  <strong>Language</strong>：
+  <strong>Language</strong>: 
   <a href="README.md">简体中文</a> ·
   <a href="README.zh-TW.md">繁體中文</a> ·
   <a href="README.en.md">English</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <strong>Docs</strong>：
+  <strong>Docs</strong>: 
   <a href="#sec-11">Documentation index</a> ·
   <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
