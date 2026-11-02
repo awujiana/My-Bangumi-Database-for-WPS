@@ -161,10 +161,10 @@ The UI follows [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/) plus the "10 usabili
 
 ## 📂 Repository layout
 
-Below is the layout of the release package **`My-Bangumi-Database-for-WPS-v2.4.0.zip`** after extraction (i.e. the files actually loaded by WPS after installation — no sources, tests or docs):
+Below is the layout of the release package **`My-Bangumi-Database-for-WPS-v2.4.1.zip`** after extraction (i.e. the files actually loaded by WPS after installation — no sources, tests or docs):
 
 ```
-My-Bangumi-Database-for-WPS-v2.4.0/
+My-Bangumi-Database-for-WPS-v2.4.1/
 ├── index.html                  # Add-in entry point (loaded when WPS starts)
 ├── main.js                     # Dynamic module loader (early ribbon placeholder, real implementation swapped in later)
 ├── manifest.xml                # Add-in manifest (ApiVersion / Name)
@@ -306,13 +306,13 @@ npm run debug
    > On Windows the quickest route: `Win + R` → type `%appdata%` → Enter, then go into `kingsoft\wps\jsaddons`.
    > Example: `C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
    - **(Recommended) Installer / publish.html**: use the `publish.html` produced by WPS's official `wpsjs` toolchain (offline mode), or the installer produced by `wpsjs build --exe`. Open it in a browser and click "Install"; it writes the `publish.xml` above for you.
-   - **Manual registration**: put the extracted add-in directory at `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.4.0\`, then edit `publish.xml` in the same directory (create it if missing) and add one entry:
+   - **Manual registration**: put the extracted add-in directory at `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.4.1\`, then edit `publish.xml` in the same directory (create it if missing) and add one entry:
 
      ```xml
      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      <jsplugins>
        <jsplugin name="My Bangumi Database for WPS"
-                 url="file:///C:/Users/you/jsaddons/My Bangumi Database for WPS_2.4.0/"
+                 url="file:///C:/Users/you/jsaddons/My Bangumi Database for WPS_2.4.1/"
                  enable="true"/>
      </jsplugins>
      ```
@@ -324,7 +324,7 @@ npm run debug
    **Close WPS completely first** (including the WPS cloud process in the tray), otherwise the files are locked and cannot be deleted:
 
    1. Go to the add-in directory from the table above (Windows: `%APPDATA%\kingsoft\wps\jsaddons`);
-   2. Find this add-in's folder — named `My-Bangumi-Database-for-WPS_2.4.0` (or `my-bangumi-database-for-wps_2.4.0`, or similar with a version suffix) — and **delete the whole directory**;
+   2. Find this add-in's folder — named `My-Bangumi-Database-for-WPS_2.4.1` (or `my-bangumi-database-for-wps_2.4.1`, or similar with a version suffix) — and **delete the whole directory**;
    3. Optional: edit `publish.xml` in the same directory and remove the `<jsplugin .../>` line pointing at it (that line only).
 
    > ⚠️ Do not delete the whole `jsaddons` folder, and do not delete `publish.xml` itself — it may contain registrations for other add-ins, and deleting it breaks them too.
@@ -385,9 +385,9 @@ Automatic install relies on PowerShell and is **Windows only**. Otherwise:
 
 ```bash
 # Windows PowerShell
-Get-FileHash .\My-Bangumi-Database-for-WPS-v2.4.0.zip -Algorithm SHA256
+Get-FileHash .\My-Bangumi-Database-for-WPS-v2.4.1.zip -Algorithm SHA256
 # macOS / Linux
-shasum -a 256 My-Bangumi-Database-for-WPS-v2.4.0.zip
+shasum -a 256 My-Bangumi-Database-for-WPS-v2.4.1.zip
 ```
 
 Both values must match for the package to be unmodified.
