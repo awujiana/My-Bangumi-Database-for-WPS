@@ -1064,6 +1064,42 @@ describe('handleScan', () => {
     expect(buttonById('cleanRunBtn').disabled).toBe(true)
   })
 
+  it('扫描与预览文案走语言包：注入英文包后统计卡、空态与 toast 同步切换', async () => {
+    await mountScannable()
+    // mountScannable 里 loadPage() 已 resetModules → 现在取到的才是渲染用的那份实例
+    const store = await import('../ts/i18n/locale-store.js')
+    store.primeLocaleForTest({
+      schemaVersion: store.LOCALE_SCHEMA_VERSION,
+      code: 'en',
+      name: 'English',
+      nativeName: 'English',
+      version: 'test',
+      updatedAt: '2026-01-01',
+      // 只放这条链路用到的 key；真实语言包是否齐全由 check:i18n（三语 100%）把关
+      messages: {
+        'clean.preview.stat.deleteRows': 'EN rows',
+        'clean.preview.stat.bytes': 'EN freed',
+        'clean.preview.nothing': 'EN nothing',
+        'clean.scan.nothing': 'EN nothing toast',
+      },
+    })
+    store.useLocale('en')
+    m.scanCleanRules.mockReturnValue(emptyScanResult())
+
+    clickById('cleanScanBtn')
+    await flushAsync()
+
+    const labels = (m.renderStatCards.mock.calls[0]?.[1] as { label: string }[]).map(
+      (card) => card.label,
+    )
+    expect(labels).toContain('EN rows')
+    expect(labels).toContain('EN freed')
+    expect(byId('cleanPreviewDetail').innerHTML).toContain('EN nothing')
+    expect(m.showToast).toHaveBeenCalledWith('EN nothing toast', 'info')
+
+    store.resetLocaleStoreForTest()
+  })
+
   it('重复组计划渲染「保留行 vs 待删除行」diff 对比', async () => {
     await mountScannable()
     m.scanCleanRules.mockReturnValue({

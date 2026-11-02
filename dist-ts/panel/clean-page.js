@@ -103,7 +103,9 @@ function getSelectedSheetKeys() {
  * - 顶部统计行：工作簿数 / 工作表数 / 已勾选数；
  * - 列表固定高度内滚动，工作簿按组分块；
  * - 每个工作簿标题可点击折叠，并提供「本簿全选 / 本簿清空」；
- * - 未识别到名称列的表**不再禁用**，仅显示 ⚠️ 原因（用户仍可勾选，规则会按列缺失自行跳过）。
+ * - 未识别到名称列的表**不再禁用**，仅显示 ⚠️ 原因（用户仍可勾选，规则会按列缺失自行跳过）；
+ * - 能清理但行级规则走不通的表（月历式新番表 / 缺标准「名称」列）额外标注原因，
+ *   避免「勾了重复名称却一条都不删」被当成 bug —— 文案全部走语言包。
  */
 function renderSheetList() {
     const container = document.getElementById('cleanSheetList');
@@ -368,7 +370,7 @@ function collectSheetCandidates(workbooks) {
 function handleLoadSheets() {
     const app = getApp();
     if (!app) {
-        BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试');
+        BGM.Dialog.alert(tOr('common.hint', '提示'), tOr('clean.noHost', '未连接到 Excel / WPS，请打开工作簿后重试'));
         return;
     }
     try {
@@ -377,22 +379,23 @@ function handleLoadSheets() {
         if (!workbooks) {
             sheetCandidates = [];
             renderSheetList();
-            appendLog('未找到已打开的工作簿', 'warn');
+            appendLog(tOr('clean.load.noWorkbook', '未找到已打开的工作簿'), 'warn');
             return;
         }
         sheetCandidates = collectSheetCandidates(workbooks);
         const autoPicked = preselectEligibleSheets();
         renderSheetList();
         const eligible = sheetCandidates.filter((candidate) => candidate.eligible).length;
-        appendLog(`已加载 ${String(sheetCandidates.length)} 张工作表（识别 ${String(eligible)} 张，自动勾选 ${String(autoPicked)} 张）`, 'info');
+        appendLog(tOr('clean.load.done', '已加载 {sheets} 张工作表（识别 {eligible} 张，自动勾选 {picked} 张）', { sheets: sheetCandidates.length, eligible, picked: autoPicked }), 'info');
         if (eligible === 0 && sheetCandidates.length > 0) {
-            appendLog('未识别到「名称 / Bangumi_URL」列的数据表；可手动勾选任意工作表，规则会按列缺失自动跳过', 'warn');
+            appendLog(tOr('clean.load.noneEligible', '未识别到「名称 / Bangumi_URL」列的数据表；可手动勾选任意工作表，规则会按列缺失自动跳过'), 'warn');
         }
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        appendLog(`加载工作表失败：${message}`, 'error');
-        showToast(`加载工作表失败：${message}`, 'error');
+        const failed = tOr('clean.load.failed', '加载工作表失败：{message}', { message });
+        appendLog(failed, 'error');
+        showToast(failed, 'error');
     }
 }
 /** 为单个工作簿预勾选识别成功的工作表；返回勾选数量（已有持久化选择则不动） */
@@ -566,8 +569,6 @@ function invalidatePreview() {
 // ========== 预览 ==========
 /** 噪声行规则 ID（其预览文本为整行拼接，列标签切换为「行内容」） */
 const NOISE_ROWS_RULE_ID = 'noiseRows';
-/** 空白数据行在 diff 视图中的占位文本 */
-const BLANK_ROW_LABEL = '（空白行）';
 /** 累加各清理计划的删除行数 */
 function sumDeleteRows(result) {
     return result.plans.reduce((sum, plan) => sum + plan.deleteRows.length, 0);
@@ -584,13 +585,25 @@ function sumChanges(result) {
  */
 function renderPreviewStats(result) {
     renderStatCards(document.getElementById('cleanPreviewSummary'), [
-        { label: '涉及文件', value: result.fileCount },
-        { label: '目标工作表', value: result.targetCount },
-        { label: '命中规则', value: result.plans.length },
-        { label: '待清理条目', value: result.itemCount },
-        { label: '删除行', value: sumDeleteRows(result), tone: 'error' },
-        { label: '单元格变更', value: sumChanges(result), tone: 'warning' },
-        { label: '预计释放', value: formatBytes(result.estimatedBytes), tone: 'accent' },
+        { label: tOr('clean.preview.stat.files', '涉及文件'), value: result.fileCount },
+        { label: tOr('clean.preview.stat.targets', '目标工作表'), value: result.targetCount },
+        { label: tOr('clean.preview.stat.rules', '命中规则'), value: result.plans.length },
+        { label: tOr('clean.preview.stat.items', '待清理条目'), value: result.itemCount },
+        {
+            label: tOr('clean.preview.stat.deleteRows', '删除行'),
+            value: sumDeleteRows(result),
+            tone: 'error',
+        },
+        {
+            label: tOr('clean.preview.stat.changes', '单元格变更'),
+            value: sumChanges(result),
+            tone: 'warning',
+        },
+        {
+            label: tOr('clean.preview.stat.bytes', '预计释放'),
+            value: formatBytes(result.estimatedBytes),
+            tone: 'accent',
+        },
     ]);
 }
 /**
@@ -605,27 +618,41 @@ function buildDeleteRowsSection(plan) {
         return null;
     // 噪声行的预览文本来自整行拼接（无「名称」概念），列标签随之切换
     const isNoiseRule = plan.ruleId === NOISE_ROWS_RULE_ID;
-    const columns = [isNoiseRule ? '行内容' : '名称', 'Bangumi_URL', '说明'];
+    // Bangumi_URL 是字段名（数据契约），不翻；其余是展示标签
+    const columns = [
+        isNoiseRule
+            ? tOr('clean.preview.col.content', '行内容')
+            : tOr('clean.preview.col.name', '名称'),
+        'Bangumi_URL',
+        tOr('clean.preview.col.note', '说明'),
+    ];
     const rows = [];
     const groups = plan.groupPreviews ?? [];
     if (groups.length > 0) {
         for (const [index, group] of groups.entries()) {
             const contextRow = {
                 kind: 'context',
-                cells: [`第 ${String(index + 1)} 组 · 名称「${group.keepName}」`],
+                cells: [
+                    tOr('clean.preview.groupHeader', '第 {index} 组 · 名称「{name}」', {
+                        index: index + 1,
+                        name: group.keepName,
+                    }),
+                ],
             };
             const keepRow = {
                 kind: 'keep',
                 rowNumber: group.keepRow,
                 cells: [group.keepName, group.keepUrl],
-                note: '保留',
+                note: tOr('clean.preview.note.keep', '保留'),
             };
             const victimRows = group.victims.map((victim) => ({
                 kind: 'delete',
                 rowNumber: victim.row,
                 cells: [victim.name, victim.url],
                 // 数据驱动说明：无 URL 的名称重复 / 与保留行同 URL 的跨名称重复
-                note: victim.url === '' ? '无 URL' : 'URL 与保留行相同',
+                note: victim.url === ''
+                    ? tOr('clean.preview.note.noUrl', '无 URL')
+                    : tOr('clean.preview.note.sameUrl', 'URL 与保留行相同'),
             }));
             rows.push(contextRow, keepRow, ...victimRows);
         }
@@ -638,16 +665,26 @@ function buildDeleteRowsSection(plan) {
             rows.push({
                 kind: 'delete',
                 rowNumber: row,
-                cells: [name === '' ? BLANK_ROW_LABEL : name, preview?.url ?? ''],
-                note: isNoiseRule ? '噪声行' : '',
+                cells: [
+                    name === '' ? tOr('clean.preview.blankRow', '（空白行）') : name,
+                    preview?.url ?? '',
+                ],
+                note: isNoiseRule ? tOr('clean.preview.note.noiseRow', '噪声行') : '',
             });
         }
     }
-    const groupSuffix = groups.length > 0 ? ` · ${String(groups.length)} 组` : '';
+    const groupSuffix = groups.length > 0
+        ? tOr('clean.preview.rows.groups', ' · {count} 组', { count: groups.length })
+        : '';
     return {
         id: `${plan.targetKey}::${plan.ruleId}::rows`,
-        title: `${plan.ruleName} · 待删除行`,
-        subtitle: `${plan.targetLabel} · 删 ${String(plan.deleteRows.length)} 行${groupSuffix} · 约 ${formatBytes(plan.estimatedBytes)}`,
+        title: tOr('clean.preview.rows.title', '{rule} · 待删除行', { rule: plan.ruleName }),
+        subtitle: tOr('clean.preview.rows.subtitle', '{target} · 删 {rows} 行{groups} · 约 {bytes}', {
+            target: plan.targetLabel,
+            rows: plan.deleteRows.length,
+            groups: groupSuffix,
+            bytes: formatBytes(plan.estimatedBytes),
+        }),
         columns,
         rows,
     };
@@ -673,9 +710,12 @@ function buildCellChangesSection(plan) {
     }
     return {
         id: `${plan.targetKey}::${plan.ruleId}::cells`,
-        title: `${plan.ruleName} · 单元格变更`,
-        subtitle: `${plan.targetLabel} · ${String(plan.changes.length)} 处变更`,
-        columns: ['列', '值'],
+        title: tOr('clean.preview.cells.title', '{rule} · 单元格变更', { rule: plan.ruleName }),
+        subtitle: tOr('clean.preview.cells.subtitle', '{target} · {count} 处变更', {
+            target: plan.targetLabel,
+            count: plan.changes.length,
+        }),
+        columns: [tOr('clean.preview.col.column', '列'), tOr('clean.preview.col.value', '值')],
         rows,
     };
 }
@@ -698,7 +738,8 @@ function renderPreview(result) {
     const detail = document.getElementById('cleanPreviewDetail');
     if (detail) {
         if (result.plans.length === 0) {
-            detail.innerHTML = '<p class="hint">🎉 未发现需要清理的数据。</p>';
+            const nothing = tOr('clean.preview.nothing', '🎉 未发现需要清理的数据。');
+            detail.innerHTML = `<p class="hint">${escapeHtml(nothing)}</p>`;
         }
         else {
             renderDiffSections(detail, buildPreviewSections(result));
@@ -715,20 +756,23 @@ async function handleScan() {
     // 宿主检查必须放在最前：下方 getSelectedSheetKeys() 依赖 getApp()?.PluginStorage，
     // 宿主缺失时它必然返回空集并在前面提前 return，使这里的提示永远不可达。
     if (!getApp()) {
-        BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试');
+        BGM.Dialog.alert(tOr('common.hint', '提示'), tOr('clean.noHost', '未连接到 Excel / WPS，请打开工作簿后重试'));
         return;
     }
     const ruleIds = getSelectedRuleIds();
     if (ruleIds.length === 0) {
-        showToast('请至少勾选一个清理项', 'warn');
+        showToast(tOr('clean.scan.noRule', '请至少勾选一个清理项'), 'warn');
         return;
     }
     const selectedSheets = getSelectedSheetKeys();
     if (selectedSheets.length === 0) {
-        showToast('请先在「🎯 选择清理的表格」中加载并勾选至少一张工作表', 'warn');
+        showToast(tOr('clean.scan.noSheet', '请先在「🎯 选择清理的表格」中加载并勾选至少一张工作表'), 'warn');
         return;
     }
-    appendLog(`开始扫描，勾选 ${String(ruleIds.length)} 个清理项 · ${String(selectedSheets.length)} 张工作表…`);
+    appendLog(tOr('clean.scan.start', '开始扫描，勾选 {rules} 个清理项 · {sheets} 张工作表…', {
+        rules: ruleIds.length,
+        sheets: selectedSheets.length,
+    }));
     const scanButton = document.getElementById('cleanScanBtn');
     isScanning = true;
     if (scanButton)
@@ -740,17 +784,23 @@ async function handleScan() {
         for (const note of result.notes)
             appendLog(note, 'warn');
         if (result.plans.length === 0) {
-            appendLog('扫描完成：未发现需要清理的数据', 'ok');
-            showToast('未发现需要清理的数据', 'info');
+            appendLog(tOr('clean.scan.empty', '扫描完成：未发现需要清理的数据'), 'ok');
+            showToast(tOr('clean.scan.nothing', '未发现需要清理的数据'), 'info');
         }
         else {
-            appendLog(`扫描完成：涉及 ${String(result.fileCount)} 个文件 / ${String(result.targetCount)} 张表，待清理 ${String(result.itemCount)} 条，预计释放 ${formatBytes(result.estimatedBytes)}`, 'ok');
+            appendLog(tOr('clean.scan.done', '扫描完成：涉及 {files} 个文件 / {targets} 张表，待清理 {items} 条，预计释放 {bytes}', {
+                files: result.fileCount,
+                targets: result.targetCount,
+                items: result.itemCount,
+                bytes: formatBytes(result.estimatedBytes),
+            }), 'ok');
         }
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        appendLog(`扫描失败：${message}`, 'error');
-        showToast(`扫描失败：${message}`, 'error');
+        const failed = tOr('clean.scan.failed', '扫描失败：{message}', { message });
+        appendLog(failed, 'error');
+        showToast(failed, 'error');
     }
     finally {
         isScanning = false;
@@ -778,7 +828,7 @@ function setRunningState(isRunning_) {
     cleanProgress = createProgress({
         mode: 'inline',
         hostId: 'cleanProgressHost',
-        title: '正在清理数据',
+        title: tOr('clean.run.progressTitle', '正在清理数据'),
         icon: '🧹',
         enableLogs: true,
         showHeader: true,
@@ -795,13 +845,17 @@ function handleRun() {
     if (isRunning)
         return;
     if (!scanResult || scanResult.plans.length === 0) {
-        showToast('请先执行扫描预览', 'warn');
+        showToast(tOr('clean.run.needScan', '请先执行扫描预览'), 'warn');
         return;
     }
     const result = scanResult;
-    BGM.Dialog.confirm(`即将清理 ${String(result.targetCount)} 张工作表、${String(result.itemCount)} 条数据，预计释放 ${formatBytes(result.estimatedBytes)}。\n\n删除行不可撤销，建议先备份工作簿。是否继续？`, (confirmed) => {
+    BGM.Dialog.confirm(tOr('clean.run.confirm', '即将清理 {targets} 张工作表、{items} 条数据，预计释放 {bytes}。\n\n删除行不可撤销，建议先备份工作簿。是否继续？', {
+        targets: result.targetCount,
+        items: result.itemCount,
+        bytes: formatBytes(result.estimatedBytes),
+    }), (confirmed) => {
         if (!confirmed) {
-            appendLog('已取消执行', 'warn');
+            appendLog(tOr('clean.run.cancelled', '已取消执行'), 'warn');
             return;
         }
         void executeClean();
@@ -812,7 +866,7 @@ async function executeClean() {
     if (!scanResult)
         return;
     setRunningState(true);
-    appendLog('开始执行清理…');
+    appendLog(tOr('clean.run.started', '开始执行清理…'));
     try {
         const outcome = await runCleanPlans(scanResult, (done, total, message) => {
             updateProgress(done, total, message);
@@ -821,21 +875,37 @@ async function executeClean() {
         for (const item of outcome.targets) {
             const { error } = item;
             const line = error === undefined
-                ? `${item.targetLabel}：删除 ${String(item.deletedRows)} 行，更新 ${String(item.changedCells)} 个单元格`
-                : `${item.targetLabel}：清理失败 - ${error}`;
+                ? tOr('clean.run.target.done', '{target}：删除 {rows} 行，更新 {cells} 个单元格', {
+                    target: item.targetLabel,
+                    rows: item.deletedRows,
+                    cells: item.changedCells,
+                })
+                : tOr('clean.run.target.failed', '{target}：清理失败 - {message}', {
+                    target: item.targetLabel,
+                    message: error,
+                });
             appendLog(line, error === undefined ? 'ok' : 'error');
             details.push(line);
         }
-        const finishLine = `清理完成：共删除 ${String(outcome.deletedRows)} 行、更新 ${String(outcome.changedCells)} 个单元格，涉及 ${String(outcome.fileCount)} 个文件，耗时 ${String(outcome.elapsedMs)}ms`;
+        const finishLine = tOr('clean.run.done', '清理完成：共删除 {rows} 行、更新 {cells} 个单元格，涉及 {files} 个文件，耗时 {ms}ms', {
+            rows: outcome.deletedRows,
+            cells: outcome.changedCells,
+            files: outcome.fileCount,
+            ms: outcome.elapsedMs,
+        });
         appendLog(finishLine, 'ok');
         cleanProgress?.complete({ summary: finishLine, details });
-        showToast(`清理完成：删除 ${String(outcome.deletedRows)} 行，更新 ${String(outcome.changedCells)} 个单元格`, 'success');
+        showToast(tOr('clean.run.toast', '清理完成：删除 {rows} 行，更新 {cells} 个单元格', {
+            rows: outcome.deletedRows,
+            cells: outcome.changedCells,
+        }), 'success');
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        appendLog(`执行失败：${message}`, 'error');
-        cleanProgress?.complete({ summary: `执行失败：${message}`, ok: false, icon: '❌' });
-        showToast(`执行失败：${message}`, 'error');
+        const failed = tOr('clean.run.failed', '执行失败：{message}', { message });
+        appendLog(failed, 'error');
+        cleanProgress?.complete({ summary: failed, ok: false, icon: '❌' });
+        showToast(failed, 'error');
     }
     finally {
         setRunningState(false);
@@ -901,7 +971,7 @@ export function initializeCleanPage() {
     renderCleanItems();
     bindButtons();
     invalidatePreview();
-    appendLog('清理页已就绪：点击「📋 加载工作表」选择要清理的表格');
+    appendLog(tOr('clean.log.ready', '清理页已就绪：点击「📋 加载工作表」选择要清理的表格'));
     // 启用 data-action 按钮：漏了这一步，页面按钮会灰 5 秒直到门禁超时兜底
     notifyModulesReady();
 }
