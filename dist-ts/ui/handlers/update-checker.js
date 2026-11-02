@@ -20,6 +20,9 @@
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js';
 import { getNotifyApi } from '../../core/ui-bridge.js';
 import { getUrlPath } from '../../tools/util/index.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 import { countUnsavedDocuments, quitWps, resolveAddinDirectory, runAutoInstall, } from '../../tools/update-install.js';
 import { CURRENT_VERSION, downloadReleaseAsset, fetchLatestRelease, isNewerVersion, saveZipViaBrowser, UPDATE_OWNER, UPDATE_REPO, verifyAssetIntegrity, } from '../../tools/update-check.js';
 /** 最近一次检查到的 Release（安装时复用，避免重复请求） */
@@ -85,7 +88,7 @@ function formatBytes(bytes) {
 }
 /** 取哈希前 12 位用于日志（完整值太长，日志里够定位） */
 function shortHash(hash) {
-    return hash === '' ? '（无）' : `${hash.slice(0, 12)}…`;
+    return hash === '' ? tOr('handlers.update.hashNone', '（无）') : `${hash.slice(0, 12)}…`;
 }
 /**
  * 组装模态框里的「安装方式」说明
@@ -95,16 +98,16 @@ function shortHash(hash) {
  */
 function buildHowToLines(release) {
     const lines = [
-        '【安装方式】',
-        '· Windows：点「下载并安装」→ 校验更新包 → 自动关闭 WPS → 备份旧版 → 覆盖安装 → 自动重新打开。',
-        '· 其他系统 / 自动安装不可用：更新包会存到下载目录，关闭 WPS 后解压覆盖到加载项目录即可。',
+        tOr('handlers.update.howto.title', '【安装方式】'),
+        tOr('handlers.update.howto.windows', '· Windows：点「下载并安装」→ 校验更新包 → 自动关闭 WPS → 备份旧版 → 覆盖安装 → 自动重新打开。'),
+        tOr('handlers.update.howto.other', '· 其他系统 / 自动安装不可用：更新包会存到下载目录，关闭 WPS 后解压覆盖到加载项目录即可。'),
         '',
-        '【不会丢的东西】',
-        '· 只替换程序文件。设置、Token、账号、条件格式规则都存在 WPS 的插件存储里，不在安装目录中。',
-        '· 装之前整份备份，失败自动回滚；检测到未保存的文档会直接拒绝安装。',
+        tOr('handlers.update.howto.keepTitle', '【不会丢的东西】'),
+        tOr('handlers.update.howto.keepBody1', '· 只替换程序文件。设置、Token、账号、条件格式规则都存在 WPS 的插件存储里，不在安装目录中。'),
+        tOr('handlers.update.howto.keepBody2', '· 装之前整份备份，失败自动回滚；检测到未保存的文档会直接拒绝安装。'),
     ];
     if (release.asset?.sha256 === '') {
-        lines.push('', '⚠️ 该版本未在发布清单里提供 SHA-256，本次会跳过完整性校验。');
+        lines.push('', tOr('handlers.update.howto.noHash', '⚠️ 该版本未在发布清单里提供 SHA-256，本次会跳过完整性校验。'));
     }
     return lines;
 }
@@ -134,18 +137,20 @@ function revealCopyButton() {
  */
 function isAssetTrusted(result) {
     if (result.status === 'verified') {
-        appendLog(`✅ 完整性校验通过（SHA-256 ${shortHash(result.actual)}）`);
+        appendLog(tOr('handlers.update.integrity.ok', '✅ 完整性校验通过（SHA-256 {hash}）', {
+            hash: shortHash(result.actual),
+        }));
         return true;
     }
     if (result.status === 'skipped') {
         appendLog(result.expected === ''
-            ? '⚠️ 发布清单未提供 SHA-256，已跳过完整性校验'
-            : '⚠️ 当前环境不支持 SHA-256 计算，已跳过完整性校验');
+            ? tOr('handlers.update.integrity.skipNoHash', '⚠️ 发布清单未提供 SHA-256，已跳过完整性校验')
+            : tOr('handlers.update.integrity.skipUnsupported', '⚠️ 当前环境不支持 SHA-256 计算，已跳过完整性校验'));
         return true;
     }
-    appendLog('❌ 完整性校验失败');
-    appendLog(`   期望：${result.expected}`);
-    appendLog(`   实际：${result.actual}`);
+    appendLog(tOr('handlers.update.integrity.failed', '❌ 完整性校验失败'));
+    appendLog(tOr('handlers.update.integrity.expected', '   期望：{hash}', { hash: result.expected }));
+    appendLog(tOr('handlers.update.integrity.actual', '   实际：{hash}', { hash: result.actual }));
     return false;
 }
 /** 复制日志（clipboard 不可用时降级为选中文本） */
@@ -153,12 +158,12 @@ async function copyLog() {
     const log = elementById('updateLog');
     const text = log?.textContent ?? '';
     if (text === '') {
-        showToast('日志为空', 'info');
+        showToast(tOr('handlers.update.logEmpty', '日志为空'), 'info');
         return;
     }
     try {
         await navigator.clipboard.writeText(text);
-        showToast('日志已复制到剪贴板', 'success');
+        showToast(tOr('handlers.update.logCopied', '日志已复制到剪贴板'), 'success');
     }
     catch {
         // file:// 下 clipboard API 可能被拒：退化为选中文本，让用户 Ctrl+C
@@ -170,19 +175,20 @@ async function copyLog() {
             selection.removeAllRanges();
             selection.addRange(range);
         }
-        showToast('已选中日志，请按 Ctrl+C 复制', 'info');
+        showToast(tOr('handlers.update.logSelected', '已选中日志，请按 Ctrl+C 复制'), 'info');
     }
 }
 /** 把 Release 信息填进模态窗 */
 function fillModal(release) {
     const versionLine = elementById('updateVersionLine');
     if (versionLine) {
-        versionLine.textContent = `当前 v${CURRENT_VERSION} → 最新 ${release.version}`;
+        versionLine.textContent = tOr('handlers.update.versionLine', '当前 v{current} → 最新 {latest}', { current: CURRENT_VERSION, latest: release.version });
     }
     const notes = elementById('updateNotes');
     if (notes) {
         const body = release.notes.trim();
-        notes.textContent = body === '' ? '（该版本没有提供更新说明）' : body;
+        notes.textContent =
+            body === '' ? tOr('handlers.update.noNotes', '（该版本没有提供更新说明）') : body;
     }
     const installButton = buttonById('updateInstallBtn');
     if (installButton)
@@ -198,7 +204,10 @@ function fillModal(release) {
     const copyButton = buttonById('updateCopyLogBtn');
     if (copyButton)
         copyButton.hidden = true;
-    setLog([`当前版本 v${CURRENT_VERSION}`, `发现新版本 ${release.version}`]);
+    setLog([
+        tOr('handlers.update.logCurrent', '当前版本 v{version}', { version: CURRENT_VERSION }),
+        tOr('handlers.update.logFound', '发现新版本 {version}', { version: release.version }),
+    ]);
 }
 /**
  * 按错误文本给出可操作的原因推测（只覆盖真机上最常见的三种）
@@ -209,34 +218,41 @@ function fillModal(release) {
 function diagnoseFailure(message) {
     const hints = [];
     if (message.includes('403')) {
-        hints.push('· HTTP 403 多为 GitHub API 限流：未登录时每小时只有 60 次，稍等几分钟再试，或换个网络（手机热点）验证。');
+        hints.push(tOr('handlers.update.hint.403', '· HTTP 403 多为 GitHub API 限流：未登录时每小时只有 60 次，稍等几分钟再试，或换个网络（手机热点）验证。'));
     }
     if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
-        hints.push('· Failed to fetch 表示请求没到达服务器：检查网络 / 代理 / 防火墙；公司网络常拦截 api.github.com。');
+        hints.push(tOr('handlers.update.hint.fetch', '· Failed to fetch 表示请求没到达服务器：检查网络 / 代理 / 防火墙；公司网络常拦截 api.github.com。'));
     }
     if (message.includes('404')) {
-        hints.push('· HTTP 404 表示仓库或 Release 不存在：可能被改名、转为私有，或还没有任何 Release。');
+        hints.push(tOr('handlers.update.hint.404', '· HTTP 404 表示仓库或 Release 不存在：可能被改名、转为私有，或还没有任何 Release。'));
     }
-    hints.push(`· 也可以直接打开 https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases 手动查看。`);
+    hints.push(tOr('handlers.update.hint.manual', '· 也可以直接打开 https://github.com/{owner}/{repo}/releases 手动查看。', { owner: UPDATE_OWNER, repo: UPDATE_REPO }));
     return hints;
 }
 /** 组装诊断日志（能贴进 Issue 的最小集合） */
 function buildDiagnostics(message, error) {
     const lines = [
-        `时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`,
-        `当前版本：v${CURRENT_VERSION}`,
-        `接口：https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
-        `错误：${message}`,
+        tOr('handlers.update.diag.time', '时间：{time}', {
+            time: new Date().toLocaleString('zh-CN', { hour12: false }),
+        }),
+        tOr('handlers.update.diag.version', '当前版本：v{version}', { version: CURRENT_VERSION }),
+        tOr('handlers.update.diag.endpoint', '接口：{url}', {
+            url: `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`,
+        }),
+        tOr('handlers.update.diag.error', '错误：{message}', { message }),
     ];
     if (error instanceof Error) {
-        lines.push(`错误名：${error.name}`);
+        lines.push(tOr('handlers.update.diag.errorName', '错误名：{name}', { name: error.name }));
         const stack = (error.stack ?? '').split('\n').slice(0, 6).join('\n');
         if (stack !== '')
-            lines.push(`调用栈：\n${stack}`);
+            lines.push(tOr('handlers.update.diag.stack', '调用栈：\n{stack}', { stack }));
     }
     if (typeof navigator !== 'undefined') {
         const isOffline = !navigator.onLine;
-        lines.push(`UA：${navigator.userAgent}`, `在线状态：${isOffline ? '离线' : '在线'}`);
+        const state = isOffline
+            ? tOr('handlers.update.diag.offline', '离线')
+            : tOr('handlers.update.diag.onlineState', '在线');
+        lines.push(tOr('handlers.update.diag.ua', 'UA：{ua}', { ua: navigator.userAgent }), tOr('handlers.update.diag.online', '在线状态：{state}', { state }));
     }
     return lines;
 }
@@ -250,10 +266,15 @@ function buildDiagnostics(message, error) {
 function showFailureModal(message, error) {
     const versionLine = elementById('updateVersionLine');
     if (versionLine)
-        versionLine.textContent = `当前 v${CURRENT_VERSION} · 检查更新失败`;
+        versionLine.textContent = tOr('handlers.update.failLine', '当前 v{current} · 检查更新失败', {
+            current: CURRENT_VERSION,
+        });
     const notes = elementById('updateNotes');
     if (notes) {
-        notes.textContent = [`失败原因：${message}`, ...diagnoseFailure(message)].join('\n');
+        notes.textContent = [
+            tOr('handlers.update.failReason', '失败原因：{message}', { message }),
+            ...diagnoseFailure(message),
+        ].join('\n');
     }
     const installButton = buttonById('updateInstallBtn');
     if (installButton)
@@ -277,11 +298,14 @@ async function checkForUpdates() {
     if (button)
         button.disabled = true;
     try {
-        setLog([`当前版本 v${CURRENT_VERSION}`, '正在查询 GitHub 最新 Release…']);
+        setLog([
+            tOr('handlers.update.logCurrent', '当前版本 v{version}', { version: CURRENT_VERSION }),
+            tOr('handlers.update.logQuerying', '正在查询 GitHub 最新 Release…'),
+        ]);
         const release = await fetchLatestRelease();
         pendingRelease = release;
         if (!isNewerVersion(release.version, CURRENT_VERSION)) {
-            showToast(`已是最新版本（v${CURRENT_VERSION}）`, 'success');
+            showToast(tOr('handlers.update.upToDate', '已是最新版本（v{version}）', { version: CURRENT_VERSION }), 'success');
             bgmLog(LOG_LEVELS.INFO, `[update] 已是最新版本：latest=${release.version}`);
             return;
         }
@@ -302,9 +326,9 @@ async function checkForUpdates() {
 /** 手动安装：把 zip 交给浏览器落盘 + 给步骤（自动安装不可用时的兜底） */
 function finishWithManualInstall(release, bytes) {
     saveZipViaBrowser(bytes, release.asset?.name ?? 'update.zip');
-    appendLog('✅ 更新包已保存到浏览器下载目录');
-    appendLog('安装步骤：关闭 WPS → 解压更新包并覆盖加载项目录 → 重新打开 WPS');
-    showToast('更新包已下载，请按日志中的步骤完成安装', 'success');
+    appendLog(tOr('handlers.update.manual.saved', '✅ 更新包已保存到浏览器下载目录'));
+    appendLog(tOr('handlers.update.manual.steps', '安装步骤：关闭 WPS → 解压更新包并覆盖加载项目录 → 重新打开 WPS'));
+    showToast(tOr('handlers.update.manual.toast', '更新包已下载，请按日志中的步骤完成安装'), 'success');
     revealCopyButton();
 }
 /**
@@ -319,24 +343,28 @@ function confirmThenAutoInstall(release, bytes, baseUrl) {
     const unsaved = countUnsavedDocuments();
     if (unsaved !== null && unsaved > 0) {
         bgmLog(LOG_LEVELS.WARN, `[update] 有 ${String(unsaved)} 个未保存文档，暂停自动安装`);
-        appendLog(`检测到 ${String(unsaved)} 个未保存的文档，已暂停自动安装`);
-        appendLog('请先保存文档，再重新点「下载并安装」');
-        getNotifyApi().alert(`检测到 ${String(unsaved)} 个未保存的文档。\n\n自动安装会关闭 WPS，为避免丢失未保存的内容，已暂停安装。\n请先保存文档，再重新点「下载并安装」。`, '请先保存文档');
+        appendLog(tOr('handlers.update.unsaved.log', '检测到 {count} 个未保存的文档，已暂停自动安装', {
+            count: String(unsaved),
+        }));
+        appendLog(tOr('handlers.update.unsaved.hint', '请先保存文档，再重新点「下载并安装」'));
+        getNotifyApi().alert(tOr('handlers.update.unsaved.alert', '检测到 {count} 个未保存的文档。\n\n自动安装会关闭 WPS，为避免丢失未保存的内容，已暂停安装。\n请先保存文档，再重新点「下载并安装」。', { count: String(unsaved) }), tOr('handlers.update.unsaved.title', '请先保存文档'));
         return;
     }
     getNotifyApi().confirm([
-        `即将把 v${release.version} 安装到：`,
-        targetDirectory ?? '（无法定位加载项目录）',
+        tOr('handlers.update.confirm.target', '即将把 v{version} 安装到：', {
+            version: release.version,
+        }),
+        targetDirectory ?? tOr('handlers.update.confirm.noDir', '（无法定位加载项目录）'),
         '',
-        '安装只替换程序文件：插件的设置、Token、条件格式规则都存在 WPS 的插件存储里，',
-        '不在此目录中，不会被覆盖；安装前还会先整份备份，失败自动回滚。',
+        tOr('handlers.update.confirm.body1', '安装只替换程序文件：插件的设置、Token、条件格式规则都存在 WPS 的插件存储里，'),
+        tOr('handlers.update.confirm.body2', '不在此目录中，不会被覆盖；安装前还会先整份备份，失败自动回滚。'),
         '',
-        '安装期间 WPS 会自动关闭，完成后再自动打开。',
+        tOr('handlers.update.confirm.body3', '安装期间 WPS 会自动关闭，完成后再自动打开。'),
         '',
-        '继续吗？',
+        tOr('handlers.update.confirm.ask', '继续吗？'),
     ].join('\n'), (isConfirmed) => {
         if (!isConfirmed) {
-            appendLog('已取消自动安装（更新包未写入，可稍后重试或按手动步骤安装）');
+            appendLog(tOr('handlers.update.cancelled', '已取消自动安装（更新包未写入，可稍后重试或按手动步骤安装）'));
             return;
         }
         const outcome = runAutoInstall({
@@ -346,26 +374,30 @@ function confirmThenAutoInstall(release, bytes, baseUrl) {
             sha256: release.asset?.sha256 ?? '',
         });
         if (outcome.status !== 'launched') {
-            appendLog(`自动安装不可用：${outcome.detail}`);
-            appendLog('改用手动安装…');
+            appendLog(tOr('handlers.update.autoUnavailable', '自动安装不可用：{detail}', {
+                detail: outcome.detail,
+            }));
+            appendLog(tOr('handlers.update.fallbackManual', '改用手动安装…'));
             finishWithManualInstall(release, bytes);
             return;
         }
-        appendLog('✅ 更新包已交给安装程序');
-        appendLog(`安装目录：${outcome.targetDirectory}`);
-        appendLog(`安装日志：${outcome.logPath}`);
-        appendLog('WPS 将在 3 秒后自动关闭，安装完成后自动重新打开（无需手动解压）');
-        showToast('正在安装更新，WPS 即将重启', 'success');
+        appendLog(tOr('handlers.update.launched', '✅ 更新包已交给安装程序'));
+        appendLog(tOr('handlers.update.installDir', '安装目录：{dir}', {
+            dir: outcome.targetDirectory,
+        }));
+        appendLog(tOr('handlers.update.installLog', '安装日志：{path}', { path: outcome.logPath }));
+        appendLog(tOr('handlers.update.restarting', 'WPS 将在 3 秒后自动关闭，安装完成后自动重新打开（无需手动解压）'));
+        showToast(tOr('handlers.update.installing', '正在安装更新，WPS 即将重启'), 'success');
         // 留 3 秒让上面的日志与 toast 被看到，再请求退出
         window.setTimeout(() => {
             try {
                 quitWps();
             }
             catch {
-                appendLog('⚠️ 自动关闭 WPS 失败，请手动关闭；安装程序会等待 3 分钟，超时自动放弃');
+                appendLog(tOr('handlers.update.quitFailed', '⚠️ 自动关闭 WPS 失败，请手动关闭；安装程序会等待 3 分钟，超时自动放弃'));
             }
         }, 3000);
-    }, '自动安装更新');
+    }, tOr('handlers.update.confirm.title', '自动安装更新'));
 }
 /** 下载并安装 */
 async function installUpdate() {
@@ -375,7 +407,12 @@ async function installUpdate() {
     const installButton = buttonById('updateInstallBtn');
     if (installButton)
         installButton.disabled = true;
-    setLog([`开始下载 ${release.asset.name}`, `大小 ${formatBytes(release.asset.size)}`]);
+    setLog([
+        tOr('handlers.update.download.start', '开始下载 {name}', { name: release.asset.name }),
+        tOr('handlers.update.download.size', '大小 {size}', {
+            size: formatBytes(release.asset.size),
+        }),
+    ]);
     setProgress(0);
     let lastLoggedPercent = -10;
     const onProgress = (progress) => {
@@ -384,7 +421,11 @@ async function installUpdate() {
         // 每 10% 记一行，避免日志被逐块刷屏
         if (percent - lastLoggedPercent >= 10) {
             lastLoggedPercent = percent;
-            appendLog(`下载中 ${String(percent)}%（${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}）`);
+            appendLog(tOr('handlers.update.download.progress', '下载中 {percent}%（{loaded} / {total}）', {
+                percent: String(percent),
+                loaded: formatBytes(progress.loaded),
+                total: formatBytes(progress.total),
+            }));
         }
     };
     try {
@@ -398,20 +439,24 @@ async function installUpdate() {
             if (fallbackUrl === undefined)
                 throw primaryError;
             const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
-            appendLog(`主下载源失败：${primaryMessage}`);
-            appendLog('改用 GitHub Release 资产重试…');
+            appendLog(tOr('handlers.update.download.primaryFailed', '主下载源失败：{message}', {
+                message: primaryMessage,
+            }));
+            appendLog(tOr('handlers.update.download.retry', '改用 GitHub Release 资产重试…'));
             bytes = await downloadReleaseAsset(fallbackUrl, onProgress);
         }
-        appendLog(`下载完成：${formatBytes(bytes.byteLength)}`);
+        appendLog(tOr('handlers.update.download.done', '下载完成：{size}', {
+            size: formatBytes(bytes.byteLength),
+        }));
         // 完整性校验必须在启动安装脚本**之前**：哈希不对就什么都不做，
         // 连临时文件都不落盘（避免把不可信的字节留在用户机器上）
         const integrity = await verifyAssetIntegrity(bytes, release.asset.sha256);
         if (!isAssetTrusted(integrity)) {
-            appendLog('已拒绝安装：更新包与发布清单不一致，可能是下载被篡改或发布端被替换');
-            appendLog('建议：稍后重试；若持续不一致，请到 Release 页面手动下载并核对 SHA-256');
+            appendLog(tOr('handlers.update.rejected', '已拒绝安装：更新包与发布清单不一致，可能是下载被篡改或发布端被替换'));
+            appendLog(tOr('handlers.update.rejected.hint', '建议：稍后重试；若持续不一致，请到 Release 页面手动下载并核对 SHA-256'));
             revealCopyButton();
             bgmLog(LOG_LEVELS.ERROR, `[update] 完整性校验失败：expected=${integrity.expected} actual=${integrity.actual}`);
-            showToast('更新包校验失败，已拒绝安装', 'error');
+            showToast(tOr('handlers.update.verifyFailed', '更新包校验失败，已拒绝安装'), 'error');
             return;
         }
         // 能定位加载项目录 = 本地安装环境，可走一键安装；否则（开发期 HTTP）回落手动
@@ -424,14 +469,14 @@ async function installUpdate() {
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        appendLog(`❌ 下载失败：${message}`);
-        appendLog('可能原因：网络中断 / GitHub 被拦截 / 更新包地址不可访问');
+        appendLog(tOr('handlers.update.download.failed', '❌ 下载失败：{message}', { message }));
+        appendLog(tOr('handlers.update.download.causes', '可能原因：网络中断 / GitHub 被拦截 / 更新包地址不可访问'));
         // fetch 失败最常见的原因是 CORS 或 WebView 限制：交给宿主直接下载作为兜底
-        appendLog('已尝试改用浏览器直接下载，请在浏览器的下载目录中查找更新包…');
+        appendLog(tOr('handlers.update.download.browserFallback', '已尝试改用浏览器直接下载，请在浏览器的下载目录中查找更新包…'));
         openExternalDownload(release.asset.downloadUrl);
         revealCopyButton();
         bgmLog(LOG_LEVELS.ERROR, `[update] 下载失败：${message}，已回退到浏览器直连下载`);
-        showToast('下载更新失败，已尝试浏览器直接下载', 'error');
+        showToast(tOr('handlers.update.download.failedToast', '下载更新失败，已尝试浏览器直接下载'), 'error');
     }
     finally {
         if (installButton)
