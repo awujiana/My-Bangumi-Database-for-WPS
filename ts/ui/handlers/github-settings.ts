@@ -19,6 +19,9 @@ import {
 } from '../../index.js'
 import type { SyncStrategy, SyncSourceType } from '../../index.js'
 import { debounce } from '../../tools/debounce.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 import { trackedAddEventListener } from './resource-tracking.js'
 import { SHARD_SAMPLES } from './shard-samples.js'
 import type { ShardSampleField } from './shard-samples.js'
@@ -34,9 +37,19 @@ import type { ShardSampleField } from './shard-samples.js'
  * 复选框上那一两个词（「资料」「关联条目」）装不下这些细节，而用户需要
  * 知道勾下去到底拖哪些字段下来（momo：选项太笼统，要完整写在分片清单里）。
  */
-export const SHARD_OPTIONS: readonly { name: string; label: string; detail: string }[] = [
+export const SHARD_OPTIONS: readonly {
+  name: string
+  /** 源语言名（兜底；实际展示走 `shardLabel()`） */
+  label: string
+  labelKey: string
+  /** 源语言说明（兜底；实际展示走 `shardDetail()`） */
+  detail: string
+  detailKey: string
+}[] = [
   {
     name: 'base',
+    labelKey: 'handlers.github.shard.base.label',
+    detailKey: 'handlers.github.shard.base.detail',
     label: '基础（SID/名称/时间）',
     detail:
       '字段：subjectId / name / name_original / updatedAt / date / meta_tags / nsfw。\n' +
@@ -45,6 +58,8 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
   },
   {
     name: 'meta',
+    labelKey: 'handlers.github.shard.meta.label',
+    detailKey: 'handlers.github.shard.meta.detail',
     label: '资料（话数/导演等）',
     detail:
       'infobox 解析出的 19 个中文列：话数、片长、动画制作公司、导演、音乐、声优阵容、' +
@@ -53,6 +68,8 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
   },
   {
     name: 'relations',
+    labelKey: 'handlers.github.shard.relations.label',
+    detailKey: 'handlers.github.shard.relations.detail',
     label: '关联条目',
     detail:
       '两个容易混的列，区别在「被关联条目的类型」：\n' +
@@ -63,6 +80,8 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
   },
   {
     name: 'stats',
+    labelKey: 'handlers.github.shard.stats.label',
+    detailKey: 'handlers.github.shard.stats.detail',
     label: '评分/排名/标签',
     detail:
       '字段：platform / series / score / rank / score_details / favorite / tags。\n' +
@@ -71,11 +90,15 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
   },
   {
     name: 'summary',
+    labelKey: 'handlers.github.shard.summary.label',
+    detailKey: 'handlers.github.shard.summary.detail',
     label: '简介',
     detail: '字段：简介（剧情简介全文）。约占数据体积 29% —— 表里没有简介列时没必要下载它。',
   },
   {
     name: 'infobox',
+    labelKey: 'handlers.github.shard.infobox.label',
+    detailKey: 'handlers.github.shard.infobox.detail',
     label: 'infobox 原文',
     detail:
       '字段：infobox 原文（未解析的原始文本，含全部制作人员明细）。约占数据体积 48%，' +
@@ -88,6 +111,16 @@ export const SHARD_OPTIONS: readonly { name: string; label: string; detail: stri
  *
  * SID / 名称 / 更新时间都只在 `base` 里，缺了它拼不出记录，所以固定勾选且禁用。
  */
+/** 分片名（复选框文字与清单标题共用） */
+export function shardLabel(option: { label: string; labelKey: string }): string {
+  return tOr(option.labelKey, option.label)
+}
+
+/** 分片取舍说明（清单浮窗里的长段落） */
+export function shardDetail(option: { detail: string; detailKey: string }): string {
+  return tOr(option.detailKey, option.detail)
+}
+
 const REQUIRED_SHARDS: readonly string[] = ['base'] as const
 
 /**
@@ -109,7 +142,7 @@ export function renderShardOptions(): void {
     input.checked = isRequired
     input.disabled = isRequired
 
-    label.append(input, document.createTextNode(option.label))
+    label.append(input, document.createTextNode(shardLabel(option)))
     list.append(label)
   }
 }
@@ -189,11 +222,17 @@ function renderShardListBody(): void {
   // 数据来源与样本条目说明（用户需要知道「示例值」是哪来的）
   const meta = document.createElement('p')
   meta.className = 'shard-list-meta'
-  meta.textContent =
-    `示例值取自 ${SHARD_SAMPLES.dataUpdatedAt} 的数据中 2026 年播出、字段最全的一条：` +
-    `sid=${SHARD_SAMPLES.sampleSid}《${SHARD_SAMPLES.sampleName}》（共 ${String(
-      SHARD_SAMPLES.shards.reduce((total, shard) => total + shard.fields.length, 0),
-    )} 个字段）。`
+  const fieldCount = SHARD_SAMPLES.shards.reduce((total, shard) => total + shard.fields.length, 0)
+  meta.textContent = tOr(
+    'handlers.github.shard.sampleMeta',
+    '示例值取自 {date} 的数据中 2026 年播出、字段最全的一条：sid={sid}《{name}》（共 {count} 个字段）。',
+    {
+      date: SHARD_SAMPLES.dataUpdatedAt,
+      sid: SHARD_SAMPLES.sampleSid,
+      name: SHARD_SAMPLES.sampleName,
+      count: String(fieldCount),
+    },
+  )
   body.append(meta)
 
   for (const option of SHARD_OPTIONS) {
@@ -201,9 +240,10 @@ function renderShardListBody(): void {
     const item = document.createElement('div')
     item.className = isRequired ? 'shard-list-item is-required' : 'shard-list-item'
     const heading = document.createElement('h4')
-    heading.textContent = `${option.label}${isRequired ? '（必选）' : ''}`
+    const requiredNote = isRequired ? tOr('handlers.github.shard.required', '（必选）') : ''
+    heading.textContent = `${shardLabel(option)}${requiredNote}`
     const detail = document.createElement('p')
-    detail.textContent = option.detail
+    detail.textContent = shardDetail(option)
     item.append(heading, detail)
 
     // 字段明细表（该片在示例数据里的字段行；生成文件缺片时降级为仅文字）
@@ -219,7 +259,13 @@ function buildShardFieldTable(fields: readonly ShardSampleField[]): HTMLElement 
   table.className = 'shard-list-table'
 
   const headRow = document.createElement('tr')
-  for (const label of ['远程字段', '类型', '示例值', '本地列']) {
+  const headers = [
+    tOr('handlers.github.shard.th.remote', '远程字段'),
+    tOr('handlers.github.shard.th.type', '类型'),
+    tOr('handlers.github.shard.th.sample', '示例值'),
+    tOr('handlers.github.shard.th.local', '本地列'),
+  ]
+  for (const label of headers) {
     const cell = document.createElement('th')
     cell.textContent = label
     headRow.append(cell)
@@ -235,10 +281,12 @@ function buildShardFieldTable(fields: readonly ShardSampleField[]): HTMLElement 
     const typeCell = document.createElement('td')
     typeCell.textContent = field.type
     const sampleCell = document.createElement('td')
-    sampleCell.textContent = field.sample === '' ? '（此条为空）' : field.sample
+    sampleCell.textContent =
+      field.sample === '' ? tOr('handlers.github.shard.emptySample', '（此条为空）') : field.sample
     sampleCell.title = field.sample
     const columnCell = document.createElement('td')
-    columnCell.textContent = field.localColumn ?? field.note ?? '不写入任何列'
+    columnCell.textContent =
+      field.localColumn ?? field.note ?? tOr('handlers.github.shard.noColumn', '不写入任何列')
     row.append(nameCell, typeCell, sampleCell, columnCell)
     table.append(row)
   }

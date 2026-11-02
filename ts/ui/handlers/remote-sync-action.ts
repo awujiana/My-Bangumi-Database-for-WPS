@@ -45,6 +45,18 @@ import type {
   SyncTimeFilter,
 } from '../../index.js'
 import { createStatusBarWriter } from '../../tools/util/status-bar.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
+
+/** 同步策略 → 译文 key（与下面 `strategyLabel` 里的源语言表一一对应） */
+const STRATEGY_KEYS: Readonly<Record<SyncStrategy, string>> = {
+  'add-update': 'handlers.remoteSync.strategy.addUpdate',
+  'add-only': 'handlers.remoteSync.strategy.addOnly',
+  'update-only': 'handlers.remoteSync.strategy.updateOnly',
+  mirror: 'handlers.remoteSync.strategy.mirror',
+  'force-overwrite': 'handlers.remoteSync.strategy.forceOverwrite',
+}
 
 /** 同步指标计算（纯函数）：从 handleActionClick 的 try 块抽出，降低 try-complexity */
 function computeSyncMetrics(
@@ -85,11 +97,15 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
   const currentSourceType: SyncSourceType =
     (sourceTypeSelect?.value as SyncSourceType | undefined) ?? getSyncSourceType()
   // 读取「仅同步选中行」开关
-  const checkboxSelectedOnly = document.getElementById('checkboxSyncSelectedOnly') as HTMLInputElement | null
+  const checkboxSelectedOnly = document.getElementById(
+    'checkboxSyncSelectedOnly',
+  ) as HTMLInputElement | null
   const isSelectedRowsOnly = checkboxSelectedOnly?.checked === true
 
   // 读取时间筛选配置
-  const checkboxTimeFilter = document.getElementById('checkboxTimeFilter') as HTMLInputElement | null
+  const checkboxTimeFilter = document.getElementById(
+    'checkboxTimeFilter',
+  ) as HTMLInputElement | null
   const isTimeFilterEnabled = checkboxTimeFilter?.checked === true
   let timeFilter: SyncTimeFilter | undefined
   if (isTimeFilterEnabled) {
@@ -115,52 +131,83 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
   if (currentSourceType === 'local') {
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
     if (!pathInput?.value.trim()) {
-      showToast('请先填写本地文件路径', 'warn')
+      showToast(tOr('handlers.remoteSync.noLocalPath', '请先填写本地文件路径'), 'warn')
       return
     }
   } else if (!isGithubConfigComplete()) {
-    showToast('请先填写并保存远程仓库配置', 'warn')
+    showToast(tOr('handlers.remoteSync.noConfig', '请先填写并保存远程仓库配置'), 'warn')
     return
   }
   // 读取策略：优先用下拉框当前值（未保存也能即时生效），兜底用已保存的策略
   const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
   const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? getSyncStrategy()
-  const strategyLabel = (
-    {
-      'add-update': '新增+更新（不删除）',
-      'add-only': '仅新增',
-      'update-only': '仅更新',
-      mirror: '镜像同步（含删除）',
-      'force-overwrite': '强制覆盖',
-    } as const
-  )[strategy]
+  const strategyLabel = tOr(
+    STRATEGY_KEYS[strategy],
+    (
+      {
+        'add-update': '新增+更新（不删除）',
+        'add-only': '仅新增',
+        'update-only': '仅更新',
+        mirror: '镜像同步（含删除）',
+        'force-overwrite': '强制覆盖',
+      } as const
+    )[strategy],
+  )
   // 同步源类型对应的来源描述（本地文件 vs 远程仓库）
-  const sourceLabel = currentSourceType === 'local' ? '本地文件' : '远程仓库'
+  const sourceLabel =
+    currentSourceType === 'local'
+      ? tOr('handlers.remoteSync.source.local', '本地文件')
+      : tOr('handlers.remoteSync.source.remote', '远程仓库')
   // 构建时间筛选描述
   let timeFilterDesc = ''
   if (timeFilter) {
     switch (timeFilter.range) {
       case 'future': {
-        timeFilterDesc = `\n🔮 时间筛选：预告/未来动漫（无开播日期）`
+        timeFilterDesc = tOr(
+          'handlers.remoteSync.timeFilter.future',
+          '\n🔮 时间筛选：预告/未来动漫（无开播日期）',
+        )
         break
       }
       case 'year': {
-        timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年全年`
+        timeFilterDesc = tOr('handlers.remoteSync.timeFilter.year', '\n📅 时间筛选：{year}年全年', {
+          year: String(timeFilter.year),
+        })
         break
       }
       case 'quarter': {
-        timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
+        timeFilterDesc = tOr(
+          'handlers.remoteSync.timeFilter.quarter',
+          '\n📅 时间筛选：{year}年{quarter}月新番',
+          { year: String(timeFilter.year), quarter: String(timeFilter.quarter ?? '') },
+        )
         break
       }
       default: {
         // month（默认，与旧 else 分支一致）
-        timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
+        timeFilterDesc = tOr(
+          'handlers.remoteSync.timeFilter.month',
+          '\n📅 时间筛选：{year}年{month}月',
+          { year: String(timeFilter.year), month: String(timeFilter.month ?? '') },
+        )
         break
       }
     }
   }
+  const selectedNote = isSelectedRowsOnly
+    ? tOr('handlers.remoteSync.selectedOnly', '\n⚠️ 仅同步选中行')
+    : ''
   showConfirm(
-    `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${isSelectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
+    tOr(
+      'handlers.remoteSync.confirm',
+      '将从{source}下载数据并按策略【{strategy}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）{selected}{timeFilter}\n是否继续？',
+      {
+        source: sourceLabel,
+        strategy: strategyLabel,
+        selected: selectedNote,
+        timeFilter: timeFilterDesc,
+      },
+    ),
     async (confirmed) => {
       if (!confirmed) {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
@@ -184,7 +231,7 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
       const configContext: BuildSyncConfigContext = {
         source: sourceLabel,
         strategy: strategyLabel,
-        direction: '远程仓库 → Excel',
+        direction: tOr('handlers.remoteSync.direction', '远程仓库 → Excel'),
         selectedRowsOnly: isSelectedRowsOnly,
       }
       if (timeFilter) {
@@ -204,7 +251,9 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
       const configSummary = buildSyncConfig(configContext)
 
       showSyncProgressDialog(
-        `正在同步 - 数据同步（${sourceLabel} → Excel）`,
+        tOr('handlers.remoteSync.progressTitle', '正在同步 - 数据同步（{source} → Excel）', {
+          source: sourceLabel,
+        }),
         {
           onPause: () => {
             bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持暂停')
@@ -251,28 +300,76 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
           syncStartTime,
         )
 
-        const summaryText = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
+        const summaryText = tOr(
+          'handlers.remoteSync.summary',
+          '远程 {total} 条 → ✅{added} 🔄{updated} ❌{deleted} ⏭️{unchanged} ⚠️{failed} | 耗时 {elapsed} | {speed} 行/秒 | 效率 {efficiency}%',
+          {
+            total: String(result.remoteTotal),
+            added: String(result.added),
+            updated: String(result.updated),
+            deleted: String(result.deleted),
+            unchanged: String(result.unchanged),
+            failed: String(result.failed),
+            elapsed: formatDuration(totalElapsed),
+            speed: String(avgSpeed > 0 ? avgSpeed : '?'),
+            efficiency: String(efficiency),
+          },
+        )
         // 写入阶段被中断时收尾文案如实标注「没跑完」，不能报成一次完整同步（P2-7）
-        const summary = wasStopped ? `⏹️ 已停止（写入阶段中断）：${summaryText}` : summaryText
+        const summary = wasStopped
+          ? tOr('handlers.remoteSync.summaryStopped', '⏹️ 已停止（写入阶段中断）：{summary}', {
+              summary: summaryText,
+            })
+          : summaryText
         // 收尾行优先级：已停止 > 有剩余 > 全部完成（写成 if/else 避免嵌套三元）
-        let tailLine = '✅ 全部完成'
+        let tailLine = tOr('handlers.remoteSync.tailDone', '✅ 全部完成')
         if (wasStopped) {
-          tailLine = '⏹️ 已停止：剩余条目未处理'
+          tailLine = tOr('handlers.remoteSync.tailStopped', '⏹️ 已停止：剩余条目未处理')
         } else if (etaMs > 0) {
-          tailLine = `🔮 预计剩余: ${formatDuration(etaMs)}`
+          tailLine = tOr('handlers.remoteSync.tailEta', '🔮 预计剩余: {eta}', {
+            eta: formatDuration(etaMs),
+          })
         }
+        const speedText =
+          avgSpeed > 0
+            ? tOr('handlers.remoteSync.rowsPerSecond', '{count} 行/秒', {
+                count: String(avgSpeed),
+              })
+            : '--'
         const details = [
-          `📥 远程数据总量: ${String(result.remoteTotal)}`,
-          `➕ 新增: ${String(result.added)}`,
-          `✏️ 更新: ${String(result.updated)}`,
-          `🗑️ 删除: ${String(result.deleted)}`,
-          `⏭️ 无变更: ${String(result.unchanged)}`,
-          `❌ 失败: ${String(result.failed)}`,
-          `🔍 跳过: ${String(result.skipped)}`,
-          `📊 实际处理: ${String(totalProcessed)} 条`,
-          `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
-          `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-          `📈 处理效率: ${String(efficiency)}%`,
+          tOr('handlers.remoteSync.detail.remoteTotal', '📥 远程数据总量: {count}', {
+            count: String(result.remoteTotal),
+          }),
+          tOr('handlers.remoteSync.detail.added', '➕ 新增: {count}', {
+            count: String(result.added),
+          }),
+          tOr('handlers.remoteSync.detail.updated', '✏️ 更新: {count}', {
+            count: String(result.updated),
+          }),
+          tOr('handlers.remoteSync.detail.deleted', '🗑️ 删除: {count}', {
+            count: String(result.deleted),
+          }),
+          tOr('handlers.remoteSync.detail.unchanged', '⏭️ 无变更: {count}', {
+            count: String(result.unchanged),
+          }),
+          tOr('handlers.remoteSync.detail.failed', '❌ 失败: {count}', {
+            count: String(result.failed),
+          }),
+          tOr('handlers.remoteSync.detail.skipped', '🔍 跳过: {count}', {
+            count: String(result.skipped),
+          }),
+          tOr('handlers.remoteSync.detail.processed', '📊 实际处理: {count} 条', {
+            count: String(totalProcessed),
+          }),
+          tOr('handlers.remoteSync.detail.elapsed', '⏱️ 总耗时: {elapsed}', {
+            elapsed: formatDuration(totalElapsed),
+          }),
+          tOr('handlers.remoteSync.detail.speed', '⚡️ 平均速度: {speed}', {
+            speed: speedText,
+          }),
+          tOr('handlers.remoteSync.detail.efficiency', '📈 处理效率: {efficiency}%', {
+            efficiency: String(efficiency),
+          }),
           tailLine,
         ]
 
@@ -348,7 +445,12 @@ export function runRemoteSyncAction(context: ActionHandlerContext): void {
         } else {
           hideSyncProgressDialog()
           bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errorMessage}`)
-          showToast(`数据同步失败：${errorMessage}`, 'error')
+          showToast(
+            tOr('handlers.remoteSync.failed', '数据同步失败：{message}', {
+              message: errorMessage,
+            }),
+            'error',
+          )
         }
         if (app?.StatusBar !== undefined) app.StatusBar = false
       }

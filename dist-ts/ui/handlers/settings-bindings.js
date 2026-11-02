@@ -6,8 +6,67 @@
 import { LOG_LEVELS, bgmLog, getRefreshInterval, getUrlPath, saveTheme, setListType, setLogLevel, setRefreshInterval, setSyncRecordEnabled, setTimeFilter, showToast, } from '../../index.js';
 import { applyTheme, switchThemeAnimated } from '../../tools/theme.js';
 import { clusterModeLabel, getTheme, mergeModeLabel, setMergeMode, setClusterMode, setModalButtonsPosition, setThemeSchedule, } from '../../tools/config.js';
-import { LOCALE_CODES, SOURCE_LOCALE, applyI18n, describeInstalledPacks, getLocale, getLocaleCoverage, getLocaleLabel, installLocalePacks, isLocaleCode, loadLocaleManifest, openLocaleDirectory, setLocale, t, } from '../../i18n/index.js';
+import { LOCALE_CODES, SOURCE_LOCALE, applyI18n, describeInstalledPacks, getLocale, getLocaleCoverage, getLocaleLabel, installLocalePacks, isLocaleCode, loadLocaleManifest, openLocaleDirectory, setLocale, t, tOr, } from '../../i18n/index.js';
 import { renderLogEntries } from './log-panel.js';
+/** 主题模式短名（源语言兜底，实际展示走 `themeModeShortLabel()`） */
+const MODE_SHORT_LABELS = {
+    dark: '深色',
+    light: '浅色',
+    system: '跟随系统',
+    schedule: '定时',
+};
+/** 主题模式长名（源语言兜底） */
+const MODE_LONG_LABELS = {
+    dark: '深色模式',
+    light: '浅色模式',
+    system: '跟随系统',
+    schedule: '定时切换',
+};
+/** 收藏列表类型（源语言兜底） */
+const LIST_TYPE_LABELS = {
+    all: '全部收藏',
+    collect: '已看',
+    wish: '想看',
+    do: '在看',
+};
+/** 时间筛选范围（源语言兜底） */
+const TIME_FILTER_LABELS = {
+    all: '全部时间',
+    year: '全年',
+    quarter: '季度新番',
+    month: '月份',
+    future: '预告 / 未来',
+};
+/** 日志级别 → 展示名（下拉四个档位；未知值原样返回） */
+function logLevelLabel(level) {
+    return tOr(`handlers.settingsBindings.logLevel.${String(level)}`, {
+        0: 'DEBUG · 全部日志',
+        1: 'INFO · 常规信息',
+        2: 'WARN · 仅警告与错误',
+        3: 'ERROR · 仅错误',
+    }[level] ?? String(level));
+}
+/** 主题模式 → 短名（日夜开关下方的说明） */
+function themeModeShortLabel(mode) {
+    return tOr(`handlers.settingsBindings.modeShort.${mode}`, MODE_SHORT_LABELS[mode] ?? mode);
+}
+/** 主题模式 → 长名（切换成功提示） */
+function themeModeLongLabel(mode) {
+    return tOr(`handlers.settingsBindings.modeLong.${mode}`, MODE_LONG_LABELS[mode] ?? mode);
+}
+/** 收藏列表类型 → 展示名 */
+function listTypeLabel(value) {
+    return tOr(`handlers.settingsBindings.listType.${value}`, LIST_TYPE_LABELS[value] ?? value);
+}
+/** 时间筛选范围 → 展示名 */
+function timeFilterLabel(value) {
+    return tOr(`handlers.settingsBindings.timeFilter.${value}`, TIME_FILTER_LABELS[value] ?? value);
+}
+/** 模态框按钮位置 → 展示名 */
+function modalPositionLabel(position) {
+    const isOutside = position === 'outside';
+    return tOr(isOutside ? 'handlers.settingsBindings.modalOutside' : 'handlers.settingsBindings.modalInside', isOutside ? '模态框外（标题栏右上角）' : '模态框内（底部）');
+}
 // ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 export const handleEnableSyncRecordChange = () => {
     const checkboxEnableSyncRecord = document.getElementById('checkboxEnableSyncRecord');
@@ -16,7 +75,9 @@ export const handleEnableSyncRecordChange = () => {
     const { checked } = checkboxEnableSyncRecord;
     bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`);
     setSyncRecordEnabled(checked);
-    showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info');
+    showToast(checked
+        ? tOr('handlers.settingsBindings.syncRecordOn', '已启用同步记录功能')
+        : tOr('handlers.settingsBindings.syncRecordOff', '已关闭同步记录功能'), 'info');
 };
 export const handleLogLevelFilterChange = () => {
     renderLogEntries();
@@ -31,16 +92,12 @@ export const handleLogLevelChange = () => {
         return;
     const isOk = setLogLevel(level);
     if (isOk) {
-        const labels = {
-            0: 'DEBUG · 全部日志',
-            1: 'INFO · 常规信息',
-            2: 'WARN · 仅警告与错误',
-            3: 'ERROR · 仅错误',
-        };
-        showToast(`日志记录级别已设为「${labels[level] ?? String(level)}」`, 'success');
+        showToast(tOr('handlers.settingsBindings.logLevelSet', '日志记录级别已设为「{level}」', {
+            level: logLevelLabel(level),
+        }), 'success');
     }
     else {
-        showToast('日志级别保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.logLevelFailed', '日志级别保存失败'), 'error');
     }
 };
 // ========== 设置页：外观主题 / 列表类型 / 时间筛选 / 刷新间隔 ==========
@@ -57,16 +114,18 @@ export function updateThemeToggle(mode) {
     const isDark = resolveCurrentTheme() === 'dark';
     if (button) {
         button.setAttribute('aria-checked', isDark ? 'true' : 'false');
-        button.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题');
+        button.setAttribute('aria-label', isDark
+            ? tOr('handlers.settingsBindings.themeToLight', '切换到浅色主题')
+            : tOr('handlers.settingsBindings.themeToDark', '切换到深色主题'));
     }
     if (state) {
-        const labels = {
-            dark: '深色',
-            light: '浅色',
-            system: '跟随系统',
-            schedule: '定时',
-        };
-        state.textContent = `当前：${labels[mode] ?? mode}（${isDark ? '深色' : '浅色'}）`;
+        const actual = isDark
+            ? tOr('handlers.settingsBindings.modeShort.dark', '深色')
+            : tOr('handlers.settingsBindings.modeShort.light', '浅色');
+        state.textContent = tOr('handlers.settingsBindings.themeState', '当前：{mode}（{actual}）', {
+            mode: themeModeShortLabel(mode),
+            actual,
+        });
     }
 }
 /** 同步模式按钮组的 active 与定时框显隐 */
@@ -113,16 +172,12 @@ export const handleThemeModeClick = (event) => {
     const isOk = saveTheme(mode);
     if (isOk) {
         switchThemeMode(mode, origin);
-        const labels = {
-            dark: '深色模式',
-            light: '浅色模式',
-            system: '跟随系统',
-            schedule: '定时切换',
-        };
-        showToast(`主题已切换为「${labels[mode] || mode}」`, 'success');
+        showToast(tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+            mode: themeModeLongLabel(mode),
+        }), 'success');
     }
     else {
-        showToast('主题保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error');
     }
 };
 /** 定时时刻变更：保存后立即按新时刻解析一次（不等 30s 轮询） */
@@ -133,12 +188,15 @@ export const handleThemeScheduleChange = () => {
         return;
     const isOk = setThemeSchedule({ enabled: true, darkStart, lightStart });
     if (!isOk) {
-        showToast('时刻格式应为 HH:MM', 'error');
+        showToast(tOr('handlers.settingsBindings.scheduleFormat', '时刻格式应为 HH:MM'), 'error');
         return;
     }
     if (getTheme(true) === 'schedule') {
         applyTheme('schedule');
-        showToast(`定时已更新：${lightStart} 浅 → ${darkStart} 深`, 'success');
+        showToast(tOr('handlers.settingsBindings.scheduleUpdated', '定时已更新：{light} 浅 → {dark} 深', {
+            light: lightStart,
+            dark: darkStart,
+        }), 'success');
     }
 };
 export const handleThemeChange = () => {
@@ -149,16 +207,12 @@ export const handleThemeChange = () => {
     const isOk = saveTheme(mode);
     if (isOk) {
         switchThemeMode(mode);
-        const labels = {
-            dark: '深色模式',
-            light: '浅色模式',
-            system: '跟随系统',
-            schedule: '定时切换',
-        };
-        showToast(`主题已切换为「${labels[mode] || mode}」`, 'success');
+        showToast(tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+            mode: themeModeLongLabel(mode),
+        }), 'success');
     }
     else {
-        showToast('主题保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error');
     }
 };
 /**
@@ -176,13 +230,15 @@ export const handleThemeToggleClick = (event) => {
         : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const isOk = saveTheme(next);
     if (!isOk) {
-        showToast('主题保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error');
         return;
     }
     switchThemeMode(next, origin);
     updateThemeModeButtons(next);
     updateThemeToggle(next);
-    showToast(`主题已切换为「${next === 'dark' ? '深色模式' : '浅色模式'}」`, 'success');
+    showToast(tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+        mode: themeModeLongLabel(next),
+    }), 'success');
 };
 /** 同步模态框按钮位置的分段按钮与说明 */
 export function updateModalButtonsPositionButtons(position) {
@@ -208,14 +264,12 @@ export const handleModalButtonsPositionClick = (event) => {
     updateModalButtonsPositionButtons(position);
     const isOk = setModalButtonsPosition(position);
     if (isOk) {
-        const labels = {
-            inside: '模态框内（底部）',
-            outside: '模态框外（标题栏右上角）',
-        };
-        showToast(`模态框按钮位置：${labels[position] || position}`, 'success');
+        showToast(tOr('handlers.settingsBindings.modalPositionSet', '模态框按钮位置：{position}', {
+            position: modalPositionLabel(position),
+        }), 'success');
     }
     else {
-        showToast('保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error');
     }
 };
 // ========== 设置页：条件格式自动聚类口径 ==========
@@ -241,10 +295,12 @@ export const handleClusterModeClick = (event) => {
     updateClusterModeButtons(mode);
     const isOk = setClusterMode(mode);
     if (isOk) {
-        showToast(`自动聚类口径：${clusterModeLabel(mode)}`, 'success');
+        showToast(tOr('handlers.settingsBindings.clusterSet', '自动聚类口径：{mode}', {
+            mode: clusterModeLabel(mode),
+        }), 'success');
     }
     else {
-        showToast('保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error');
     }
 };
 // ========== 设置页：条件格式合并重复项口径 ==========
@@ -265,10 +321,12 @@ export const handleMergeModeClick = (event) => {
     updateMergeModeButtons(mode);
     const isOk = setMergeMode(mode);
     if (isOk) {
-        showToast(`合并重复项口径：${mergeModeLabel(mode)}`, 'success');
+        showToast(tOr('handlers.settingsBindings.mergeSet', '合并重复项口径：{mode}', {
+            mode: mergeModeLabel(mode),
+        }), 'success');
     }
     else {
-        showToast('保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error');
     }
 };
 export const handleListTypeChange = () => {
@@ -277,16 +335,12 @@ export const handleListTypeChange = () => {
         return;
     const isOk = setListType(select.value);
     if (isOk) {
-        const labels = {
-            all: '全部收藏',
-            collect: '已看',
-            wish: '想看',
-            do: '在看',
-        };
-        showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success');
+        showToast(tOr('handlers.settingsBindings.listTypeSet', '默认收藏列表类型：{type}', {
+            type: listTypeLabel(select.value),
+        }), 'success');
     }
     else {
-        showToast('收藏列表类型保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.listTypeFailed', '收藏列表类型保存失败'), 'error');
     }
 };
 export const handleTimeFilterChange = () => {
@@ -295,17 +349,12 @@ export const handleTimeFilterChange = () => {
         return;
     const isOk = setTimeFilter(select.value);
     if (isOk) {
-        const labels = {
-            all: '全部时间',
-            year: '全年',
-            quarter: '季度新番',
-            month: '月份',
-            future: '预告 / 未来',
-        };
-        showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success');
+        showToast(tOr('handlers.settingsBindings.timeFilterSet', '默认时间筛选范围：{range}', {
+            range: timeFilterLabel(select.value),
+        }), 'success');
     }
     else {
-        showToast('时间筛选范围保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.timeFilterFailed', '时间筛选范围保存失败'), 'error');
     }
 };
 export const handleRefreshIntervalChange = () => {
@@ -319,17 +368,21 @@ export const handleRefreshIntervalChange = () => {
     }
     const minutes = Number(raw);
     if (!Number.isFinite(minutes) || minutes < 0 || minutes > 1440) {
-        showToast('刷新间隔需为 0–1440 之间的整数（分钟）', 'warn');
+        showToast(tOr('handlers.settingsBindings.refreshInvalid', '刷新间隔需为 0–1440 之间的整数（分钟）'), 'warn');
         input.value = String(getRefreshInterval(true));
         return;
     }
     const isOk = setRefreshInterval(minutes);
     if (isOk) {
         const value = Math.round(minutes);
-        showToast(`自动刷新间隔已设为 ${String(value)} 分钟${value === 0 ? '（已关闭）' : ''}`, 'success');
+        const offNote = value === 0 ? tOr('handlers.settingsBindings.refreshOff', '（已关闭）') : '';
+        showToast(tOr('handlers.settingsBindings.refreshSet', '自动刷新间隔已设为 {minutes} 分钟{off}', {
+            minutes: String(value),
+            off: offNote,
+        }), 'success');
     }
     else {
-        showToast('刷新间隔保存失败', 'error');
+        showToast(tOr('handlers.settingsBindings.refreshFailed', '刷新间隔保存失败'), 'error');
     }
 };
 // ========== 时间筛选 UI 控制 ==========

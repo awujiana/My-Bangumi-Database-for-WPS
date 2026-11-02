@@ -18,9 +18,28 @@ import type { SyncStrategy, SyncSourceType } from '../../index.js';
  */
 export declare const SHARD_OPTIONS: readonly {
     name: string;
+    /** 源语言名（兜底；实际展示走 `shardLabel()`） */
     label: string;
+    labelKey: string;
+    /** 源语言说明（兜底；实际展示走 `shardDetail()`） */
     detail: string;
+    detailKey: string;
 }[];
+/**
+ * 不可取消的必选分片
+ *
+ * SID / 名称 / 更新时间都只在 `base` 里，缺了它拼不出记录，所以固定勾选且禁用。
+ */
+/** 分片名（复选框文字与清单标题共用） */
+export declare function shardLabel(option: {
+    label: string;
+    labelKey: string;
+}): string;
+/** 分片取舍说明（清单浮窗里的长段落） */
+export declare function shardDetail(option: {
+    detail: string;
+    detailKey: string;
+}): string;
 /**
  * 按 {@link SHARD_OPTIONS} 渲染分片复选框（幂等：重复调用先清空）
  */

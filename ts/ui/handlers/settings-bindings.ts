@@ -42,9 +42,85 @@ import {
   openLocaleDirectory,
   setLocale,
   t,
+  tOr,
 } from '../../i18n/index.js'
 import type { LocaleCode } from '../../i18n/index.js'
 import { renderLogEntries } from './log-panel.js'
+
+/** 主题模式短名（源语言兜底，实际展示走 `themeModeShortLabel()`） */
+const MODE_SHORT_LABELS: Readonly<Record<string, string>> = {
+  dark: '深色',
+  light: '浅色',
+  system: '跟随系统',
+  schedule: '定时',
+}
+
+/** 主题模式长名（源语言兜底） */
+const MODE_LONG_LABELS: Readonly<Record<string, string>> = {
+  dark: '深色模式',
+  light: '浅色模式',
+  system: '跟随系统',
+  schedule: '定时切换',
+}
+
+/** 收藏列表类型（源语言兜底） */
+const LIST_TYPE_LABELS: Readonly<Record<string, string>> = {
+  all: '全部收藏',
+  collect: '已看',
+  wish: '想看',
+  do: '在看',
+}
+
+/** 时间筛选范围（源语言兜底） */
+const TIME_FILTER_LABELS: Readonly<Record<string, string>> = {
+  all: '全部时间',
+  year: '全年',
+  quarter: '季度新番',
+  month: '月份',
+  future: '预告 / 未来',
+}
+
+/** 日志级别 → 展示名（下拉四个档位；未知值原样返回） */
+function logLevelLabel(level: number): string {
+  return tOr(
+    `handlers.settingsBindings.logLevel.${String(level)}`,
+    {
+      0: 'DEBUG · 全部日志',
+      1: 'INFO · 常规信息',
+      2: 'WARN · 仅警告与错误',
+      3: 'ERROR · 仅错误',
+    }[level] ?? String(level),
+  )
+}
+
+/** 主题模式 → 短名（日夜开关下方的说明） */
+function themeModeShortLabel(mode: string): string {
+  return tOr(`handlers.settingsBindings.modeShort.${mode}`, MODE_SHORT_LABELS[mode] ?? mode)
+}
+
+/** 主题模式 → 长名（切换成功提示） */
+function themeModeLongLabel(mode: string): string {
+  return tOr(`handlers.settingsBindings.modeLong.${mode}`, MODE_LONG_LABELS[mode] ?? mode)
+}
+
+/** 收藏列表类型 → 展示名 */
+function listTypeLabel(value: string): string {
+  return tOr(`handlers.settingsBindings.listType.${value}`, LIST_TYPE_LABELS[value] ?? value)
+}
+
+/** 时间筛选范围 → 展示名 */
+function timeFilterLabel(value: string): string {
+  return tOr(`handlers.settingsBindings.timeFilter.${value}`, TIME_FILTER_LABELS[value] ?? value)
+}
+
+/** 模态框按钮位置 → 展示名 */
+function modalPositionLabel(position: string): string {
+  const isOutside = position === 'outside'
+  return tOr(
+    isOutside ? 'handlers.settingsBindings.modalOutside' : 'handlers.settingsBindings.modalInside',
+    isOutside ? '模态框外（标题栏右上角）' : '模态框内（底部）',
+  )
+}
 
 // ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 
@@ -56,7 +132,12 @@ export const handleEnableSyncRecordChange = (): void => {
   const { checked } = checkboxEnableSyncRecord
   bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`)
   setSyncRecordEnabled(checked)
-  showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info')
+  showToast(
+    checked
+      ? tOr('handlers.settingsBindings.syncRecordOn', '已启用同步记录功能')
+      : tOr('handlers.settingsBindings.syncRecordOff', '已关闭同步记录功能'),
+    'info',
+  )
 }
 
 export const handleLogLevelFilterChange = (): void => {
@@ -71,15 +152,14 @@ export const handleLogLevelChange = (): void => {
   if (!Number.isSafeInteger(level)) return
   const isOk = setLogLevel(level)
   if (isOk) {
-    const labels: Record<number, string> = {
-      0: 'DEBUG · 全部日志',
-      1: 'INFO · 常规信息',
-      2: 'WARN · 仅警告与错误',
-      3: 'ERROR · 仅错误',
-    }
-    showToast(`日志记录级别已设为「${labels[level] ?? String(level)}」`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.logLevelSet', '日志记录级别已设为「{level}」', {
+        level: logLevelLabel(level),
+      }),
+      'success',
+    )
   } else {
-    showToast('日志级别保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.logLevelFailed', '日志级别保存失败'), 'error')
   }
 }
 
@@ -98,16 +178,21 @@ export function updateThemeToggle(mode: string): void {
   const isDark = resolveCurrentTheme() === 'dark'
   if (button) {
     button.setAttribute('aria-checked', isDark ? 'true' : 'false')
-    button.setAttribute('aria-label', isDark ? '切换到浅色主题' : '切换到深色主题')
+    button.setAttribute(
+      'aria-label',
+      isDark
+        ? tOr('handlers.settingsBindings.themeToLight', '切换到浅色主题')
+        : tOr('handlers.settingsBindings.themeToDark', '切换到深色主题'),
+    )
   }
   if (state) {
-    const labels: Record<string, string> = {
-      dark: '深色',
-      light: '浅色',
-      system: '跟随系统',
-      schedule: '定时',
-    }
-    state.textContent = `当前：${labels[mode] ?? mode}（${isDark ? '深色' : '浅色'}）`
+    const actual = isDark
+      ? tOr('handlers.settingsBindings.modeShort.dark', '深色')
+      : tOr('handlers.settingsBindings.modeShort.light', '浅色')
+    state.textContent = tOr('handlers.settingsBindings.themeState', '当前：{mode}（{actual}）', {
+      mode: themeModeShortLabel(mode),
+      actual,
+    })
   }
 }
 
@@ -157,15 +242,14 @@ export const handleThemeModeClick = (event: Event): void => {
   const isOk = saveTheme(mode)
   if (isOk) {
     switchThemeMode(mode, origin)
-    const labels: Record<string, string> = {
-      dark: '深色模式',
-      light: '浅色模式',
-      system: '跟随系统',
-      schedule: '定时切换',
-    }
-    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+        mode: themeModeLongLabel(mode),
+      }),
+      'success',
+    )
   } else {
-    showToast('主题保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error')
   }
 }
 
@@ -176,12 +260,18 @@ export const handleThemeScheduleChange = (): void => {
   if (!darkStart || !lightStart) return
   const isOk = setThemeSchedule({ enabled: true, darkStart, lightStart })
   if (!isOk) {
-    showToast('时刻格式应为 HH:MM', 'error')
+    showToast(tOr('handlers.settingsBindings.scheduleFormat', '时刻格式应为 HH:MM'), 'error')
     return
   }
   if (getTheme(true) === 'schedule') {
     applyTheme('schedule')
-    showToast(`定时已更新：${lightStart} 浅 → ${darkStart} 深`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.scheduleUpdated', '定时已更新：{light} 浅 → {dark} 深', {
+        light: lightStart,
+        dark: darkStart,
+      }),
+      'success',
+    )
   }
 }
 
@@ -193,15 +283,14 @@ export const handleThemeChange = (): void => {
   const isOk = saveTheme(mode)
   if (isOk) {
     switchThemeMode(mode)
-    const labels: Record<string, string> = {
-      dark: '深色模式',
-      light: '浅色模式',
-      system: '跟随系统',
-      schedule: '定时切换',
-    }
-    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+        mode: themeModeLongLabel(mode),
+      }),
+      'success',
+    )
   } else {
-    showToast('主题保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error')
   }
 }
 
@@ -221,13 +310,18 @@ export const handleThemeToggleClick = (event: Event): void => {
       : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
   const isOk = saveTheme(next)
   if (!isOk) {
-    showToast('主题保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.themeFailed', '主题保存失败'), 'error')
     return
   }
   switchThemeMode(next, origin)
   updateThemeModeButtons(next)
   updateThemeToggle(next)
-  showToast(`主题已切换为「${next === 'dark' ? '深色模式' : '浅色模式'}」`, 'success')
+  showToast(
+    tOr('handlers.settingsBindings.themeSet', '主题已切换为「{mode}」', {
+      mode: themeModeLongLabel(next),
+    }),
+    'success',
+  )
 }
 
 /** 同步模态框按钮位置的分段按钮与说明 */
@@ -256,13 +350,14 @@ export const handleModalButtonsPositionClick = (event: Event): void => {
   updateModalButtonsPositionButtons(position)
   const isOk = setModalButtonsPosition(position)
   if (isOk) {
-    const labels: Record<string, string> = {
-      inside: '模态框内（底部）',
-      outside: '模态框外（标题栏右上角）',
-    }
-    showToast(`模态框按钮位置：${labels[position] || position}`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.modalPositionSet', '模态框按钮位置：{position}', {
+        position: modalPositionLabel(position),
+      }),
+      'success',
+    )
   } else {
-    showToast('保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error')
   }
 }
 
@@ -290,9 +385,14 @@ export const handleClusterModeClick = (event: Event): void => {
   updateClusterModeButtons(mode)
   const isOk = setClusterMode(mode)
   if (isOk) {
-    showToast(`自动聚类口径：${clusterModeLabel(mode)}`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.clusterSet', '自动聚类口径：{mode}', {
+        mode: clusterModeLabel(mode),
+      }),
+      'success',
+    )
   } else {
-    showToast('保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error')
   }
 }
 
@@ -315,9 +415,14 @@ export const handleMergeModeClick = (event: Event): void => {
   updateMergeModeButtons(mode)
   const isOk = setMergeMode(mode)
   if (isOk) {
-    showToast(`合并重复项口径：${mergeModeLabel(mode)}`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.mergeSet', '合并重复项口径：{mode}', {
+        mode: mergeModeLabel(mode),
+      }),
+      'success',
+    )
   } else {
-    showToast('保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.saveFailed', '保存失败'), 'error')
   }
 }
 
@@ -326,15 +431,14 @@ export const handleListTypeChange = (): void => {
   if (!select) return
   const isOk = setListType(select.value)
   if (isOk) {
-    const labels: Record<string, string> = {
-      all: '全部收藏',
-      collect: '已看',
-      wish: '想看',
-      do: '在看',
-    }
-    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.listTypeSet', '默认收藏列表类型：{type}', {
+        type: listTypeLabel(select.value),
+      }),
+      'success',
+    )
   } else {
-    showToast('收藏列表类型保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.listTypeFailed', '收藏列表类型保存失败'), 'error')
   }
 }
 
@@ -343,16 +447,14 @@ export const handleTimeFilterChange = (): void => {
   if (!select) return
   const isOk = setTimeFilter(select.value)
   if (isOk) {
-    const labels: Record<string, string> = {
-      all: '全部时间',
-      year: '全年',
-      quarter: '季度新番',
-      month: '月份',
-      future: '预告 / 未来',
-    }
-    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success')
+    showToast(
+      tOr('handlers.settingsBindings.timeFilterSet', '默认时间筛选范围：{range}', {
+        range: timeFilterLabel(select.value),
+      }),
+      'success',
+    )
   } else {
-    showToast('时间筛选范围保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.timeFilterFailed', '时间筛选范围保存失败'), 'error')
   }
 }
 
@@ -366,19 +468,26 @@ export const handleRefreshIntervalChange = (): void => {
   }
   const minutes = Number(raw)
   if (!Number.isFinite(minutes) || minutes < 0 || minutes > 1440) {
-    showToast('刷新间隔需为 0–1440 之间的整数（分钟）', 'warn')
+    showToast(
+      tOr('handlers.settingsBindings.refreshInvalid', '刷新间隔需为 0–1440 之间的整数（分钟）'),
+      'warn',
+    )
     input.value = String(getRefreshInterval(true))
     return
   }
   const isOk = setRefreshInterval(minutes)
   if (isOk) {
     const value = Math.round(minutes)
+    const offNote = value === 0 ? tOr('handlers.settingsBindings.refreshOff', '（已关闭）') : ''
     showToast(
-      `自动刷新间隔已设为 ${String(value)} 分钟${value === 0 ? '（已关闭）' : ''}`,
+      tOr('handlers.settingsBindings.refreshSet', '自动刷新间隔已设为 {minutes} 分钟{off}', {
+        minutes: String(value),
+        off: offNote,
+      }),
       'success',
     )
   } else {
-    showToast('刷新间隔保存失败', 'error')
+    showToast(tOr('handlers.settingsBindings.refreshFailed', '刷新间隔保存失败'), 'error')
   }
 }
 
@@ -391,7 +500,9 @@ export const handleRefreshIntervalChange = (): void => {
  * - 选择「预告/未来动漫」时隐藏年份/季度/月份，显示提示
  */
 export function setupTimeFilterControls(): void {
-  const checkboxTimeFilter = document.getElementById('checkboxTimeFilter') as HTMLInputElement | null
+  const checkboxTimeFilter = document.getElementById(
+    'checkboxTimeFilter',
+  ) as HTMLInputElement | null
   const timeFilterControls = document.getElementById('timeFilterControls')
   if (!checkboxTimeFilter || !timeFilterControls) return
 
