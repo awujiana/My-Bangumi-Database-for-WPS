@@ -778,7 +778,8 @@ async function handleScan() {
     if (scanButton)
         scanButton.disabled = true;
     try {
-        const result = await scanCleanRules(ruleIds, { selectedSheets });
+        // translate 直接传 tOr（同签名）：引擎产出的提示与进度都按当前语言渲染
+        const result = await scanCleanRules(ruleIds, { selectedSheets, translate: tOr });
         scanResult = result;
         renderPreview(result);
         for (const note of result.notes)
@@ -870,7 +871,7 @@ async function executeClean() {
     try {
         const outcome = await runCleanPlans(scanResult, (done, total, message) => {
             updateProgress(done, total, message);
-        });
+        }, tOr);
         const details = [];
         for (const item of outcome.targets) {
             const { error } = item;

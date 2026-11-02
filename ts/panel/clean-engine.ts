@@ -32,6 +32,7 @@ import {
 } from './clean-rules.js'
 import type { CleanRule } from './clean-rules.js'
 import { estimateUtf8Bytes, transformCellValue } from './clean-transforms.js'
+import { interpolate } from '../i18n/translate.js'
 import {
   applyRowPlan,
   planDuplicateRows,
@@ -48,6 +49,31 @@ import type {
 } from '../sync/sheet-cleaning.js'
 
 // ========== 类型 ==========
+
+/**
+ * 引擎内文案翻译器（`tOr` 同签名，可直接传入）
+ *
+ * 引擎是纯逻辑层、不 import i18n 运行时：文案由调用方注入，不注入时退回源语言
+ * 原文并只做插值（单测与无宿主环境即此路径）。产出的提示是**扫描当时的快照**，
+ * 之后切语言不会改写已有日志 —— 对日志而言这才是正确语义。
+ */
+export type CleanTranslate = (
+  key: string,
+  fallback: string,
+  parameters?: Readonly<Record<string, string | number>>,
+) => string
+
+/** 默认翻译器：不查语言包，只把 `{name}` 占位符填上 */
+const identityTranslate: CleanTranslate = (_key, fallback, parameters) =>
+  interpolate(fallback, parameters)
+
+/** 扫描期上下文：提示收集器 + 文案翻译器 */
+interface ScanContext {
+  /** 扫描过程中的提示（目标过滤原因、跳过原因等） */
+  notes: string[]
+  /** 文案翻译器 */
+  translate: CleanTranslate
+}
 
 /** 一个待清理目标（工作簿中的一张工作表） */
 export interface CleanTargetInfo {
@@ -657,12 +683,12 @@ function resolveColumn(target: CleanTargetInfo, keywords: readonly string[]): nu
   return undefined
 }
 
-/** 列号 → 列名（日志展示用） */
-function columnName(target: CleanTargetInfo, column: number): string {
+/** 列号 → 列名（日志展示用；未在表头里识别到的列退回「第 N 列」） */
+function columnName(target: CleanTargetInfo, column: number, translate: CleanTranslate): string {
   for (const [key, value] of target.columnMap) {
     if (value === column) return key
   }
-  return `第${String(column)}列`
+  return translate('clean.preview.columnFallback', '第{index}列', { index: column })
 }
 
 /** 扫描 cellTransform 类规则 */
@@ -670,6 +696,7 @@ function scanCellTransform(
   rule: CleanRule,
   target: CleanTargetInfo,
   excludedRows: ReadonlySet<number>,
+  translate: CleanTranslate,
 ): RulePlan {
   const base: RulePlanBase = {
     ruleId: rule.id,
@@ -677,11 +704,20 @@ function scanCellTransform(
     targetKey: target.key,
     targetLabel: target.label,
   }
-  if (!rule.transform) return skippedPlan(base, '规则未配置变换函数')
+  if (!rule.transform) {
+    return skippedPlan(base, translate('clean.skip.noTransform', '规则未配置变换函数'))
+  }
 
   const keywords = rule.columns ?? []
   const column = resolveColumn(target, keywords)
-  if (!column) return skippedPlan(base, `未找到目标列（${keywords.join(' / ')}）`)
+  if (!column) {
+    return skippedPlan(
+      base,
+      translate('clean.skip.noTargetColumn', '未找到目标列（{columns}）', {
+        columns: keywords.join(' / '),
+      }),
+    )
+  }
 
   // 需要「名称」参照列的变换（别名去重）额外读取名称列
   const isNameRequired = rule.transform === 'dedupAliasAgainstName'
@@ -716,7 +752,7 @@ function scanCellTransform(
         changes.push({
           row,
           column,
-          columnName: columnName(target, column),
+          columnName: columnName(target, column, translate),
           oldValue,
           nextValue: outcome.value,
         })
@@ -745,6 +781,7 @@ function planNoiseRows(
   worksheet: WpsWorksheet,
   headerRow: number,
   lastRow: number,
+  translate: CleanTranslate,
   block?: readonly string[][],
 ): RowPlan {
   const keywords = CLEAN_EXCLUDES.noiseRowText
@@ -754,7 +791,8 @@ function planNoiseRows(
       changes: [],
       groups: 0,
       mergedGroups: 0,
-      skippedReason: '未配置噪声行词表',
+      skippedReasonKey: 'clean.skip.noNoiseWordList',
+      skippedReason: translate('clean.skip.noNoiseWordList', '未配置噪声行词表'),
     }
   }
   const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
@@ -777,7 +815,8 @@ function planNoiseRows(
       changes: [],
       groups: 0,
       mergedGroups: 0,
-      skippedReason: '未发现噪声行',
+      skippedReasonKey: 'clean.skip.noNoiseRow',
+      skippedReason: translate('clean.skip.noNoiseRow', '未发现噪声行'),
     }
   }
   return {
@@ -795,6 +834,7 @@ function scanRowRule(
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
   getLayout: () => SheetLayout | null,
+  translate: CleanTranslate,
   block?: readonly string[][],
 ): RulePlan {
   const base: RulePlanBase = {
@@ -821,26 +861,30 @@ function scanRowRule(
       }
       case 'noiseRows': {
         // 噪声行刻意不遵守 excludedRows：否则这些行会被 rowText 保护语义先行排除，永远删不掉
-        plan = planNoiseRows(target.worksheet, target.headerRow, target.lastRow, block)
+        plan = planNoiseRows(target.worksheet, target.headerRow, target.lastRow, translate, block)
         break
       }
       default: {
-        return skippedPlan(base, '未知清理种类')
+        return skippedPlan(base, translate('clean.skip.unknownKind', '未知清理种类'))
       }
     }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
-    return skippedPlan(base, `扫描失败：${message}`)
+    return skippedPlan(base, translate('clean.skip.scanFailed', '扫描失败：{message}', { message }))
   }
 
   if (plan.deleteRows.length === 0) {
-    return skippedPlan(base, plan.skippedReason ?? '未发现待清理数据')
+    // sheet-cleaning 侧的原因自带 key；兜底那条是引擎自己的
+    const reason = plan.skippedReasonKey
+      ? translate(plan.skippedReasonKey, plan.skippedReason ?? '')
+      : (plan.skippedReason ?? translate('clean.skip.nothingToClean', '未发现待清理数据'))
+    return skippedPlan(base, reason)
   }
 
   const changes: CellChange[] = plan.changes.map((change: RowChange) => ({
     row: change.row,
     column: change.column,
-    columnName: columnName(target, change.column),
+    columnName: columnName(target, change.column, translate),
     // 行级变更（标签合并）的旧值由计划顺带采集；未提供时为空串
     oldValue: change.oldValue ?? '',
     nextValue: change.value,
@@ -862,21 +906,28 @@ function scanOneRule(
   target: CleanTargetInfo,
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
-  notes: string[],
+  context: ScanContext,
   getLayout: () => SheetLayout | null,
   block?: readonly string[][],
 ): RulePlan | null {
+  const { translate } = context
   const rule = findCleanRule(id)
   if (!rule) {
-    notes.push(`未知清理项：${id}`)
+    context.notes.push(translate('clean.note.unknownRule', '未知清理项：{id}', { id }))
     return null
   }
   const plan =
     rule.kind === 'cellTransform'
-      ? scanCellTransform(rule, target, excludedRows)
-      : scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block)
+      ? scanCellTransform(rule, target, excludedRows, translate)
+      : scanRowRule(rule, target, excludedRows, rowBytes, getLayout, translate, block)
   if (plan.skipped) {
-    notes.push(`${target.label} · ${rule.name}：${plan.skipped}`)
+    context.notes.push(
+      translate('clean.note.ruleSkipped', '{target} · {rule}：{reason}', {
+        target: target.label,
+        rule: rule.name,
+        reason: plan.skipped,
+      }),
+    )
     return null
   }
   return plan
@@ -886,7 +937,7 @@ function scanOneRule(
 function scanTarget(
   target: CleanTargetInfo,
   ruleIds: readonly string[],
-  notes: string[],
+  context: ScanContext,
 ): RulePlan[] {
   // 数据区整块只读一次，排除行判定与行字节估算共用：
   // 原为 collectExcludedRows 1 次 + estimateRowBytes 至多 ROW_BYTES_SAMPLE_LIMIT 次 COM 往返
@@ -897,7 +948,12 @@ function scanTarget(
       : undefined
   const excludedRows = collectExcludedRows(target, block)
   if (excludedRows.size > 0) {
-    notes.push(`${target.label}：排除 ${String(excludedRows.size)} 行（汇总/说明行）`)
+    context.notes.push(
+      context.translate('clean.note.excludedRows', '{target}：排除 {count} 行（汇总/说明行）', {
+        target: target.label,
+        count: excludedRows.size,
+      }),
+    )
   }
   const rowBytes = estimateRowBytes(target, block)
 
@@ -916,7 +972,7 @@ function scanTarget(
 
   const plans: RulePlan[] = []
   for (const id of ruleIds) {
-    const plan = scanOneRule(id, target, excludedRows, rowBytes, notes, getLayout, block)
+    const plan = scanOneRule(id, target, excludedRows, rowBytes, context, getLayout, block)
     if (plan) plans.push(plan)
   }
   return plans
@@ -933,18 +989,32 @@ function scanTarget(
  * @param options.selectedSheets 用户显式勾选的工作表白名单（按 `工作簿全路径 :: 表名` 形式）；
  *   传空数组表示不限制（保留旧行为，向后兼容）。
  *   命中时只清理白名单内的目标；未命中时整张表跳过。
+ * @param options.translate 文案翻译器（传 `tOr` 即可）；不传则只做插值、保留源语言原文。
  */
 export async function scanCleanRules(
   ruleIds: readonly string[],
-  options: { selectedSheets?: readonly { workbookKey: string; sheetName: string }[] } = {},
+  options: {
+    selectedSheets?: readonly { workbookKey: string; sheetName: string }[]
+    translate?: CleanTranslate
+  } = {},
 ): Promise<CleanScanResult> {
-  const notes: string[] = []
+  const context: ScanContext = { notes: [], translate: options.translate ?? identityTranslate }
   const targets = listCleanTargets(options.selectedSheets)
   if (targets.length === 0) {
     if (options.selectedSheets && options.selectedSheets.length > 0) {
-      notes.push('已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）')
+      context.notes.push(
+        context.translate(
+          'clean.note.noTargetsInSelection',
+          '已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）',
+        ),
+      )
     } else {
-      notes.push('未找到可清理目标（需在「选择清理的表格」中勾选工作表）')
+      context.notes.push(
+        context.translate(
+          'clean.note.noTargets',
+          '未找到可清理目标（需在「选择清理的表格」中勾选工作表）',
+        ),
+      )
     }
   }
 
@@ -959,7 +1029,7 @@ export async function scanCleanRules(
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 0)
     })
-    for (const plan of scanTarget(target, ruleIds, notes)) {
+    for (const plan of scanTarget(target, ruleIds, context)) {
       plans.push(plan)
       itemCount += plan.deleteRows.length + plan.changes.length
       estimatedBytes += plan.estimatedBytes
@@ -973,7 +1043,7 @@ export async function scanCleanRules(
     targetCount: targets.length,
     itemCount,
     estimatedBytes: Math.round(estimatedBytes),
-    notes,
+    notes: context.notes,
   }
 }
 
@@ -1054,6 +1124,7 @@ export function aggregatePlans(result: CleanScanResult): AggregatedTargetPlan[] 
 export async function runCleanPlans(
   result: CleanScanResult,
   onProgress?: CleanProgressCallback,
+  translate: CleanTranslate = identityTranslate,
 ): Promise<CleanRunResult> {
   const startTime = Date.now()
   const buckets = aggregatePlans(result)
@@ -1066,7 +1137,11 @@ export async function runCleanPlans(
   for (const bucket of buckets) {
     const { target } = bucket
     files.add(target.workbookPath)
-    onProgress?.(done, buckets.length, `正在清理 ${target.label}`)
+    onProgress?.(
+      done,
+      buckets.length,
+      translate('clean.progress.cleaning', '正在清理 {target}', { target: target.label }),
+    )
     try {
       // 让出一次事件循环，使进度条有机会重绘（WPS COM 调用为同步阻塞）
       await Promise.resolve()
@@ -1104,7 +1179,11 @@ export async function runCleanPlans(
       })
     }
     done += 1
-    onProgress?.(done, buckets.length, `已完成 ${target.label}`)
+    onProgress?.(
+      done,
+      buckets.length,
+      translate('clean.progress.done', '已完成 {target}', { target: target.label }),
+    )
   }
 
   return {

@@ -15,19 +15,47 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { bgmLog, findHeaderRow, getColumnMap, getLastRow, readRangeValues, setCellValue, } from '../tools/util/index.js';
 import { mergeTagValues } from './value-merge.js';
-/** 未执行清洗时的空结果（附原因） */
-function emptyResult(skippedReason) {
+/**
+ * 跳过原因的语言包 key（与 {@link CleanDuplicatesResult.skippedReason} 的中文原文配对）
+ *
+ * 本模块是纯数据层，且同一份原因会被**清理页与同步页两处**消费 —— 所以这里只带 key，
+ * 翻译留给消费方（各自的 i18n 运行时）。`skippedReason` 保留中文原文作兜底与日志。
+ */
+export const SHEET_CLEANING_SKIP_KEYS = {
+    /** 未找到表头行或无数据行 */
+    noLayout: 'clean.skip.noHeaderRow',
+    /** 未找到「名称」列 */
+    noNameColumn: 'clean.skip.noNameColumn',
+    /** 未找到「Bangumi_URL」列 */
+    noUrlColumn: 'clean.skip.noUrlColumn',
+    /** 未发现重复数据 */
+    noDuplicates: 'clean.skip.noDuplicates',
+    /** 未发现同 URL 重复行 */
+    noDuplicateUrl: 'clean.skip.noDuplicateUrl',
+    /** 未发现空白数据行 */
+    noEmptyName: 'clean.skip.noEmptyName',
+};
+/** 未执行清洗时的空结果（附原因 + 语言包 key） */
+function emptyResult(skippedReasonKey, skippedReason) {
     return {
         performed: false,
         deletedRows: 0,
         mergedTagGroups: 0,
         duplicateNameGroups: 0,
         skippedReason,
+        skippedReasonKey,
     };
 }
-/** 空的清理计划 */
-function emptyPlan(skippedReason) {
-    return { deleteRows: [], changes: [], groups: 0, mergedGroups: 0, skippedReason };
+/** 空的清理计划（附原因 + 语言包 key） */
+function emptyPlan(skippedReasonKey, skippedReason) {
+    return {
+        deleteRows: [],
+        changes: [],
+        groups: 0,
+        mergedGroups: 0,
+        skippedReason,
+        skippedReasonKey,
+    };
 }
 /**
  * 解析工作表结构。失败（无表头 / 无数据行）时返回 null，由调用方记日志。
@@ -127,13 +155,13 @@ export function planDuplicateRows(worksheet, options) {
     // 未提供时才自行解析（plan* 可独立调用）。null = 已解析且失败，直接空计划。
     const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout;
     if (!layout)
-        return emptyPlan('未找到表头行或无数据行');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行');
     const nameColumn = layout.columnMap.get('名称');
     if (!nameColumn)
-        return emptyPlan('未找到「名称」列');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noNameColumn, '未找到「名称」列');
     const urlColumn = layout.columnMap.get('Bangumi_URL');
     if (!urlColumn)
-        return emptyPlan('未找到「Bangumi_URL」列');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noUrlColumn, '未找到「Bangumi_URL」列');
     const tagsColumn = layout.columnMap.get('标签/分级');
     const dateColumn = layout.columnMap.get('开播日期');
     const episodesColumn = layout.columnMap.get('集数');
@@ -190,7 +218,7 @@ export function planDuplicateRows(worksheet, options) {
     }
     rowsToDelete.sort((a, b) => a - b);
     if (rowsToDelete.length === 0)
-        return emptyPlan('未发现重复数据');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noDuplicates, '未发现重复数据');
     return {
         deleteRows: rowsToDelete,
         changes,
@@ -222,10 +250,10 @@ function resolveUrlGroup(layout, rows, tags) {
 export function planDuplicateUrlRows(worksheet, options) {
     const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout;
     if (!layout)
-        return emptyPlan('未找到表头行或无数据行');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行');
     const urlColumn = layout.columnMap.get('Bangumi_URL');
     if (!urlColumn)
-        return emptyPlan('未找到「Bangumi_URL」列');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noUrlColumn, '未找到「Bangumi_URL」列');
     const tagsColumn = layout.columnMap.get('标签/分级');
     const excluded = options?.excludedRows;
     const urls = readColumn(worksheet, layout, urlColumn);
@@ -277,7 +305,7 @@ export function planDuplicateUrlRows(worksheet, options) {
     }
     rowsToDelete.sort((a, b) => a - b);
     if (rowsToDelete.length === 0)
-        return emptyPlan('未发现同 URL 重复行');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noDuplicateUrl, '未发现同 URL 重复行');
     return {
         deleteRows: rowsToDelete,
         changes,
@@ -295,10 +323,10 @@ export function planDuplicateUrlRows(worksheet, options) {
 export function planEmptyNameRows(worksheet, options) {
     const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout;
     if (!layout)
-        return emptyPlan('未找到表头行或无数据行');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行');
     const nameColumn = layout.columnMap.get('名称');
     if (!nameColumn)
-        return emptyPlan('未找到「名称」列');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noNameColumn, '未找到「名称」列');
     const excluded = options?.excludedRows;
     // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
     // 语义不变——仍只检查 columnMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
@@ -314,7 +342,7 @@ export function planEmptyNameRows(worksheet, options) {
             rowsToDelete.push(row);
     }
     if (rowsToDelete.length === 0)
-        return emptyPlan('未发现空白数据行');
+        return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noEmptyName, '未发现空白数据行');
     return {
         deleteRows: rowsToDelete,
         changes: [],
@@ -380,7 +408,7 @@ export function cleanSheetDuplicates(worksheet) {
     const plan = planDuplicateRows(worksheet);
     if (plan.deleteRows.length === 0) {
         bgmLog(LOG_LEVELS.INFO, `[cleanSheetDuplicates] 未发现需清洗的重复数据，耗时: ${String(Date.now() - startTime)}ms`);
-        return emptyResult(plan.skippedReason ?? '未发现重复数据');
+        return emptyResult(plan.skippedReasonKey ?? SHEET_CLEANING_SKIP_KEYS.noDuplicates, plan.skippedReason ?? '未发现重复数据');
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanSheetDuplicates] 统计: 重复名称=${String(plan.groups)}个, 待删除行=${String(plan.deleteRows.length)}, 合并标签组=${String(plan.mergedGroups)}`);
     const deleted = applyRowPlan(worksheet, plan);

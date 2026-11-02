@@ -5,7 +5,7 @@
  *              核心逻辑在 sync/sheet-cleaning.ts（富化完成后自动去重复用同一实现）。
  */
 import { LOG_LEVELS, bgmLog, BGM, getApp, showToast, buildFailedRowsAddress, getLastFailedRows, } from '../../index.js';
-import { cleanSheetDuplicates } from '../../sync/sheet-cleaning.js';
+import { cleanSheetDuplicates, SHEET_CLEANING_SKIP_KEYS } from '../../sync/sheet-cleaning.js';
 // tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
 // node 单测一 import 就 ReferenceError。别改回桶。
 import { tOr } from '../../i18n/locale-store.js';
@@ -93,7 +93,12 @@ export function cleanLockedDataSheet(targetWorksheet) {
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 清洗工作表: "${sheetName}"${lockedIndex}`);
     const result = cleanSheetDuplicates(worksheet);
     if (result.skippedReason) {
-        showToast(result.skippedReason, result.skippedReason === '未发现重复数据' ? 'info' : 'error');
+        // 分级判据改用 key：原先拿中文原文比字符串，译文一进来就永远落 error 分支
+        const message = result.skippedReasonKey
+            ? tOr(result.skippedReasonKey, result.skippedReason)
+            : result.skippedReason;
+        const level = result.skippedReasonKey === SHEET_CLEANING_SKIP_KEYS.noDuplicates ? 'info' : 'error';
+        showToast(message, level);
         return;
     }
     showToast(tOr('handlers.sheet.cleaned', '清洗完成：删除 {deleted} 行，合并 {merged} 个名称组的标签', {

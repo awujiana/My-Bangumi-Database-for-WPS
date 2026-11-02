@@ -25,6 +25,27 @@ import {
 } from '../tools/util/index.js'
 import { mergeTagValues } from './value-merge.js'
 
+/**
+ * 跳过原因的语言包 key（与 {@link CleanDuplicatesResult.skippedReason} 的中文原文配对）
+ *
+ * 本模块是纯数据层，且同一份原因会被**清理页与同步页两处**消费 —— 所以这里只带 key，
+ * 翻译留给消费方（各自的 i18n 运行时）。`skippedReason` 保留中文原文作兜底与日志。
+ */
+export const SHEET_CLEANING_SKIP_KEYS = {
+  /** 未找到表头行或无数据行 */
+  noLayout: 'clean.skip.noHeaderRow',
+  /** 未找到「名称」列 */
+  noNameColumn: 'clean.skip.noNameColumn',
+  /** 未找到「Bangumi_URL」列 */
+  noUrlColumn: 'clean.skip.noUrlColumn',
+  /** 未发现重复数据 */
+  noDuplicates: 'clean.skip.noDuplicates',
+  /** 未发现同 URL 重复行 */
+  noDuplicateUrl: 'clean.skip.noDuplicateUrl',
+  /** 未发现空白数据行 */
+  noEmptyName: 'clean.skip.noEmptyName',
+} as const
+
 /** 清洗结果摘要（cleanSheetDuplicates 的返回类型） */
 export interface CleanDuplicatesResult {
   /** 是否执行了删除（发生重复清洗） */
@@ -37,6 +58,8 @@ export interface CleanDuplicatesResult {
   duplicateNameGroups: number
   /** 未执行清洗的原因（无重复/缺列/无数据等），已执行时为 undefined */
   skippedReason?: string | undefined
+  /** {@link skippedReason} 对应的语言包 key（展示方优先取译文） */
+  skippedReasonKey?: string | undefined
 }
 
 /** 单个待写入的单元格变更 */
@@ -88,6 +111,8 @@ export interface RowPlan {
   mergedGroups: number
   /** 未产生任何清理时的原因 */
   skippedReason?: string | undefined
+  /** {@link skippedReason} 对应的语言包 key（展示方优先取译文） */
+  skippedReasonKey?: string | undefined
   /** 待删除行的预览数据（执行前预览用；扫描期顺带采集，零额外 COM 读取） */
   rowPreviews?: DeletedRowPreview[]
   /** 重复分组结构（保留行 vs 待删除行；仅重复类规则产出） */
@@ -136,20 +161,28 @@ interface GroupOutcome {
   mergedTags: string | null
 }
 
-/** 未执行清洗时的空结果（附原因） */
-function emptyResult(skippedReason?: string): CleanDuplicatesResult {
+/** 未执行清洗时的空结果（附原因 + 语言包 key） */
+function emptyResult(skippedReasonKey: string, skippedReason: string): CleanDuplicatesResult {
   return {
     performed: false,
     deletedRows: 0,
     mergedTagGroups: 0,
     duplicateNameGroups: 0,
     skippedReason,
+    skippedReasonKey,
   }
 }
 
-/** 空的清理计划 */
-function emptyPlan(skippedReason?: string): RowPlan {
-  return { deleteRows: [], changes: [], groups: 0, mergedGroups: 0, skippedReason }
+/** 空的清理计划（附原因 + 语言包 key） */
+function emptyPlan(skippedReasonKey: string, skippedReason: string): RowPlan {
+  return {
+    deleteRows: [],
+    changes: [],
+    groups: 0,
+    mergedGroups: 0,
+    skippedReason,
+    skippedReasonKey,
+  }
 }
 
 /**
@@ -281,12 +314,12 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
   // 表结构优先用调用方解析好的（scanTarget 每目标一次、多规则共用）；
   // 未提供时才自行解析（plan* 可独立调用）。null = 已解析且失败，直接空计划。
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
-  if (!layout) return emptyPlan('未找到表头行或无数据行')
+  if (!layout) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行')
 
   const nameColumn = layout.columnMap.get('名称')
-  if (!nameColumn) return emptyPlan('未找到「名称」列')
+  if (!nameColumn) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noNameColumn, '未找到「名称」列')
   const urlColumn = layout.columnMap.get('Bangumi_URL')
-  if (!urlColumn) return emptyPlan('未找到「Bangumi_URL」列')
+  if (!urlColumn) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noUrlColumn, '未找到「Bangumi_URL」列')
   const tagsColumn = layout.columnMap.get('标签/分级')
   const dateColumn = layout.columnMap.get('开播日期')
   const episodesColumn = layout.columnMap.get('集数')
@@ -348,7 +381,8 @@ export function planDuplicateRows(worksheet: WpsWorksheet, options?: RowPlanOpti
   }
 
   rowsToDelete.sort((a, b) => a - b)
-  if (rowsToDelete.length === 0) return emptyPlan('未发现重复数据')
+  if (rowsToDelete.length === 0)
+    return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noDuplicates, '未发现重复数据')
   return {
     deleteRows: rowsToDelete,
     changes,
@@ -384,9 +418,9 @@ function resolveUrlGroup(
  */
 export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
-  if (!layout) return emptyPlan('未找到表头行或无数据行')
+  if (!layout) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行')
   const urlColumn = layout.columnMap.get('Bangumi_URL')
-  if (!urlColumn) return emptyPlan('未找到「Bangumi_URL」列')
+  if (!urlColumn) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noUrlColumn, '未找到「Bangumi_URL」列')
   const tagsColumn = layout.columnMap.get('标签/分级')
 
   const excluded = options?.excludedRows
@@ -443,7 +477,8 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
   }
 
   rowsToDelete.sort((a, b) => a - b)
-  if (rowsToDelete.length === 0) return emptyPlan('未发现同 URL 重复行')
+  if (rowsToDelete.length === 0)
+    return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noDuplicateUrl, '未发现同 URL 重复行')
   return {
     deleteRows: rowsToDelete,
     changes,
@@ -462,9 +497,9 @@ export function planDuplicateUrlRows(worksheet: WpsWorksheet, options?: RowPlanO
  */
 export function planEmptyNameRows(worksheet: WpsWorksheet, options?: RowPlanOptions): RowPlan {
   const layout = options?.layout === undefined ? readSheetLayout(worksheet) : options.layout
-  if (!layout) return emptyPlan('未找到表头行或无数据行')
+  if (!layout) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noLayout, '未找到表头行或无数据行')
   const nameColumn = layout.columnMap.get('名称')
-  if (!nameColumn) return emptyPlan('未找到「名称」列')
+  if (!nameColumn) return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noNameColumn, '未找到「名称」列')
 
   const excluded = options?.excludedRows
   // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
@@ -482,7 +517,8 @@ export function planEmptyNameRows(worksheet: WpsWorksheet, options?: RowPlanOpti
     if (isBlank && !excluded?.has(row)) rowsToDelete.push(row)
   }
 
-  if (rowsToDelete.length === 0) return emptyPlan('未发现空白数据行')
+  if (rowsToDelete.length === 0)
+    return emptyPlan(SHEET_CLEANING_SKIP_KEYS.noEmptyName, '未发现空白数据行')
   return {
     deleteRows: rowsToDelete,
     changes: [],
@@ -554,7 +590,10 @@ export function cleanSheetDuplicates(worksheet: WpsWorksheet): CleanDuplicatesRe
       LOG_LEVELS.INFO,
       `[cleanSheetDuplicates] 未发现需清洗的重复数据，耗时: ${String(Date.now() - startTime)}ms`,
     )
-    return emptyResult(plan.skippedReason ?? '未发现重复数据')
+    return emptyResult(
+      plan.skippedReasonKey ?? SHEET_CLEANING_SKIP_KEYS.noDuplicates,
+      plan.skippedReason ?? '未发现重复数据',
+    )
   }
 
   bgmLog(

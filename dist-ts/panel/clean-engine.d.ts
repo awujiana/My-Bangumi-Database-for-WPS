@@ -11,6 +11,14 @@
  */
 import type { WpsWorksheet } from '../tools/wps.js';
 import type { DeletedRowPreview, DuplicateGroupPreview } from '../sync/sheet-cleaning.js';
+/**
+ * 引擎内文案翻译器（`tOr` 同签名，可直接传入）
+ *
+ * 引擎是纯逻辑层、不 import i18n 运行时：文案由调用方注入，不注入时退回源语言
+ * 原文并只做插值（单测与无宿主环境即此路径）。产出的提示是**扫描当时的快照**，
+ * 之后切语言不会改写已有日志 —— 对日志而言这才是正确语义。
+ */
+export type CleanTranslate = (key: string, fallback: string, parameters?: Readonly<Record<string, string | number>>) => string;
 /** 一个待清理目标（工作簿中的一张工作表） */
 export interface CleanTargetInfo {
     /** 唯一键：`工作簿全路径::表名` */
@@ -194,12 +202,14 @@ export declare function estimateRowBytes(target: CleanTargetInfo, block?: readon
  * @param options.selectedSheets 用户显式勾选的工作表白名单（按 `工作簿全路径 :: 表名` 形式）；
  *   传空数组表示不限制（保留旧行为，向后兼容）。
  *   命中时只清理白名单内的目标；未命中时整张表跳过。
+ * @param options.translate 文案翻译器（传 `tOr` 即可）；不传则只做插值、保留源语言原文。
  */
 export declare function scanCleanRules(ruleIds: readonly string[], options?: {
     selectedSheets?: readonly {
         workbookKey: string;
         sheetName: string;
     }[];
+    translate?: CleanTranslate;
 }): Promise<CleanScanResult>;
 /** 按目标聚合后的计划 */
 interface AggregatedTargetPlan {
@@ -217,7 +227,7 @@ export declare function aggregatePlans(result: CleanScanResult): AggregatedTarge
  * 执行清理：先写单元格变更，再批量删行。
  * 单个目标失败不影响其他目标，失败原因通过 TargetRunResult.error 返回。
  */
-export declare function runCleanPlans(result: CleanScanResult, onProgress?: CleanProgressCallback): Promise<CleanRunResult>;
+export declare function runCleanPlans(result: CleanScanResult, onProgress?: CleanProgressCallback, translate?: CleanTranslate): Promise<CleanRunResult>;
 /** 字节数格式化为可读文本（B / KB / MB / GB） */
 export declare function formatBytes(bytes: number): string;
 /** 目标摘要（页面「清理范围」区块展示，全部来自配置） */

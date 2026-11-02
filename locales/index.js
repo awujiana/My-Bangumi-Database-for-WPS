@@ -13,7 +13,7 @@
 export default {
   "schemaVersion": 1,
   "sourceLocale": "zh-CN",
-  "keyCount": 1923,
+  "keyCount": 1944,
   "locales": [
     {
       "code": "zh-CN",
@@ -21,10 +21,10 @@ export default {
       "nativeName": "简体中文",
       "version": "2.4.0",
       "updatedAt": "2026-11-02",
-      "keyCount": 1923,
+      "keyCount": 1944,
       "coverage": 100,
-      "sha256": "9cc9351618138f2bd4538999cebe654140c352d1cff1dc9c67626f139bb3045b",
-      "bytes": 158252
+      "sha256": "fae5456b6b7c3742c7e57b86ba3099c5b0375db22e59aaaf035ddb70049a74fe",
+      "bytes": 159665
     },
     {
       "code": "zh-TW",
@@ -32,10 +32,10 @@ export default {
       "nativeName": "繁體中文",
       "version": "2.4.0",
       "updatedAt": "2026-11-02",
-      "keyCount": 1923,
+      "keyCount": 1944,
       "coverage": 100,
-      "sha256": "1659004137ce2a7e9f161f3183b866e1b494e8b29957f8b35deec7143833ba76",
-      "bytes": 158678
+      "sha256": "969c9d1d1adf5d029075d0b4e889968332aa88cd1a21cf5286ba693667217cc6",
+      "bytes": 160094
     },
     {
       "code": "en",
@@ -43,10 +43,10 @@ export default {
       "nativeName": "English",
       "version": "2.4.0",
       "updatedAt": "2026-11-02",
-      "keyCount": 1923,
+      "keyCount": 1944,
       "coverage": 100,
-      "sha256": "873ac05a271fd51ac22f88ce06d4dfd788968116e37f8a1f9f0020376f4f0a43",
-      "bytes": 164478
+      "sha256": "eb0345e65a65b9afa507c70ecf66f9a2b442c247e9f44966ea73453b00ba0b90",
+      "bytes": 165861
     }
   ]
 };

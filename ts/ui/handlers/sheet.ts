@@ -15,7 +15,7 @@ import {
   getLastFailedRows,
 } from '../../index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
-import { cleanSheetDuplicates } from '../../sync/sheet-cleaning.js'
+import { cleanSheetDuplicates, SHEET_CLEANING_SKIP_KEYS } from '../../sync/sheet-cleaning.js'
 // tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
 // node 单测一 import 就 ReferenceError。别改回桶。
 import { tOr } from '../../i18n/locale-store.js'
@@ -128,7 +128,13 @@ export function cleanLockedDataSheet(targetWorksheet?: WpsWorksheet): void {
   const result = cleanSheetDuplicates(worksheet)
 
   if (result.skippedReason) {
-    showToast(result.skippedReason, result.skippedReason === '未发现重复数据' ? 'info' : 'error')
+    // 分级判据改用 key：原先拿中文原文比字符串，译文一进来就永远落 error 分支
+    const message = result.skippedReasonKey
+      ? tOr(result.skippedReasonKey, result.skippedReason)
+      : result.skippedReason
+    const level =
+      result.skippedReasonKey === SHEET_CLEANING_SKIP_KEYS.noDuplicates ? 'info' : 'error'
+    showToast(message, level)
     return
   }
 

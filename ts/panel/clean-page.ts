@@ -919,7 +919,8 @@ async function handleScan(): Promise<void> {
   isScanning = true
   if (scanButton) scanButton.disabled = true
   try {
-    const result = await scanCleanRules(ruleIds, { selectedSheets })
+    // translate 直接传 tOr（同签名）：引擎产出的提示与进度都按当前语言渲染
+    const result = await scanCleanRules(ruleIds, { selectedSheets, translate: tOr })
     scanResult = result
     renderPreview(result)
     for (const note of result.notes) appendLog(note, 'warn')
@@ -1018,9 +1019,13 @@ async function executeClean(): Promise<void> {
   setRunningState(true)
   appendLog(tOr('clean.run.started', '开始执行清理…'))
   try {
-    const outcome = await runCleanPlans(scanResult, (done, total, message) => {
-      updateProgress(done, total, message)
-    })
+    const outcome = await runCleanPlans(
+      scanResult,
+      (done, total, message) => {
+        updateProgress(done, total, message)
+      },
+      tOr,
+    )
     const details: string[] = []
     for (const item of outcome.targets) {
       const { error } = item

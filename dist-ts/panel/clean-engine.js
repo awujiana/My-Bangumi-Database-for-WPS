@@ -14,7 +14,10 @@ import { getOpenWorkbooks } from '../tools/locked-sheet.js';
 import { bgmLog, findHeaderRow, getCellValue, getColumnMap, getLastRow, readRangeValues, setCellValue, } from '../tools/util/index.js';
 import { CLEAN_EXCLUDES, CLEAN_TARGETS, findCleanRule, ROW_BYTES_FALLBACK, ROW_BYTES_SAMPLE_LIMIT, XINFAN_HEADER, } from './clean-rules.js';
 import { estimateUtf8Bytes, transformCellValue } from './clean-transforms.js';
+import { interpolate } from '../i18n/translate.js';
 import { applyRowPlan, planDuplicateRows, planDuplicateUrlRows, planEmptyNameRows, readSheetLayout, } from '../sync/sheet-cleaning.js';
+/** 默认翻译器：不查语言包，只把 `{name}` 占位符填上 */
+const identityTranslate = (_key, fallback, parameters) => interpolate(fallback, parameters);
 /** 空计划（附跳过原因） */
 function skippedPlan(base, skipped) {
     return { ...base, deleteRows: [], changes: [], estimatedBytes: 0, skipped };
@@ -425,28 +428,32 @@ function resolveColumn(target, keywords) {
     }
     return undefined;
 }
-/** 列号 → 列名（日志展示用） */
-function columnName(target, column) {
+/** 列号 → 列名（日志展示用；未在表头里识别到的列退回「第 N 列」） */
+function columnName(target, column, translate) {
     for (const [key, value] of target.columnMap) {
         if (value === column)
             return key;
     }
-    return `第${String(column)}列`;
+    return translate('clean.preview.columnFallback', '第{index}列', { index: column });
 }
 /** 扫描 cellTransform 类规则 */
-function scanCellTransform(rule, target, excludedRows) {
+function scanCellTransform(rule, target, excludedRows, translate) {
     const base = {
         ruleId: rule.id,
         ruleName: rule.name,
         targetKey: target.key,
         targetLabel: target.label,
     };
-    if (!rule.transform)
-        return skippedPlan(base, '规则未配置变换函数');
+    if (!rule.transform) {
+        return skippedPlan(base, translate('clean.skip.noTransform', '规则未配置变换函数'));
+    }
     const keywords = rule.columns ?? [];
     const column = resolveColumn(target, keywords);
-    if (!column)
-        return skippedPlan(base, `未找到目标列（${keywords.join(' / ')}）`);
+    if (!column) {
+        return skippedPlan(base, translate('clean.skip.noTargetColumn', '未找到目标列（{columns}）', {
+            columns: keywords.join(' / '),
+        }));
+    }
     // 需要「名称」参照列的变换（别名去重）额外读取名称列
     const isNameRequired = rule.transform === 'dedupAliasAgainstName';
     const nameColumn = isNameRequired ? target.columnMap.get('名称') : undefined;
@@ -467,7 +474,7 @@ function scanCellTransform(rule, target, excludedRows) {
                 changes.push({
                     row,
                     column,
-                    columnName: columnName(target, column),
+                    columnName: columnName(target, column, translate),
                     oldValue,
                     nextValue: outcome.value,
                 });
@@ -485,7 +492,7 @@ function truncatePreviewText(text) {
     return trimmed.length <= PREVIEW_TEXT_LIMIT ? trimmed : `${trimmed.slice(0, PREVIEW_TEXT_LIMIT)}…`;
 }
 /** 扫描噪声行：按 {@link CLEAN_EXCLUDES.noiseRowText} 命中的行整行删除（不遵守 excludedRows） */
-function planNoiseRows(worksheet, headerRow, lastRow, block) {
+function planNoiseRows(worksheet, headerRow, lastRow, translate, block) {
     const keywords = CLEAN_EXCLUDES.noiseRowText;
     if (keywords.length === 0) {
         return {
@@ -493,7 +500,8 @@ function planNoiseRows(worksheet, headerRow, lastRow, block) {
             changes: [],
             groups: 0,
             mergedGroups: 0,
-            skippedReason: '未配置噪声行词表',
+            skippedReasonKey: 'clean.skip.noNoiseWordList',
+            skippedReason: translate('clean.skip.noNoiseWordList', '未配置噪声行词表'),
         };
     }
     const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50);
@@ -516,7 +524,8 @@ function planNoiseRows(worksheet, headerRow, lastRow, block) {
             changes: [],
             groups: 0,
             mergedGroups: 0,
-            skippedReason: '未发现噪声行',
+            skippedReasonKey: 'clean.skip.noNoiseRow',
+            skippedReason: translate('clean.skip.noNoiseRow', '未发现噪声行'),
         };
     }
     return {
@@ -527,7 +536,7 @@ function planNoiseRows(worksheet, headerRow, lastRow, block) {
         rowPreviews,
     };
 }
-function scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block) {
+function scanRowRule(rule, target, excludedRows, rowBytes, getLayout, translate, block) {
     const base = {
         ruleId: rule.id,
         ruleName: rule.name,
@@ -551,25 +560,29 @@ function scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block) {
             }
             case 'noiseRows': {
                 // 噪声行刻意不遵守 excludedRows：否则这些行会被 rowText 保护语义先行排除，永远删不掉
-                plan = planNoiseRows(target.worksheet, target.headerRow, target.lastRow, block);
+                plan = planNoiseRows(target.worksheet, target.headerRow, target.lastRow, translate, block);
                 break;
             }
             default: {
-                return skippedPlan(base, '未知清理种类');
+                return skippedPlan(base, translate('clean.skip.unknownKind', '未知清理种类'));
             }
         }
     }
     catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return skippedPlan(base, `扫描失败：${message}`);
+        return skippedPlan(base, translate('clean.skip.scanFailed', '扫描失败：{message}', { message }));
     }
     if (plan.deleteRows.length === 0) {
-        return skippedPlan(base, plan.skippedReason ?? '未发现待清理数据');
+        // sheet-cleaning 侧的原因自带 key；兜底那条是引擎自己的
+        const reason = plan.skippedReasonKey
+            ? translate(plan.skippedReasonKey, plan.skippedReason ?? '')
+            : (plan.skippedReason ?? translate('clean.skip.nothingToClean', '未发现待清理数据'));
+        return skippedPlan(base, reason);
     }
     const changes = plan.changes.map((change) => ({
         row: change.row,
         column: change.column,
-        columnName: columnName(target, change.column),
+        columnName: columnName(target, change.column, translate),
         // 行级变更（标签合并）的旧值由计划顺带采集；未提供时为空串
         oldValue: change.oldValue ?? '',
         nextValue: change.value,
@@ -584,23 +597,28 @@ function scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block) {
     };
 }
 /** 扫描单条规则；无法产出计划时把原因写入 notes 并返回 null */
-function scanOneRule(id, target, excludedRows, rowBytes, notes, getLayout, block) {
+function scanOneRule(id, target, excludedRows, rowBytes, context, getLayout, block) {
+    const { translate } = context;
     const rule = findCleanRule(id);
     if (!rule) {
-        notes.push(`未知清理项：${id}`);
+        context.notes.push(translate('clean.note.unknownRule', '未知清理项：{id}', { id }));
         return null;
     }
     const plan = rule.kind === 'cellTransform'
-        ? scanCellTransform(rule, target, excludedRows)
-        : scanRowRule(rule, target, excludedRows, rowBytes, getLayout, block);
+        ? scanCellTransform(rule, target, excludedRows, translate)
+        : scanRowRule(rule, target, excludedRows, rowBytes, getLayout, translate, block);
     if (plan.skipped) {
-        notes.push(`${target.label} · ${rule.name}：${plan.skipped}`);
+        context.notes.push(translate('clean.note.ruleSkipped', '{target} · {rule}：{reason}', {
+            target: target.label,
+            rule: rule.name,
+            reason: plan.skipped,
+        }));
         return null;
     }
     return plan;
 }
 /** 扫描单个目标上的全部勾选规则 */
-function scanTarget(target, ruleIds, notes) {
+function scanTarget(target, ruleIds, context) {
     // 数据区整块只读一次，排除行判定与行字节估算共用：
     // 原为 collectExcludedRows 1 次 + estimateRowBytes 至多 ROW_BYTES_SAMPLE_LIMIT 次 COM 往返
     const maxColumn = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50);
@@ -609,7 +627,10 @@ function scanTarget(target, ruleIds, notes) {
         : undefined;
     const excludedRows = collectExcludedRows(target, block);
     if (excludedRows.size > 0) {
-        notes.push(`${target.label}：排除 ${String(excludedRows.size)} 行（汇总/说明行）`);
+        context.notes.push(context.translate('clean.note.excludedRows', '{target}：排除 {count} 行（汇总/说明行）', {
+            target: target.label,
+            count: excludedRows.size,
+        }));
     }
     const rowBytes = estimateRowBytes(target, block);
     // 表结构每目标只解析一次，三个行规则共用（原为每规则各自 readSheetLayout，~3 次 COM × 规则数）。
@@ -626,7 +647,7 @@ function scanTarget(target, ruleIds, notes) {
     };
     const plans = [];
     for (const id of ruleIds) {
-        const plan = scanOneRule(id, target, excludedRows, rowBytes, notes, getLayout, block);
+        const plan = scanOneRule(id, target, excludedRows, rowBytes, context, getLayout, block);
         if (plan)
             plans.push(plan);
     }
@@ -643,16 +664,17 @@ function scanTarget(target, ruleIds, notes) {
  * @param options.selectedSheets 用户显式勾选的工作表白名单（按 `工作簿全路径 :: 表名` 形式）；
  *   传空数组表示不限制（保留旧行为，向后兼容）。
  *   命中时只清理白名单内的目标；未命中时整张表跳过。
+ * @param options.translate 文案翻译器（传 `tOr` 即可）；不传则只做插值、保留源语言原文。
  */
 export async function scanCleanRules(ruleIds, options = {}) {
-    const notes = [];
+    const context = { notes: [], translate: options.translate ?? identityTranslate };
     const targets = listCleanTargets(options.selectedSheets);
     if (targets.length === 0) {
         if (options.selectedSheets && options.selectedSheets.length > 0) {
-            notes.push('已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）');
+            context.notes.push(context.translate('clean.note.noTargetsInSelection', '已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）'));
         }
         else {
-            notes.push('未找到可清理目标（需在「选择清理的表格」中勾选工作表）');
+            context.notes.push(context.translate('clean.note.noTargets', '未找到可清理目标（需在「选择清理的表格」中勾选工作表）'));
         }
     }
     const plans = [];
@@ -665,7 +687,7 @@ export async function scanCleanRules(ruleIds, options = {}) {
         await new Promise((resolve) => {
             setTimeout(resolve, 0);
         });
-        for (const plan of scanTarget(target, ruleIds, notes)) {
+        for (const plan of scanTarget(target, ruleIds, context)) {
             plans.push(plan);
             itemCount += plan.deleteRows.length + plan.changes.length;
             estimatedBytes += plan.estimatedBytes;
@@ -678,7 +700,7 @@ export async function scanCleanRules(ruleIds, options = {}) {
         targetCount: targets.length,
         itemCount,
         estimatedBytes: Math.round(estimatedBytes),
-        notes,
+        notes: context.notes,
     };
 }
 /** 合并同一单元格的多次变更：按 ` | ` 拆分后保序去重（标签合并场景安全） */
@@ -740,7 +762,7 @@ export function aggregatePlans(result) {
  * 执行清理：先写单元格变更，再批量删行。
  * 单个目标失败不影响其他目标，失败原因通过 TargetRunResult.error 返回。
  */
-export async function runCleanPlans(result, onProgress) {
+export async function runCleanPlans(result, onProgress, translate = identityTranslate) {
     const startTime = Date.now();
     const buckets = aggregatePlans(result);
     const targets = [];
@@ -751,7 +773,7 @@ export async function runCleanPlans(result, onProgress) {
     for (const bucket of buckets) {
         const { target } = bucket;
         files.add(target.workbookPath);
-        onProgress?.(done, buckets.length, `正在清理 ${target.label}`);
+        onProgress?.(done, buckets.length, translate('clean.progress.cleaning', '正在清理 {target}', { target: target.label }));
         try {
             // 让出一次事件循环，使进度条有机会重绘（WPS COM 调用为同步阻塞）
             await Promise.resolve();
@@ -787,7 +809,7 @@ export async function runCleanPlans(result, onProgress) {
             });
         }
         done += 1;
-        onProgress?.(done, buckets.length, `已完成 ${target.label}`);
+        onProgress?.(done, buckets.length, translate('clean.progress.done', '已完成 {target}', { target: target.label }));
     }
     return {
         targets,

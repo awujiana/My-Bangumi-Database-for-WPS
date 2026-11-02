@@ -765,6 +765,8 @@ describe('cleanSheetDuplicates', () => {
       mergedTagGroups: 0,
       duplicateNameGroups: 0,
       skippedReason: '未发现重复数据',
+      // 展示方按 key 取译文（中文原文只作兜底）
+      skippedReasonKey: 'clean.skip.noDuplicates',
     })
     expect(model.deletedRanges).toEqual([])
     expect(m.bgmLog).toHaveBeenCalled()

@@ -37,6 +37,15 @@ vi.mock('../ts/index.js', () => ({
 }))
 vi.mock('../ts/sync/sheet-cleaning.js', () => ({
   cleanSheetDuplicates: m.cleanSheetDuplicates,
+  // 真实常量表（纯数据、无副作用）：与生产逐字同构，避免测试里再抄一份 key 字符串
+  SHEET_CLEANING_SKIP_KEYS: {
+    noLayout: 'clean.skip.noHeaderRow',
+    noNameColumn: 'clean.skip.noNameColumn',
+    noUrlColumn: 'clean.skip.noUrlColumn',
+    noDuplicates: 'clean.skip.noDuplicates',
+    noDuplicateUrl: 'clean.skip.noDuplicateUrl',
+    noEmptyName: 'clean.skip.noEmptyName',
+  },
 }))
 
 import { cleanLockedDataSheet, selectFailedRowsFromLastSync } from '../ts/ui/handlers/sheet.js'
@@ -66,13 +75,25 @@ describe('ui/handlers/sheet · cleanLockedDataSheet', () => {
     )
   })
 
-  it('skippedReason 为「未发现重复数据」时按 info 提示', () => {
-    m.cleanSheetDuplicates.mockReturnValue({ skippedReason: '未发现重复数据' })
+  it('跳过原因为「未发现重复数据」的 key 时按 info 提示', () => {
+    m.cleanSheetDuplicates.mockReturnValue({
+      skippedReason: '未发现重复数据',
+      skippedReasonKey: 'clean.skip.noDuplicates',
+    })
     cleanLockedDataSheet(fakeWorksheet as never)
     expect(m.showToast).toHaveBeenCalledWith('未发现重复数据', 'info')
   })
 
-  it('其它 skippedReason 按 error 提示', () => {
+  it('其它跳过原因按 error 提示', () => {
+    m.cleanSheetDuplicates.mockReturnValue({
+      skippedReason: '锁定表结构异常',
+      skippedReasonKey: 'clean.skip.noHeaderRow',
+    })
+    cleanLockedDataSheet(fakeWorksheet as never)
+    expect(m.showToast).toHaveBeenCalledWith('锁定表结构异常', 'error')
+  })
+
+  it('没有 key 的老调用方：仍按 error 提示且只显示原文', () => {
     m.cleanSheetDuplicates.mockReturnValue({ skippedReason: '锁定表结构异常' })
     cleanLockedDataSheet(fakeWorksheet as never)
     expect(m.showToast).toHaveBeenCalledWith('锁定表结构异常', 'error')

@@ -574,6 +574,47 @@ describe('scanCleanRules', () => {
     expect(result.targetCount).toBe(0)
     expect(result.notes.join('\n')).toContain('未找到可清理目标')
   })
+
+  it('注入翻译器后 notes 走译文（key 由引擎给出，不传则退回中文原文）', async () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    const keys: string[] = []
+    const translate = (key: string): string => {
+      keys.push(key)
+      return `<${key}>`
+    }
+
+    const result = await scanCleanRules(['__no_such_rule__'], { translate })
+
+    expect(keys).toContain('clean.note.unknownRule')
+    expect(result.notes.join('\n')).toContain('<clean.note.unknownRule>')
+  })
+
+  it('sheet-cleaning 的 skippedReasonKey 优先于中文原文', async () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    mocks.planDuplicateUrlRows.mockReturnValue({
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未找到「Bangumi_URL」列',
+      skippedReasonKey: 'clean.skip.noUrlColumn',
+    })
+
+    const keys: string[] = []
+    const result = await scanCleanRules(['dup-url'], {
+      translate: (key: string) => {
+        keys.push(key)
+        return `<${key}>`
+      },
+    })
+
+    // 原因先按 sheet-cleaning 给的 key 翻译，再拼进 ruleSkipped 的 {reason}
+    expect(keys).toContain('clean.skip.noUrlColumn')
+    expect(keys).toContain('clean.note.ruleSkipped')
+    expect(result.notes.join('\n')).not.toContain('未找到「Bangumi_URL」列')
+  })
 })
 
 // ========== 工作表探测（页面与引擎共用） ==========
@@ -744,6 +785,37 @@ describe('runCleanPlans', () => {
     expect(runResult.targets[0]?.error).toBeUndefined()
     expect(progress).toHaveLength(2)
     expect(progress[0]).toContain('正在清理')
+  })
+
+  it('执行进度消息走注入的翻译器', async () => {
+    const target = fakeTarget('t1', '数据表 / 动画')
+    const result = fakeScanResult(
+      [
+        {
+          ruleId: 'noise-tags',
+          ruleName: '噪声标签',
+          targetKey: 't1',
+          targetLabel: target.label,
+          deleteRows: [4],
+          changes: [],
+          estimatedBytes: 0,
+        },
+      ],
+      [target],
+    )
+    mocks.applyRowPlan.mockReturnValue(1)
+    const progress: string[] = []
+
+    await runCleanPlans(
+      result,
+      (done, total, message) => {
+        progress.push(message)
+      },
+      (key: string) => `<${key}>`,
+    )
+
+    expect(progress[0]).toBe('<clean.progress.cleaning>')
+    expect(progress[1]).toBe('<clean.progress.done>')
   })
 
   it('单个目标失败不影响其他目标（异常隔离）', async () => {

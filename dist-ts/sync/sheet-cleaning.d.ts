@@ -13,6 +13,26 @@
  * 预览与执行走同一份计划，保证预览条数与实际执行条数严格一致。
  */
 import type { WpsWorksheet } from '../tools/wps.js';
+/**
+ * 跳过原因的语言包 key（与 {@link CleanDuplicatesResult.skippedReason} 的中文原文配对）
+ *
+ * 本模块是纯数据层，且同一份原因会被**清理页与同步页两处**消费 —— 所以这里只带 key，
+ * 翻译留给消费方（各自的 i18n 运行时）。`skippedReason` 保留中文原文作兜底与日志。
+ */
+export declare const SHEET_CLEANING_SKIP_KEYS: {
+    /** 未找到表头行或无数据行 */
+    readonly noLayout: "clean.skip.noHeaderRow";
+    /** 未找到「名称」列 */
+    readonly noNameColumn: "clean.skip.noNameColumn";
+    /** 未找到「Bangumi_URL」列 */
+    readonly noUrlColumn: "clean.skip.noUrlColumn";
+    /** 未发现重复数据 */
+    readonly noDuplicates: "clean.skip.noDuplicates";
+    /** 未发现同 URL 重复行 */
+    readonly noDuplicateUrl: "clean.skip.noDuplicateUrl";
+    /** 未发现空白数据行 */
+    readonly noEmptyName: "clean.skip.noEmptyName";
+};
 /** 清洗结果摘要（cleanSheetDuplicates 的返回类型） */
 export interface CleanDuplicatesResult {
     /** 是否执行了删除（发生重复清洗） */
@@ -25,6 +45,8 @@ export interface CleanDuplicatesResult {
     duplicateNameGroups: number;
     /** 未执行清洗的原因（无重复/缺列/无数据等），已执行时为 undefined */
     skippedReason?: string | undefined;
+    /** {@link skippedReason} 对应的语言包 key（展示方优先取译文） */
+    skippedReasonKey?: string | undefined;
 }
 /** 单个待写入的单元格变更 */
 export interface RowChange {
@@ -72,6 +94,8 @@ export interface RowPlan {
     mergedGroups: number;
     /** 未产生任何清理时的原因 */
     skippedReason?: string | undefined;
+    /** {@link skippedReason} 对应的语言包 key（展示方优先取译文） */
+    skippedReasonKey?: string | undefined;
     /** 待删除行的预览数据（执行前预览用；扫描期顺带采集，零额外 COM 读取） */
     rowPreviews?: DeletedRowPreview[];
     /** 重复分组结构（保留行 vs 待删除行；仅重复类规则产出） */

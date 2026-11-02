@@ -1081,6 +1081,7 @@ describe('handleScan', () => {
         'clean.preview.stat.bytes': 'EN freed',
         'clean.preview.nothing': 'EN nothing',
         'clean.scan.nothing': 'EN nothing toast',
+        'clean.note.excludedRows': 'EN excluded {count}',
       },
     })
     store.useLocale('en')
@@ -1096,6 +1097,15 @@ describe('handleScan', () => {
     expect(labels).toContain('EN freed')
     expect(byId('cleanPreviewDetail').innerHTML).toContain('EN nothing')
     expect(m.showToast).toHaveBeenCalledWith('EN nothing toast', 'info')
+
+    // 引擎产出的提示由页面注入翻译器（直接传 tOr），不是引擎自己翻
+    const scanOptions = m.scanCleanRules.mock.calls[0]?.[1] as {
+      translate?: (key: string, fallback: string, parameters?: Record<string, number>) => string
+    }
+    expect(scanOptions.translate).toBeTypeOf('function')
+    expect(scanOptions.translate?.('clean.note.excludedRows', 'X', { count: 3 })).toBe(
+      'EN excluded 3',
+    )
 
     store.resetLocaleStoreForTest()
   })
