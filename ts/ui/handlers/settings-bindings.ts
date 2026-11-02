@@ -32,18 +32,22 @@ import {
   LOCALE_CODES,
   SOURCE_LOCALE,
   applyI18n,
-  describeInstalledPacks,
   getLocale,
   getLocaleCoverage,
   getLocaleLabel,
-  installLocalePacks,
   isLocaleCode,
-  loadLocaleManifest,
-  openLocaleDirectory,
   setLocale,
   t,
   tOr,
 } from '../../i18n/index.js'
+// 安装器直连、不经 i18n/index：它 → tools/save-file → ts/index 会绕回桶，
+// 把 788 行的总入口拖进每个用桶的模块（详见 ts/i18n/index.ts 的说明）。
+import {
+  describeInstalledPacks,
+  installLocalePacks,
+  openLocaleDirectory,
+} from '../../i18n/locale-install.js'
+import { loadLocaleManifest } from '../../i18n/locale-manifest.js'
 import type { LocaleCode } from '../../i18n/index.js'
 import { renderLogEntries } from './log-panel.js'
 
