@@ -1415,6 +1415,8 @@ export default {
     "handlers.enrichPreview.fullLabel": "「完结」阈值",
     "handlers.enrichPreview.fullGreaterThanSingle": "「完结」阈值必须大于「单集」阈值",
     "handlers.enrichPreview.saved": "富化预览设置已保存，下次预览即生效",
+    "handlers.template.loading": "正在获取最新版本…",
+    "handlers.template.unresolved": "未能解析到最新版本，按钮将打开数据仓库 Release 页（默认停在 Latest，挑最新的 -template.xlsx 即可）",
     "handlers.template.opened": "已打开下载链接；若没自动下载，用「复制链接」粘到浏览器",
     "handlers.template.copied": "下载链接已复制",
     "handlers.sync.failed": "同步失败: {message}",

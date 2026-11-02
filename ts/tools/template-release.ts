@@ -162,9 +162,14 @@ export async function fetchLatestTemplate(
 }
 
 /** 展示文案：`2026.10.27 · ani-...-template.xlsx · 7.75 MB`（兜底时给出指引） */
-export function formatTemplateMeta(info: TemplateReleaseInfo): string {
+export function formatTemplateMeta(
+  info: TemplateReleaseInfo,
+  // 未解析时那段话要跟界面语言走。本模块是纯工具（不依赖 i18n），所以由调用方
+  // 传入；默认值只给测试与兜底用，UI 必须传 `tOr('handlers.template.unresolved')`。
+  unresolvedText = '未能解析到最新版本，按钮将打开数据仓库 Release 页（默认停在 Latest，挑最新的 -template.xlsx 即可）',
+): string {
   if (!info.resolved) {
-    return '未能解析到最新版本，按钮将打开数据仓库 Release 页（默认停在 Latest，挑最新的 -template.xlsx 即可）'
+    return unresolvedText
   }
   const parts = [info.tag === '' ? 'Latest' : info.tag, info.assetName, formatSize(info.size)]
   return parts.join(' · ')

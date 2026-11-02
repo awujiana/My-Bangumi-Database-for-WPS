@@ -1449,6 +1449,8 @@ export default {
     "handlers.enrichPreview.fullLabel": "the completed-series threshold",
     "handlers.enrichPreview.fullGreaterThanSingle": "The completed-series threshold must be greater than the single-episode threshold",
     "handlers.enrichPreview.saved": "Enrich preview settings saved — they take effect on the next preview",
+    "handlers.template.loading": "Fetching the latest version…",
+    "handlers.template.unresolved": "Could not resolve the latest version — the button opens the data repository's Release page (it lands on Latest; pick the newest -template.xlsx).",
     "handlers.template.opened": "Download link opened — if the download did not start, use “Copy link” and paste it into your browser",
     "handlers.template.copied": "Download link copied",
     "handlers.sync.failed": "Sync failed: {message}",

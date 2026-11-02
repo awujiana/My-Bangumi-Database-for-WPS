@@ -69,6 +69,6 @@ export declare function resolveTemplateRelease(data: ReleaseJson): TemplateRelea
  */
 export declare function fetchLatestTemplate(fetchFunction?: typeof fetch): Promise<TemplateReleaseInfo>;
 /** 展示文案：`2026.10.27 · ani-...-template.xlsx · 7.75 MB`（兜底时给出指引） */
-export declare function formatTemplateMeta(info: TemplateReleaseInfo): string;
+export declare function formatTemplateMeta(info: TemplateReleaseInfo, unresolvedText?: string): string;
 export {};
 //# sourceMappingURL=template-release.d.ts.map

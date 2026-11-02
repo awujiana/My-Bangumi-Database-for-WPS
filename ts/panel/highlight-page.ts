@@ -51,7 +51,7 @@ import type { PreviewRowDetail, PreviewView } from './highlight-preview-render.j
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
-import { initializeI18n, t } from '../i18n/index.js'
+import { canApplyI18n, initializeI18n, onLocaleChange, t } from '../i18n/index.js'
 import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
@@ -488,7 +488,7 @@ function resetSheetData(): void {
   state.sourceCol = 0
   renderSourcePicker()
   setText('highlightSheetName', selectedSheetEntry()?.sheet ?? t('highlight.sheet.placeholder'))
-  renderPreviewEmpty(t('highlight.preview.emptyDefault'))
+  renderPreviewEmpty('highlight.preview.emptyDefault')
 }
 
 // ===== 预览 =====
@@ -506,7 +506,7 @@ function refreshPreview(): void {
   if (!source) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
     state.lastTarget = null
-    renderPreviewEmpty(t('highlight.preview.emptyNoDateColumn'))
+    renderPreviewEmpty('highlight.preview.emptyNoDateColumn')
     return
   }
   state.sourceKey = source.key
@@ -520,7 +520,7 @@ function refreshPreview(): void {
   const firstRow = headerRow + 1
   if (lastRow < firstRow) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
-    renderPreviewEmpty(t('highlight.preview.emptyNoRows'))
+    renderPreviewEmpty('highlight.preview.emptyNoRows')
     return
   }
 
@@ -540,7 +540,7 @@ function refreshPreview(): void {
   const block = readRangeValues(worksheet, firstRow, lastRow, minColumn, maxColumn)
   if (block.length === 0) {
     state.lastSelect = { matchedRows: [], emptyCount: 0, invalidCount: 0 }
-    renderPreviewEmpty(t('highlight.preview.emptyReadFailed'))
+    renderPreviewEmpty('highlight.preview.emptyReadFailed')
     return
   }
 
@@ -629,6 +629,17 @@ function selectVisibleRows(
 }
 
 /**
+ * 预览区当前处于哪种状态（语言切换后要按**同一状态**重绘，不能一律回落空态）
+ *
+ * 只存「状态 + key」，不存译文：译文必须等到真正要显示时才算，否则切语言后
+ * 手里拿的还是旧语言那句。
+ */
+let previewMode: { kind: 'empty'; messageKey: string } | { kind: 'result' } = {
+  kind: 'empty',
+  messageKey: 'highlight.preview.emptyDefault',
+}
+
+/**
  * 渲染实时预览（摘要行 + 详情区）
  *
  * 摘要三行只回答「命中几行 / 按什么口径 / 跳过了什么」；**哪几行、叫什么、凭什么
@@ -638,6 +649,8 @@ function selectVisibleRows(
 function renderPreview(): void {
   const { matchedRows, emptyCount, invalidCount } = state.lastSelect
   const target = state.lastTarget
+  // 登记状态：切语言时 `renderPreviewTexts()` 靠它决定重绘结果还是空态
+  previewMode = { kind: 'result' }
 
   setText('highlightPreviewCount', t('highlight.preview.count', { count: matchedRows.length }))
   setText(
@@ -681,12 +694,35 @@ function syncPreviewViewButtons(): void {
   }
 }
 
-function renderPreviewEmpty(message: string): void {
-  state.lastMatched = []
+/**
+ * 按当前语言重绘预览区的摘要三行
+ *
+ * 存在的理由：`initializeI18n()` 内部是**异步加载**语言包，而 `highlightPhaseConfig()`
+ * 剩下的代码在同一个 tick 里跑完 —— 那时 `t()` 只会返回 key。而计数 / 空态说明是
+ * 动态文案（没有 `data-i18n`），`applyI18n()` 补不到它们，首屏就会一直露着
+ * `highlight.preview.countZero`（2026-11-02 实测确认，三种语言都中招）。
+ * 所以语言就绪 / 切换时都从这里重绘一次。
+ */
+function renderPreviewTexts(): void {
+  // 语言包没就绪时 `t()` 只会把 key 原样吐出来。此时宁可保留 HTML 里的中文原文，
+  // 也不要闪一行 `highlight.preview.countZero`；就绪后 `onLocaleChange` 会再调一次。
+  if (!canApplyI18n()) return
+
+  if (previewMode.kind === 'result') {
+    // 纯渲染：用的是 `state.lastSelect` / `lastTarget`，**不读表**（切语言不该触发 COM）
+    renderPreview()
+    return
+  }
   setText('highlightPreviewCount', t('highlight.preview.countZero'))
-  setText('highlightPreviewTarget', message)
+  setText('highlightPreviewTarget', t(previewMode.messageKey))
   setText('highlightPreviewSkip', '')
   renderPreviewDetail()
+}
+
+function renderPreviewEmpty(messageKey: string): void {
+  previewMode = { kind: 'empty', messageKey }
+  state.lastMatched = []
+  renderPreviewTexts()
 }
 
 // ===== 应用 / 清除 =====
@@ -1108,7 +1144,7 @@ function reloadSheet(): void {
   const { worksheet } = state
   if (!worksheet) {
     setText('highlightSheetName', t('highlight.sheet.none'))
-    renderPreviewEmpty(t('highlight.preview.emptyNoSheet'))
+    renderPreviewEmpty('highlight.preview.emptyNoSheet')
     return
   }
   // 每次加载工作表前重读功能开关（设置页改的模式 / 自动关注在此对齐）
@@ -1132,12 +1168,13 @@ function highlightPhaseConfig(): void {
   markHighlightPaneLoaded()
   initializeTheme()
   initializeI18n()
-  // 预览计数是动态文案（`命中 N 行`），不能挂 `data-i18n`——否则切语言时
-  // `applyI18n()` 会把已算出的结果覆盖成「0 行」。而首屏按设计**不读数据**
-  // （见 highlight-bootstrap 的三条硬约束），这个节点就会一直停在 HTML 里的
-  // 中文初始值上：英文界面打开高亮页，直到点「加载并预览」前都是「命中 0 行」。
-  // 所以在 i18n 就绪后按当前语言写一次。
-  setText('highlightPreviewCount', t('highlight.preview.countZero'))
+  // 语言包是异步加载的（`initializeI18n` 内部 await import），本函数剩下的代码
+  // 在同一个 tick 里跑完 —— 那时 `t()` 只能返回 key。预览区的计数 / 空态说明是
+  // 动态文案（没有 `data-i18n`），`applyI18n()` 补不到，首屏就会一直露 key。
+  // 所以语言就绪（以及之后每次切语言）都重绘一次预览摘要。
+  onLocaleChange(() => {
+    renderPreviewTexts()
+  })
   startThemeSync()
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
   mountDataContextNotice('highlight')

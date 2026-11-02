@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 /**
- * @fileoverview 四个页面启动脚本（`sync-panel-bootstrap` / `settings-bootstrap` /
- * `enrich-bootstrap` / `clean-bootstrap`）的单元测试。
+ * @fileoverview 七个页面启动脚本（`sync-panel` / `settings` / `enrich` / `clean` /
+ * `highlight` / `conditional-format` / `donate` 的 `*-bootstrap.ts`）的单元测试。
  *
- * 这四个文件是**导入即执行**的顶层脚本：没有导出、靠模块求值时的副作用工作。因此
+ * 这些文件是**导入即执行**的顶层脚本：没有导出、靠模块求值时的副作用工作。因此
  * 每条用例都 `vi.resetModules()` 后重新 `import()`，用「按钮状态 / 调用了大盘初始化 /
  * console 输出」这些**外部可观察量**断言，而不是断言内部变量。
  *
- * 四个脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initializeShellNav` / …）或
+ * 脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initializeShellNav` / …）或
  * 纯副作用（`import '../ui/dialog.js'`）。测试把两类一起接管：副作用模块 mock 成空对象
  * （否则会拖进整张真实依赖图，barrel 循环还会静默回退真实现），具名导出换成 spy。
+ * **`com-ready` 故意不 mock**：闸门本身就是被测对象的一部分（「闸门没开时一个分片都不
+ * 跑」只有用真实现才测得出来），用例靠 `drainComGate()` 推进时钟开闸。
  *
  * ## 三条让本文件稳定的做法（都是踩过的坑）
  *
@@ -23,7 +25,7 @@
  * 4. **刻意不追 `typeof window/document !== 'undefined'` 保护的另一侧**：那半边只在
  *    无宿主环境（node）可达，而这些脚本的意义正在于「有宿主时装配页面」。另建一个
  *    node 环境的文件只为点亮 SSR 保护分支，收益是 0 行覆盖（lines 已 100%），
- *    因此三个脚本的分支覆盖率停在 61~77% 是被有意接受的 —— 不是漏测。
+ *    因此七个脚本的分支覆盖率停在 50~82% 是被有意接受的 —— 不是漏测。
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -41,18 +43,35 @@ const stubs = vi.hoisted(() => ({
   installModalA11y: vi.fn<() => void>(),
   initializeEnrichPage: vi.fn<() => void>(),
   initializeCleanPage: vi.fn<() => void>(),
+  // ---- highlight / conditional-format / donate ----
+  // 心跳与分片都是**跨进程副作用**，这里换成 spy：断言「哪个页面起了心跳」「分片按什么
+  // 顺序跑」比断言 DOM 更直接。`ComPhase` 结构只有 name/run 两个字段，内联声明即可
+  // （vi.hoisted 在 import 之前执行，拿不到类型导入）。
+  startPaneHeartbeat: vi.fn<(page: string) => void>(),
+  createHighlightPagePhases: vi.fn<() => { name: string; run: () => void }[]>(),
+  initializeConditionalFormatPage: vi.fn<() => void>(),
+  copyTextWithResult: vi.fn<(text: string) => { ok: boolean }>(),
+  markDonatePaneLoaded: vi.fn<() => void>(),
+  showToast: vi.fn<(message: string, type?: string) => void>(),
+  phaseConfig: vi.fn<() => void>(),
+  phaseWiring: vi.fn<() => void>(),
+  phaseExtra: vi.fn<() => void>(),
 }))
 
 // 纯副作用导入：mock 成空对象，避免拖入真实依赖图
 vi.mock('../ts/index.js', () => ({}))
 vi.mock('../ts/tools/config.js', () => ({}))
-vi.mock('../ts/tools/util/index.js', () => ({}))
+// 目录工具在这里只有副作用 + 两个具名导出（赞赏页复制联系方式 / 标记页面已加载）
+vi.mock('../ts/tools/util/index.js', () => ({
+  copyTextWithResult: stubs.copyTextWithResult,
+  markDonatePaneLoaded: stubs.markDonatePaneLoaded,
+}))
 vi.mock('../ts/core/token-payload.js', () => ({}))
 vi.mock('../ts/tools/events.js', () => ({}))
 vi.mock('../ts/core/result.js', () => ({}))
 vi.mock('../ts/tools/wps.js', () => ({}))
 vi.mock('../ts/tools/http.js', () => ({}))
-vi.mock('../ts/ui/dialog.js', () => ({}))
+vi.mock('../ts/ui/dialog.js', () => ({ showToast: stubs.showToast }))
 vi.mock('../ts/ui/message.js', () => ({}))
 vi.mock('../ts/ui/preview.js', () => ({}))
 vi.mock('../ts/sync/sync-record.js', () => ({}))
@@ -60,6 +79,8 @@ vi.mock('../ts/sync/scraping.js', () => ({}))
 vi.mock('../ts/sync/exceltobangumi/index.js', () => ({}))
 vi.mock('../ts/entry/sync-panel-entry.js', () => ({}))
 vi.mock('../ts/entry/settings-entry.js', () => ({}))
+// 心跳是周期性 COM：换 spy，才能断言「哪个页面起了心跳」
+vi.mock('../ts/tools/pane-alive.js', () => ({ startPaneHeartbeat: stubs.startPaneHeartbeat }))
 
 // 具有名导出的模块：换成 spy
 vi.mock('../ts/tools/theme.js', () => ({
@@ -67,7 +88,11 @@ vi.mock('../ts/tools/theme.js', () => ({
   startThemeSync: stubs.startThemeSync,
 }))
 // 语言初始化也是装配层职责：这里只钉「有没有调」，翻译行为在 tests/i18n.test.ts
-vi.mock('../ts/i18n/index.js', () => ({ initializeI18n: stubs.initializeI18n }))
+vi.mock('../ts/i18n/index.js', () => ({
+  initializeI18n: stubs.initializeI18n,
+  // 赞赏页的复制提示走 t()：回显 key，断言「用了哪个 key」比断言中文原文更防回归
+  t: (key: string) => `[${key}]`,
+}))
 vi.mock('../ts/tools/nav-mode.js', () => ({ startNavModeSync: stubs.startNavModeSync }))
 vi.mock('../ts/tools/module-state.js', () => ({
   startModuleStateSync: stubs.startModuleStateSync,
@@ -76,6 +101,13 @@ vi.mock('../ts/tools/nav-order.js', () => ({ startNavOrderSync: stubs.startNavOr
 vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: stubs.initializeShellNav }))
 vi.mock('../ts/panel/enrich-page.js', () => ({ initializeEnrichPage: stubs.initializeEnrichPage }))
 vi.mock('../ts/panel/clean-page.js', () => ({ initializeCleanPage: stubs.initializeCleanPage }))
+// 高亮页的分片由 bootstrap 组装：mock 成可控数组，才能测「分片顺序」与「越界兜底」
+vi.mock('../ts/panel/highlight-page.js', () => ({
+  createHighlightPagePhases: stubs.createHighlightPagePhases,
+}))
+vi.mock('../ts/panel/conditional-format-page.js', () => ({
+  initializeConditionalFormatPage: stubs.initializeConditionalFormatPage,
+}))
 vi.mock('../ts/ui/components/modal-a11y.js', () => ({
   installModalA11y: stubs.installModalA11y,
 }))
@@ -150,6 +182,13 @@ beforeEach(() => {
 
   for (const stub of Object.values(stubs)) stub.mockClear()
   for (const mockInstance of Object.values(consoleMocks)) mockInstance.mockClear()
+
+  // 高亮页正常返回 2 个分片（恢复配置 / 事件接线）；个别用例改成 4、5 个测越界兜底
+  stubs.createHighlightPagePhases.mockImplementation(() => [
+    { name: '恢复配置', run: stubs.phaseConfig },
+    { name: '事件接线', run: stubs.phaseWiring },
+  ])
+  stubs.copyTextWithResult.mockReturnValue({ ok: true })
 
   // 用例可能把它改成 'loading'，jsdom 不会自己复位
   Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true })
@@ -406,5 +445,192 @@ describe('clean-bootstrap', () => {
     expect(stubs.initializeTheme).not.toHaveBeenCalled()
     expect(stubs.initializeShellNav).not.toHaveBeenCalled()
     expect(stubs.installModalA11y).not.toHaveBeenCalled()
+  })
+})
+
+// ========== highlight-bootstrap ==========
+
+describe('highlight-bootstrap', () => {
+  it('导入即禁用 data-action 按钮，modulesReady 后启用并打印 Highlight 前缀日志', async () => {
+    const buttons = mountActionButtons()
+    await import('../ts/panel/highlight-bootstrap.js')
+    expect(buttons.every((button) => button.disabled)).toBe(true)
+
+    consoleMocks.log.mockClear()
+    signalModulesReady()
+
+    expect(buttons.every((button) => !button.disabled)).toBe(true)
+    expect(hasConsoleOutput('log', '[BGM Highlight] 模块加载完成，按钮已启用')).toBe(true)
+  })
+
+  it('页标识为 highlight：外壳导航 + 三个跨页同步 + 心跳', async () => {
+    await import('../ts/panel/highlight-bootstrap.js')
+    await drainComGate()
+
+    expect(stubs.initializeShellNav).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavOrderSync).toHaveBeenCalledWith('highlight')
+    expect(stubs.startModuleStateSync).toHaveBeenCalledWith('highlight')
+    expect(stubs.startPaneHeartbeat).toHaveBeenCalledWith('highlight')
+  })
+
+  it('分片顺序：恢复配置 → 事件接线 → 启动轮询（数据读取绝不自动跑）', async () => {
+    await import('../ts/panel/highlight-bootstrap.js')
+    await drainComGate()
+
+    expect(stubs.createHighlightPagePhases).toHaveBeenCalledTimes(1)
+    const configOrder = stubs.phaseConfig.mock.invocationCallOrder.at(0) ?? -1
+    const wiringOrder = stubs.phaseWiring.mock.invocationCallOrder.at(0) ?? -1
+    const pollingOrder = stubs.startNavModeSync.mock.invocationCallOrder.at(0) ?? -1
+    expect(configOrder).toBeGreaterThan(-1)
+    expect(configOrder).toBeLessThan(wiringOrder)
+    expect(wiringOrder).toBeLessThan(pollingOrder)
+  })
+
+  it('分片多于槽位时多出的不执行（槽位只有 4 个：0/1/轮询/2/3）', async () => {
+    stubs.createHighlightPagePhases.mockImplementation(() => [
+      { name: '恢复配置', run: stubs.phaseConfig },
+      { name: '事件接线', run: stubs.phaseWiring },
+      { name: '槽位二', run: stubs.phaseExtra },
+      { name: '槽位三', run: stubs.phaseExtra },
+      // 第 5 片没有槽位：bootstrap 只取 phases[0..3]
+      { name: '越界分片', run: stubs.phaseExtra },
+    ])
+    await import('../ts/panel/highlight-bootstrap.js')
+    await drainComGate()
+
+    expect(stubs.phaseConfig).toHaveBeenCalledTimes(1)
+    expect(stubs.phaseWiring).toHaveBeenCalledTimes(1)
+    expect(stubs.phaseExtra).toHaveBeenCalledTimes(2)
+  })
+
+  it('document 仍在加载 → 闸门不开，分片一个都不跑', async () => {
+    Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
+
+    await import('../ts/panel/highlight-bootstrap.js')
+    await drainComGate()
+    expect(stubs.phaseConfig).not.toHaveBeenCalled()
+    expect(stubs.startNavModeSync).not.toHaveBeenCalled()
+
+    signalLoad()
+    await drainComGate()
+    expect(stubs.phaseConfig).toHaveBeenCalledTimes(1)
+    expect(stubs.startPaneHeartbeat).toHaveBeenCalledWith('highlight')
+  })
+})
+
+// ========== conditional-format-bootstrap ==========
+
+describe('conditional-format-bootstrap', () => {
+  it('导入即禁用 data-action 按钮，modulesReady 后启用并打印 ConditionalFormat 前缀日志', async () => {
+    const buttons = mountActionButtons()
+    await import('../ts/panel/conditional-format-bootstrap.js')
+    expect(buttons.every((button) => button.disabled)).toBe(true)
+
+    consoleMocks.log.mockClear()
+    signalModulesReady()
+
+    expect(buttons.every((button) => !button.disabled)).toBe(true)
+    expect(hasConsoleOutput('log', '[BGM ConditionalFormat] 模块加载完成，按钮已启用')).toBe(true)
+  })
+
+  it('闸门开启后初始化页面并启动轮询（页标识 conditionalFormat）', async () => {
+    await import('../ts/panel/conditional-format-bootstrap.js')
+    await drainComGate()
+
+    expect(stubs.initializeConditionalFormatPage).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavOrderSync).toHaveBeenCalledWith('conditional-format')
+    expect(stubs.startModuleStateSync).toHaveBeenCalledWith('conditional-format')
+    expect(stubs.startPaneHeartbeat).toHaveBeenCalledWith('conditionalFormat')
+  })
+
+  it('初始化先于轮询（轮询依赖页面已装配）', async () => {
+    await import('../ts/panel/conditional-format-bootstrap.js')
+    await drainComGate()
+
+    const initializationOrder =
+      stubs.initializeConditionalFormatPage.mock.invocationCallOrder.at(0) ?? -1
+    const pollingOrder = stubs.startNavModeSync.mock.invocationCallOrder.at(0) ?? -1
+    expect(initializationOrder).toBeGreaterThan(-1)
+    expect(initializationOrder).toBeLessThan(pollingOrder)
+  })
+
+  it('document 仍在加载 → 等 load 事件开闸门后才初始化', async () => {
+    Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
+
+    await import('../ts/panel/conditional-format-bootstrap.js')
+    await drainComGate()
+    expect(stubs.initializeConditionalFormatPage).not.toHaveBeenCalled()
+
+    signalLoad()
+    await drainComGate()
+    expect(stubs.initializeConditionalFormatPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('不装配外壳导航、主题与模态框增强（条件格式页无侧栏）', async () => {
+    await import('../ts/panel/conditional-format-bootstrap.js')
+
+    expect(stubs.initializeShellNav).not.toHaveBeenCalled()
+    expect(stubs.initializeTheme).not.toHaveBeenCalled()
+    expect(stubs.installModalA11y).not.toHaveBeenCalled()
+  })
+})
+
+// ========== donate-bootstrap ==========
+
+describe('donate-bootstrap', () => {
+  it('点击 [data-copy] → 复制成功弹 success 提示', async () => {
+    const button = mountButton('copy-github')
+    button.dataset.copy = 'https://github.com/awujiana'
+
+    await import('../ts/panel/donate-bootstrap.js')
+    button.click()
+
+    expect(stubs.copyTextWithResult).toHaveBeenCalledWith('https://github.com/awujiana')
+    expect(stubs.showToast).toHaveBeenCalledWith('[common.copySuccess]', 'success')
+  })
+
+  it('复制失败 → 弹 error 提示引导手动复制', async () => {
+    stubs.copyTextWithResult.mockReturnValue({ ok: false })
+    const button = mountButton('copy-email')
+    button.dataset.copy = 'bingshanlengtie@qq.com'
+
+    await import('../ts/panel/donate-bootstrap.js')
+    button.click()
+
+    expect(stubs.showToast).toHaveBeenCalledWith('[common.copyFailedManual]', 'error')
+  })
+
+  it('data-copy 为空 → 既不复制也不弹提示（防误报成功）', async () => {
+    const button = mountButton('copy-empty')
+
+    await import('../ts/panel/donate-bootstrap.js')
+    button.click()
+
+    expect(stubs.copyTextWithResult).not.toHaveBeenCalled()
+    expect(stubs.showToast).not.toHaveBeenCalled()
+  })
+
+  it('闸门开启后：应用主题 + 初始化语言 + 标记页面已加载 + 起心跳', async () => {
+    await import('../ts/panel/donate-bootstrap.js')
+    await drainComGate()
+
+    expect(stubs.initializeTheme).toHaveBeenCalledTimes(1)
+    expect(stubs.initializeI18n).toHaveBeenCalledTimes(1)
+    expect(stubs.markDonatePaneLoaded).toHaveBeenCalledTimes(1)
+    expect(stubs.startPaneHeartbeat).toHaveBeenCalledWith('donate')
+  })
+
+  it('纯展示页：不装按钮门禁、不装配外壳导航与跨页同步', async () => {
+    const buttons = mountActionButtons()
+
+    await import('../ts/panel/donate-bootstrap.js')
+
+    // 没有 data-action 门禁 → 按钮保持可用（赞赏页只有 data-copy）
+    expect(buttons.every((button) => !button.disabled)).toBe(true)
+    expect(stubs.initializeShellNav).not.toHaveBeenCalled()
+    expect(stubs.startNavOrderSync).not.toHaveBeenCalled()
+    expect(stubs.startModuleStateSync).not.toHaveBeenCalled()
   })
 })

@@ -44,7 +44,13 @@ function renderMeta(): void {
   const meta = metaElement()
   if (!meta) return
   // textContent：资产名来自接口，绝不拼 HTML
-  meta.textContent = formatTemplateMeta(latest)
+  meta.textContent = formatTemplateMeta(
+    latest,
+    tOr(
+      'handlers.template.unresolved',
+      '未能解析到最新版本，按钮将打开数据仓库 Release 页（默认停在 Latest，挑最新的 -template.xlsx 即可）',
+    ),
+  )
 }
 
 /**
@@ -54,8 +60,14 @@ function renderMeta(): void {
  * 别在非面板页白打一次网络请求）。
  */
 export async function loadTemplateFileInfo(): Promise<void> {
-  if (hasLoaded || metaElement() === null) return
+  const meta = metaElement()
+  if (hasLoaded || meta === null) return
   hasLoaded = true
+  // 首屏文案：HTML 里写死的是中文「正在获取最新版本…」，而拉取是异步的——
+  // 网络慢时这段会停留好几秒，英文界面就一直露中文。不能给它挂 `data-i18n`：
+  // 紧接着 `renderMeta()` 会写入版本信息，切语言时 `applyI18n()` 又会把它冲回
+  // 「正在获取…」（版本信息丢了）。所以按当前语言写一次，之后由 renderMeta 接管。
+  meta.textContent = tOr('handlers.template.loading', '正在获取最新版本…')
   try {
     latest = await fetchLatestTemplate()
   } catch {
