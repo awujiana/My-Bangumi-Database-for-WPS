@@ -231,17 +231,27 @@ export function inspectWorksheet(worksheet) {
     // 身份判定：命中特征列（名称 / Bangumi_URL），或命中月历式新番表专属签名
     const isBangumiSheet = hasIdentityColumn(columnMap) || isXinFan;
     let reason = '';
+    let reasonKey = '';
+    let reasonParameters = {};
     if (!headerRow) {
         reason = '未识别到表头行';
+        reasonKey = 'clean.reason.noHeaderRow';
     }
     else if (!isBangumiSheet) {
-        reason = `未识别到 Bangumi 数据表特征列（${CLEAN_TARGETS.identityColumns.join(' / ')}）`;
+        const columns = CLEAN_TARGETS.identityColumns.join(' / ');
+        reason = `未识别到 Bangumi 数据表特征列（${columns}）`;
+        reasonKey = 'clean.reason.noIdentityColumn';
+        reasonParameters = { columns };
     }
     else if (dataRows < CLEAN_EXCLUDES.minDataRows) {
         reason = '无数据行';
+        reasonKey = 'clean.reason.noDataRows';
     }
     else if (dataRows > CLEAN_TARGETS.maxDataRows) {
-        reason = `数据行超过护栏（${String(CLEAN_TARGETS.maxDataRows)} 行）`;
+        const max = CLEAN_TARGETS.maxDataRows;
+        reason = `数据行超过护栏（${String(max)} 行）`;
+        reasonKey = 'clean.reason.tooManyRows';
+        reasonParameters = { max };
     }
     return {
         headerRow,
@@ -253,6 +263,8 @@ export function inspectWorksheet(worksheet) {
         isBangumiSheet,
         eligible: reason === '',
         reason,
+        reasonKey,
+        reasonParameters,
     };
 }
 /** 枚举工作簿内的全部工作表（异常时返回空数组） */

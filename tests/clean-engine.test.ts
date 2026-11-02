@@ -592,6 +592,8 @@ describe('inspectWorksheet', () => {
     expect(info.hasNameColumn).toBe(true)
     expect(info.eligible).toBe(true)
     expect(info.reason).toBe('')
+    expect(info.reasonKey).toBe('')
+    expect(info.reasonParameters).toEqual({})
     expect(info.isXinFan).toBe(false)
   })
 
@@ -611,6 +613,9 @@ describe('inspectWorksheet', () => {
     expect(info.isBangumiSheet).toBe(false)
     expect(info.eligible).toBe(false)
     expect(info.reason).toContain('特征列')
+    // 展示走 key（引擎不依赖 i18n 运行时，中文原文只作日志与兜底）
+    expect(info.reasonKey).toBe('clean.reason.noIdentityColumn')
+    expect(String(info.reasonParameters.columns)).toContain('名称')
   })
 
   it('仅有 Bangumi_URL 而无「名称」列：仍判定为 Bangumi 数据表且可清理', () => {
@@ -640,6 +645,7 @@ describe('inspectWorksheet', () => {
     expect(info.headerRow).toBe(0)
     expect(info.eligible).toBe(false)
     expect(info.reason).toBe('未识别到表头行')
+    expect(info.reasonKey).toBe('clean.reason.noHeaderRow')
   })
 
   it('有名称列但无数据行：reason 为无数据行', () => {
@@ -649,6 +655,7 @@ describe('inspectWorksheet', () => {
     const info = inspectWorksheet({ Name: '空数据表' } as CleanTargetInfo['worksheet'])
     expect(info.dataRows).toBe(0)
     expect(info.reason).toBe('无数据行')
+    expect(info.reasonKey).toBe('clean.reason.noDataRows')
   })
 })
 
@@ -1089,6 +1096,8 @@ describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
     expect(info.dataRows).toBe(59_999)
     expect(info.eligible).toBe(false)
     expect(info.reason).toContain('数据行超过护栏')
+    expect(info.reasonKey).toBe('clean.reason.tooManyRows')
+    expect(info.reasonParameters.max).toBe(CLEAN_TARGETS.maxDataRows)
   })
 
   it('表头行有文本时用于展示（前 8 个非空值）', () => {

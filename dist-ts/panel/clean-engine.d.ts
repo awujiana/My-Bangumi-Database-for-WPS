@@ -143,6 +143,15 @@ export interface SheetInspection {
     eligible: boolean;
     /** 未满足清理条件的原因（达标时为空串，页面据此展示提示） */
     reason: string;
+    /**
+     * {@link reason} 对应的语言包 key（达标时为空串）
+     *
+     * 引擎是纯逻辑层，不依赖 i18n 运行时；`reason` 保留中文原文作日志与兜底，
+     * 页面渲染时用本 key + {@link reasonParameters} 取译文，避免多语言界面里夹中文。
+     */
+    reasonKey: string;
+    /** {@link reasonKey} 的插值变量（如特征列清单、护栏行数） */
+    reasonParameters: Readonly<Record<string, string | number>>;
 }
 /**
  * 探测单张工作表的表头与数据规模（只读，不修改任何数据）。

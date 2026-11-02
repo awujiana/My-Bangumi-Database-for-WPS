@@ -111,7 +111,8 @@ function renderSheetList() {
         return;
     const summary = document.getElementById('cleanSheetSummary');
     if (sheetCandidates.length === 0) {
-        container.innerHTML = sanitizeHtml('<div class="hint">点击「📋 加载工作表」枚举已打开工作簿。</div>');
+        const emptyHint = tOr('clean.targets.empty', '点击「📋 加载工作表」枚举已打开工作簿。');
+        container.innerHTML = sanitizeHtml(`<div class="hint">${escapeHtml(emptyHint)}</div>`);
         if (summary)
             summary.textContent = '';
         return;
@@ -140,7 +141,7 @@ function renderSheetList() {
             selectedCount += 1;
     }
     if (summary) {
-        summary.textContent = `共 ${String(groups.length)} 个工作簿 · ${String(sheetCandidates.length)} 张工作表 · 已选 ${String(selectedCount)} 张`;
+        summary.textContent = formatSheetSummary(groups.length, sheetCandidates.length, selectedCount);
     }
     const blocks = groups
         .map((group) => {
@@ -154,39 +155,59 @@ function renderSheetList() {
                 .map((candidate) => {
                 const isChecked = selected.has(candidate.sheetName);
                 const id = `clean-sheet-${escapeHtml(group.workbookKey)}-${escapeHtml(candidate.sheetName)}`;
-                const metaParts = [`${String(candidate.dataRows)} 行数据`];
-                if (candidate.isXinFan)
-                    metaParts.push('🗓️ 新番表');
+                const metaParts = [
+                    tOr('clean.targets.dataRows', '{count} 行数据', { count: candidate.dataRows }),
+                ];
+                if (candidate.isXinFan) {
+                    metaParts.push(tOr('clean.targets.xinfan', '🗓️ 新番表'));
+                }
+                // 行级规则依赖标准表头（readSheetLayout），新番表与缺「名称」列的表都走不通。
+                // 仅对能清理的表提示：未识别的表已有 ⚠️ 原因，不必重复。
+                if (candidate.eligible && !candidate.hasNameColumn) {
+                    metaParts.push(tOr('clean.targets.rowRulesUnavailable', '重复行规则不可用（无标准「名称」列）'));
+                }
                 if (candidate.headers.length > 0) {
-                    metaParts.push(`表头：${candidate.headers.join(' / ')}`);
+                    metaParts.push(tOr('clean.targets.headers', '表头：{list}', {
+                        list: candidate.headers.join(' / '),
+                    }));
                 }
                 if (!candidate.eligible && candidate.reason) {
-                    metaParts.push(`⚠️ ${candidate.reason}（仍可勾选，规则会按列缺失跳过）`);
+                    // 有 key 走译文；没有（引擎新增分支未配 key）退回中文原文，绝不显示空串
+                    const reasonText = candidate.reasonKey
+                        ? tOr(candidate.reasonKey, candidate.reason, candidate.reasonParameters)
+                        : candidate.reason;
+                    metaParts.push(tOr('clean.targets.notEligible', '⚠️ {reason}（仍可勾选，规则会按列缺失跳过）', {
+                        reason: reasonText,
+                    }));
                 }
                 const metaText = metaParts.join(' · ');
+                const unrecognizedTag = candidate.eligible
+                    ? ''
+                    : `<span class="clean-sheet-tag-warn">${escapeHtml(tOr('clean.targets.unrecognized', '未识别'))}</span>`;
                 return `
             <label class="clean-sheet-item">
               <input type="checkbox" id="${id}" data-workbook-key="${escapeHtml(group.workbookKey)}" data-sheet-name="${escapeHtml(candidate.sheetName)}" ${isChecked ? 'checked' : ''} />
               <span class="clean-sheet-item-body">
                 <span class="clean-sheet-item-title">
                   <span class="clean-sheet-item-name">${escapeHtml(candidate.sheetName)}</span>
-                  ${candidate.eligible ? '' : '<span class="clean-sheet-tag-warn">未识别</span>'}
+                  ${unrecognizedTag}
                 </span>
                 <span class="clean-sheet-item-meta">${escapeHtml(metaText)}</span>
               </span>
             </label>`;
             })
                 .join('');
+        const groupStats = tOr('clean.targets.groupStats', '{total} 张 · 识别 {eligible} · 已选 {selected}', { total: group.items.length, eligible: eligibleInGroup, selected: pickedInGroup });
         return `
         <div class="clean-sheet-group">
           <div class="clean-sheet-group-head">
-            <button class="clean-sheet-group-toggle" data-group-toggle="${escapeHtml(group.workbookKey)}" title="展开/折叠">
+            <button class="clean-sheet-group-toggle" data-group-toggle="${escapeHtml(group.workbookKey)}" title="${escapeHtml(tOr('clean.targets.collapse', '展开/折叠'))}">
               <span class="clean-sheet-caret">${isCollapsed ? '▸' : '▾'}</span>
               <span class="clean-sheet-group-title-name">${escapeHtml(group.workbookName)}</span>
             </button>
-            <span class="clean-sheet-item-meta">${String(group.items.length)} 张 · 识别 ${String(eligibleInGroup)} · 已选 ${String(pickedInGroup)}</span>
-            <button class="bgm-btn small" data-group-all="${escapeHtml(group.workbookKey)}">本簿全选</button>
-            <button class="bgm-btn small" data-group-none="${escapeHtml(group.workbookKey)}">清空</button>
+            <span class="clean-sheet-item-meta">${escapeHtml(groupStats)}</span>
+            <button class="bgm-btn small" data-group-all="${escapeHtml(group.workbookKey)}">${escapeHtml(tOr('clean.targets.selectAll', '本簿全选'))}</button>
+            <button class="bgm-btn small" data-group-none="${escapeHtml(group.workbookKey)}">${escapeHtml(tOr('clean.targets.clear', '清空'))}</button>
           </div>
           ${items}
         </div>`;
@@ -268,7 +289,15 @@ function refreshSheetSummary() {
         if (loadSelectedSheetNames(candidate.workbookKey).has(candidate.sheetName))
             selectedCount += 1;
     }
-    summary.textContent = `共 ${String(workbookKeys.size)} 个工作簿 · ${String(sheetCandidates.length)} 张工作表 · 已选 ${String(selectedCount)} 张`;
+    summary.textContent = formatSheetSummary(workbookKeys.size, sheetCandidates.length, selectedCount);
+}
+/**
+ * 顶部统计串（整表重绘与「仅刷新统计」共用一份模板）
+ *
+ * 两处原先各写一遍同样的中文字面量，改成函数后新增语言只需改语言包。
+ */
+function formatSheetSummary(workbookCount, sheetCount, selectedCount) {
+    return tOr('clean.targets.summary', '共 {workbooks} 个工作簿 · {sheets} 张工作表 · 已选 {selected} 张', { workbooks: workbookCount, sheets: sheetCount, selected: selectedCount });
 }
 /** 读取路径是否命中任一关键词（大小写不敏感） */
 function hasAnyKeyword(value, keywords) {
@@ -306,7 +335,10 @@ function buildSheetCandidate(wb, path, worksheet) {
         sheetName,
         eligible: info.eligible,
         reason: info.reason,
+        reasonKey: info.reasonKey,
+        reasonParameters: info.reasonParameters,
         isXinFan: info.isXinFan,
+        hasNameColumn: info.hasNameColumn,
         headers: info.headers,
         dataRows: info.dataRows,
     };
@@ -519,8 +551,11 @@ function renderCleanItems() {
 function invalidatePreview() {
     scanResult = null;
     const summary = document.getElementById('cleanPreviewSummary');
-    if (summary)
-        summary.innerHTML = '<p class="hint">勾选后点击「🔍 扫描预览」查看待清理条目。</p>';
+    if (summary) {
+        // 语言包里本就有这条 key（clean.preview.empty），此前这里另写了一份中文字面量
+        const hint = tOr('clean.preview.empty', '勾选后点击「🔍 扫描预览」查看待清理条目。');
+        summary.innerHTML = `<p class="hint">${escapeHtml(hint)}</p>`;
+    }
     const detail = document.getElementById('cleanPreviewDetail');
     if (detail)
         detail.replaceChildren();

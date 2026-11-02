@@ -128,7 +128,10 @@ type CleanPageModule = typeof import('../ts/panel/clean-page.js')
 const DEFAULT_INSPECTION = {
   eligible: true,
   reason: '',
+  reasonKey: '',
+  reasonParameters: {},
   isXinFan: false,
+  hasNameColumn: true,
   headers: ['名称', 'Bangumi_URL'],
   dataRows: 12,
 }
@@ -360,18 +363,33 @@ async function mountTwoWorkbooks(): Promise<void> {
       return {
         eligible: true,
         reason: '',
+        reasonKey: '',
+        reasonParameters: {},
         isXinFan: false,
+        hasNameColumn: true,
         headers: ['名称', 'Bangumi_URL'],
         dataRows: 100,
       }
     }
     if (name === '归档') {
-      return { eligible: true, reason: '', isXinFan: false, headers: [], dataRows: 5 }
+      return {
+        eligible: true,
+        reason: '',
+        reasonKey: '',
+        reasonParameters: {},
+        isXinFan: false,
+        hasNameColumn: true,
+        headers: [],
+        dataRows: 5,
+      }
     }
     return {
       eligible: false,
       reason: '未找到名称列',
+      reasonKey: '',
+      reasonParameters: {},
       isXinFan: true,
+      hasNameColumn: false,
       headers: ['周更时间'],
       dataRows: 2,
     }
@@ -551,7 +569,10 @@ describe('handleLoadSheets', () => {
       return {
         eligible: isEligible,
         reason: isEligible ? '' : '未找到名称列',
+        reasonKey: '',
+        reasonParameters: {},
         isXinFan: !isEligible,
+        hasNameColumn: isEligible,
         headers: isEligible ? ['名称'] : [],
         dataRows: 8,
       }
@@ -572,6 +593,81 @@ describe('handleLoadSheets', () => {
     expect(m.showToast).not.toHaveBeenCalled()
   })
 
+  it('新番表候选行标注「重复行规则不可用」，标准表不标注', async () => {
+    installApp(
+      makeWorkbooks([
+        makeWorkbook({
+          name: 'A',
+          fullName: 'D:/A.xlsx',
+          sheets: [makeSheet('动画'), makeSheet('2026年4月新番表')],
+        }),
+      ]),
+    )
+    m.inspectWorksheet.mockImplementation((worksheet: unknown) => {
+      const isXinFan = (worksheet as { Name?: string }).Name === '2026年4月新番表'
+      return {
+        eligible: true,
+        reason: '',
+        reasonKey: '',
+        reasonParameters: {},
+        isXinFan,
+        // 新番表名称列由锚点推导（表头为空）→ 行级规则依赖的标准表头不存在
+        hasNameColumn: !isXinFan,
+        headers: isXinFan ? ['周更时间'] : ['名称'],
+        dataRows: 6,
+      }
+    })
+    await loadPage()
+    page.initializeCleanPage()
+    clickById('cleanLoadSheetsBtn')
+
+    const html = byId('cleanSheetList').innerHTML
+    expect(html).toContain('🗓️ 新番表')
+    // 只有新番表那一行提示，标准表不该出现
+    expect(html.split('重复行规则不可用').length - 1).toBe(1)
+    // 提示紧跟在「新番表」标记之后（同一条 meta 串）
+    expect(html).toContain('🗓️ 新番表 · 重复行规则不可用')
+  })
+
+  it('候选列表走语言包：注入英文包后统计串与行内文案同步切换', async () => {
+    installApp(
+      makeWorkbooks([
+        makeWorkbook({ name: 'A', fullName: 'D:/A.xlsx', sheets: [makeSheet('动画')] }),
+      ]),
+    )
+    m.inspectWorksheet.mockReturnValue(DEFAULT_INSPECTION)
+    await loadPage()
+    // loadPage 里 vi.resetModules() 过：clean-page 拿到的是新实例，
+    // 必须在这之后再取同一份 locale-store，否则 prime 到的是另一份模块状态。
+    const store = await import('../ts/i18n/locale-store.js')
+    store.primeLocaleForTest({
+      schemaVersion: store.LOCALE_SCHEMA_VERSION,
+      code: 'en',
+      name: 'English',
+      nativeName: 'English',
+      version: 'test',
+      updatedAt: '2026-01-01',
+      // 只放候选列表用到的 3 个 key：证明渲染确实经 tOr 取值，
+      // 真实语言包是否齐全由 check:i18n（三语 100% 对齐）把关。
+      messages: {
+        'clean.targets.summary': 'EN {workbooks}/{sheets}/{selected}',
+        'clean.targets.dataRows': 'EN {count} rows',
+        'clean.targets.selectAll': 'EN select all',
+      },
+    })
+    store.useLocale('en')
+
+    page.initializeCleanPage()
+    clickById('cleanLoadSheetsBtn')
+
+    // 唯一一张达标表被自动勾选 → 已选 1
+    expect(byId('cleanSheetSummary').textContent).toBe('EN 1/1/1')
+    expect(byId('cleanSheetList').innerHTML).toContain('EN 12 rows')
+    expect(byId('cleanSheetList').innerHTML).toContain('EN select all')
+
+    store.resetLocaleStoreForTest()
+  })
+
   it('一张都没识别到时追加引导 warn 日志', async () => {
     installApp(
       makeWorkbooks([
@@ -581,7 +677,10 @@ describe('handleLoadSheets', () => {
     m.inspectWorksheet.mockReturnValue({
       eligible: false,
       reason: '未找到名称列',
+      reasonKey: '',
+      reasonParameters: {},
       isXinFan: true,
+      hasNameColumn: false,
       headers: [],
       dataRows: 3,
     })

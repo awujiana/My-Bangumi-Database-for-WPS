@@ -331,6 +331,15 @@ export interface SheetInspection {
   eligible: boolean
   /** 未满足清理条件的原因（达标时为空串，页面据此展示提示） */
   reason: string
+  /**
+   * {@link reason} 对应的语言包 key（达标时为空串）
+   *
+   * 引擎是纯逻辑层，不依赖 i18n 运行时；`reason` 保留中文原文作日志与兜底，
+   * 页面渲染时用本 key + {@link reasonParameters} 取译文，避免多语言界面里夹中文。
+   */
+  reasonKey: string
+  /** {@link reasonKey} 的插值变量（如特征列清单、护栏行数） */
+  reasonParameters: Readonly<Record<string, string | number>>
 }
 
 /** 读取工作表末行（UsedRange 优先，异常回退 getLastRow） */
@@ -431,14 +440,24 @@ export function inspectWorksheet(worksheet: WpsWorksheet): SheetInspection {
   const isBangumiSheet = hasIdentityColumn(columnMap) || isXinFan
 
   let reason = ''
+  let reasonKey = ''
+  let reasonParameters: Record<string, string | number> = {}
   if (!headerRow) {
     reason = '未识别到表头行'
+    reasonKey = 'clean.reason.noHeaderRow'
   } else if (!isBangumiSheet) {
-    reason = `未识别到 Bangumi 数据表特征列（${CLEAN_TARGETS.identityColumns.join(' / ')}）`
+    const columns = CLEAN_TARGETS.identityColumns.join(' / ')
+    reason = `未识别到 Bangumi 数据表特征列（${columns}）`
+    reasonKey = 'clean.reason.noIdentityColumn'
+    reasonParameters = { columns }
   } else if (dataRows < CLEAN_EXCLUDES.minDataRows) {
     reason = '无数据行'
+    reasonKey = 'clean.reason.noDataRows'
   } else if (dataRows > CLEAN_TARGETS.maxDataRows) {
-    reason = `数据行超过护栏（${String(CLEAN_TARGETS.maxDataRows)} 行）`
+    const max = CLEAN_TARGETS.maxDataRows
+    reason = `数据行超过护栏（${String(max)} 行）`
+    reasonKey = 'clean.reason.tooManyRows'
+    reasonParameters = { max }
   }
 
   return {
@@ -451,6 +470,8 @@ export function inspectWorksheet(worksheet: WpsWorksheet): SheetInspection {
     isBangumiSheet,
     eligible: reason === '',
     reason,
+    reasonKey,
+    reasonParameters,
   }
 }
 
