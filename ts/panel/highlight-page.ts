@@ -51,7 +51,7 @@ import type { PreviewRowDetail, PreviewView } from './highlight-preview-render.j
 import { initializeShellNav } from './shell-nav.js'
 import { notifyModulesReady } from './action-buttons-gate.js'
 import { initializeTheme, startThemeSync } from '../tools/theme.js'
-import { canApplyI18n, initializeI18n, onLocaleChange, t } from '../i18n/index.js'
+import { canApplyI18n, initializeI18n, onLocaleChange, t, tOr } from '../i18n/index.js'
 import type { ComPhase } from '../tools/com-ready.js'
 import type { WpsRange, WpsWorksheet } from '../tools/wps.js'
 import { activeWorksheet, collectSheets } from '../tools/sheet-list.js'
@@ -311,10 +311,19 @@ function rebuildColumns(): void {
 }
 
 /** 渲染识别列选择器（列多时自动带搜索） */
+/**
+ * 「识别列」配置值缓存
+ *
+ * `renderSourcePicker()` 现在会被**切语言**重绘，而它原本每次 `getConfig()` ——
+ * 那是同步 COM（PluginStorage 跨进程）。切语言不该发 COM，所以配置在配置分片里
+ * 读一次存这里，之后渲染只读缓存。本页是 `KEY_SOURCE` 的唯一写入方，不会读到脏值。
+ */
+let configuredSource = '__auto__'
+
 function renderSourcePicker(): void {
   const container = byId('highlightSourcePicker')
   if (!container) return
-  const configured = getConfig(KEY_SOURCE, '__auto__', true)
+  const configured = configuredSource
   // 列出全部列供用户选「识别列」；默认「自动识别」按日期候选挑
   const values: string[] = ['__auto__']
   for (const [name] of state.columnMap) {
@@ -324,11 +333,11 @@ function renderSourcePicker(): void {
     container,
     values.map((value) => ({
       value,
-      label: value === '__auto__' ? t('highlight.picker.auto') : value,
+      label: value === '__auto__' ? tOr('highlight.picker.auto', '自动识别（日期列优先）') : value,
     })),
     {
       value: configured,
-      ariaLabel: t('highlight.picker.sourceAria'),
+      ariaLabel: tOr('highlight.picker.sourceAria', '识别列'),
       onChange: (value) => {
         onSourceChange(value)
       },
@@ -338,7 +347,8 @@ function renderSourcePicker(): void {
 
 /** 识别列切换：写配置 + 重算预览 */
 function onSourceChange(value: string): void {
-  setConfig(KEY_SOURCE, value === '__auto__' ? '__auto__' : value)
+  configuredSource = value === '__auto__' ? '__auto__' : value
+  setConfig(KEY_SOURCE, configuredSource)
   refreshPreview()
   renderColumnListIfChanged()
 }
@@ -417,8 +427,8 @@ function renderWorkbookPicker(): void {
     workbookNames.map((name) => ({ value: name, label: name })),
     {
       value: currentWorkbookName(),
-      ariaLabel: t('highlight.condition.workbook'),
-      emptyText: t('highlight.picker.workbookEmpty'),
+      ariaLabel: tOr('highlight.condition.workbook', '工作簿'),
+      emptyText: tOr('highlight.picker.workbookEmpty', '（无已打开的工作簿）'),
       onChange: (workbook) => {
         onWorkbookChange(workbook)
       },
@@ -437,8 +447,8 @@ function renderSheetPicker(): void {
     visible.map((entry) => ({ value: entry.key, label: entry.sheet })),
     {
       value: state.selectedKey,
-      ariaLabel: t('highlight.condition.sheet'),
-      emptyText: t('highlight.picker.sheetEmpty'),
+      ariaLabel: tOr('highlight.condition.sheet', '工作表'),
+      emptyText: tOr('highlight.picker.sheetEmpty', '（该工作簿下没有可显示的工作表）'),
       onChange: (key) => {
         onSheetChange(key)
       },
@@ -451,7 +461,9 @@ function renderSheetPicker(): void {
     notice.textContent =
       state.selectionMissing === ''
         ? ''
-        : t('highlight.picker.sheetMissing', { sheet: state.selectionMissing })
+        : tOr('highlight.picker.sheetMissing', '⚠️ 原目标表 {sheet} 已不存在，请重新选择', {
+            sheet: state.selectionMissing,
+          })
   }
 }
 
@@ -486,9 +498,17 @@ function resetSheetData(): void {
   state.columns = []
   state.sourceKey = ''
   state.sourceCol = 0
-  renderSourcePicker()
-  setText('highlightSheetName', selectedSheetEntry()?.sheet ?? t('highlight.sheet.placeholder'))
+  renderSheetHeaderTexts()
   renderPreviewEmpty('highlight.preview.emptyDefault')
+}
+
+/** 表头区文案（来源选择器 + 表名）：只读 state，可反复调用，不绑事件 */
+function renderSheetHeaderTexts(): void {
+  renderSourcePicker()
+  setText(
+    'highlightSheetName',
+    selectedSheetEntry()?.sheet ?? tOr('highlight.sheet.placeholder', '请选择工作表'),
+  )
 }
 
 // ===== 预览 =====
@@ -695,6 +715,27 @@ function syncPreviewViewButtons(): void {
 }
 
 /**
+ * 按当前语言重绘**首屏就会写一遍**的那些文案
+ *
+ * `highlightPhaseConfig()` 与 `initializeI18n()` 在同一个 tick，而语言包是异步加载的
+ * —— 那一刻 `t()` / `tOr()` 拿到的都还是「没加载」状态。这里把「只改文案」的部分
+ * 重跑一遍：全部不绑事件（`buildManualSelectors` / `buildFilterControls` 已拆成
+ * 「填 option」+「绑一次」），重复执行没有副作用。
+ *
+ * 语言没就绪就一个字都不写（`canApplyI18n()` 守卫）：宁可保留 HTML 里的中文原文，
+ * 也不要闪一行 key。就绪后 `onLocaleChange` 会再调一次。
+ */
+function refreshFirstPaintTexts(): void {
+  if (!canApplyI18n()) return
+  renderManualOptions()
+  renderFilterOptions()
+  renderWorkbookPicker()
+  renderSheetPicker()
+  renderSheetHeaderTexts()
+  renderPreviewTexts()
+}
+
+/**
  * 按当前语言重绘预览区的摘要三行
  *
  * 存在的理由：`initializeI18n()` 内部是**异步加载**语言包，而 `highlightPhaseConfig()`
@@ -894,7 +935,14 @@ function syncAutoWatch(): void {
 
 // ===== 手动年月选择器 =====
 
-function buildManualSelectors(): void {
+/**
+ * 填手动年月的 option 文案
+ *
+ * 与 {@link buildManualSelectors} 拆开是**必须的**：切语言要重绘 option，而重绘若连
+ * `addEventListener` 一起跑就会重复绑定（一个 change 触发两次 `refreshPreview`，
+ * 每次都是几百毫秒的同步 COM）。本函数不碰事件，可反复调用。
+ */
+function renderManualOptions(): void {
   const yearSelect = selectById('highlightManualYear')
   if (yearSelect) {
     const thisYear = new Date().getFullYear()
@@ -902,31 +950,38 @@ function buildManualSelectors(): void {
     yearSelect.innerHTML = years
       .map(
         (y) =>
-          `<option value="${String(y)}">${escapeHtml(t('highlight.season.yearOption', { year: y }))}</option>`,
+          `<option value="${String(y)}">${escapeHtml(tOr('highlight.season.yearOption', '{year} 年', { year: y }))}</option>`,
       )
       .join('')
     yearSelect.value = String(state.manual.year)
-    yearSelect.addEventListener('change', () => {
-      state.manual = { ...state.manual, year: Number(yearSelect.value) }
-      persistManual()
-      refreshPreview()
-    })
   }
   const monthSelect = selectById('highlightManualMonth')
   if (monthSelect) {
     monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
       .map(
         (m) =>
-          `<option value="${String(m)}">${escapeHtml(t('highlight.season.monthOption', { month: m }))}</option>`,
+          `<option value="${String(m)}">${escapeHtml(tOr('highlight.season.monthOption', '{month} 月', { month: m }))}</option>`,
       )
       .join('')
     monthSelect.value = String(state.manual.month)
-    monthSelect.addEventListener('change', () => {
-      state.manual = { ...state.manual, month: Number(monthSelect.value) }
-      persistManual()
-      refreshPreview()
-    })
   }
+}
+
+/** 建手动年月选择器：填 option（可重绘）+ 绑 change（**只一次**） */
+function buildManualSelectors(): void {
+  renderManualOptions()
+  const yearSelect = selectById('highlightManualYear')
+  yearSelect?.addEventListener('change', () => {
+    state.manual = { ...state.manual, year: Number(yearSelect.value) }
+    persistManual()
+    refreshPreview()
+  })
+  const monthSelect = selectById('highlightManualMonth')
+  monthSelect?.addEventListener('change', () => {
+    state.manual = { ...state.manual, month: Number(monthSelect.value) }
+    persistManual()
+    refreshPreview()
+  })
 }
 
 /** 手动年月变更只落 KEY_MANUAL（高亮模式归设置页管理，本页不再写 KEY_MODE） */
@@ -942,8 +997,13 @@ function persistManual(): void {
 /** 季度起点月选项（番剧四季：1 / 4 / 7 / 10 月） */
 const QUARTER_OPTIONS: readonly SeasonMonth[] = [1, 4, 7, 10]
 
-/** 建筛选控件（年 / 季 / 月下拉 + 五个范围按钮 + 非动漫开关 + 筛选动作） */
-function buildFilterControls(): void {
+/**
+ * 填筛选下拉的 option 文案（年 / 季 / 月）
+ *
+ * 与 {@link buildFilterControls} 拆开的理由同 {@link renderManualOptions}：
+ * 切语言要重绘 option，但不能顺带把 change 监听再绑一遍。
+ */
+function renderFilterOptions(): void {
   const yearSelect = selectById('highlightFilterYear')
   if (yearSelect) {
     const thisYear = new Date().getFullYear()
@@ -951,44 +1011,52 @@ function buildFilterControls(): void {
     yearSelect.innerHTML = years
       .map(
         (y) =>
-          `<option value="${String(y)}">${escapeHtml(t('highlight.season.yearOption', { year: y }))}</option>`,
+          `<option value="${String(y)}">${escapeHtml(tOr('highlight.season.yearOption', '{year} 年', { year: y }))}</option>`,
       )
       .join('')
     yearSelect.value = String(state.filter.year)
-    yearSelect.addEventListener('change', () => {
-      state.filter = { ...state.filter, year: Number(yearSelect.value) }
-      persistFilter()
-      refreshPreview()
-    })
   }
   const quarterSelect = selectById('highlightFilterQuarter')
   if (quarterSelect) {
     quarterSelect.innerHTML = QUARTER_OPTIONS.map(
       (m) =>
-        `<option value="${String(m)}">${escapeHtml(t('highlight.season.quarterOption', { month: m }))}</option>`,
+        `<option value="${String(m)}">${escapeHtml(tOr('highlight.season.quarterOption', '{month} 月季', { month: m }))}</option>`,
     ).join('')
     quarterSelect.value = String(state.filter.quarter ?? 1)
-    quarterSelect.addEventListener('change', () => {
-      state.filter = { ...state.filter, quarter: Number(quarterSelect.value) as SeasonMonth }
-      persistFilter()
-      refreshPreview()
-    })
   }
   const monthSelect = selectById('highlightFilterMonth')
   if (monthSelect) {
     monthSelect.innerHTML = Array.from({ length: 12 }, (_, index) => index + 1)
       .map(
         (m) =>
-          `<option value="${String(m)}">${escapeHtml(t('highlight.season.monthOption', { month: m }))}</option>`,
+          `<option value="${String(m)}">${escapeHtml(tOr('highlight.season.monthOption', '{month} 月', { month: m }))}</option>`,
       )
       .join('')
     monthSelect.value = String(state.filter.month ?? 1)
-    monthSelect.addEventListener('change', () => {
-      state.filter = { ...state.filter, month: Number(monthSelect.value) }
-      persistFilter()
-      refreshPreview()
-    })
   }
+}
+
+/** 建筛选控件：填 option（可重绘）+ 绑事件（**只一次**） */
+function buildFilterControls(): void {
+  renderFilterOptions()
+  const yearSelect = selectById('highlightFilterYear')
+  yearSelect?.addEventListener('change', () => {
+    state.filter = { ...state.filter, year: Number(yearSelect.value) }
+    persistFilter()
+    refreshPreview()
+  })
+  const quarterSelect = selectById('highlightFilterQuarter')
+  quarterSelect?.addEventListener('change', () => {
+    state.filter = { ...state.filter, quarter: Number(quarterSelect.value) as SeasonMonth }
+    persistFilter()
+    refreshPreview()
+  })
+  const monthSelect = selectById('highlightFilterMonth')
+  monthSelect?.addEventListener('change', () => {
+    state.filter = { ...state.filter, month: Number(monthSelect.value) }
+    persistFilter()
+    refreshPreview()
+  })
   for (const button of document.querySelectorAll<HTMLElement>('[data-filter-range]')) {
     button.addEventListener('click', () => {
       const range = button.dataset.filterRange
@@ -1173,7 +1241,7 @@ function highlightPhaseConfig(): void {
   // 动态文案（没有 `data-i18n`），`applyI18n()` 补不到，首屏就会一直露 key。
   // 所以语言就绪（以及之后每次切语言）都重绘一次预览摘要。
   onLocaleChange(() => {
-    renderPreviewTexts()
+    refreshFirstPaintTexts()
   })
   startThemeSync()
   // 进入时重放：其它页获取的工作簿/表/列/行一次性显示（读一次存储，零轮询）
@@ -1185,6 +1253,8 @@ function highlightPhaseConfig(): void {
     state.manual = { year: Number(manualMatch[1]), month: Number(manualMatch[2]) }
   }
   buildManualSelectors()
+  // 「识别列」读一次：`renderSourcePicker()` 之后会被**切语言**重绘，渲染路径不该再发 COM
+  configuredSource = getConfig(KEY_SOURCE, '__auto__', true)
   // 筛选范围（年度 / 季度 / 月份 / 未来番，与 GitHub 同步同口径）+ 非动漫开关
   restoreFilter()
   buildFilterControls()

@@ -27,6 +27,37 @@ const i18nState = vi.hoisted(() => ({
   listeners: [] as (() => void)[],
 }))
 
+/** `{name}` 插值（真实实现在 locale-store，语义相同） */
+function interpolateLocaleText(
+  template: string,
+  parameters?: Readonly<Record<string, string | number>>,
+): string {
+  if (parameters === undefined) return template
+  return template.replaceAll(/\{(\w+)\}/gu, (match: string, name: string) => {
+    const value = parameters[name]
+    return value === undefined ? match : String(value)
+  })
+}
+
+/** 语言未就绪 → 原样返回 key（真实实现就是这样）；就绪后回显 `[key]` + 参数 */
+function translateForTest(
+  key: string,
+  parameters?: Readonly<Record<string, string | number>>,
+): string {
+  if (!i18nState.isReady) return key
+  return `[${key}]${parameters === undefined ? '' : JSON.stringify(parameters)}`
+}
+
+/** 与 `locale-store.tOr` 同构：`t()` 返回 key 时退回原文并插值 */
+function translateOrForTest(
+  key: string,
+  fallback: string,
+  parameters?: Readonly<Record<string, string | number>>,
+): string {
+  const text = translateForTest(key, parameters)
+  return text === key ? interpolateLocaleText(fallback, parameters) : text
+}
+
 const mocks = vi.hoisted(() => ({
   bgmLog: vi.fn(),
   showToast: vi.fn(),
@@ -73,8 +104,13 @@ vi.mock('../ts/tools/theme.js', () => ({
   startThemeSync: mocks.startThemeSync,
 }))
 
-// t 回显 key（带参数时一并回显）：断言「用了哪个 key、传了什么」比断言中文原文更能防回归。
-// `canApplyI18n` / `onLocaleChange` 也是 mock：生产里 `initializeI18n()` 是**异步**加载
+// 语言层的替身，**语义与真实实现一致**：
+//   - 未就绪时 `t()` 把 key 原样返回（真实 `locale-store` 就是这样，bundles 还是空的）
+//   - 就绪后 `t()` 回显 `[key]`（带参数一并回显）—— 断言「用了哪个 key、传了什么」
+//     比断言中文原文更能防回归
+//   - `tOr()` 在 `t()` 返回 key 时退回原文并插值，与 `locale-store.tOr` 同构
+//
+// `canApplyI18n` / `onLocaleChange` 也做成可控：生产里 `initializeI18n()` 是**异步**加载
 // 语言包的，配置阶段剩下的代码在同一个 tick 里跑完 —— 真实时序没法在单测里复现，
 // 所以把「语言是否就绪」做成开关，「语言变更通知」做成手动触发。
 vi.mock('../ts/i18n/index.js', () => ({
@@ -84,8 +120,8 @@ vi.mock('../ts/i18n/index.js', () => ({
   onLocaleChange: (listener: () => void) => {
     i18nState.listeners.push(listener)
   },
-  t: (key: string, parameters?: Record<string, unknown>) =>
-    parameters === undefined ? `[${key}]` : `[${key}]${JSON.stringify(parameters)}`,
+  t: translateForTest,
+  tOr: translateOrForTest,
 }))
 
 vi.mock('../ts/panel/shell-nav.js', () => ({ initializeShellNav: mocks.initializeShellNav }))
@@ -259,6 +295,58 @@ describe('恢复目标表', () => {
     // 锁定的语义是「别替我换表」：要么留空、要么明确提示，绝不能显示别的表
     expect(document.getElementById('highlightSheetName')?.textContent).not.toBe('Sheet1')
     expect(notice?.hidden).toBe(false)
+  })
+})
+
+describe('切语言重绘（首屏文案）', () => {
+  // 首屏那些下拉 / 选择器 / 表名都在 `highlightPhaseConfig()` 里写一遍，而那一步与
+  // `initializeI18n()` 同一个 tick —— 语言包没加载时 `tOr()` 会退回中文原文。
+  // 所以语言就绪后必须整体重绘一次，且**不能重复绑事件**（否则一次 change 触发两次
+  // 预览，每次都是几百毫秒的同步 COM），也**不能发 COM**（切语言不该读配置）。
+  it('语言就绪后重绘：年月 option / 表名 / 来源选择器都换成译文', () => {
+    runConfigPhase()
+    i18nState.isReady = true
+
+    fireLocaleChange()
+
+    expect(document.querySelector('#highlightManualYear option')?.textContent).toContain(
+      'highlight.season.yearOption',
+    )
+    expect(document.querySelector('#highlightFilterQuarter option')?.textContent).toContain(
+      'highlight.season.quarterOption',
+    )
+    expect(document.getElementById('highlightSheetName')?.textContent).toBe(
+      '[highlight.sheet.placeholder]',
+    )
+    expect(document.getElementById('highlightSourcePicker')?.textContent).toContain(
+      'highlight.picker.auto',
+    )
+  })
+
+  it('重绘不重复绑事件：连切两次语言后，改一次年月只落一次配置', () => {
+    runConfigPhase()
+    i18nState.isReady = true
+    fireLocaleChange()
+    fireLocaleChange()
+
+    mocks.setConfig.mockClear()
+    const yearSelect = document.getElementById('highlightManualYear') as HTMLSelectElement
+    yearSelect.dispatchEvent(new Event('change'))
+
+    // 绑了两次的话 `persistManual()` 会写两次 `highlight.manual`
+    const manualWrites = mocks.setConfig.mock.calls.filter(([key]) => key === 'highlight.manual')
+    expect(manualWrites).toHaveLength(1)
+  })
+
+  it('重绘不发 COM：切语言期间一次 getConfig 都不调', () => {
+    runConfigPhase()
+    i18nState.isReady = true
+    mocks.getConfig.mockClear()
+
+    fireLocaleChange()
+
+    // 来源选择器原本每次渲染都 `getConfig(KEY_SOURCE)`（同步 COM，跨进程）
+    expect(mocks.getConfig).not.toHaveBeenCalled()
   })
 })
 
