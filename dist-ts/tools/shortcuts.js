@@ -24,6 +24,9 @@ import { LOG_LEVELS } from '../core/constants.js';
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js';
 import { applyModuleState, enterSoloMode, exitSoloMode, isSoloMode, toggleModuleHidden, } from './module-state.js';
 import { bgmLog, showSyncPanel, showCleanPanel, showConditionalFormatPanel, showEnrichPanel, showHighlightPanel, showSettingsPanel, } from './util/index.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../i18n/locale-store.js';
 /**
  * 全部可绑定动作（唯一真相）
  *
@@ -31,20 +34,66 @@ import { bgmLog, showSyncPanel, showCleanPanel, showConditionalFormatPanel, show
  * 各自有显式按钮，绑成全局键反而容易误触（尤其 Alt+S 与宿主菜单冲突）。
  */
 export const SHORTCUT_ACTIONS = [
-    { id: 'nav.bangumi', label: '主面板', defaultKey: 'Alt+1', hint: '打开 Bangumi 数据面板' },
-    { id: 'nav.enrich', label: '富化面板', defaultKey: 'Alt+2', hint: '打开新番表富化面板' },
-    { id: 'nav.clean', label: '清理面板', defaultKey: 'Alt+3', hint: '打开数据清理面板' },
-    { id: 'nav.highlight', label: '高亮面板', defaultKey: 'Alt+4', hint: '打开番剧高亮面板' },
+    {
+        id: 'nav.bangumi',
+        label: '主面板',
+        labelKey: 'shortcuts.action.navBangumi',
+        defaultKey: 'Alt+1',
+        hint: '打开 Bangumi 数据面板',
+        hintKey: 'shortcuts.action.navBangumiHint',
+    },
+    {
+        id: 'nav.enrich',
+        label: '富化面板',
+        labelKey: 'shortcuts.action.navEnrich',
+        defaultKey: 'Alt+2',
+        hint: '打开新番表富化面板',
+        hintKey: 'shortcuts.action.navEnrichHint',
+    },
+    {
+        id: 'nav.clean',
+        label: '清理面板',
+        labelKey: 'shortcuts.action.navClean',
+        defaultKey: 'Alt+3',
+        hint: '打开数据清理面板',
+        hintKey: 'shortcuts.action.navCleanHint',
+    },
+    {
+        id: 'nav.highlight',
+        label: '高亮面板',
+        labelKey: 'shortcuts.action.navHighlight',
+        defaultKey: 'Alt+4',
+        hint: '打开番剧高亮面板',
+        hintKey: 'shortcuts.action.navHighlightHint',
+    },
     {
         id: 'nav.conditionalFormat',
         label: '条件格式',
+        labelKey: 'shortcuts.action.navConditionalFormat',
         defaultKey: 'Alt+5',
         hint: '打开条件格式管理页',
+        hintKey: 'shortcuts.action.navConditionalFormatHint',
     },
-    { id: 'nav.settings', label: '设置页', defaultKey: 'Alt+6', hint: '打开设置页' },
+    {
+        id: 'nav.settings',
+        label: '设置页',
+        labelKey: 'shortcuts.action.navSettings',
+        defaultKey: 'Alt+6',
+        hint: '打开设置页',
+        hintKey: 'shortcuts.action.navSettingsHint',
+    },
 ];
 /** 动作 id → 动作定义（查表用，避免每次 find） */
 const ACTION_BY_ID = new Map(SHORTCUT_ACTIONS.map((action) => [action.id, action]));
+/** 动作名（设置页清单、aria-label 与冲突提示共用一份） */
+export function shortcutActionLabel(actionId) {
+    const action = ACTION_BY_ID.get(actionId);
+    return action === undefined ? actionId : tOr(action.labelKey, action.label);
+}
+/** 动作说明（清单行 hover 提示） */
+export function shortcutActionHint(action) {
+    return tOr(action.hintKey, action.hint);
+}
 /** 只按下修饰键时返回空串（不算一个组合） */
 const MODIFIER_KEY_NAMES = new Set(['Control', 'Alt', 'Shift', 'Meta', 'AltGraph', 'CapsLock']);
 /** 特殊键的展示名（其余键直接用大写字符 / 原名） */
@@ -91,7 +140,7 @@ export function normalizeKeyboardEvent(event) {
 }
 /** 组合串的展示名（空串 → 「未绑定」） */
 export function describeShortcut(combo) {
-    return combo === '' ? '未绑定' : combo;
+    return combo === '' ? tOr('shortcuts.unbound', '未绑定') : combo;
 }
 // ========== 存储读写 ==========
 /** 读取用户改过的绑定差异（`{ 动作 id: 组合串 }`），坏数据当空对象 */
@@ -198,18 +247,37 @@ export function setShortcutsEnabled(isEnabled) {
 }
 // ========== 鼠标快捷键（侧栏导航上的手势） ==========
 const MOUSE_ACTIONS = ['none', 'solo', 'hide'];
-/** 鼠标动作的中文名（设置页下拉用） */
+/** 鼠标动作的源语言名（设置页下拉用；实际展示走 `mouseActionLabel()`） */
 export const MOUSE_ACTION_LABELS = {
     none: '不响应',
     solo: '只显示该模块（专注）',
     hide: '隐藏该模块',
 };
+/** 鼠标动作 → 译文 key（与上面那张表一一对应） */
+export const MOUSE_ACTION_LABEL_KEYS = {
+    none: 'shortcuts.mouse.none',
+    solo: 'shortcuts.mouse.solo',
+    hide: 'shortcuts.mouse.hide',
+};
+/** 鼠标动作名（下拉选项与切换提示共用） */
+export function mouseActionLabel(action) {
+    return tOr(MOUSE_ACTION_LABEL_KEYS[action], MOUSE_ACTION_LABELS[action]);
+}
 const DEFAULT_MOUSE_SHORTCUTS = { middle: 'solo', ctrlClick: 'hide' };
-/** 槽位名 → 中文名 */
+/** 槽位名 → 源语言名（实际展示走 `mouseSlotLabel()`） */
 export const MOUSE_SLOT_LABELS = {
     middle: '中键点击导航项',
     ctrlClick: 'Ctrl + 左键点击导航项',
 };
+/** 槽位名 → 译文 key */
+const MOUSE_SLOT_LABEL_KEYS = {
+    middle: 'shortcuts.slot.middle',
+    ctrlClick: 'shortcuts.slot.ctrlClick',
+};
+/** 槽位名（下拉前的 label） */
+export function mouseSlotLabel(slot) {
+    return tOr(MOUSE_SLOT_LABEL_KEYS[slot], MOUSE_SLOT_LABELS[slot]);
+}
 function normalizeMouseAction(value) {
     return MOUSE_ACTIONS.includes(value)
         ? value

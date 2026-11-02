@@ -24,12 +24,16 @@
 export interface ShortcutAction {
     /** 稳定 id（存储键；改名会丢用户绑定，故不要随文案改） */
     id: string;
-    /** 设置页里显示的动作名 */
+    /** 设置页里显示的动作名（源语言原文，实际展示走 `shortcutActionLabel()`） */
     label: string;
+    /** 动作名的译文 key */
+    labelKey: string;
     /** 默认组合（空串 = 默认不绑定） */
     defaultKey: string;
-    /** 一句话说明 */
+    /** 一句话说明（源语言原文，实际展示走 `shortcutActionHint()`） */
     hint: string;
+    /** 说明的译文 key */
+    hintKey: string;
 }
 /**
  * 全部可绑定动作（唯一真相）
@@ -38,6 +42,10 @@ export interface ShortcutAction {
  * 各自有显式按钮，绑成全局键反而容易误触（尤其 Alt+S 与宿主菜单冲突）。
  */
 export declare const SHORTCUT_ACTIONS: readonly ShortcutAction[];
+/** 动作名（设置页清单、aria-label 与冲突提示共用一份） */
+export declare function shortcutActionLabel(actionId: string): string;
+/** 动作说明（清单行 hover 提示） */
+export declare function shortcutActionHint(action: ShortcutAction): string;
 /**
  * 把键盘事件规范成存储 / 比较用的组合串（修饰键固定顺序：Ctrl+Alt+Shift+Meta+键）
  *
@@ -75,8 +83,12 @@ export declare function setShortcutsEnabled(isEnabled: boolean): boolean;
 declare const MOUSE_ACTIONS: readonly ["none", "solo", "hide"];
 /** 侧栏导航上可用鼠标手势触发的动作 */
 export type MouseShortcutAction = (typeof MOUSE_ACTIONS)[number];
-/** 鼠标动作的中文名（设置页下拉用） */
+/** 鼠标动作的源语言名（设置页下拉用；实际展示走 `mouseActionLabel()`） */
 export declare const MOUSE_ACTION_LABELS: Readonly<Record<MouseShortcutAction, string>>;
+/** 鼠标动作 → 译文 key（与上面那张表一一对应） */
+export declare const MOUSE_ACTION_LABEL_KEYS: Readonly<Record<MouseShortcutAction, string>>;
+/** 鼠标动作名（下拉选项与切换提示共用） */
+export declare function mouseActionLabel(action: MouseShortcutAction): string;
 /** 两个可配置的鼠标手势槽位 */
 export interface MouseShortcutConfig {
     /** 中键点击导航项 */
@@ -84,8 +96,10 @@ export interface MouseShortcutConfig {
     /** Ctrl + 左键点击导航项 */
     ctrlClick: MouseShortcutAction;
 }
-/** 槽位名 → 中文名 */
+/** 槽位名 → 源语言名（实际展示走 `mouseSlotLabel()`） */
 export declare const MOUSE_SLOT_LABELS: Readonly<Record<keyof MouseShortcutConfig, string>>;
+/** 槽位名（下拉前的 label） */
+export declare function mouseSlotLabel(slot: keyof MouseShortcutConfig): string;
 /** 读取鼠标手势配置（坏数据逐槽回落默认值） */
 export declare function getMouseShortcuts(isSilent?: boolean): MouseShortcutConfig;
 /** 设置某个槽位的鼠标手势 */

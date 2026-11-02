@@ -43,8 +43,10 @@ export interface ExportNaming {
 export interface ExportSource {
     /** 唯一键，用于 `data-args` 与 {@link getExportSource} 查找 */
     key: string;
-    /** 中文名（设置页展示 + 文件名主体） */
+    /** 中文名（文件名主体 + 日志；界面提示走 `labelKey`） */
     label: string;
+    /** 界面提示用的译文 key（文件名仍用 `label`，导出文件里不掺译文） */
+    labelKey: string;
     /** CSV/TXT 表头 */
     headers: readonly string[];
     /** 取数（导出时才调用，避免启动时白读一次存储） */

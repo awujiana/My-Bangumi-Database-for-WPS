@@ -23,6 +23,9 @@ import type { LogLevel } from '../../tools/logger.js'
 import { bgmLog } from '../../tools/util/index.js'
 import { getAllEnrichRecords } from '../../sync/enrich-record.js'
 import { getAllSyncRecords } from '../../sync/sync-record.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 import { showToast } from '../dialog.js'
 
 /**
@@ -55,8 +58,10 @@ export interface ExportNaming {
 export interface ExportSource {
   /** 唯一键，用于 `data-args` 与 {@link getExportSource} 查找 */
   key: string
-  /** 中文名（设置页展示 + 文件名主体） */
+  /** 中文名（文件名主体 + 日志；界面提示走 `labelKey`） */
   label: string
+  /** 界面提示用的译文 key（文件名仍用 `label`，导出文件里不掺译文） */
+  labelKey: string
   /** CSV/TXT 表头 */
   headers: readonly string[]
   /** 取数（导出时才调用，避免启动时白读一次存储） */
@@ -89,6 +94,7 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
   {
     key: 'syncRecords',
     label: '同步记录',
+    labelKey: 'handlers.dataExport.label.syncRecords',
     headers: ['时间', '名称', '类型', '收藏类型', '状态', '数量', 'SID', 'URL', '来源', '消息'],
     getRows: () =>
       getAllSyncRecords().map((record) => [
@@ -107,11 +113,17 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
   {
     key: 'systemLogs',
     label: '系统日志',
+    labelKey: 'handlers.dataExport.label.systemLogs',
     headers: LOG_HEADERS,
     // 级别筛选只对本源有意义，故由本源决定文件名与提示要不要带级别
     getNaming: (options) =>
       options?.logLevel
-        ? { baseName: `系统日志-${options.logLevel}`, note: `（仅 ${options.logLevel}）` }
+        ? {
+            baseName: `系统日志-${options.logLevel}`,
+            note: tOr('handlers.dataExport.onlyLevel', '（仅 {level}）', {
+              level: options.logLevel,
+            }),
+          }
         : { baseName: '系统日志', note: '' },
     getRows: (options) =>
       getRecentLogs(options?.logLevel, 1000).map((entry) => [
@@ -123,6 +135,7 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
   {
     key: 'enrichRecords',
     label: '富化记录',
+    labelKey: 'handlers.dataExport.label.enrichRecords',
     headers: ['时间', '匹配方式', '名称', '行号', '富化字段', '原值', '新值', '动作', '备注'],
     getRows: () =>
       getAllEnrichRecords().map((record) => [
@@ -140,6 +153,7 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
   {
     key: 'cleanLogs',
     label: '清理日志',
+    labelKey: 'handlers.dataExport.label.cleanLogs',
     headers: LOG_HEADERS,
     getRows: () =>
       getOperationLogs(CLEAN_LOG_SCOPE).map((entry) => [
@@ -180,24 +194,43 @@ export function exportData(key: string, format: ExportFormat, options?: ExportOp
     baseName: source.label,
     note: '',
   }
+  // 文件名（baseName）保持中文，界面提示用译文；两者不能混用同一个字符串
+  const label = tOr(source.labelKey, source.label)
 
   let rows: ExportCell[][]
   try {
     rows = source.getRows(options)
   } catch (error: unknown) {
-    showToast(`${source.label}导出失败：${(error as Error).message}`, 'error')
+    showToast(
+      tOr('handlers.dataExport.failed', '{label}导出失败：{message}', {
+        label,
+        message: (error as Error).message,
+      }),
+      'error',
+    )
     bgmLog(LOG_LEVELS.ERROR, `[dataExport] ${source.label} 取数失败: ${(error as Error).message}`)
     return 0
   }
 
   if (rows.length === 0) {
-    showToast(`暂无${source.label}可导出${note}`, 'warning')
+    showToast(
+      tOr('handlers.dataExport.empty', '暂无{label}可导出{note}', { label, note }),
+      'warning',
+    )
     return 0
   }
 
   const count = exportRows(baseName, source.headers, rows, format)
   const formatLabel = format === 'csv' ? 'CSV' : 'TXT'
-  showToast(`已导出 ${String(count)} 条${source.label}${note} · ${formatLabel}`, 'success')
+  showToast(
+    tOr('handlers.dataExport.done', '已导出 {count} 条{label}{note} · {format}', {
+      count: String(count),
+      label,
+      note,
+      format: formatLabel,
+    }),
+    'success',
+  )
   bgmLog(
     LOG_LEVELS.INFO,
     `[dataExport] 导出 ${source.label} ${String(count)} 条${note}，格式 ${formatLabel}`,

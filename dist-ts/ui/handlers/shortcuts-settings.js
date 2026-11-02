@@ -13,12 +13,15 @@
  *    UI 只负责把占用者的中文名说清楚（两处各判一次必然会漂）。
  */
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js';
-import { findShortcutConflicts, getMouseShortcuts, getShortcutBindings, areShortcutsEnabled, MOUSE_ACTION_LABELS, MOUSE_SLOT_LABELS, normalizeKeyboardEvent, resetAllShortcutBindings, resetShortcutBinding, setMouseShortcut, setShortcutBinding, setShortcutsEnabled, SHORTCUT_ACTIONS, describeShortcut, } from '../../tools/shortcuts.js';
+import { findShortcutConflicts, getMouseShortcuts, getShortcutBindings, areShortcutsEnabled, MOUSE_ACTION_LABEL_KEYS, MOUSE_SLOT_LABELS, normalizeKeyboardEvent, resetAllShortcutBindings, resetShortcutBinding, setMouseShortcut, setShortcutBinding, setShortcutsEnabled, SHORTCUT_ACTIONS, describeShortcut, mouseActionLabel, mouseSlotLabel, shortcutActionHint, shortcutActionLabel, } from '../../tools/shortcuts.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 /** 正在录制新组合的动作 id（null = 未在录制） */
 let recordingActionId = null;
-/** 动作 id → 中文名（冲突提示里说「被谁占用」） */
+/** 动作 id → 动作名（冲突提示里说「被谁占用」；与清单行同一份文案） */
 function actionLabel(actionId) {
-    return SHORTCUT_ACTIONS.find((action) => action.id === actionId)?.label ?? actionId;
+    return shortcutActionLabel(actionId);
 }
 /** 渲染一条绑定行 */
 function buildRow(actionId, label, combo, hint) {
@@ -34,15 +37,18 @@ function buildRow(actionId, label, combo, hint) {
     key.className = 'bgm-btn small shortcut-key';
     key.dataset.shortcutRecord = actionId;
     key.textContent = describeShortcut(combo);
-    key.title = '点一下，然后按下要绑定的组合键（Esc 取消）';
-    key.setAttribute('aria-label', `${label} 当前绑定 ${describeShortcut(combo)}，点击可改绑`);
+    key.title = tOr('handlers.shortcuts.recordTitle', '点一下，然后按下要绑定的组合键（Esc 取消）');
+    key.setAttribute('aria-label', tOr('handlers.shortcuts.recordAria', '{label} 当前绑定 {combo}，点击可改绑', {
+        label,
+        combo: describeShortcut(combo),
+    }));
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'bgm-btn small';
     reset.dataset.shortcutReset = actionId;
     reset.textContent = '↩️';
-    reset.title = '恢复默认组合';
-    reset.setAttribute('aria-label', `${label} 恢复默认组合`);
+    reset.title = tOr('handlers.shortcuts.resetTitle', '恢复默认组合');
+    reset.setAttribute('aria-label', tOr('handlers.shortcuts.resetAria', '{label} 恢复默认组合', { label }));
     row.append(name, key, reset);
     return row;
 }
@@ -58,9 +64,21 @@ function renderConflicts() {
         return;
     }
     host.hidden = false;
-    host.textContent = `⚠️ 有 ${String(conflicts.length)} 组组合被重复占用：${conflicts
-        .map((item) => `${item.combo}（${item.actionIds.map((actionId) => actionLabel(actionId)).join('、')}）`)
-        .join('；')}`;
+    const nameSeparator = tOr('handlers.shortcuts.conflictSeparator', '、');
+    const itemSeparator = tOr('handlers.shortcuts.conflictItemSeparator', '；');
+    const list = conflicts
+        .map((item) => {
+        const names = item.actionIds.map((actionId) => actionLabel(actionId)).join(nameSeparator);
+        return tOr('handlers.shortcuts.conflictItem', '{combo}（{names}）', {
+            combo: item.combo,
+            names,
+        });
+    })
+        .join(itemSeparator);
+    host.textContent = tOr('handlers.shortcuts.conflicts', '⚠️ 有 {count} 组组合被重复占用：{list}', {
+        count: String(conflicts.length),
+        list,
+    });
 }
 /** 重渲染整份绑定清单 */
 export function renderShortcutList() {
@@ -72,7 +90,8 @@ export function renderShortcutList() {
     for (const action of SHORTCUT_ACTIONS) {
         const combo = bindings[action.id] ?? '';
         const isRecording = recordingActionId === action.id;
-        const row = buildRow(action.id, action.label, isRecording ? '按下按键…' : combo, action.hint);
+        const recordingText = tOr('handlers.shortcuts.recording', '按下按键…');
+        const row = buildRow(action.id, actionLabel(action.id), isRecording ? recordingText : combo, shortcutActionHint(action));
         if (isRecording)
             row.querySelector('.shortcut-key')?.classList.add('is-recording');
         host.append(row);
@@ -90,16 +109,18 @@ function renderMouseRows() {
         const row = document.createElement('div');
         row.className = 'form-group';
         const label = document.createElement('label');
-        label.textContent = `鼠标 · ${MOUSE_SLOT_LABELS[slot]}`;
+        label.textContent = tOr('handlers.shortcuts.mouseRow', '鼠标 · {slot}', {
+            slot: mouseSlotLabel(slot),
+        });
         label.htmlFor = `shortcutMouse-${slot}`;
         const select = document.createElement('select');
         select.className = 'input';
         select.id = `shortcutMouse-${slot}`;
         select.dataset.shortcutMouse = slot;
-        for (const [value, text] of Object.entries(MOUSE_ACTION_LABELS)) {
+        for (const value of Object.keys(MOUSE_ACTION_LABEL_KEYS)) {
             const option = document.createElement('option');
             option.value = value;
-            option.textContent = text;
+            option.textContent = mouseActionLabel(value);
             select.append(option);
         }
         select.value = config[slot];
@@ -120,7 +141,7 @@ function onRecordingKeyDown(event) {
     event.stopPropagation();
     if (event.key === 'Escape') {
         stopRecording();
-        showToast('已取消改绑', 'info');
+        showToast(tOr('handlers.shortcuts.cancelled', '已取消改绑'), 'info');
         return;
     }
     const combo = normalizeKeyboardEvent(event);
@@ -129,13 +150,23 @@ function onRecordingKeyDown(event) {
     const actionId = recordingActionId;
     const result = setShortcutBinding(actionId, combo);
     if (!result.ok) {
-        const holder = result.conflictWith === null ? '其它动作' : `「${actionLabel(result.conflictWith)}」`;
-        showToast(`组合 ${combo} 已被${holder}占用，未保存`, 'warn');
+        const holder = result.conflictWith === null
+            ? tOr('handlers.shortcuts.conflictOther', '其它动作')
+            : tOr('handlers.shortcuts.holderQuoted', '「{name}」', {
+                name: actionLabel(result.conflictWith),
+            });
+        showToast(tOr('handlers.shortcuts.conflict', '组合 {combo} 已被{holder}占用，未保存', {
+            combo,
+            holder,
+        }), 'warn');
         stopRecording();
         return;
     }
     bgmLog(LOG_LEVELS.INFO, `[shortcuts] 设置页改绑 ${actionId} → ${combo}`);
-    showToast(`「${actionLabel(actionId)}」已绑定 ${combo}`, 'success');
+    showToast(tOr('handlers.shortcuts.bound', '「{name}」已绑定 {combo}', {
+        name: actionLabel(actionId),
+        combo,
+    }), 'success');
     stopRecording();
 }
 /** 清单点击委托：改绑 / 恢复默认 / 全部恢复 */
@@ -156,22 +187,24 @@ function onListClick(event) {
     if (resetId !== undefined) {
         event.preventDefault();
         if (resetShortcutBinding(resetId)) {
-            showToast(`「${actionLabel(resetId)}」已恢复默认组合`, 'success');
+            showToast(tOr('handlers.shortcuts.resetOne', '「{name}」已恢复默认组合', {
+                name: actionLabel(resetId),
+            }), 'success');
             renderShortcutList();
         }
         else {
-            showToast('恢复默认失败', 'error');
+            showToast(tOr('handlers.shortcuts.resetFailed', '恢复默认失败'), 'error');
         }
         return;
     }
     if (target.closest('[data-shortcut-reset-all]') !== null) {
         event.preventDefault();
         if (resetAllShortcutBindings()) {
-            showToast('全部快捷键已恢复默认', 'success');
+            showToast(tOr('handlers.shortcuts.resetAll', '全部快捷键已恢复默认'), 'success');
             renderShortcutList();
         }
         else {
-            showToast('恢复默认失败', 'error');
+            showToast(tOr('handlers.shortcuts.resetFailed', '恢复默认失败'), 'error');
         }
     }
 }
@@ -185,10 +218,13 @@ function onMouseChange(event) {
         return;
     const action = target.value;
     if (setMouseShortcut(slot, action)) {
-        showToast(`${MOUSE_SLOT_LABELS[slot]}：${MOUSE_ACTION_LABELS[action]}`, 'success');
+        showToast(tOr('handlers.shortcuts.mouseSaved', '{slot}：{action}', {
+            slot: mouseSlotLabel(slot),
+            action: mouseActionLabel(action),
+        }), 'success');
     }
     else {
-        showToast('鼠标手势保存失败', 'error');
+        showToast(tOr('handlers.shortcuts.mouseSaveFailed', '鼠标手势保存失败'), 'error');
     }
 }
 /** 总开关变化 */
@@ -197,10 +233,12 @@ function onEnabledChange(event) {
     if (!(target instanceof HTMLInputElement))
         return;
     if (setShortcutsEnabled(target.checked)) {
-        showToast(target.checked ? '已启用全局快捷键' : '已停用全局快捷键', 'info');
+        showToast(target.checked
+            ? tOr('handlers.shortcuts.enabled', '已启用全局快捷键')
+            : tOr('handlers.shortcuts.disabled', '已停用全局快捷键'), 'info');
     }
     else {
-        showToast('快捷键开关保存失败', 'error');
+        showToast(tOr('handlers.shortcuts.switchSaveFailed', '快捷键开关保存失败'), 'error');
     }
 }
 /**

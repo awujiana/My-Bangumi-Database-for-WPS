@@ -15,6 +15,9 @@ import { CONFIG_KEYS, getConfig } from '../../tools/config.js';
 import { ORDERABLE_PAGES, PAGE_MODULES, getNavOrder, navModuleLabel, pageLabel, moveModuleBy, notifyNavOrderChanged, resetNavOrder, setNavOrder, } from '../../tools/nav-order.js';
 import { applyModuleState, canHideModule, getHiddenModules, NAV_MODULE_ID, toggleModuleHidden, } from '../../tools/module-state.js';
 import { escapeHtml } from '../../tools/string-utilities.js';
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js';
 import { createSortable, moveInArray } from '../components/sortable-list.js';
 /**
  * 渲染「功能导航（侧栏）」这一行
@@ -24,13 +27,16 @@ import { createSortable, moveInArray } from '../components/sortable-list.js';
  * 也复用同一个 `data-mod-hidden` 点击委托。
  */
 function buildNavRowHtml(page, isHidden) {
-    const hideTitle = isHidden ? '恢复显示侧栏功能导航' : '隐藏本页的侧栏功能导航';
+    const hideTitle = tOr(isHidden ? 'handlers.moduleOrder.titleShowNav' : 'handlers.moduleOrder.titleHideNav', isHidden ? '恢复显示侧栏功能导航' : '隐藏本页的侧栏功能导航');
+    const navName = tOr('handlers.moduleOrder.navName', '功能导航');
+    const navLabel = tOr('handlers.moduleOrder.navLabel', '功能导航（侧栏）');
+    const navAria = tOr(isHidden ? 'handlers.moduleOrder.ariaShow' : 'handlers.moduleOrder.ariaHide', isHidden ? '{name} 恢复显示' : '{name} 隐藏', { name: navName });
     return `
     <div class="module-order-nav-row${isHidden ? ' is-module-hidden' : ''}">
       <span class="module-order-ico" aria-hidden="true">🧭</span>
-      <span class="module-order-label">功能导航（侧栏）</span>
+      <span class="module-order-label">${navLabel}</span>
       <span class="module-order-btns">
-        <button class="bgm-btn small" data-mod-hidden="${NAV_MODULE_ID}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="功能导航 ${isHidden ? '恢复显示' : '隐藏'}">${isHidden ? '🚫' : '👁️'}</button>
+        <button class="bgm-btn small" data-mod-hidden="${NAV_MODULE_ID}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="${navAria}">${isHidden ? '🚫' : '👁️'}</button>
       </span>
     </div>`;
 }
@@ -42,7 +48,9 @@ function buildGroupHtml(page) {
     const order = getNavOrder(page);
     const byId = new Map(modules.map((module) => [module.id, module]));
     const label = pageLabel(page);
+    const resetOrderText = tOr('handlers.moduleOrder.resetOrder', '恢复默认顺序');
     const hidden = new Set(getHiddenModules(page));
+    const dragHint = tOr('handlers.moduleOrder.dragHint', '拖拽调整顺序（也可用键盘：Space 拾起、↑↓ 移动、Space 放置）');
     const items = order
         .map((id, index) => {
         const module = byId.get(id);
@@ -54,22 +62,28 @@ function buildGroupHtml(page) {
         const isHidden = hidden.has(id);
         // 编辑器所在模块禁止隐藏：隐藏后就没有入口能把任何模块恢复了
         const hideDisabled = canHideModule(page, id) ? '' : ' disabled';
-        let hideTitle = '在页面中隐藏此模块';
+        let hideTitle = tOr('handlers.moduleOrder.titleHideModule', '在页面中隐藏此模块');
         if (!canHideModule(page, id)) {
-            hideTitle = '本模块是排序编辑器自身，不可隐藏';
+            hideTitle = tOr('handlers.moduleOrder.titleSelfNotHidable', '本模块是排序编辑器自身，不可隐藏');
         }
         else if (isHidden) {
-            hideTitle = '恢复显示';
+            hideTitle = tOr('handlers.moduleOrder.titleShow', '恢复显示');
         }
+        // 三个按钮的 aria 都把模块名放在前面，读屏时能听出「哪个模块的什么操作」
+        const hideAria = tOr(isHidden ? 'handlers.moduleOrder.ariaShow' : 'handlers.moduleOrder.ariaHide', isHidden ? '{name} 恢复显示' : '{name} 隐藏', { name });
+        const upAria = tOr('handlers.moduleOrder.ariaUp', '{name} 上移', { name });
+        const downAria = tOr('handlers.moduleOrder.ariaDown', '{name} 下移', { name });
+        const upTitle = tOr('handlers.moduleOrder.titleUp', '上移');
+        const downTitle = tOr('handlers.moduleOrder.titleDown', '下移');
         return `
         <li class="module-order-item${isHidden ? ' is-module-hidden' : ''}" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}">
-          <span class="module-order-handle" title="拖拽调整顺序（也可用键盘：Space 拾起、↑↓ 移动、Space 放置）" aria-hidden="true">⋮⋮</span>
+          <span class="module-order-handle" title="${dragHint}" aria-hidden="true">⋮⋮</span>
           <span class="module-order-ico" aria-hidden="true">${escapeHtml(module.icon)}</span>
           <span class="module-order-label">${name}</span>
           <span class="module-order-btns">
-            <button class="bgm-btn small" data-mod-hidden="${escapeHtml(module.id)}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="${name} ${isHidden ? '恢复显示' : '隐藏'}"${hideDisabled}>${isHidden ? '🚫' : '👁️'}</button>
-            <button class="bgm-btn small" data-mod-move="up" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="上移" aria-label="${name} 上移"${isFirst ? ' disabled' : ''}>↑</button>
-            <button class="bgm-btn small" data-mod-move="down" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="下移" aria-label="${name} 下移"${isLast ? ' disabled' : ''}>↓</button>
+            <button class="bgm-btn small" data-mod-hidden="${escapeHtml(module.id)}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="${hideAria}"${hideDisabled}>${isHidden ? '🚫' : '👁️'}</button>
+            <button class="bgm-btn small" data-mod-move="up" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="${upTitle}" aria-label="${upAria}"${isFirst ? ' disabled' : ''}>↑</button>
+            <button class="bgm-btn small" data-mod-move="down" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="${downTitle}" aria-label="${downAria}"${isLast ? ' disabled' : ''}>↓</button>
           </span>
         </li>`;
     })
@@ -78,7 +92,7 @@ function buildGroupHtml(page) {
     <div class="module-order-group">
       <div class="module-order-head">
         <span class="module-order-title">${escapeHtml(label)}</span>
-        <button class="bgm-btn small" data-mod-reset="${escapeHtml(page)}">↩️ 恢复默认顺序</button>
+        <button class="bgm-btn small" data-mod-reset="${escapeHtml(page)}">↩️ ${resetOrderText}</button>
       </div>
       ${buildNavRowHtml(page, hidden.has(NAV_MODULE_ID))}
       <ul class="module-order-list" data-list-page="${escapeHtml(page)}">${items}</ul>
@@ -119,10 +133,12 @@ function onEditorClick(event) {
     const resetPage = button.dataset.modReset;
     if (resetPage) {
         if (resetNavOrder(resetPage)) {
-            afterOrderChanged(resetPage, `已恢复「${pageLabel(resetPage)}」默认顺序`);
+            afterOrderChanged(resetPage, tOr('handlers.moduleOrder.resetDone', '已恢复「{page}」默认顺序', {
+                page: pageLabel(resetPage),
+            }));
         }
         else {
-            showToast('恢复默认顺序失败', 'error');
+            showToast(tOr('handlers.moduleOrder.resetFailed', '恢复默认顺序失败'), 'error');
         }
         return;
     }
@@ -135,14 +151,20 @@ function onEditorClick(event) {
         const isNowHidden = getHiddenModules(hidePage).includes(hideId);
         if (isNowHidden === wasHidden) {
             // 状态没变 = 切换没生效（模块不可隐藏，或页面未知）
-            showToast('切换显示状态失败', 'error');
+            showToast(tOr('handlers.moduleOrder.toggleFailed', '切换显示状态失败'), 'error');
             return;
         }
         renderModuleOrderEditor();
         applyModuleState(hidePage);
         const isNavRow = hideId === NAV_MODULE_ID;
-        const targetName = isNavRow ? '功能导航' : '模块';
-        showToast(isNowHidden ? `${targetName}已隐藏，可在设置页恢复` : `${targetName}已恢复显示`, 'success');
+        const targetName = isNavRow
+            ? tOr('handlers.moduleOrder.targetNav', '功能导航')
+            : tOr('handlers.moduleOrder.targetModule', '模块');
+        showToast(isNowHidden
+            ? tOr('handlers.moduleOrder.hidden', '{target}已隐藏，可在设置页恢复', {
+                target: targetName,
+            })
+            : tOr('handlers.moduleOrder.shown', '{target}已恢复显示', { target: targetName }), 'success');
         bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${pageLabel(hidePage)} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`);
         return;
     }
@@ -153,10 +175,12 @@ function onEditorClick(event) {
         return;
     const offset = direction === 'up' ? -1 : 1;
     if (moveModuleBy(page, moduleId, offset)) {
-        afterOrderChanged(page, offset < 0 ? '已上移' : '已下移');
+        afterOrderChanged(page, offset < 0
+            ? tOr('handlers.moduleOrder.movedUp', '已上移')
+            : tOr('handlers.moduleOrder.movedDown', '已下移'));
     }
     else {
-        showToast('调整顺序失败', 'error');
+        showToast(tOr('handlers.moduleOrder.moveFailed', '调整顺序失败'), 'error');
     }
 }
 /** 轮询间隔（ms），与 nav-order / nav-mode 的跨页同步保持一致 */
@@ -260,10 +284,10 @@ function bindSortables() {
                 const toIndex = event.placeAfter ? overIndex + 1 : overIndex;
                 const next = moveInArray(order, fromIndex, toIndex);
                 if (!setNavOrder(page, next)) {
-                    showToast('调整顺序失败', 'error');
+                    showToast(tOr('handlers.moduleOrder.moveFailed', '调整顺序失败'), 'error');
                     return;
                 }
-                afterOrderChanged(page, '顺序已更新');
+                afterOrderChanged(page, tOr('handlers.moduleOrder.orderUpdated', '顺序已更新'));
             },
         }));
     });

@@ -27,6 +27,9 @@ import {
 } from '../../index.js'
 
 import { _T } from './_constants.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 // ========== 业务对话框 ==========
 
@@ -40,7 +43,7 @@ export function showTokenDialog(currentToken?: string): void {
       updateTokenStatus()
       showToast(_T.tokenSaved, 'success')
     } else {
-      showToast('Token 不能为空', 'warn')
+      showToast(tOr('handlers.token.emptyToken', 'Token 不能为空'), 'warn')
     }
   })
 }
@@ -53,7 +56,7 @@ export function showUserIdDialog(): void {
       updateUserIdStatus()
       showToast(_T.userIdSaved, 'success')
     } else {
-      showToast('用户 ID 不能为空', 'warn')
+      showToast(tOr('handlers.token.emptyUserId', '用户 ID 不能为空'), 'warn')
     }
   })
 }
@@ -104,13 +107,19 @@ export function updateTokenStatus(): void {
             // 常见原因：被 GFW 墙、断网、DNS 失败
             // 橙色警告
             tokenStatus.style.color = '#ff9800'
-            tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...) ⚠ 网络无法连接`
+            tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...) ${tOr(
+              'handlers.token.networkStatus',
+              '⚠ 网络无法连接',
+            )}`
             bgmLog(
               LOG_LEVELS.WARN,
               '[updateTokenStatus] 网络错误：无法连接到 BGM API（可能被 GFW 墙）',
             )
             showToast(
-              'Token 已设置，但无法连接到 Bangumi API\n可能原因：网络被墙（GFW）或断网\nToken 本身可能有效，请在网络恢复后重试',
+              tOr(
+                'handlers.token.networkToast',
+                'Token 已设置，但无法连接到 Bangumi API\n可能原因：网络被墙（GFW）或断网\nToken 本身可能有效，请在网络恢复后重试',
+              ),
               'warn',
             )
             // 离线时仍显示本地缓存的过期信息
@@ -121,7 +130,7 @@ export function updateTokenStatus(): void {
           } else if (errorType === 'http') {
             // HTTP 错误（如 401）：Token 失效
             tokenStatus.style.color = '#f44336'
-            tokenStatus.textContent = `${_T.set} (Token 可能失效)`
+            tokenStatus.textContent = `${_T.set} (${tOr('handlers.token.invalidStatus', 'Token 可能失效')})`
             bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效')
           }
           // errorType === 'parse' 或 'none'：保持原显示
@@ -318,10 +327,23 @@ export function testTokenValidity(): void {
               LOG_LEVELS.INFO,
               `[testTokenValidity] 📅 Token 剩余时间: ${remaining.label} | 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
             )
-            showToast(`✅ Token 有效 | 用户: ${nickname} | ${remaining.label}`, 'success')
+            showToast(
+              tOr(
+                'handlers.token.validWithRemaining',
+                '✅ Token 有效 | 用户: {user} | {remaining}',
+                {
+                  user: nickname,
+                  remaining: remaining.label,
+                },
+              ),
+              'success',
+            )
           } catch {
             bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
-            showToast(`✅ Token 有效 | 用户: ${nickname}`, 'success')
+            showToast(
+              tOr('handlers.token.valid', '✅ Token 有效 | 用户: {user}', { user: nickname }),
+              'success',
+            )
           }
         })()
       } catch (error: unknown) {
@@ -343,7 +365,12 @@ export function testTokenValidity(): void {
         `[testTokenValidity] Token 验证失败，HTTP 状态码: ${String(xhr.status)}`,
       )
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`)
-      showError('错误', `Token验证失败 (HTTP ${String(xhr.status)})`)
+      showError(
+        tOr('common.error', '错误'),
+        tOr('handlers.token.verifyFailed', 'Token验证失败 (HTTP {status})', {
+          status: String(xhr.status),
+        }),
+      )
     }
   })
 
@@ -360,7 +387,10 @@ export function testTokenValidity(): void {
     const requestEndTime = Date.now()
     const duration = requestEndTime - requestStartTime
     bgmLog(LOG_LEVELS.WARN, `[testTokenValidity] 请求超时（15s），耗时: ${String(duration)}ms`)
-    showError('网络超时，请重试', '超时')
+    showError(
+      tOr('handlers.token.timeoutTitle', '网络超时，请重试'),
+      tOr('handlers.token.timeoutMsg', '超时'),
+    )
   }
 
   bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 正在发送请求...`)

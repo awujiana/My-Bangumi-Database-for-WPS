@@ -18,6 +18,9 @@ import {
   didUpsertAccount,
 } from '../../tools/accounts.js'
 import type { AccountRecord } from '../../tools/accounts.js'
+// tOr 直连 locale-store：i18n/index 桶会经 locale-install 拉进 ts/index（模块顶层写 window），
+// node 单测一 import 就 ReferenceError。别改回桶。
+import { tOr } from '../../i18n/locale-store.js'
 
 /** 长按判定时长（ms） */
 const LONG_PRESS_MS = 550
@@ -28,14 +31,21 @@ const MENU_ID = 'accountSwitcherMenu'
 /** 当前生效账号的用户名（档案里没有时退回 userId） */
 function displayName(account: AccountRecord, activeId: string): string {
   const name = account.username === '' ? account.userId : account.username
-  return account.userId === activeId ? `${name}（当前）` : name
+  return account.userId === activeId
+    ? tOr('handlers.accounts.currentSuffix', '{name}（当前）', { name })
+    : name
 }
 
 /** 切换成功后统一收尾：关浮层 + 重渲染列表 + 提示 */
 function afterSwitch(account: AccountRecord): void {
   closeAccountMenu()
   renderAccountList()
-  showToast(`已切换到「${account.username === '' ? account.userId : account.username}」`, 'success')
+  showToast(
+    tOr('handlers.accounts.switched', '已切换到「{name}」', {
+      name: account.username === '' ? account.userId : account.username,
+    }),
+    'success',
+  )
   bgmLog(LOG_LEVELS.INFO, `[accounts] 已切换账号: ${account.userId}`)
 }
 
@@ -50,8 +60,10 @@ export function renderAccountList(): void {
   if (accounts.length === 0) {
     const empty = document.createElement('p')
     empty.className = 'hint'
-    empty.textContent =
-      '还没有记录任何账号。先在上面填好 Token 并点「测试 Token」识别用户，再点下面的「记录当前账号」。'
+    empty.textContent = tOr(
+      'handlers.accounts.emptyList',
+      '还没有记录任何账号。先在上面填好 Token 并点「测试 Token」识别用户，再点下面的「记录当前账号」。',
+    )
     host.append(empty)
     return
   }
@@ -73,7 +85,10 @@ export function renderAccountList(): void {
     switchButton.type = 'button'
     switchButton.className = 'bgm-btn small'
     switchButton.dataset.accountSwitch = account.userId
-    switchButton.textContent = account.userId === activeId ? '使用中' : '切换'
+    switchButton.textContent =
+      account.userId === activeId
+        ? tOr('handlers.accounts.inUse', '使用中')
+        : tOr('handlers.accounts.switch', '切换')
     switchButton.disabled = account.userId === activeId
 
     const accountDeleteButton = document.createElement('button')
@@ -81,8 +96,14 @@ export function renderAccountList(): void {
     accountDeleteButton.className = 'bgm-btn small'
     accountDeleteButton.dataset.accountRemove = account.userId
     accountDeleteButton.textContent = '🗑️'
-    accountDeleteButton.title = '从列表移除（不影响当前 Token）'
-    accountDeleteButton.setAttribute('aria-label', `移除账号 ${account.userId}`)
+    accountDeleteButton.title = tOr(
+      'handlers.accounts.removeTitle',
+      '从列表移除（不影响当前 Token）',
+    )
+    accountDeleteButton.setAttribute(
+      'aria-label',
+      tOr('handlers.accounts.removeAria', '移除账号 {id}', { id: account.userId }),
+    )
 
     row.append(name, meta, switchButton, accountDeleteButton)
     host.append(row)
@@ -107,12 +128,15 @@ function showAccountMenu(anchor: HTMLElement): void {
   menu.id = MENU_ID
   menu.className = 'account-menu'
   menu.setAttribute('role', 'menu')
-  menu.setAttribute('aria-label', '切换账号')
+  menu.setAttribute('aria-label', tOr('handlers.accounts.menuAria', '切换账号'))
 
   if (accounts.length === 0) {
     const hint = document.createElement('p')
     hint.className = 'account-menu-hint'
-    hint.textContent = '还没有记录账号。到「设置 → 账号」里记录当前 Token 后可在这里一键切换。'
+    hint.textContent = tOr(
+      'handlers.accounts.menuEmpty',
+      '还没有记录账号。到「设置 → 账号」里记录当前 Token 后可在这里一键切换。',
+    )
     menu.append(hint)
   }
 
@@ -131,7 +155,7 @@ function showAccountMenu(anchor: HTMLElement): void {
   manage.type = 'button'
   manage.className = 'account-menu-item account-menu-manage'
   manage.dataset.accountManage = '1'
-  manage.textContent = '⚙️ 在设置页管理账号…'
+  manage.textContent = tOr('handlers.accounts.manage', '⚙️ 在设置页管理账号…')
   menu.append(manage)
 
   const rect = anchor.getBoundingClientRect()
@@ -150,21 +174,22 @@ function onAccountClick(event: Event): void {
     event.preventDefault()
     const account = switchAccount(switchId)
     if (account === null) {
-      showToast('切换失败：该账号不在记录里', 'error')
+      showToast(tOr('handlers.accounts.switchFailed', '切换失败：该账号不在记录里'), 'error')
       return
     }
     afterSwitch(account)
     return
   }
 
-  const accountDeleteId = target.closest<HTMLElement>('[data-account-remove]')?.dataset.accountRemove
+  const accountDeleteId =
+    target.closest<HTMLElement>('[data-account-remove]')?.dataset.accountRemove
   if (accountDeleteId !== undefined && accountDeleteId !== '') {
     event.preventDefault()
     if (removeAccount(accountDeleteId)) {
       renderAccountList()
-      showToast('已从账号列表移除（当前 Token 未变）', 'info')
+      showToast(tOr('handlers.accounts.removed', '已从账号列表移除（当前 Token 未变）'), 'info')
     } else {
-      showToast('移除失败', 'error')
+      showToast(tOr('handlers.accounts.removeFailed', '移除失败'), 'error')
     }
     return
   }
@@ -173,21 +198,27 @@ function onAccountClick(event: Event): void {
     event.preventDefault()
     const token = loadBgToken()
     if (!token) {
-      showToast('当前还没有 Token，请先在上方填写并保存', 'warn')
+      showToast(tOr('handlers.accounts.noToken', '当前还没有 Token，请先在上方填写并保存'), 'warn')
       return
     }
     const userId = getActiveUserId(true)
     if (userId === '') {
-      showToast('还不知道用户 ID：先点「测试 Token」识别，再回来记录', 'warn')
+      showToast(
+        tOr('handlers.accounts.noUserId', '还不知道用户 ID：先点「测试 Token」识别，再回来记录'),
+        'warn',
+      )
       return
     }
     const nameElement = document.getElementById('userNameDisplay')
     const username = nameElement === null ? '' : nameElement.textContent.trim()
     if (didUpsertAccount({ userId, token, username })) {
       renderAccountList()
-      showToast('已记录当前账号，之后可长按头像一键切换', 'success')
+      showToast(
+        tOr('handlers.accounts.recorded', '已记录当前账号，之后可长按头像一键切换'),
+        'success',
+      )
     } else {
-      showToast('记录失败', 'error')
+      showToast(tOr('handlers.accounts.recordFailed', '记录失败'), 'error')
     }
     return
   }
@@ -195,7 +226,7 @@ function onAccountClick(event: Event): void {
   if (target.closest('[data-account-manage]') !== null) {
     closeAccountMenu()
     // 设置页由 ribbon / 面板的 openSettings 负责打开；这里只关浮层并提示
-    showToast('请到「设置 → 👤 账号」管理账号', 'info')
+    showToast(tOr('handlers.accounts.goSettings', '请到「设置 → 👤 账号」管理账号'), 'info')
   }
 }
 
