@@ -316,7 +316,14 @@ export interface SheetInspection {
   headers: string[]
   /** 是否识别为月历式新番表（无「名称」表头） */
   isXinFan: boolean
-  /** 是否具备「名称」列（含新番表锚点列推导；仅作展示信息，不再作为入选门槛） */
+  /**
+   * 是否具备**标准**「名称」列（表头即「名称」，行级规则可用）
+   *
+   * 新番表的名称列由锚点推导（表头本身为空），而行级规则走 `readSheetLayout`、
+   * 只认标准表头 —— 那列对行级规则不可用。此处如实返回 `false`，避免
+   * 「页面说有名称列、重复名称规则却跳过」的判定不一致。
+   * 仅作展示信息，不作入选门槛（入选看 {@link isBangumiSheet}）。
+   */
   hasNameColumn: boolean
   /** 是否识别为 Bangumi 数据表（命中特征列，或命中月历式新番表签名） */
   isBangumiSheet: boolean
@@ -417,7 +424,9 @@ export function inspectWorksheet(worksheet: WpsWorksheet): SheetInspection {
 
   const lastRow = readLastRow(worksheet)
   const dataRows = headerRow > 0 ? Math.max(0, lastRow - headerRow) : Math.max(0, lastRow - 1)
-  const hasNameColumn = columnMap.has('名称')
+  // 新番表的「名称」列由锚点推导（表头本身为空），而行级规则走 `readSheetLayout`
+  // 只认标准表头 → 那列对行级规则不可用。判定与规则能力保持一致，故排除新番表路径。
+  const hasNameColumn = !isXinFan && columnMap.has('名称')
   // 身份判定：命中特征列（名称 / Bangumi_URL），或命中月历式新番表专属签名
   const isBangumiSheet = hasIdentityColumn(columnMap) || isXinFan
 

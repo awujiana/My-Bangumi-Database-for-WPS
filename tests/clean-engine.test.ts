@@ -298,7 +298,7 @@ describe('listCleanTargets · 配置过滤', () => {
   })
 
   it('月历式新番表（无「名称」表头）按专属签名入选，并映射名称列与 TAGS 列', () => {
-    mockWorkbookSheet('2026年4月新番表')
+    const worksheet = mockWorkbookSheet('2026年4月新番表')
     // 标准路径失败 → 走新番表签名
     mocks.findHeaderRow.mockReturnValue(0)
     // 表头行（行2）命中签名：周更时间(D4) / 播放平台(F6) / 集数(L12) / TAGS(N14)
@@ -325,6 +325,15 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(columnMap?.get('名称')).toBe(3)
     // TAGS 列复用「标签/分级」键
     expect(columnMap?.get('标签/分级')).toBe(14)
+
+    // 判定统一：锚点推导出的名称列对行级规则不可用（readSheetLayout 只认标准表头），
+    // 因此 hasNameColumn 必须为 false —— 否则页面显示「有名称列」而「重复名称」规则却跳过。
+    const info = inspectWorksheet(worksheet as CleanTargetInfo['worksheet'])
+    expect(info.isXinFan).toBe(true)
+    expect(info.hasNameColumn).toBe(false)
+    // 但不影响入选：新番表走 isXinFan 签名，仍可清理
+    expect(info.isBangumiSheet).toBe(true)
+    expect(info.eligible).toBe(true)
   })
 
   it('新番表表头未命中签名时仍按标准「名称」要求跳过', () => {
