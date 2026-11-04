@@ -10,8 +10,8 @@ export default {
   "code": "zh-TW",
   "name": "Traditional Chinese",
   "nativeName": "繁體中文",
-  "version": "2.5.0",
-  "updatedAt": "2026-11-04T21:36",
+  "version": "2.5.1",
+  "updatedAt": "2026-11-04T21:57",
   "messages": {
     "ribbon.pluginGroup": "外掛",
     "ribbon.buttonOpenPluginMarket": "外掛市集",

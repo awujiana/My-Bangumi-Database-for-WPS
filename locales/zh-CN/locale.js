@@ -10,8 +10,8 @@ export default {
   "code": "zh-CN",
   "name": "Simplified Chinese",
   "nativeName": "简体中文",
-  "version": "2.5.0",
-  "updatedAt": "2026-11-04T21:36",
+  "version": "2.5.1",
+  "updatedAt": "2026-11-04T21:57",
   "messages": {
     "ribbon.pluginGroup": "插件",
     "ribbon.buttonOpenPluginMarket": "插件市场",

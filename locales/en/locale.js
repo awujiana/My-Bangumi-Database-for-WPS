@@ -15,8 +15,8 @@ export default {
   "code": "en",
   "name": "English",
   "nativeName": "English",
-  "version": "2.5.0",
-  "updatedAt": "2026-11-04T21:36",
+  "version": "2.5.1",
+  "updatedAt": "2026-11-04T21:57",
   "messages": {
     "ribbon.pluginGroup": "Plugins",
     "ribbon.buttonOpenPluginMarket": "Plugin market",
