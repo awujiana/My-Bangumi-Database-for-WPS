@@ -308,6 +308,9 @@ export function parsePluginManifest(input, hostVersion) {
     const license = readOptionalString(input, 'license');
     if (license !== undefined)
         manifest.license = license;
+    const dataSourceVersion = readOptionalString(input, 'dataSourceVersion');
+    if (dataSourceVersion !== undefined)
+        manifest.dataSourceVersion = dataSourceVersion;
     if (network !== undefined)
         manifest.network = network;
     const features = readFeatures(input);

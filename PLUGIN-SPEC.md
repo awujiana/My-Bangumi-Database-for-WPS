@@ -59,6 +59,7 @@
   "version": "1.2.0",
   "apiVersion": "1.0.0",
   "minHostVersion": "2.5.0",
+  "dataSourceVersion": "2026H2-2026-11-04-c9d24809",
   "description": "一键把 H萌字幕组的新番表下载成本地 Excel，并按标准字段整理进你的番组数据库。",
   "author": "awujiana",
   "homepage": "https://github.com/awujiana/MBD-plugin-hmacg",
@@ -91,7 +92,8 @@
 | `name` | ✅ | 展示名，≤ 24 字符。 |
 | `version` | ✅ | 语义化版本 `MAJOR.MINOR.PATCH`。**无感更新只认这个字段**，改了代码必须改它。 |
 | `apiVersion` | ✅ | 插件所依赖的宿主 API 版本。宿主按 `MAJOR` 判兼容（见第 8 节）。 |
-| `minHostVersion` | ✅ | 低于此版本宿主拒绝加载，市场页显示「需要 MBD ≥ x.y.z」。 |
+| `minHostVersion` | ✅ | 低于此版本宿主拒绝加载，市场页显示「支持 MBD ≥ x.y.z」。 |
+| `dataSourceVersion` | 条件 | 插件自带数据源的版本标识（如 `2026H2-2026-11-04-c9d24809`）。**带数据源的插件必填**，须与 `data/manifest.json` 的 `dataVersion` 完全一致；纯工具型插件可省略。市场页显示为「数据源 v…」。 |
 | `description` | ✅ | 一句话功能描述，≤ 120 字，市场页直接展示。**写清「做什么」而不是「怎么实现」**。 |
 | `author` | ✅ | 作者名或 GitHub 账号。 |
 | `homepage` | 建议 | 仓库地址，市场页给「查看源码」用。 |
@@ -104,12 +106,30 @@
 | `checksum` | ✅ | 每个文件的 `sha256` + `size`。宿主下载后逐一比对，不一致直接拒装。 |
 | `signature` | 强烈建议 | 作者签名，见第 7 节。**没有它用户会看到「未签名」并需要二次确认**；有它且验签通过才显示「作者已验证」。 |
 
-### 版本号规则
+### 三项版本信息
 
-- `version` **单调递增**。宿主只做「新版本 > 旧版本」判断，降级需要用户手动「重装」。
-- 改 `plugin.js` 必须同时改 `version` 并重算 `checksum` —— 否则用户永远收不到更新
-  （宿主认为版本没变）。
+市场页「待确认」与「已安装」卡片都显示同一行版本信息，装之前和装完看到的口径一致：
+
+| 信息 | 字段 | 回答的问题 | 什么时候改 |
+| --- | --- | --- | --- |
+| 插件版本 | `version` | 「装的是哪个版本的插件代码？」 | 改 `plugin.js` 时，且必须同时重算 `checksum` |
+| 数据源版本 | `dataSourceVersion` | 「这份插件带的是哪一批数据？」 | 数据内容变了就改（不改插件代码也能改它） |
+| 支持 MBD 最低版本 | `minHostVersion` | 「哪个版本以上的宿主能装？」 | 用到新版宿主 API 时改 |
+
+规则：
+
+- `version` **单调递增**，语义化版本 `MAJOR.MINOR.PATCH`。宿主只做「新版本 > 旧版本」
+  判断，降级需要用户手动「重装」；**无感更新只认这个字段**。
 - `apiVersion` 与 `version` 无关：改插件功能升 `version`；只有用上新宿主 API 才升 `apiVersion`。
+- `dataSourceVersion` 是**数据快照**的版本，不是代码版本：数据更新时它可以单独变，
+  `version` 不必跟着升。它必须与数据清单里的 `dataVersion` 一致（见 §9.1），否则用户
+  看到的版本和数据对不上。该字段属于展示信息，**不参与签名**。
+- 首批两个数据源仓库用 `<期号>-<更新日期>-<分片 sha256 前 8 位>` 作 `dataVersion`
+  （如 `2026H2-2026-11-04-c9d24809`）：`scripts/fetch.mjs` 生成后自动写回 `plugin.json`。
+  内容哈希保证「同一天内数据变了、版本也跟着变」；格式可自定，但**内容变了就必须变**，
+  且清单与 `dataSourceVersion` 必须逐字符一致。
+- 三项都会写进 `bgm_plugins_index`，页面重载后「已安装」列表仍然显示完整版本信息。
+- `minHostVersion` 由宿主在解析清单时校验：当前 MBD 版本低于它就拒绝安装。
 
 ---
 
@@ -324,8 +344,9 @@ checksum:<文件>:<sha256>:<size>（文件按码位升序，逗号分隔）
 
 - 分隔符是 `\n`（LF），**末尾不带换行**；排序一律按码位，不用 `localeCompare`
   —— 否则同一个清单在不同语言的机器上会算出不同签名。
-- `name` / `description` / `features` **不参与签名**：改文案不该导致重签，而它们
-  被篡改最多让界面显示错乱，不会改变插件的行为边界。
+- `name` / `description` / `features` / `dataSourceVersion` **不参与签名**：改文案
+  或数据快照版本不该导致重签，而它们被篡改最多让界面显示错乱，不会改变插件的行为边界
+  （数据文件本身由 `data/manifest.json` 里的 sha256 保护）。
 - 因为 `checksum` 在签名范围内，而 `checksum` 锁住了 `plugin.js` 的 sha256，
   所以**签清单等价于签代码**，不需要单独给代码签名。
 
@@ -386,8 +407,8 @@ node scripts/plugin-sign.mjs --manifest plugin.json --key ~/.mbd-plugin-signing-
 main 分支：
   plugin.json            # 必须
   plugin.js              # 必须
-  data/manifest.json     # 插件自带数据时（数据源仓库的清单）
-  data/*.jsonlines.gz    # 插件自带数据时
+  data/manifest.json     # 含 dataVersion（fetch.mjs 生成，含分片内容哈希短码）
+  data/*.jsonlines       # 纯文本 UTF-8，不 gzip（宿主 net.fetch 只返回文本）
   scripts/               # 数据抓取与发布脚本（不参与运行）
   .github/workflows/     # 数据同步（频率待定）
 ```
@@ -478,6 +499,7 @@ export async function activate(context) {
 ## 12. 提交前检查清单
 
 - [ ] `plugin.json` 的 `version` 比上一版大；
+- [ ] `dataSourceVersion` 与 `data/manifest.json` 的 `dataVersion` 一致（有数据源时）；
 - [ ] `checksum` 与实际文件一致（跑过 `plugin:manifest`）；
 - [ ] `signature` 是在 `checksum` **之后**签的（顺序错了必然验签失败）；
 - [ ] `permissions` 与实际调用一致 —— **没用到的不声明**，用到的必须声明；
@@ -494,5 +516,6 @@ export async function activate(context) {
 
 | 规范版本 | 日期 | 变更 |
 | --- | --- | --- |
+| 1.2 | 2026-11-04 | 加「三项版本信息」（插件版本 / 数据源版本 / 支持 MBD 最低版本，§3）；README 与市场页加入规范文档入口 |
 | 1.1 | 2026-11-04 | 加清单签名（§7.1）、首批两插件仓库（§9.1）、插件自带 Ribbon 按钮的将来机制（§5.8） |
 | 1.0 | 2026-11-04 | 首版，对应宿主 MBD v2.5.0 / `apiVersion` 1.0.0 |

@@ -225,6 +225,11 @@ export async function installPlugin(rootUrl, source, hostVersion, options = {}) 
     // 白名单要跟着索引走：下次开页面用索引重建清单，没有它 net.fetch 会全被拒
     if (manifest.network !== undefined)
         record.network = [...manifest.network];
+    // 三项版本信息也要跟着索引走：页面重载后「已安装」列表只认索引，不认远程清单
+    record.minHostVersion = manifest.minHostVersion;
+    if (manifest.dataSourceVersion !== undefined) {
+        record.dataSourceVersion = manifest.dataSourceVersion;
+    }
     upsertPluginRecord(record);
     if (findPluginRecord(manifest.id) === null) {
         return { ok: false, reason: '写入插件索引失败（PluginStorage 不可用）' };

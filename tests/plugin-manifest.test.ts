@@ -65,6 +65,28 @@ describe('parsePluginManifest · 正常路径', () => {
     expect(manifest.signature).toBeUndefined()
     expect(manifest.network).toBeUndefined()
     expect(manifest.features).toBeUndefined()
+    expect(manifest.dataSourceVersion).toBeUndefined()
+  })
+
+  it('三项版本信息：version / minHostVersion / dataSourceVersion 各自独立', () => {
+    const manifest = manifestOf({
+      ...validManifest(),
+      version: '1.0.1',
+      minHostVersion: '2.4.1',
+      dataSourceVersion: '2026H2-2026-11-04',
+    })
+    expect(manifest.version).toBe('1.0.1')
+    expect(manifest.minHostVersion).toBe('2.4.1')
+    expect(manifest.dataSourceVersion).toBe('2026H2-2026-11-04')
+  })
+
+  it('dataSourceVersion 不是字符串时被忽略（脏字段不该污染市场页展示）', () => {
+    expect(
+      manifestOf({ ...validManifest(), dataSourceVersion: 42 }).dataSourceVersion,
+    ).toBeUndefined()
+    expect(
+      manifestOf({ ...validManifest(), dataSourceVersion: null }).dataSourceVersion,
+    ).toBeUndefined()
   })
 
   it('可选字段被带上，且 network 统一小写', () => {
@@ -291,6 +313,14 @@ describe('pluginSignaturePayload', () => {
   it('没有 network 时该行是空串（不是省略该行）', () => {
     const payload = pluginSignaturePayload(manifestOf(validManifest()))
     expect(payload).toContain('\nnetwork:\n')
+  })
+
+  it('dataSourceVersion 不参与签名（数据更新不必重签，旧宿主验签也不失效）', () => {
+    const withData = pluginSignaturePayload(
+      manifestOf({ ...validManifest(), dataSourceVersion: '2026H2-2026-11-05' }),
+    )
+    expect(withData).toBe(pluginSignaturePayload(manifestOf(validManifest())))
+    expect(withData).not.toContain('2026H2')
   })
 })
 

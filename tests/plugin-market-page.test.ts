@@ -35,11 +35,18 @@ const m = vi.hoisted(() => ({
   checkPluginUpdates: vi.fn(),
   startPluginUpdateLoop: vi.fn(),
   bgmLog: vi.fn(),
+  getApp: vi.fn(),
+  copyTextWithResult: vi.fn(),
+  shellExecute: vi.fn(),
 }))
 
 vi.mock('../ts/i18n/locale-store.js', () => ({ tOr: m.tOr }))
 vi.mock('../ts/ui/dialog.js', () => ({ confirmAsync: m.confirmAsync, showToast: m.showToast }))
-vi.mock('../ts/tools/util/index.js', () => ({ bgmLog: m.bgmLog }))
+vi.mock('../ts/tools/util/index.js', () => ({
+  bgmLog: m.bgmLog,
+  getApp: m.getApp,
+  copyTextWithResult: m.copyTextWithResult,
+}))
 vi.mock('../ts/tools/update-check.js', () => ({ CURRENT_VERSION: '2.4.1' }))
 vi.mock('../ts/plugins/plugin-market.js', () => ({
   fetchPluginManifest: m.fetchPluginManifest,
@@ -70,6 +77,7 @@ const BODY_HTML = `
     <input id="pluginSourceInput" type="text" />
     <button id="pluginInstallButton">安装 / 更新</button>
     <input id="pluginDevModeToggle" type="checkbox" />
+    <a id="pluginSpecLink" href="https://github.com/awujiana/My-Bangumi-Database-for-WPS/blob/main/PLUGIN-SPEC.md"></a>
     <p id="pluginSourceMessage"></p>
     <span id="pluginInstalledCount"></span>
     <div id="pluginInstalledList"></div>
@@ -126,7 +134,8 @@ function byId(id: string): HTMLElement {
 
 /** 点一下并让微任务跑完 */
 async function click(node: HTMLElement): Promise<void> {
-  node.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  // cancelable 让页面里的 preventDefault() 真的生效：否则 jsdom 会对 <a> 报「导航未实现」
+  node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   await vi.waitFor(() => {})
 }
 
@@ -146,6 +155,8 @@ beforeEach(() => {
     }
     return text
   })
+  m.getApp.mockReturnValue({ OAAssist: { ShellExecute: m.shellExecute } })
+  m.copyTextWithResult.mockReturnValue({ ok: true })
   m.confirmAsync.mockResolvedValue(true)
   m.loadPluginIndex.mockReturnValue({ schemaVersion: 1, plugins: [] })
   m.startPluginUpdateLoop.mockReturnValue(() => {})
@@ -554,5 +565,105 @@ describe('其它交互', () => {
     expect(m.startPluginUpdateLoop).toHaveBeenCalled()
     window.dispatchEvent(new Event('beforeunload'))
     expect(stop).toHaveBeenCalled()
+  })
+})
+
+describe('三项版本信息', () => {
+  it('待确认卡片把插件版本 / 数据源版本 / 最低宿主版本放在同一行', async () => {
+    m.fetchPluginManifest.mockResolvedValue({
+      ok: true,
+      manifest: manifest({
+        version: '1.0.1',
+        minHostVersion: '2.5.0',
+        dataSourceVersion: '2026H2-2026-11-04',
+      }),
+      baseUrl: 'x',
+      signatureStatus: 'verified',
+    })
+    ;(byId('pluginSourceInput') as HTMLInputElement).value = 'awujiana/MBD-plugin-hmacg'
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+    await click(byId('pluginInstallButton'))
+
+    const line = byId('pluginPendingList').querySelector('.plugin-version-line')
+    expect(line?.textContent).toBe(
+      '插件 v1.0.1 · 数据源 v2026H2-2026-11-04 · 支持 MBD ≥ 2.5.0',
+    )
+  })
+
+  it('没有数据源的清单用短模板，不露出未替换的占位符', async () => {
+    m.fetchPluginManifest.mockResolvedValue({
+      ok: true,
+      manifest: manifest(),
+      baseUrl: 'x',
+      signatureStatus: 'verified',
+    })
+    ;(byId('pluginSourceInput') as HTMLInputElement).value = 'awujiana/MBD-plugin-hmacg'
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+    await click(byId('pluginInstallButton'))
+
+    const line = byId('pluginPendingList').querySelector('.plugin-version-line')
+    expect(line?.textContent).toBe('插件 v1.0.0 · 支持 MBD ≥ 2.4.0')
+    expect(line?.textContent).not.toContain('{')
+  })
+
+  it('已安装卡片从索引读三项，页面重载后仍完整显示', async () => {
+    m.loadPluginIndex.mockReturnValue({
+      schemaVersion: 1,
+      plugins: [
+        record({ minHostVersion: '2.5.0', dataSourceVersion: '2026H2-2026-11-04' }),
+      ],
+    })
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+
+    const line = byId('pluginInstalledList').querySelector('.plugin-version-line')
+    expect(line?.textContent).toBe(
+      '插件 v1.0.0 · 数据源 v2026H2-2026-11-04 · 支持 MBD ≥ 2.5.0',
+    )
+  })
+
+  it('旧索引缺 minHostVersion 时显示破折号而不是 undefined', async () => {
+    m.loadPluginIndex.mockReturnValue({ schemaVersion: 1, plugins: [record()] })
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+
+    const line = byId('pluginInstalledList').querySelector('.plugin-version-line')
+    expect(line?.textContent).toBe('插件 v1.0.0 · 支持 MBD ≥ —')
+    expect(line?.textContent).not.toContain('undefined')
+  })
+})
+
+describe('插件开发规范链接', () => {
+  const specUrl =
+    'https://github.com/awujiana/My-Bangumi-Database-for-WPS/blob/main/PLUGIN-SPEC.md'
+
+  it('点击交给宿主 ShellExecute 打开，并把地址复制到剪贴板', async () => {
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+    await click(byId('pluginSpecLink'))
+    expect(m.shellExecute).toHaveBeenCalledWith(specUrl)
+    expect(m.copyTextWithResult).toHaveBeenCalledWith(specUrl)
+    expect(m.showToast).toHaveBeenCalled()
+  })
+
+  it('宿主没有 ShellExecute 时退回 window.open', async () => {
+    m.getApp.mockReturnValue(null)
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+    await click(byId('pluginSpecLink'))
+    expect(openSpy).toHaveBeenCalledWith(specUrl, '_blank', 'noopener,noreferrer')
+    openSpy.mockRestore()
+  })
+
+  it('复制失败时把地址写进日志，用户仍能手动访问', async () => {
+    m.copyTextWithResult.mockReturnValue({ ok: false })
+    const page = await loadPage()
+    page.initializePluginMarketPage()
+    await click(byId('pluginSpecLink'))
+    expect(byId('pluginLog').textContent).toContain(specUrl)
+    expect(m.showToast).not.toHaveBeenCalled()
   })
 })

@@ -252,6 +252,41 @@ describe('installPlugin', () => {
     ])
   })
 
+  it('三项版本信息写进索引，重载后重建清单仍带着它', async () => {
+    const text = await manifestText({
+      minHostVersion: '2.5.0',
+      dataSourceVersion: '2026H2-2026-11-04',
+    })
+    mockFetch({ [manifestUrl]: stubResponse(text), [entryUrl]: stubResponse(ENTRY_SOURCE) })
+    await installPlugin(ROOT_URL, { kind: 'github', value: 'a/b' }, '2.5.0', {
+      allowUntrusted: true,
+    })
+
+    const installed = findPluginRecord('hmoe-new-anime')
+    expect(installed?.version).toBe('1.0.0')
+    expect(installed?.minHostVersion).toBe('2.5.0')
+    expect(installed?.dataSourceVersion).toBe('2026H2-2026-11-04')
+    if (installed === null) throw new Error('索引里没有记录')
+    const rebuilt = manifestFromRecord(installed)
+    expect(rebuilt.version).toBe('1.0.0')
+    expect(rebuilt.minHostVersion).toBe('2.5.0')
+    expect(rebuilt.dataSourceVersion).toBe('2026H2-2026-11-04')
+  })
+
+  it('纯工具型插件没有数据源时不写 dataSourceVersion', async () => {
+    const text = await manifestText()
+    mockFetch({ [manifestUrl]: stubResponse(text), [entryUrl]: stubResponse(ENTRY_SOURCE) })
+    await installPlugin(ROOT_URL, { kind: 'github', value: 'a/b' }, '2.4.1', {
+      allowUntrusted: true,
+    })
+
+    const installed = findPluginRecord('hmoe-new-anime')
+    expect(installed?.minHostVersion).toBe('2.4.0')
+    expect(installed?.dataSourceVersion).toBeUndefined()
+    if (installed === null) throw new Error('索引里没有记录')
+    expect(manifestFromRecord(installed).dataSourceVersion).toBeUndefined()
+  })
+
   it('落盘的源码是纯 ASCII（中文被转义）', async () => {
     mockFetch({
       [manifestUrl]: stubResponse(await manifestText()),

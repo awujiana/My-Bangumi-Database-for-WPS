@@ -104,6 +104,15 @@ export interface PluginManifest {
   version: string
   apiVersion: string
   minHostVersion: string
+  /**
+   * 插件自带数据源的版本（如 `2026H2-2026-11-04`）。
+   *
+   * 与 `version`（插件代码版本）、`minHostVersion`（宿主最低版本）并称「三项版本信息」。
+   * 带数据源的插件必须写，且要与 `data/manifest.json` 的 `dataVersion` 一致；
+   * 纯工具型插件可以省略。**不参与签名**：它与 `name` / `description` / `features`
+   * 同属展示信息，签它会导致每次更新数据都要重签，且让旧宿主验签失效。
+   */
+  dataSourceVersion?: string
   description: string
   author: string
   homepage?: string
@@ -147,6 +156,10 @@ export interface InstalledPluginRecord {
    * `createHostApi()` 里的 `host.net.fetch` 会把每个 URL 都判成「不在白名单内」。
    */
   network?: string[]
+  /** 上次安装/更新时声明的宿主最低版本，市场页「已安装」列表要靠它展示 */
+  minHostVersion?: string
+  /** 上次安装/更新时声明的数据源版本（可缺省：纯工具型插件没有数据源） */
+  dataSourceVersion?: string
   /** 更新已落盘但页面未重载 */
   pendingReload?: boolean
   /** 新版本要求更多权限，暂停更新 */

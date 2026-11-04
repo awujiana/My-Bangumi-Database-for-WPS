@@ -228,4 +228,34 @@ describe('parsePluginIndex · 坏数据隔离', () => {
     )
     expect(parsed.plugins[0]?.signatureStatus).toBeUndefined()
   })
+
+  it('三项版本信息能往返（市场页重载后靠索引显示，不认远程清单）', () => {
+    const parsed = parsePluginIndex(
+      JSON.stringify({
+        plugins: [
+          record({ minHostVersion: '2.5.0', dataSourceVersion: '2026H2-2026-11-04' }),
+        ],
+      }),
+    )
+    const saved = parsed.plugins[0]
+    expect(saved?.version).toBe('1.0.0')
+    expect(saved?.minHostVersion).toBe('2.5.0')
+    expect(saved?.dataSourceVersion).toBe('2026H2-2026-11-04')
+  })
+
+  it('旧索引没有新增字段时不臆造版本信息', () => {
+    const parsed = parsePluginIndex(JSON.stringify({ plugins: [record()] }))
+    expect(parsed.plugins[0]?.minHostVersion).toBeUndefined()
+    expect(parsed.plugins[0]?.dataSourceVersion).toBeUndefined()
+  })
+
+  it('版本字段不是字符串时被丢掉', () => {
+    const parsed = parsePluginIndex(
+      JSON.stringify({
+        plugins: [{ ...record(), minHostVersion: 7, dataSourceVersion: null }],
+      }),
+    )
+    expect(parsed.plugins[0]?.minHostVersion).toBeUndefined()
+    expect(parsed.plugins[0]?.dataSourceVersion).toBeUndefined()
+  })
 })

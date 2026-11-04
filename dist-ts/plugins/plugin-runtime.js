@@ -184,7 +184,7 @@ export function manifestFromRecord(record) {
         name: record.name,
         version: record.version,
         apiVersion: '1.0.0',
-        minHostVersion: '0.0.0',
+        minHostVersion: record.minHostVersion ?? '0.0.0',
         description: '',
         author: record.author,
         entry: 'plugin.js',
@@ -195,6 +195,10 @@ export function manifestFromRecord(record) {
     // 白名单不回灌的话，重载后 createHostApi 会把插件的每一个网络请求都拦掉
     if (record.network !== undefined)
         manifest.network = [...record.network];
+    // 数据源版本是展示信息，但插件自己在 context.manifest 里也该读到同一份
+    if (record.dataSourceVersion !== undefined) {
+        manifest.dataSourceVersion = record.dataSourceVersion;
+    }
     return manifest;
 }
 /** 标记插件「已加载」，供市场页显示运行状态 */

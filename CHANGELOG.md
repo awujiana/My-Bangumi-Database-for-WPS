@@ -59,6 +59,20 @@
   新增 `dist-ts/plugins/*` 与 `dist-ts/panel/plugin-market-*` 产物已强制入库
   （被 `.gitignore` 忽略的新模块不 `git add -f` 会让发布树静默缺文件）。
 
+### 补充：三项版本信息与规范文档入口（2026-11-04 后续修订）
+
+- `plugin.json` 新增可选字段 `dataSourceVersion`（数据源版本），与 `version`（插件版本）、
+  `minHostVersion`（支持 MBD 最低版本）并称「三项版本信息」；`PLUGIN-SPEC.md` 升到 1.2，
+  字段表、版本号规则、检查清单同步补齐。该字段是展示信息、**不进签名载荷**，所以
+  已发布宿主验签逻辑不变，数据更新不需要重签。
+- 三项版本信息写入 `bgm_plugins_index`（安装 → `toRecord()` → `manifestFromRecord()`
+  全链路贯通），插件市场「待确认」与「已安装」卡片用同一行模板展示，三语文案齐备。
+- 三份 README 的文档索引加入 `PLUGIN-SPEC.md` 链接；插件市场页面「添加来源」卡片
+  加入同一份规范的在线链接，点击走宿主 `OAAssist.ShellExecute`（WPS 任务窗格会拦
+  `<a>` 导航），并复制一份地址兜底。
+- 两个首批插件仓库的 `data/manifest.json` 生成 `dataVersion`，`scripts/fetch.mjs`
+  自动同步 `plugin.json` 的 `dataSourceVersion`，避免数据版本与展示版本漂移。
+
 ## [2.4.1] - 2026-11-02
 
 ### 清理页：候选表如实标注「行级规则不可用」+ 页面与引擎文案全接入语言包（2026-11-02）

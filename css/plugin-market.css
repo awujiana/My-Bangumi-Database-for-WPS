@@ -242,3 +242,17 @@ body[data-page='plugin-market'] .global {
 .btn-link:hover {
   text-decoration: underline;
 }
+
+.plugin-spec-row {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.plugin-spec-link {
+  text-decoration: none;
+}
+
+.plugin-spec-link:focus-visible {
+  outline: 2px solid var(--text-link, #6aa9ff);
+  outline-offset: 2px;
+}

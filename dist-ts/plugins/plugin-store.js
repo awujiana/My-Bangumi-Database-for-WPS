@@ -72,6 +72,11 @@ function toRecord(value) {
     }
     if (typeof item.lastCheckedAt === 'string')
         record.lastCheckedAt = item.lastCheckedAt;
+    if (typeof item.minHostVersion === 'string')
+        record.minHostVersion = item.minHostVersion;
+    if (typeof item.dataSourceVersion === 'string') {
+        record.dataSourceVersion = item.dataSourceVersion;
+    }
     if (item.pendingReload === true)
         record.pendingReload = true;
     // 签名结论必须持久化：更新链路靠它判「信任是否变差」，丢了就每次都要重新确认

@@ -10,7 +10,7 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { tOr } from '../i18n/locale-store.js';
 import { confirmAsync, showToast } from '../ui/dialog.js';
-import { bgmLog } from '../tools/util/index.js';
+import { bgmLog, copyTextWithResult, getApp } from '../tools/util/index.js';
 import { CURRENT_VERSION } from '../tools/update-check.js';
 import { describeSignatureStatus, fetchPluginManifest, installPlugin, pluginDirectoryUrl, uninstallPlugin, } from '../plugins/plugin-market.js';
 import { parsePluginSource, HOST_PLUGIN_API_VERSION } from '../plugins/plugin-manifest.js';
@@ -101,6 +101,23 @@ function renderSignatureBadge(status) {
     badge.dataset.status = status;
     return badge;
 }
+/**
+ * 三项版本信息：插件版本 / 数据源版本 / 支持的 MBD 最低版本。
+ *
+ * 待确认与已安装两张卡片共用这一行，保证「装之前看到的」和「装完之后看到的」口径一致。
+ * 纯工具型插件没有数据源，用不带数据源的模板；旧索引缺 minHostVersion 时显示破折号。
+ * 文案走 `tOr` 且变量交给第三参插值 —— 兜底原文同样是模板，写死中文会露出 `{version}`。
+ */
+function renderVersionInfo(pluginVersion, minHostVersion, dataSourceVersion) {
+    const values = {
+        pluginVersion,
+        minHostVersion: minHostVersion === '' ? '—' : minHostVersion,
+    };
+    const text = dataSourceVersion === undefined
+        ? tOr('plugin.meta.versionInfoNoData', '插件 v{pluginVersion} · 支持 MBD ≥ {minHostVersion}', values)
+        : tOr('plugin.meta.versionInfo', '插件 v{pluginVersion} · 数据源 v{dataSourceVersion} · 支持 MBD ≥ {minHostVersion}', { ...values, dataSourceVersion });
+    return element('p', 'plugin-item-meta plugin-version-line', text);
+}
 /** 渲染「待确认」卡片 */
 function renderPending() {
     const list = byId('pluginPendingList');
@@ -117,8 +134,9 @@ function renderPending() {
     const { manifest, source, signatureStatus } = pending;
     const item = element('div', 'plugin-item');
     const head = element('div', 'plugin-item-head');
-    head.append(element('span', 'plugin-item-name', manifest.name), element('span', 'plugin-item-version', `v${manifest.version}`), element('span', 'plugin-item-version', `MBD ≥ ${manifest.minHostVersion}`), renderSignatureBadge(signatureStatus));
+    head.append(element('span', 'plugin-item-name', manifest.name), renderSignatureBadge(signatureStatus));
     item.append(head, element('p', 'plugin-item-desc', manifest.description));
+    item.append(renderVersionInfo(manifest.version, manifest.minHostVersion, manifest.dataSourceVersion));
     item.append(element('p', 'plugin-item-meta', `${manifest.author} · ${source.value} · apiVersion ${manifest.apiVersion}`));
     item.append(renderPermissions(manifest.permissions));
     if (manifest.features !== undefined) {
@@ -165,7 +183,7 @@ function renderInstalled() {
 function renderInstalledItem(record) {
     const item = element('div', 'plugin-item');
     const head = element('div', 'plugin-item-head');
-    head.append(element('span', 'plugin-item-name', record.name), element('span', 'plugin-item-version', `v${record.version}`));
+    head.append(element('span', 'plugin-item-name', record.name));
     if (record.pendingReload === true) {
         head.append(element('span', 'plugin-item-badge', tOr('plugin.badge.pendingReload', '待重载生效')));
     }
@@ -176,6 +194,7 @@ function renderInstalledItem(record) {
         head.append(element('span', 'plugin-item-version', tOr('plugin.badge.disabled', '已禁用')));
     }
     item.append(head);
+    item.append(renderVersionInfo(record.version, record.minHostVersion ?? '', record.dataSourceVersion));
     item.append(element('p', 'plugin-item-meta', `${record.author} · ${record.source.value}`));
     if (record.permissions !== undefined)
         item.append(renderPermissions(record.permissions));
@@ -394,6 +413,31 @@ async function runCheckAll() {
         describeOutcome(outcome);
     renderInstalled();
 }
+/**
+ * 打开插件开发规范文档。
+ *
+ * WPS 任务窗格会拦掉 `<a>` 导航（赞赏页实测 `target="_blank"` / `mailto:` 都拉不起
+ * 外部程序），所以优先交给宿主 `OAAssist.ShellExecute` 唤起系统浏览器；宿主没给这个
+ * 接口时退回 `window.open`。不管走哪条路都把地址复制一份到剪贴板：宿主真的静默拦掉
+ * 导航时，用户至少能直接粘贴到浏览器，不会遇到「点了没反应」。
+ */
+function openPluginSpec(link) {
+    const url = link.href;
+    const app = getApp();
+    if (app?.OAAssist?.ShellExecute) {
+        app.OAAssist.ShellExecute(url);
+    }
+    else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+    const copied = copyTextWithResult(url);
+    if (copied.ok) {
+        showToast(tOr('plugin.status.specLinkCopied', '规范链接已复制；浏览器没打开时请手动粘贴访问'), 'success');
+    }
+    else {
+        appendLog(`插件开发规范：${url}`);
+    }
+}
 /** 初始化页面 */
 export function initializePluginMarketPage() {
     const installButton = byId('pluginInstallButton');
@@ -411,6 +455,11 @@ export function initializePluginMarketPage() {
         const target = byId('pluginLog');
         if (target !== null)
             target.textContent = '';
+    });
+    const specLink = byId('pluginSpecLink');
+    specLink?.addEventListener('click', (event) => {
+        event.preventDefault();
+        openPluginSpec(specLink);
     });
     const developmentModeToggle = byId('pluginDevModeToggle');
     developmentModeToggle?.addEventListener('change', () => {
