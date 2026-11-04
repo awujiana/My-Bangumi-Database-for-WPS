@@ -25,6 +25,7 @@ const mockState = vi.hoisted(() => ({
   bgmLog: vi.fn(),
   handleError: vi.fn(),
   showSyncPanel: vi.fn(),
+  showPluginMarketPanel: vi.fn(),
   syncWithConfirmation: vi.fn(() => Promise.resolve()),
   closeAllPanels: vi.fn(() => 0),
   notifyToast: vi.fn(),
@@ -33,6 +34,7 @@ const mockState = vi.hoisted(() => ({
 vi.mock('../ts/index.js', () => ({
   WPS_ENUM: {},
   showSyncPanel: mockState.showSyncPanel,
+  showPluginMarketPanel: mockState.showPluginMarketPanel,
   showEnrichPanel: vi.fn(),
   showSettingsPanel: vi.fn(),
   showCleanPanel: vi.fn(),
@@ -92,6 +94,13 @@ describe('OnAction 分发', () => {
     expect(OnAction({ Id: 'buttonOpenSyncPanel' })).toBe(true)
 
     expect(mockState.showSyncPanel).toHaveBeenCalledTimes(1)
+    expect(countUnknownButtonWarnings()).toBe(0)
+  })
+
+  it('插件市场按钮命中同步分发表并打开市场页', () => {
+    expect(OnAction({ Id: 'buttonOpenPluginMarket' })).toBe(true)
+
+    expect(mockState.showPluginMarketPanel).toHaveBeenCalledTimes(1)
     expect(countUnknownButtonWarnings()).toBe(0)
   })
 

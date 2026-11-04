@@ -29,6 +29,9 @@
 				<group id="cleanGroup" label="数据清理">
                     <button id="buttonOpenCleanPanel" label="数据清理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
+				<group id="pluginGroup" label="插件">
+                    <button id="buttonOpenPluginMarket" label="插件市场" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                </group>
 				<group id="highlightGroup" label="番剧高亮">
                     <button id="buttonOpenHighlightPanel" label="番剧高亮" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>

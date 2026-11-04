@@ -1,7 +1,7 @@
 {
   "name": "my-bangumi-database-for-wps",
   "addonType": "et",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "private": true,
   "engines": {
     "node": ">=22.22.2"

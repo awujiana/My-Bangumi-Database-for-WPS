@@ -161,10 +161,10 @@
 
 ## 📂 目錄結構
 
-以下為發佈包 **`My-Bangumi-Database-for-WPS-v2.4.1.zip`** 解壓後的目錄結構（即使用者安裝到 WPS 後實際載入的檔案，不含原始碼 / 測試 / 文件）：
+以下為發佈包 **`My-Bangumi-Database-for-WPS-v2.5.0.zip`** 解壓後的目錄結構（即使用者安裝到 WPS 後實際載入的檔案，不含原始碼 / 測試 / 文件）：
 
 ```
-My-Bangumi-Database-for-WPS-v2.4.1/
+My-Bangumi-Database-for-WPS-v2.5.0/
 ├── index.html                  # 外掛入口（WPS 啟動時載入）
 ├── main.js                     # 動態模組載入器（Ribbon 早期佔位 + 模組就緒後替換真實實作）
 ├── manifest.xml                # 外掛清單（ApiVersion / Name）
@@ -306,13 +306,13 @@ npm run debug
    > Windows 上最快的到達方式：`Win + R` → 輸入 `%appdata%` → Enter，再依序進入 `kingsoft\wps\jsaddons`。
    > 例：`C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
    - **(建議) 安裝器 / publish.html**：用 WPS 官方 `wpsjs` 工具鏈產生的 `publish.html`（離線模式）或 `wpsjs build --exe` 產生的安裝器，瀏覽器開啟後點「安裝」，會自動寫入上面的 `publish.xml`。
-   - **手動註冊**：把解壓後的外掛目錄放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.4.1\`，並編輯同目錄的 `publish.xml`（不存在則新建），加入一條外掛：
+   - **手動註冊**：把解壓後的外掛目錄放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.5.0\`，並編輯同目錄的 `publish.xml`（不存在則新建），加入一條外掛：
 
      ```xml
      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      <jsplugins>
        <jsplugin name="My Bangumi Database for WPS"
-                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.4.1/"
+                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.5.0/"
                  enable="true"/>
      </jsplugins>
      ```
@@ -324,7 +324,7 @@ npm run debug
    **操作前請務必先完全關閉 WPS**（含系統匣裡的 WPS 雲端服務程序），否則檔案被佔用會刪不掉：
 
    1. 進入上表的外掛目錄（Windows：`%APPDATA%\kingsoft\wps\jsaddons`）；
-   2. 找到本外掛的資料夾 —— 名為 `My-Bangumi-Database-for-WPS_2.4.1`（或 `my-bangumi-database-for-wps_2.4.1`、以及帶版本號後綴的類似名稱），**整目錄刪除**；
+   2. 找到本外掛的資料夾 —— 名為 `My-Bangumi-Database-for-WPS_2.5.0`（或 `my-bangumi-database-for-wps_2.5.0`、以及帶版本號後綴的類似名稱），**整目錄刪除**；
    3. 選用：編輯同目錄的 `publish.xml`，刪掉指向該目錄的 `<jsplugin .../>` 那一行（只刪這一行）。
 
    > ⚠️ 不要刪除整個 `jsaddons` 資料夾，也不要刪掉 `publish.xml` 本身 —— 裡面可能還有其它外掛的註冊資訊，刪了會一起失效。
@@ -391,9 +391,9 @@ npm run debug
 
 ```bash
 # Windows PowerShell
-Get-FileHash .\My-Bangumi-Database-for-WPS-v2.4.1.zip -Algorithm SHA256
+Get-FileHash .\My-Bangumi-Database-for-WPS-v2.5.0.zip -Algorithm SHA256
 # macOS / Linux
-shasum -a 256 My-Bangumi-Database-for-WPS-v2.4.1.zip
+shasum -a 256 My-Bangumi-Database-for-WPS-v2.5.0.zip
 ```
 
 兩個值一致才說明這份包沒被改過。

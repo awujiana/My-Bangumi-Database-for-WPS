@@ -6,7 +6,7 @@
 import { syncWithConfirmation, setTokenForRibbon, testTokenForRibbon, copyTokenForRibbon, setUserIdForRibbon, openCollectionForRibbon, syncFromGithubForRibbon, undoLastSyncForRibbon, } from './services/ribbon-service.js';
 // 对话框走依赖反转桥：ribbon 属上层入口，不得直接 runtime-import UI 层
 import { getNotifyApi } from './core/ui-bridge.js';
-import { WPS_ENUM, showSyncPanel, showEnrichPanel, showSettingsPanel, showCleanPanel, showHighlightPanel, showConditionalFormatPanel, showDonatePanel, closeAllPanels, BGM, isIncrementalSyncEnabled, isSkipConflictsEnabled, setIncrementalSync, setSkipConflicts, isSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, CONFIG_KEYS, getConfig, } from './index.js';
+import { WPS_ENUM, showSyncPanel, showEnrichPanel, showSettingsPanel, showCleanPanel, showPluginMarketPanel, showHighlightPanel, showConditionalFormatPanel, showDonatePanel, closeAllPanels, BGM, isIncrementalSyncEnabled, isSkipConflictsEnabled, setIncrementalSync, setSkipConflicts, isSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, CONFIG_KEYS, getConfig, } from './index.js';
 import { canApplyI18n } from './i18n/dom.js';
 import { onLocaleChange, t } from './i18n/locale-store.js';
 import { initializeI18n } from './i18n/runtime.js';
@@ -268,6 +268,7 @@ const SYNC_ACTIONS = {
     buttonOpenSettingsPanel: showSettingsPanel,
     buttonOpenEnrichPanel: showEnrichPanel,
     buttonOpenCleanPanel: showCleanPanel,
+    buttonOpenPluginMarket: showPluginMarketPanel,
     buttonOpenHighlightPanel: showHighlightPanel,
     buttonOpenConditionalFormatPanel: showConditionalFormatPanel,
     buttonCloseAllPanels: closeAllPanelsForRibbon,
@@ -379,6 +380,7 @@ const ICON_PATHS = {
     buttonCloseAllPanels: 'images/closeAllPanels.svg',
     buttonOpenEnrichPanel: 'images/enrichPage.svg',
     buttonOpenCleanPanel: 'images/cleanPage.svg',
+    buttonOpenPluginMarket: 'images/pluginMarket.svg',
     buttonOpenHighlightPanel: 'images/highlightPage.svg',
     buttonOpenConditionalFormatPanel: 'images/conditionalFormatPage.svg',
     buttonOpenDonatePanel: 'images/donate.svg',

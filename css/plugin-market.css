@@ -1,0 +1,244 @@
+/**
+ * 插件市场页面样式
+ *
+ * 与其它独立页面同构：`.global` 是 grid 外壳，本页没有侧栏，收成「顶栏 + 主体」两行。
+ * 颜色一律走 tokens.css 的变量 —— 填充色与文字色分开用（`--accent-blue` 只当填充，
+ * 文字用 `--text-link`），避免浅色主题跌破对比度。
+ */
+
+body[data-page='plugin-market'] .global {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  height: 100vh;
+}
+
+.plugin-market-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.plugin-card {
+  background: var(--bg-elevated, #24243a);
+  border: 1px solid var(--border-subtle, #33334d);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.plugin-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.plugin-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e6e6f0);
+}
+
+.plugin-count {
+  font-size: 12px;
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-hint {
+  margin: 4px 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-hint code {
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-input, #1c1c2e);
+  color: var(--text-primary, #e6e6f0);
+}
+
+.plugin-source-row {
+  display: flex;
+  gap: 8px;
+}
+
+.plugin-source-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #9a9ab0);
+  cursor: pointer;
+}
+
+.plugin-message {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 16px;
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-message[data-level='error'] {
+  color: var(--text-danger, #e56a6a);
+}
+
+.plugin-message[data-level='success'] {
+  color: var(--text-success, #5fbf7f);
+}
+
+.plugin-message[data-level='warn'] {
+  color: var(--text-warn, #d8a657);
+}
+
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-item {
+  border: 1px solid var(--border-subtle, #33334d);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg-input, #1c1c2e);
+}
+
+.plugin-item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plugin-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #e6e6f0);
+}
+
+.plugin-item-version {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-elevated, #24243a);
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-item-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-blue, #2f7fe0);
+  color: #ffffff;
+}
+
+/* 签名徽标：只有「已验证」用成功色，其余都是提示/警告 —— 颜色本身就在告诉用户该不该信 */
+.plugin-signature-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  color: var(--text-muted, #7a7a92);
+}
+
+.plugin-signature-badge[data-status='verified'] {
+  color: var(--text-success, #4caf7d);
+}
+
+.plugin-signature-badge[data-status='untrusted-key'],
+.plugin-signature-badge[data-status='invalid'] {
+  color: var(--text-danger, #e05c5c);
+}
+
+.plugin-signature-badge[data-status='unsupported'] {
+  color: var(--text-warn, #d8a657);
+}
+
+.plugin-item-desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-item-meta {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted, #7a7a92);
+  word-break: break-all;
+}
+
+.plugin-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.plugin-permission {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle, #33334d);
+  color: var(--text-secondary, #9a9ab0);
+}
+
+.plugin-permission[data-risky='true'] {
+  border-color: var(--text-warn, #d8a657);
+  color: var(--text-warn, #d8a657);
+}
+
+.plugin-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.plugin-empty {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted, #7a7a92);
+}
+
+.plugin-log {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-input, #1c1c2e);
+  color: var(--text-secondary, #9a9ab0);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--text-link, #6aa9ff);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}

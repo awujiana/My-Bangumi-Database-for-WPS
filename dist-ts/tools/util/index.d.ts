@@ -265,6 +265,15 @@ export declare function markDonatePaneLoaded(): void;
  * 标记「条件格式管理」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建）
  */
 export declare function markConditionalFormatPaneLoaded(): void;
+/** 标记「插件市场」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建） */
+export declare function markPluginMarketPaneLoaded(): void;
+/**
+ * 显示 / 切换「插件市场」面板（独立面板，与设置 / 富化 / 清理 / 高亮 / 条件格式并列）
+ *
+ * 与清理面板同款自愈机制：缓存 ID 存在但页面从未成功加载（URL 拼错 / 页面报错）时，
+ * 隐藏旧面板并重建，避免坏 ID 被持久化卡死。
+ */
+export declare function showPluginMarketPanel(): void;
 /**
  * 显示 / 切换「条件格式管理」面板（独立面板，与设置 / 富化 / 清理 / 高亮并列）
  *

@@ -911,6 +911,65 @@ export function markConditionalFormatPaneLoaded() {
     const app = getApp();
     app?.PluginStorage?.setItem('conditionalFormat_pane_url', window.location.href);
 }
+/** 标记「插件市场」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建） */
+export function markPluginMarketPaneLoaded() {
+    if (typeof window === 'undefined')
+        return;
+    const app = getApp();
+    app?.PluginStorage?.setItem('pluginMarket_pane_url', window.location.href);
+}
+/**
+ * 显示 / 切换「插件市场」面板（独立面板，与设置 / 富化 / 清理 / 高亮 / 条件格式并列）
+ *
+ * 与清理面板同款自愈机制：缓存 ID 存在但页面从未成功加载（URL 拼错 / 页面报错）时，
+ * 隐藏旧面板并重建，避免坏 ID 被持久化卡死。
+ */
+export function showPluginMarketPanel() {
+    const app = getApp();
+    if (!app) {
+        bgmLog(LOG_LEVELS.ERROR, '[showPluginMarketPanel] 无法获取 WPS Application 对象');
+        return;
+    }
+    let marketId = app.PluginStorage?.getItem('pluginMarket_pane_id');
+    const storedPaneUrl = app.PluginStorage?.getItem('pluginMarket_pane_url');
+    if (marketId && !storedPaneUrl?.includes('plugin-market.html')) {
+        const stalePane = app.GetTaskPane?.(marketId);
+        if (stalePane)
+            stalePane.Visible = false;
+        app.PluginStorage?.setItem('pluginMarket_pane_id', '');
+        app.PluginStorage?.setItem('pluginMarket_pane_url', '');
+        marketId = null;
+        bgmLog(LOG_LEVELS.WARN, '[showPluginMarketPanel] 检测到加载失败的旧插件市场面板，已重建');
+    }
+    if (marketId) {
+        const pane = app.GetTaskPane?.(marketId);
+        if (pane) {
+            if (isPanePageAlive('plugin-market')) {
+                pane.Visible = !pane.Visible;
+                bgmLog(LOG_LEVELS.INFO, `[showPluginMarketPanel] 插件市场面板可见性切换: ${String(pane.Visible)}`);
+                return;
+            }
+            pane.Visible = false;
+            app.PluginStorage?.setItem('pluginMarket_pane_id', '');
+            app.PluginStorage?.setItem('pluginMarket_pane_url', '');
+            bgmLog(LOG_LEVELS.WARN, '[showPluginMarketPanel] 窗格对象仍在但页面心跳已停（黑屏/加载失败），已重建');
+        }
+        else {
+            app.PluginStorage?.setItem('pluginMarket_pane_id', '');
+            app.PluginStorage?.setItem('pluginMarket_pane_url', '');
+            bgmLog(LOG_LEVELS.WARN, '[showPluginMarketPanel] 面板ID失效，已清除存储');
+        }
+    }
+    const pane = app.CreateTaskPane?.(buildTaskPaneUrl('plugin-market.html'));
+    if (pane) {
+        pane.Visible = true;
+        app.PluginStorage?.setItem('pluginMarket_pane_id', pane.ID);
+        bgmLog(LOG_LEVELS.INFO, `[showPluginMarketPanel] 插件市场面板已创建(ID:${pane.ID})`);
+    }
+    else {
+        bgmLog(LOG_LEVELS.ERROR, '[showPluginMarketPanel] 创建插件市场面板失败');
+    }
+}
 /**
  * 显示 / 切换「条件格式管理」面板（独立面板，与设置 / 富化 / 清理 / 高亮并列）
  *

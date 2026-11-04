@@ -373,6 +373,7 @@ export {
   showEnrichPanel,
   // 显示通用数据清理面板
   showCleanPanel,
+  showPluginMarketPanel,
   showHighlightPanel,
   showConditionalFormatPanel,
   // 显示赞赏页面（Ribbon「赞赏」按钮）

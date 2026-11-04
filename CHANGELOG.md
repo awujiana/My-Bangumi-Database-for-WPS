@@ -6,6 +6,59 @@
 
 ---
 
+## [2.5.0] - 2026-11-04
+
+### 新增「插件市场」：GitHub / API / 本地目录安装，清单签名与后台无感更新（2026-11-04）
+
+- **Ribbon 新增「插件」组与「插件市场」按钮**（`buttonOpenPluginMarket` →
+  `ui/plugin-market.html`）。页面可填三种来源：`owner/repo`（GitHub 仓库，拼
+  `https://raw.githubusercontent.com/<owner>/<repo>/main`）、完整 HTTPS URL（API 模式）、
+  或本地目录（开发者模式）。`plugin-manifest.ts` 统一负责解析、base URL 与域名白名单判定。
+- **`plugin.json` 成为插件作者唯一契约**（`PLUGIN-SPEC.md`）：`schemaVersion` / `id` /
+  `version` / `apiVersion` / `minHostVersion` / `permissions` / `network` / `features` /
+  `entry` / `checksum` / `signature` / `updatePolicy`。安装时按 `sha256 + size` 逐字节校验
+  入口文件，不一致直接拒装。
+- **清单签名（ECDSA P-256 + SHA-256，IEEE P1363 的 raw r||s）**：宿主内置可信公钥表
+  `TRUSTED_PLUGIN_KEYS`，验签结论为 `verified | unsigned | untrusted-key | invalid |
+  unsupported` 五态。签名只覆盖身份、版本、入口、权限、域名白名单与文件哈希，
+  展示性字段（名称 / 描述 / features）不签。签名未通过的安装一律拒绝，只有界面二次确认
+  「无视风险安装」才传入 `allowUntrusted: true`；自动更新时信任状态**不得从 `verified`
+  降级**，状态变化或老记录缺 `signatureStatus` 就暂停更新并返回 `needs-trust`。
+  签名工具 `scripts/plugin-sign.mjs` 与宿主 `pluginSignaturePayload()` 的拼串逻辑由单测
+  逐字节比对锁死，两边改任一边就会红。
+- **宿主按权限「构造」API，而不是「存在但抛错」**：`createHostApi()` 提供
+  `version / apiVersion / plugin / locale` 及按权限裁剪的 `sheet.*`、`data.*`、`net.*`、
+  `storage`、`ui.*`、`i18n`、`log`；未授权的属性根本不存在，插件用 `typeof` 即可降级。
+  `registerCommand` 不占权限。`data.*` 建立在 42 列 `STANDARD_HEADERS` 之上，
+  支持 `replace / append / merge`（merge 按键去重，空值不覆盖已有数据）。
+  插件私有存储靠自维护 `plugin:<id>:#keys` 登记表实现卸载清理（`PluginStorage` 官方契约
+  只有 `getItem / setItem / removeItem`，没有枚举能力）。
+- **安装态适配 `file://`**：插件代码只能通过 ESM `import()` 加载；FSO 只能写
+  UTF-16LE / ANSI，所以落盘前把非 ASCII 源码转成 `\uXXXX` / `\u{...}` 纯 ASCII，
+  保证落盘字节与清单 `sha256` 一致。新页面 bootstrap 走 `openComGate('plugin-market')` +
+  `runComPhases(...)` 的启动期 COM 闸门。
+- **首批两个公开插件仓库**（各 477 条 `2026H2` 种子数据，均带签名）：
+  `awujiana/MBD-plugin-hmacg`（H萌新番表：下载本期新番表 / 整理进我的番组数据库）与
+  `awujiana/MBD-plugin-yucwiki`（长门有C：下载 / 整理，字段更全）。数据在 `data/` 下以
+  **纯文本 UTF-8 JSON Lines** 发布（不 gzip：宿主 `net.fetch()` 只返文本，WPS 内嵌 CEF
+  不保证支持 `DecompressionStream`），`data/manifest.json` 带每片 `bytes` 与 `sha256`。
+  仓库 `.gitattributes` 固定 LF，避免 Windows CRLF 让按字节校验的 checksum 失配。
+  同步工作流目前只有 `workflow_dispatch`（**更新频率待定**，不擅自加 `schedule`）。
+- **文档**：新增 `PLUGIN-SPEC.md`（插件规范：清单字段、权限表、API、签名、发布流程、
+  检查清单）与 `文档/插件市场.md`（宿主侧设计）。§5.8 明确「插件自带新 Ribbon 按钮」v1
+  **不做**、插件不注册成独立 WPS 加载项，并写清将来需要另一套按钮注册与生命周期机制。
+- **三语 key 1944 → 2003**：新增 59 个 key，`check:i18n` 仍是 100%；`locales/index.js`
+  由 `npm run i18n:index` 重新生成。
+- **顺带修掉两个真实缺陷**：
+  ① 索引记录此前没有持久化 `network` 白名单，页面重载后用 `manifestFromRecord()`
+  重建清单会把所有 `host.net.fetch` 判成「域名不在白名单内」—— 现在
+  `InstalledPluginRecord` / `toRecord()` / `manifestFromRecord()` 三处贯通并补了回归测试；
+  ② 签名工具 `computeChecksum()` 原来只返回 checksum 表，`--compute-checksum` 会崩在
+  `Object.keys(undefined)` —— 现在返回整份清单，并补了单测。
+- **验证**：全量门禁 192 个测试文件 / 5774 个测试通过；`npm run build:ts` 通过，
+  新增 `dist-ts/plugins/*` 与 `dist-ts/panel/plugin-market-*` 产物已强制入库
+  （被 `.gitignore` 忽略的新模块不 `git add -f` 会让发布树静默缺文件）。
+
 ## [2.4.1] - 2026-11-02
 
 ### 清理页：候选表如实标注「行级规则不可用」+ 页面与引擎文案全接入语言包（2026-11-02）

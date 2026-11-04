@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892 https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
+    <link rel="stylesheet" href="../css/plugin-market.css" />
+  </head>
+  <body data-page="plugin-market">
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/plugin-market-bootstrap.js"></script>
+    <script src="../libs/fit-viewport.js"></script>
+    <script src="../libs/wps-sdk-loader.js"></script>
+
+    <div class="global">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title" data-i18n="plugin.header.title">🧩 插件市场</span>
+            <span class="brand-sub" data-i18n="plugin.header.subtitle"
+              >填写 GitHub 仓库即可安装插件，支持后台自动更新</span
+            >
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="pluginCheckUpdatesButton" class="bgm-btn small" data-action="check-updates">
+            <span data-i18n="plugin.action.checkUpdates">检查更新</span>
+          </button>
+          <button id="pluginRefreshButton" class="bgm-btn small" data-action="refresh">
+            <span data-i18n="plugin.action.refresh">刷新列表</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="main plugin-market-main">
+        <section class="plugin-card plugin-source-card">
+          <h2 class="plugin-section-title" data-i18n="plugin.source.title">添加来源</h2>
+          <p class="plugin-hint" data-i18n-html="plugin.source.hint">
+            填 <code>owner/repo</code>（GitHub 仓库）或 <code>https://</code> 开头的清单地址。
+            安装前会显示插件声明的权限。
+          </p>
+          <div class="plugin-source-row">
+            <input
+              id="pluginSourceInput"
+              class="input plugin-source-input"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="awujiana/MBD-plugin-hmacg"
+              data-i18n-placeholder="plugin.source.placeholder"
+            />
+            <button id="pluginInstallButton" class="bgm-btn small primary" data-action="install">
+              <span data-i18n="plugin.action.install">安装 / 更新</span>
+            </button>
+          </div>
+          <label class="plugin-checkbox-row">
+            <input id="pluginDevModeToggle" type="checkbox" />
+            <span data-i18n="plugin.source.devMode">开发者模式（允许本地目录来源）</span>
+          </label>
+          <p id="pluginSourceMessage" class="plugin-message" role="status"></p>
+        </section>
+
+        <section class="plugin-card">
+          <div class="plugin-section-head">
+            <h2 class="plugin-section-title" data-i18n="plugin.installed.title">已安装</h2>
+            <span id="pluginInstalledCount" class="plugin-count"></span>
+          </div>
+          <div id="pluginInstalledList" class="plugin-list"></div>
+          <p id="pluginInstalledEmpty" class="plugin-empty" data-i18n="plugin.installed.empty">
+            还没有安装任何插件。在上面填一个仓库地址试试。
+          </p>
+        </section>
+
+        <section class="plugin-card">
+          <div class="plugin-section-head">
+            <h2 class="plugin-section-title" data-i18n="plugin.pending.title">待确认的清单</h2>
+          </div>
+          <div id="pluginPendingList" class="plugin-list"></div>
+          <p id="pluginPendingEmpty" class="plugin-empty" data-i18n="plugin.pending.empty">
+            填入来源后点「安装 / 更新」，这里会显示版本、功能与权限。
+          </p>
+        </section>
+
+        <section class="plugin-card">
+          <div class="plugin-section-head">
+            <h2 class="plugin-section-title" data-i18n="plugin.log.title">日志</h2>
+            <button id="pluginLogClearButton" class="bgm-btn small" data-action="clear-log">
+              <span data-i18n="plugin.log.clear">清空</span>
+            </button>
+          </div>
+          <pre id="pluginLog" class="plugin-log"></pre>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

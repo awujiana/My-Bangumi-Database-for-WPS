@@ -235,7 +235,7 @@ showSettingsPanel,
 // 显示新番表富化面板
 showEnrichPanel, 
 // 显示通用数据清理面板
-showCleanPanel, showHighlightPanel, showConditionalFormatPanel, 
+showCleanPanel, showPluginMarketPanel, showHighlightPanel, showConditionalFormatPanel, 
 // 显示赞赏页面（Ribbon「赞赏」按钮）
 showDonatePanel, 
 // 一键关闭所有任务窗格页面（Ribbon「关闭所有页面」）
