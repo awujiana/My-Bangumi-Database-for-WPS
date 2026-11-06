@@ -746,6 +746,18 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 
 ---
 
+## 🏷 关联标签
+
+<p align="center">
+  <a href="https://github.com/topics/bangumi"><img alt="bangumi" src="https://img.shields.io/badge/bangumi-1f6feb?style=flat-square"></a>
+  <a href="https://github.com/topics/wps"><img alt="wps" src="https://img.shields.io/badge/wps-1f6feb?style=flat-square"></a>
+  <a href="https://github.com/topics/excel"><img alt="excel" src="https://img.shields.io/badge/excel-1f6feb?style=flat-square"></a>
+  <a href="https://github.com/topics/javascript"><img alt="javascript" src="https://img.shields.io/badge/javascript-1f6feb?style=flat-square"></a>
+  <a href="https://github.com/topics/wps-addin"><img alt="wps-addin" src="https://img.shields.io/badge/wps--addin-1f6feb?style=flat-square"></a>
+</p>
+
+> 以上为本仓库的 GitHub Topics（关联标签）；可在仓库首页 Topics 区或 `gh repo edit awujiana/My-Bangumi-Database-for-WPS --add-topic "..."` 维护。
+
 ## 🔗 关联仓库
 
 | 仓库                                                                                   | 说明                                                  |
