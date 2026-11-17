@@ -146,7 +146,7 @@ export function exportData(key, format, options) {
         return 0;
     }
     if (rows.length === 0) {
-        showToast(tOr('handlers.dataExport.empty', '暂无{label}可导出{note}', { label, note }), 'warning');
+        showToast(tOr('handlers.dataExport.empty', '还没有可导出的{label}{note}，先同步一次', { label, note }), 'warning');
         return 0;
     }
     const count = exportRows(baseName, source.headers, rows, format);

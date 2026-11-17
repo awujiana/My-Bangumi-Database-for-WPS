@@ -50,7 +50,7 @@
 
 .table-resize-handle:hover,
 .is-resizing .table-resize-handle {
-  background: var(--accent, #4f8cff);
+  background: var(--accent-blue);
   opacity: 0.55;
 }
 
@@ -70,7 +70,7 @@
 
 .table-resize-row-handle:hover,
 .is-resizing .table-resize-row-handle {
-  background: var(--accent, #4f8cff);
+  background: var(--accent-blue);
   opacity: 0.55;
 }
 

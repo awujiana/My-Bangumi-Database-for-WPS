@@ -12,20 +12,25 @@ import type { ScalarMappingKey } from './enrich-page-state.js'
 
 // ========== 着色工具（TAGS / 首播 / 平台按内容稳定配色） ==========
 
-/** 徽章调色板：12 色相，深色主题下保证可读的半透明底 + 高亮文字 */
-const CHIP_COLOR_PALETTE: { bg: string; border: string; text: string }[] = [
-  { bg: 'rgba(248,113,113,0.14)', border: 'rgba(248,113,113,0.40)', text: '#f87171' },
-  { bg: 'rgba(251,146,60,0.14)', border: 'rgba(251,146,60,0.40)', text: '#fb923c' },
-  { bg: 'rgba(250,204,21,0.14)', border: 'rgba(250,204,21,0.45)', text: '#facc15' },
-  { bg: 'rgba(132,204,22,0.14)', border: 'rgba(132,204,22,0.40)', text: '#84cc16' },
-  { bg: 'rgba(34,197,94,0.14)', border: 'rgba(34,197,94,0.40)', text: '#22c55e' },
-  { bg: 'rgba(45,212,191,0.14)', border: 'rgba(45,212,191,0.40)', text: '#2dd4bf' },
-  { bg: 'rgba(56,189,248,0.14)', border: 'rgba(56,189,248,0.40)', text: '#38bdf8' },
-  { bg: 'rgba(96,165,250,0.14)', border: 'rgba(96,165,250,0.40)', text: '#60a5fa' },
-  { bg: 'rgba(167,139,250,0.14)', border: 'rgba(167,139,250,0.40)', text: '#a78bfa' },
-  { bg: 'rgba(192,132,252,0.14)', border: 'rgba(192,132,252,0.40)', text: '#c084fc' },
-  { bg: 'rgba(244,114,182,0.14)', border: 'rgba(244,114,182,0.40)', text: '#f472b6' },
-  { bg: 'rgba(251,113,133,0.14)', border: 'rgba(251,113,133,0.40)', text: '#fb7185' },
+/**
+ * 徽标 12 色相（顺序即哈希取模顺序，**改动会让已有表格换色**，只允许追加）。
+ * 只存色相名，真实色值由 css/tokens.css 的 --chip-* 按深浅主题给出：
+ * 之前这里写死 12 组十六进制，浅色主题下亮色当文字在浅底上只有 1.5~2.5:1，
+ * 而内联 style 又会盖掉 CSS 里的主题覆盖，等于浅色主题彻底失守。
+ */
+const CHIP_HUES: string[] = [
+  'red',
+  'orange',
+  'yellow',
+  'lime',
+  'green',
+  'teal',
+  'sky',
+  'blue',
+  'violet',
+  'purple',
+  'pink',
+  'rose',
 ]
 
 /**
@@ -37,17 +42,22 @@ function stableColorIndex(text: string): number {
   for (let index = 0; index < text.length; index += 1) {
     hash = (hash * 31 + (text.codePointAt(index) ?? 0)) >>> 0
   }
-  return hash % CHIP_COLOR_PALETTE.length
+  return hash % CHIP_HUES.length
 }
 
-/** 按文本稳定着色的徽章 HTML（颜色写入内联 style，DOMPurify 白名单允许 style 属性） */
+/** 按文本稳定着色的徽章 HTML（颜色名写入内联 style，DOMPurify 白名单允许 style 属性） */
 function coloredChipHtml(text: string, baseClass: string): string {
-  const palette = CHIP_COLOR_PALETTE[stableColorIndex(text)] ?? CHIP_COLOR_PALETTE[0]
+  const hue = CHIP_HUES[stableColorIndex(text)] ?? CHIP_HUES[0]
   const escaped = escapeHtml(text)
-  if (!palette) {
+  if (!hue) {
     return `<span class="${baseClass}">${escaped}</span>`
   }
-  return `<span class="${baseClass}" title="${escaped}" style="background:${palette.bg};border-color:${palette.border};color:${palette.text}">${escaped}</span>`
+  const color = `var(--chip-${hue})`
+  const style =
+    `background:color-mix(in srgb, ${color} 14%, transparent);` +
+    `border-color:color-mix(in srgb, ${color} 40%, transparent);` +
+    `color:${color}`
+  return `<span class="${baseClass}" title="${escaped}" style="${style}">${escaped}</span>`
 }
 
 /** 按 `/`、`|`、逗号、顿号拆分为条目列表（去空 + 噪声过滤） */

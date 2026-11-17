@@ -84,7 +84,7 @@ export function buildTabsHTML(logCount) {
 export function buildModulesPanelHTML() {
     const modules = getModuleStatuses();
     if (modules.length === 0) {
-        return `<div class="bgm-dp-panel active" data-panel="modules"><p style="color:#64748b;text-align:center;padding:20px;">等待模块加载...</p></div>`;
+        return `<div class="bgm-dp-panel active" data-panel="modules"><p style="color:var(--text-3);text-align:center;padding:20px;">等待模块加载...</p></div>`;
     }
     const items = modules
         .map((m) => `

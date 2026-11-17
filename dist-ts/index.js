@@ -235,7 +235,9 @@ showSettingsPanel,
 // 显示新番表富化面板
 showEnrichPanel, 
 // 显示通用数据清理面板
-showCleanPanel, showPluginMarketPanel, showHighlightPanel, showConditionalFormatPanel, 
+showCleanPanel, showPluginMarketPanel, 
+// 显示数据中心面板（Ribbon「数据中心」按钮）
+showDataCenterPanel, showHighlightPanel, showConditionalFormatPanel, 
 // 显示赞赏页面（Ribbon「赞赏」按钮）
 showDonatePanel, 
 // 一键关闭所有任务窗格页面（Ribbon「关闭所有页面」）

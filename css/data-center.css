@@ -1,0 +1,274 @@
+/**
+ * 数据中心页面样式
+ *
+ * 与 plugin-market.css 同构：`.global` 收成「顶栏 + 主体」两行，颜色一律走 tokens.css。
+ * 填充色（--chip-*）与文字色（--text-*）分开用，避免浅色主题跌破对比度。
+ */
+
+body[data-page='data-center'] .global {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  height: 100vh;
+}
+
+.dc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.dc-card {
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.dc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dc-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.dc-subtitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.dc-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.dc-count {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.dc-update-diff {
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.dc-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dc-chart-block {
+  min-width: 0;
+}
+
+.dc-pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dc-pie {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex: 0 0 auto;
+}
+
+.dc-pie-svg {
+  width: 120px;
+  height: 120px;
+}
+
+.dc-pie-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text-1);
+  pointer-events: none;
+}
+
+.dc-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.dc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dc-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dc-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+}
+
+.dc-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.dc-bar-track {
+  width: 100%;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--bg-surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dc-bar-fill {
+  width: 100%;
+  background: var(--accent-blue);
+  border-radius: 4px 4px 0 0;
+}
+
+.dc-bar-value {
+  font-size: 11px;
+  color: var(--text-1);
+}
+
+.dc-bar-label {
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.dc-compare {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.dc-compare-arrow {
+  font-size: 12px;
+}
+
+.dc-compare-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.dc-empty {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.dc-recommend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dc-recommend-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.dc-recommend-reason {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.dc-search-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.dc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.dc-field .input {
+  width: 100%;
+}
+
+.dc-message {
+  min-height: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-warn);
+}
+
+.dc-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.dc-result-item {
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.dc-result-meta {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.dc-result-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+.dc-log-card pre.dc-log {
+  max-height: 140px;
+  overflow: auto;
+  font-size: 11px;
+  color: var(--text-2);
+}

@@ -267,6 +267,8 @@ export declare function markDonatePaneLoaded(): void;
 export declare function markConditionalFormatPaneLoaded(): void;
 /** 标记「插件市场」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建） */
 export declare function markPluginMarketPaneLoaded(): void;
+/** 标记「数据中心」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建） */
+export declare function markDataCenterPaneLoaded(): void;
 /**
  * 显示 / 切换「插件市场」面板（独立面板，与设置 / 富化 / 清理 / 高亮 / 条件格式并列）
  *
@@ -274,6 +276,11 @@ export declare function markPluginMarketPaneLoaded(): void;
  * 隐藏旧面板并重建，避免坏 ID 被持久化卡死。
  */
 export declare function showPluginMarketPanel(): void;
+/**
+ * 显示 / 切换「数据中心」面板（独立面板，与插件市场 / 设置 / 富化 / 清理并列）
+ * 与插件市场同款自愈机制：坏 ID（页面从未成功加载）会被重建，避免卡死。
+ */
+export declare function showDataCenterPanel(): void;
 /**
  * 显示 / 切换「条件格式管理」面板（独立面板，与设置 / 富化 / 清理 / 高亮并列）
  *

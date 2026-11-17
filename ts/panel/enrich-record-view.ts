@@ -86,7 +86,7 @@ export function loadRecentRecords(): void {
 
     const recentRecords = records.slice(-10).reverse()
     if (recentRecords.length === 0) {
-      const emptyHtml = `<div class="record-empty">${escapeHtml(tOr('enrich.records.empty', '暂无记录'))}</div>`
+      const emptyHtml = `<div class="record-empty">${escapeHtml(tOr('enrich.records.empty', '还没有富化记录 · 选中文件后点「开始富化」，结果会出现在这里'))}</div>`
       recordsContainer.innerHTML = sanitizeHtml(emptyHtml)
       return
     }

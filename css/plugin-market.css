@@ -22,8 +22,8 @@ body[data-page='plugin-market'] .global {
 }
 
 .plugin-card {
-  background: var(--bg-elevated, #24243a);
-  border: 1px solid var(--border-subtle, #33334d);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 12px 14px;
 }
@@ -40,27 +40,27 @@ body[data-page='plugin-market'] .global {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary, #e6e6f0);
+  color: var(--text-1);
 }
 
 .plugin-count {
   font-size: 12px;
-  color: var(--text-secondary, #9a9ab0);
+  color: var(--text-2);
 }
 
 .plugin-hint {
   margin: 4px 0 10px;
   font-size: 12px;
   line-height: 1.6;
-  color: var(--text-secondary, #9a9ab0);
+  color: var(--text-2);
 }
 
 .plugin-hint code {
   font-size: 11px;
   padding: 1px 4px;
   border-radius: 4px;
-  background: var(--bg-input, #1c1c2e);
-  color: var(--text-primary, #e6e6f0);
+  background: var(--bg-surface);
+  color: var(--text-1);
 }
 
 .plugin-source-row {
@@ -79,7 +79,7 @@ body[data-page='plugin-market'] .global {
   gap: 6px;
   margin-top: 8px;
   font-size: 12px;
-  color: var(--text-secondary, #9a9ab0);
+  color: var(--text-2);
   cursor: pointer;
 }
 
@@ -88,19 +88,19 @@ body[data-page='plugin-market'] .global {
   font-size: 12px;
   line-height: 1.6;
   min-height: 16px;
-  color: var(--text-secondary, #9a9ab0);
+  color: var(--text-2);
 }
 
 .plugin-message[data-level='error'] {
-  color: var(--text-danger, #e56a6a);
+  color: var(--text-danger);
 }
 
 .plugin-message[data-level='success'] {
-  color: var(--text-success, #5fbf7f);
+  color: var(--text-success);
 }
 
 .plugin-message[data-level='warn'] {
-  color: var(--text-warn, #d8a657);
+  color: var(--text-warn);
 }
 
 .plugin-list {
@@ -110,10 +110,10 @@ body[data-page='plugin-market'] .global {
 }
 
 .plugin-item {
-  border: 1px solid var(--border-subtle, #33334d);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 10px 12px;
-  background: var(--bg-input, #1c1c2e);
+  background: var(--bg-surface);
 }
 
 .plugin-item-head {
@@ -126,23 +126,25 @@ body[data-page='plugin-market'] .global {
 .plugin-item-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary, #e6e6f0);
+  color: var(--text-1);
 }
 
 .plugin-item-version {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--bg-elevated, #24243a);
-  color: var(--text-secondary, #9a9ab0);
+  background: var(--bg-base);
+  color: var(--text-2);
 }
 
 .plugin-item-badge {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--accent-blue, #2f7fe0);
-  color: #ffffff;
+  /* 深蓝实心底 + 恒定白字：#4a9eff 上白字只有 2.75:1，
+     而 --text-on-accent 在深色主题会给深字 → 深底深字同样失守。 */
+  background: var(--accent-blue-deep);
+  color: var(--on-solid-dark);
 }
 
 /* 签名徽标：只有「已验证」用成功色，其余都是提示/警告 —— 颜色本身就在告诉用户该不该信 */
@@ -151,34 +153,34 @@ body[data-page='plugin-market'] .global {
   padding: 1px 6px;
   border-radius: 999px;
   border: 1px solid currentColor;
-  color: var(--text-muted, #7a7a92);
+  color: var(--text-3);
 }
 
 .plugin-signature-badge[data-status='verified'] {
-  color: var(--text-success, #4caf7d);
+  color: var(--text-success);
 }
 
 .plugin-signature-badge[data-status='untrusted-key'],
 .plugin-signature-badge[data-status='invalid'] {
-  color: var(--text-danger, #e05c5c);
+  color: var(--text-danger);
 }
 
 .plugin-signature-badge[data-status='unsupported'] {
-  color: var(--text-warn, #d8a657);
+  color: var(--text-warn);
 }
 
 .plugin-item-desc {
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.6;
-  color: var(--text-secondary, #9a9ab0);
+  color: var(--text-2);
 }
 
 .plugin-item-meta {
   margin: 6px 0 0;
   font-size: 11px;
   line-height: 1.6;
-  color: var(--text-muted, #7a7a92);
+  color: var(--text-3);
   word-break: break-all;
 }
 
@@ -193,13 +195,13 @@ body[data-page='plugin-market'] .global {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 4px;
-  border: 1px solid var(--border-subtle, #33334d);
-  color: var(--text-secondary, #9a9ab0);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-2);
 }
 
 .plugin-permission[data-risky='true'] {
-  border-color: var(--text-warn, #d8a657);
-  color: var(--text-warn, #d8a657);
+  border-color: var(--text-warn);
+  color: var(--text-warn);
 }
 
 .plugin-item-actions {
@@ -212,7 +214,7 @@ body[data-page='plugin-market'] .global {
 .plugin-empty {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--text-muted, #7a7a92);
+  color: var(--text-3);
 }
 
 .plugin-log {
@@ -221,8 +223,8 @@ body[data-page='plugin-market'] .global {
   overflow: auto;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--bg-input, #1c1c2e);
-  color: var(--text-secondary, #9a9ab0);
+  background: var(--bg-surface);
+  color: var(--text-2);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 11px;
   line-height: 1.6;
@@ -233,7 +235,7 @@ body[data-page='plugin-market'] .global {
 .btn-link {
   background: transparent;
   border: none;
-  color: var(--text-link, #6aa9ff);
+  color: var(--text-link);
   font-size: 12px;
   cursor: pointer;
   padding: 0;
@@ -253,6 +255,6 @@ body[data-page='plugin-market'] .global {
 }
 
 .plugin-spec-link:focus-visible {
-  outline: 2px solid var(--text-link, #6aa9ff);
+  outline: 2px solid var(--text-link);
   outline-offset: 2px;
 }

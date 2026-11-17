@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:58890 https://127.0.0.1:58891 ws://127.0.0.1:58892 https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/detachable-panel.css" />
+    <link rel="stylesheet" href="../css/data-center.css" />
+  </head>
+  <body data-page="data-center">
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/data-center-bootstrap.js"></script>
+    <script src="../libs/fit-viewport.js"></script>
+    <script src="../libs/wps-sdk-loader.js"></script>
+
+    <div class="global">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title" data-i18n="dc.header.title">📊 数据中心</span>
+            <span class="brand-sub" data-i18n="dc.header.subtitle">更新对比 · 打卡统计 · 喜好推荐 · 在线搜索</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="dcRefreshButton" class="bgm-btn small" data-action="dc-refresh">
+            <span data-i18n="dc.action.refresh">刷新统计</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="main dc-main">
+        <!-- 数据更新检查 -->
+        <section class="dc-card">
+          <div class="dc-section-head">
+            <h2 class="dc-section-title" data-i18n="dc.update.title">数据更新</h2>
+            <button id="dcCheckUpdateButton" class="bgm-btn small primary" data-action="dc-check-update">
+              <span data-i18n="dc.update.check">检查更新</span>
+            </button>
+          </div>
+          <p id="dcUpdateStatus" class="dc-hint" data-i18n="dc.update.hint">检查线上数据源是否有更新，并与上次记录对比。</p>
+          <div id="dcUpdateDiff" class="dc-update-diff"></div>
+        </section>
+
+        <!-- 打卡统计 -->
+        <section class="dc-card">
+          <div class="dc-section-head">
+            <h2 class="dc-section-title" data-i18n="dc.stats.title">打卡统计</h2>
+            <button id="dcExportButton" class="bgm-btn small" data-action="dc-export">
+              <span data-i18n="dc.stats.export">导出 CSV</span>
+            </button>
+          </div>
+          <div class="dc-stats-grid">
+            <div class="dc-chart-block">
+              <h3 class="dc-subtitle" data-i18n="dc.stats.statusDist">观看状态分布</h3>
+              <div id="dcStatusPie" class="dc-pie-wrap"></div>
+            </div>
+            <div class="dc-chart-block">
+              <h3 class="dc-subtitle" data-i18n="dc.stats.monthlyDone">月度完成数</h3>
+              <div id="dcMonthlyBars" class="dc-bars-wrap"></div>
+              <div id="dcComparison" class="dc-compare-wrap"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 喜好推荐 -->
+        <section class="dc-card">
+          <div class="dc-section-head">
+            <h2 class="dc-section-title" data-i18n="dc.recommend.title">为你推荐</h2>
+            <span id="dcRecommendCount" class="dc-count"></span>
+          </div>
+          <p id="dcRecommendHint" class="dc-hint" data-i18n="dc.recommend.hint">根据你看过的条目标签推荐。</p>
+          <div id="dcRecommendList" class="dc-recommend-list"></div>
+        </section>
+
+        <!-- 在线搜索 -->
+        <section class="dc-card">
+          <h2 class="dc-section-title" data-i18n="dc.search.title">在线搜索</h2>
+          <p class="dc-hint" data-i18n="dc.search.hint">全部选填，但至少填一项。可搜本地库与 Bangumi 的动漫 / 电视剧 / 电影。</p>
+          <div class="dc-search-form">
+            <label class="dc-field">
+              <span data-i18n="dc.search.keyword">关键词</span>
+              <input id="dcSearchKeyword" class="input" type="text" autocomplete="off" />
+            </label>
+            <label class="dc-field">
+              <span data-i18n="dc.search.kind">类型</span>
+              <select id="dcSearchKind" class="input">
+                <option value="all" data-i18n="dc.kind.all">不限</option>
+                <option value="anime" data-i18n="dc.kind.anime">动漫</option>
+                <option value="tv" data-i18n="dc.kind.tv">电视剧</option>
+                <option value="movie" data-i18n="dc.kind.movie">电影</option>
+              </select>
+            </label>
+            <label class="dc-field">
+              <span data-i18n="dc.search.year">年份</span>
+              <input id="dcSearchYear" class="input" type="number" min="1900" max="2100" />
+            </label>
+            <label class="dc-field">
+              <span data-i18n="dc.search.minRating">最低评分</span>
+              <input id="dcSearchRating" class="input" type="number" min="0" max="10" step="0.5" />
+            </label>
+            <label class="dc-field">
+              <span data-i18n="dc.search.scope">范围</span>
+              <select id="dcSearchScope" class="input">
+                <option value="both" data-i18n="dc.scope.both">本地 + 在线</option>
+                <option value="local" data-i18n="dc.scope.local">仅本地</option>
+                <option value="online" data-i18n="dc.scope.online">仅在线</option>
+              </select>
+            </label>
+            <button id="dcSearchButton" class="bgm-btn small primary" data-action="dc-search">
+              <span data-i18n="dc.search.do">搜索</span>
+            </button>
+          </div>
+          <div id="dcSearchMessage" class="dc-message" role="status"></div>
+          <div id="dcSearchResults" class="dc-search-results"></div>
+        </section>
+
+        <section class="dc-card dc-log-card">
+          <div class="dc-section-head">
+            <h2 class="dc-section-title" data-i18n="dc.log.title">日志</h2>
+            <button id="dcLogClearButton" class="bgm-btn small" data-action="dc-clear-log">
+              <span data-i18n="dc.log.clear">清空</span>
+            </button>
+          </div>
+          <pre id="dcLog" class="dc-log"></pre>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

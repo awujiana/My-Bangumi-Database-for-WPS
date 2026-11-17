@@ -617,9 +617,9 @@ function renderBatchFileList(): void {
       const rows = state.batchFiles.map((filePath, index) => {
         const fileName = extractFileName(filePath)
         return `
-          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid #2a2a2a;font-size:12px;">
-            <span style="color:#888;flex-shrink:0;">#${String(index + 1)}</span>
-            <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid var(--border-strong);font-size:12px;">
+            <span style="color:var(--text-3);flex-shrink:0;">#${String(index + 1)}</span>
+            <span style="flex:1;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
             <button class="bgm-btn small" data-batch-remove="${String(index)}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
           </div>
         `
@@ -1731,9 +1731,9 @@ function renderBatchSummary(): void {
             reason: escapeHtml(r.error || tOr('enrich.page.unknownError', '未知错误')),
           })
       return `
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
-          <span style="color:#ddd;">${statusIcon} #${String(index + 1)} ${escapeHtml(r.fileName)}</span>
-          <span style="color:${r.success ? '#a6e3a1' : '#f38ba8'};">${detail}</span>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed var(--border-strong);">
+          <span style="color:var(--text-2);">${statusIcon} #${String(index + 1)} ${escapeHtml(r.fileName)}</span>
+          <span style="color:${r.success ? 'var(--text-success)' : 'var(--text-danger)'};">${detail}</span>
         </div>
       `
     })
@@ -1742,13 +1742,13 @@ function renderBatchSummary(): void {
   const html = `
     <div style="display:flex;gap:16px;margin-bottom:8px;font-size:13px;">
       <span>${tOr('enrich.page.sumFiles', '📄 <b>{count}</b> 个文件', { count: total })}</span>
-      <span style="color:#a6e3a1;">${tOr('enrich.page.sumSuccess', '✅ {count} 成功', { count: successCount })}</span>
-      ${failCount > 0 ? `<span style="color:#f38ba8;">${tOr('enrich.page.batchFailCount', '❌ {count} 失败', { count: failCount })}</span>` : ''}
+      <span style="color:var(--text-success);">${tOr('enrich.page.sumSuccess', '✅ {count} 成功', { count: successCount })}</span>
+      ${failCount > 0 ? `<span style="color:var(--text-danger);">${tOr('enrich.page.batchFailCount', '❌ {count} 失败', { count: failCount })}</span>` : ''}
     </div>
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--text-2);">
-      <span>${tOr('enrich.page.sumMatchedLabel', '匹配总数')} <b style="color:#a6e3a1;">${String(totalMatched)}</b></span>
-      <span>${tOr('enrich.page.sumUpdatedLabel', '已更新')} <b style="color:#89b4fa;">${String(totalUpdated)}</b></span>
-      <span>${tOr('enrich.page.sumUnmatchedLabel', '未匹配')} <b style="color:#f9e2af;">${String(totalUnmatched)}</b></span>
+      <span>${tOr('enrich.page.sumMatchedLabel', '匹配总数')} <b style="color:var(--text-success);">${String(totalMatched)}</b></span>
+      <span>${tOr('enrich.page.sumUpdatedLabel', '已更新')} <b style="color:var(--text-link);">${String(totalUpdated)}</b></span>
+      <span>${tOr('enrich.page.sumUnmatchedLabel', '未匹配')} <b style="color:var(--text-warn);">${String(totalUnmatched)}</b></span>
     </div>
     <div style="max-height:200px;overflow-y:auto;">${fileRows}</div>
   `

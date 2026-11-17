@@ -72,12 +72,12 @@
 
 /* 危险项：删除类操作红色，hover 给一层红底（不抢焦点环） */
 .bgm-context-menu-item.is-danger {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
 }
 
 .bgm-context-menu-item.is-danger:hover,
 .bgm-context-menu-item.is-danger:focus-visible {
-  background: color-mix(in srgb, var(--danger, #ef4444) 14%, transparent);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .bgm-context-menu-label {

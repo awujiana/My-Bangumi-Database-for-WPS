@@ -167,7 +167,7 @@ function renderColumnMappingEditor(worksheet: WpsWorksheet, mapping: EnrichColum
       })
       .join('')}`
 
-    const requiredMark = field.required ? ' <span style="color:#ff6b6b;">*</span>' : ''
+    const requiredMark = field.required ? ' <span style="color:var(--text-danger);">*</span>' : ''
 
     html += `
       <div class="mapping-item" data-field="${field.key}">
@@ -881,7 +881,7 @@ function showAllMatchesDetail(matches: MatchResult[]): void {
   if (!modalElement || !bodyElement) return
   if (matches.length === 0) {
     bodyElement.innerHTML = sanitizeHtml(
-      `<p class="hint">${escapeHtml(tOr('enrich.preview.noMatchResult', '暂无匹配结果'))}</p>`,
+      `<p class="hint">${escapeHtml(tOr('enrich.preview.noMatchResult', '这一批没有匹配到任何条目 · 回预览列表确认名称 / ID 列选对了，再重新识别'))}</p>`,
     )
     modalElement.style.display = 'flex'
     return

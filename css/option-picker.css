@@ -25,13 +25,13 @@
 }
 
 .bgm-option-picker-radio-item:has(input:checked) {
-  border-color: var(--accent, #3b82f6);
+  border-color: var(--accent-blue);
   background: var(--bg-surface-2);
   color: var(--text-1);
 }
 
 .bgm-option-picker-radio-item input {
-  accent-color: var(--accent, #3b82f6);
+  accent-color: var(--accent);
 }
 
 .bgm-option-picker-select {

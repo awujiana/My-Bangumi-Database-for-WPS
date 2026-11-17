@@ -73,6 +73,10 @@ async function getExporter(): Promise<ExportModule | null> {
 
 // ========== 样式 ==========
 
+/* 调试面板刻意固定为「浅底 slate 字」的一套配色，不接 design token、不跟随深浅主题：
+   它是排障工具，必须和插件自己的主题区分开（否则深色主题下会跟任务窗格糊成一片，
+   反而分不清哪块是插件、哪块是调试台）。同一原则见 css/styles.css 的 .debug-* 区块
+   （那边是深底绿字的终端配色）。U-01 评审把这两处都记为「有意保留」。 */
 const PANEL_CSS = `
 .bgm-dp-root {
   position: fixed;

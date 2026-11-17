@@ -918,6 +918,13 @@ export function markPluginMarketPaneLoaded() {
     const app = getApp();
     app?.PluginStorage?.setItem('pluginMarket_pane_url', window.location.href);
 }
+/** 标记「数据中心」面板已成功加载（自愈用：URL 拼错 / 页面报错时下次重建） */
+export function markDataCenterPaneLoaded() {
+    if (typeof window === 'undefined')
+        return;
+    const app = getApp();
+    app?.PluginStorage?.setItem('dataCenter_pane_url', window.location.href);
+}
 /**
  * 显示 / 切换「插件市场」面板（独立面板，与设置 / 富化 / 清理 / 高亮 / 条件格式并列）
  *
@@ -968,6 +975,55 @@ export function showPluginMarketPanel() {
     }
     else {
         bgmLog(LOG_LEVELS.ERROR, '[showPluginMarketPanel] 创建插件市场面板失败');
+    }
+}
+/**
+ * 显示 / 切换「数据中心」面板（独立面板，与插件市场 / 设置 / 富化 / 清理并列）
+ * 与插件市场同款自愈机制：坏 ID（页面从未成功加载）会被重建，避免卡死。
+ */
+export function showDataCenterPanel() {
+    const app = getApp();
+    if (!app) {
+        bgmLog(LOG_LEVELS.ERROR, '[showDataCenterPanel] 无法获取 WPS Application 对象');
+        return;
+    }
+    let paneId = app.PluginStorage?.getItem('dataCenter_pane_id');
+    const storedPaneUrl = app.PluginStorage?.getItem('dataCenter_pane_url');
+    if (paneId && !storedPaneUrl?.includes('data-center.html')) {
+        const stalePane = app.GetTaskPane?.(paneId);
+        if (stalePane)
+            stalePane.Visible = false;
+        app.PluginStorage?.setItem('dataCenter_pane_id', '');
+        app.PluginStorage?.setItem('dataCenter_pane_url', '');
+        paneId = null;
+        bgmLog(LOG_LEVELS.WARN, '[showDataCenterPanel] 检测到加载失败的旧数据中心面板，已重建');
+    }
+    if (paneId) {
+        const pane = app.GetTaskPane?.(paneId);
+        if (pane) {
+            if (isPanePageAlive('data-center')) {
+                pane.Visible = !pane.Visible;
+                bgmLog(LOG_LEVELS.INFO, `[showDataCenterPanel] 数据中心面板可见性切换: ${String(pane.Visible)}`);
+                return;
+            }
+            pane.Visible = false;
+            app.PluginStorage?.setItem('dataCenter_pane_id', '');
+            app.PluginStorage?.setItem('dataCenter_pane_url', '');
+            bgmLog(LOG_LEVELS.WARN, '[showDataCenterPanel] 窗格对象仍在但页面心跳已停，已重建');
+        }
+        else {
+            app.PluginStorage?.setItem('dataCenter_pane_id', '');
+            app.PluginStorage?.setItem('dataCenter_pane_url', '');
+        }
+    }
+    const pane = app.CreateTaskPane?.(buildTaskPaneUrl('data-center.html'));
+    if (pane) {
+        pane.Visible = true;
+        app.PluginStorage?.setItem('dataCenter_pane_id', pane.ID);
+        bgmLog(LOG_LEVELS.INFO, `[showDataCenterPanel] 数据中心面板已创建(ID:${pane.ID})`);
+    }
+    else {
+        bgmLog(LOG_LEVELS.ERROR, '[showDataCenterPanel] 创建数据中心面板失败');
     }
 }
 /**
@@ -1351,6 +1407,8 @@ const ALL_PANE_ID_KEYS = [
     'settings_pane_id',
     // 赞赏页是独立任务窗格（showDonatePanel），遗漏会导致 Ribbon「关闭所有页面」静默跳过它
     'donate_pane_id',
+    // 数据中心页（showDataCenterPanel），遗漏会导致「关闭所有页面」静默跳过
+    'dataCenter_pane_id',
 ];
 /**
  * 一键关闭所有任务窗格页面（Ribbon「关闭所有页面」按钮）。

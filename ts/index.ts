@@ -374,6 +374,8 @@ export {
   // 显示通用数据清理面板
   showCleanPanel,
   showPluginMarketPanel,
+  // 显示数据中心面板（Ribbon「数据中心」按钮）
+  showDataCenterPanel,
   showHighlightPanel,
   showConditionalFormatPanel,
   // 显示赞赏页面（Ribbon「赞赏」按钮）

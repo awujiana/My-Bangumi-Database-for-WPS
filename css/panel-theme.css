@@ -371,9 +371,9 @@ body.nav-icons-only .nav a::after {
   left: calc(100% + 8px);
   top: 50%;
   transform: translateY(-50%);
-  background: var(--bg-mantle, #1e1e2e);
-  color: var(--text-1, #e0e0e0);
-  border: 1px solid var(--border, #444);
+  background: var(--bg-mantle);
+  color: var(--text-1);
+  border: 1px solid var(--border);
   padding: 4px 10px;
   border-radius: var(--r-sm);
   font-size: 12px;

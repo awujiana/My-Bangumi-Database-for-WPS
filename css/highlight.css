@@ -155,7 +155,7 @@
 }
 
 .highlight-preview-view-btn.is-active {
-  background: var(--accent-soft, var(--bg-surface-2));
+  background: var(--bg-surface-2);
   border-color: var(--accent, var(--border-strong));
   color: var(--text-1);
   font-weight: 600;

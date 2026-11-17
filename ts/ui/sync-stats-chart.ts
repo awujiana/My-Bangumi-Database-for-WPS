@@ -92,11 +92,11 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
   // 环形图颜色：≥90 绿、≥50 黄、否则红
   let ringColor: string
   if (completionPct >= 90) {
-    ringColor = 'var(--green, #a6e3a1)'
+    ringColor = 'var(--green)'
   } else if (completionPct >= 50) {
-    ringColor = 'var(--yellow, #f9e2af)'
+    ringColor = 'var(--yellow)'
   } else {
-    ringColor = 'var(--red, #f38ba8)'
+    ringColor = 'var(--red)'
   }
 
   // 效率（处理数/活跃总数）
@@ -162,7 +162,7 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       </div>
       <div class="bgm-completion-ring">
         <svg viewBox="0 0 120 120" class="bgm-progress-svg">
-          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0, #313244)" stroke-width="10" />
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0)" stroke-width="10" />
           <circle cx="60" cy="60" r="50" fill="none"
             stroke="${ringColor}"
             stroke-width="10"
@@ -184,27 +184,27 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       <div class="bgm-chart-left">
         <div class="bgm-donut-chart">
           <svg viewBox="0 0 140 140" class="bgm-donut-svg">
-            <circle cx="70" cy="70" r="${String(radius)}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
+            <circle cx="70" cy="70" r="${String(radius)}" fill="none" stroke="var(--surface0)" stroke-width="14" />
             ${
               totalAll > 0
                 ? `
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--green, #a6e3a1)" stroke-width="14"
+                stroke="var(--green)" stroke-width="14"
                 stroke-dasharray="${String(seg(addedPct))} ${String(circumference)}"
                 stroke-dashoffset="0"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--yellow, #f9e2af)" stroke-width="14"
+                stroke="var(--yellow)" stroke-width="14"
                 stroke-dasharray="${String(seg(updatedPct))} ${String(circumference)}"
                 stroke-dashoffset="${String(-seg(addedPct))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--red, #f38ba8)" stroke-width="14"
+                stroke="var(--red)" stroke-width="14"
                 stroke-dasharray="${String(seg(deletedPct))} ${String(circumference)}"
                 stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--overlay1, #7f849c)" stroke-width="14"
+                stroke="var(--overlay1)" stroke-width="14"
                 stroke-dasharray="${String(seg(unchangedPct))} ${String(circumference)}"
                 stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
@@ -212,7 +212,7 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
                 stats.failed > 0
                   ? `
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--peach, #fab387)" stroke-width="14"
+                stroke="var(--peach)" stroke-width="14"
                 stroke-dasharray="${String(seg(failedPct))} ${String(circumference)}"
                 stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
@@ -222,7 +222,7 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
                 stats.skipped > 0
                   ? `
               <circle cx="70" cy="70" r="${String(radius)}" fill="none"
-                stroke="var(--lavender, #b4befe)" stroke-width="14"
+                stroke="var(--lavender)" stroke-width="14"
                 stroke-dasharray="${String(seg(skippedPct))} ${String(circumference)}"
                 stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
@@ -238,12 +238,12 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
           </div>
         </div>
         <div class="bgm-chart-legend">
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${String(stats.added)}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${String(stats.updated)}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${String(stats.deleted)}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${String(stats.unchanged)}</div>
-          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${String(stats.failed)}</div>` : ''}
-          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${String(stats.skipped)}</div>` : ''}
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green)"></span>新增 ${String(stats.added)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow)"></span>更新 ${String(stats.updated)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red)"></span>删除 ${String(stats.deleted)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1)"></span>无变更 ${String(stats.unchanged)}</div>
+          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach)"></span>失败 ${String(stats.failed)}</div>` : ''}
+          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender)"></span>跳过 ${String(stats.skipped)}</div>` : ''}
         </div>
       </div>
 
@@ -298,9 +298,9 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       <div class="bgm-perg-item">
         <div class="bgm-perg-ring">
           <svg viewBox="0 0 80 80" class="bgm-perg-svg">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
-              stroke="var(--blue, #89b4fa)" stroke-width="6"
+              stroke="var(--blue)" stroke-width="6"
               stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
               stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
@@ -316,9 +316,9 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       <div class="bgm-perg-item">
         <div class="bgm-perg-ring">
           <svg viewBox="0 0 80 80" class="bgm-perg-svg">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
-              stroke="var(--green, #a6e3a1)" stroke-width="6"
+              stroke="var(--green)" stroke-width="6"
               stroke-dasharray="${String(Math.min(stats.avgSpeed / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
               stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
@@ -334,9 +334,9 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       <div class="bgm-perg-item">
         <div class="bgm-perg-ring">
           <svg viewBox="0 0 80 80" class="bgm-perg-svg">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
-              stroke="var(--peach, #fab387)" stroke-width="6"
+              stroke="var(--peach)" stroke-width="6"
               stroke-dasharray="${String((efficiencyPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
               stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
@@ -352,9 +352,9 @@ export function renderSyncStatsChart(stats: SyncProgressStats): string {
       <div class="bgm-perg-item">
         <div class="bgm-perg-ring">
           <svg viewBox="0 0 80 80" class="bgm-perg-svg">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
-              stroke="var(--sapphire, #74c7ec)" stroke-width="6"
+              stroke="var(--info)" stroke-width="6"
               stroke-dasharray="${String(Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
               stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"

@@ -260,7 +260,9 @@ export function installComStartupFallback(pageKey) {
         banner.setAttribute('role', 'status');
         banner.style.cssText =
             'position:sticky;top:0;z-index:9999;padding:8px 10px;margin:0 0 8px;' +
-                'background:#fff4e5;border:1px solid #ffb35c;border-radius:6px;' +
+                // 跟随主题的警告条：深色主题不再糊一条奶油色，浅色主题也不会亮到刺眼。
+                'background:color-mix(in srgb, var(--warning) 18%, var(--bg-base));' +
+                'border:1px solid color-mix(in srgb, var(--warning) 55%, transparent);border-radius:6px;' +
                 'font-size:12px;line-height:1.5;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
         const text = document.createElement('span');
         text.textContent = `初始化撞上宿主忙（${detail.reason}）。`;
@@ -268,8 +270,8 @@ export function installComStartupFallback(pageKey) {
         button.type = 'button';
         button.textContent = '点此继续初始化';
         button.style.cssText =
-            'flex:0 0 auto;padding:4px 10px;border:1px solid #d98c2b;border-radius:4px;' +
-                'background:#ffb35c;color:#3a2200;cursor:pointer;font-size:12px';
+            'flex:0 0 auto;padding:4px 10px;border:1px solid var(--warning);border-radius:4px;' +
+                'background:var(--warning);color:var(--text-on-accent);cursor:pointer;font-size:12px';
         button.addEventListener('click', () => {
             banner.remove();
             detail.resume();

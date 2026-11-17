@@ -121,6 +121,8 @@ body[data-page='donate'] .donate-main {
   /* 静区：二维码四周留白，扫码器需要 */
   padding: 12px;
   box-sizing: content-box;
+  /* 有意硬编码纯白：二维码静区必须是不透明白，扫码器才认（两套主题一致），
+     换成 --bg-base 会在深色主题变成一片黑，扫码直接失败。 */
   background: #ffffff;
   border-radius: var(--r-md);
   border: 1px solid var(--border-strong);

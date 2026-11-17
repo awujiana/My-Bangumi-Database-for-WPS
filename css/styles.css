@@ -13,7 +13,7 @@
 }
 
 .modal-content {
-    background: #2d2d2d;
+    background: var(--bg-base);
     padding: 0;
     border-radius: 12px;
     min-width: 340px;
@@ -26,7 +26,7 @@
 
 .modal-content h3 {
     margin: 0;
-    color: #ffffff;
+    color: var(--text-1);
     font-size: 17px;
     font-weight: 600;
 }
@@ -42,7 +42,7 @@
 
 .modal-header h3 {
     flex: 1;
-    color: #fff;
+    color: var(--text-1);
     font-size: 17px;
     font-weight: 600;
 }
@@ -114,7 +114,7 @@
 
 .confirm-yes {
     background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: #fff;
+    color: var(--text-on-accent);
 }
 
 /* ========== 同步预览弹窗 ========== */
@@ -139,8 +139,8 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 13px;
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
     transition: all 0.2s;
 }
 
@@ -150,11 +150,11 @@
 }
 
 .modal-action-btn.secondary {
-    background: #3a3a3a;
+    background: var(--bg-surface);
 }
 
 .modal-action-btn.secondary:hover {
-    background: #4a4a4a;
+    background: var(--bg-surface-2);
 }
 
 /* ========== 关闭按钮样式兼容 ========== */
@@ -191,10 +191,10 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
     font-size: 14px;
-    background: #242424;
+    background: var(--bg-app);
     min-height: 100vh;
     padding: 15px;
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 .global {
@@ -206,7 +206,7 @@ body {
 .header {
     text-align: center;
     padding: 20px 15px;
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     margin-bottom: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -275,7 +275,7 @@ body {
 
 /* ========== 区域卡片 ========== */
 .section {
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     padding: 18px;
     margin-bottom: 12px;
@@ -324,8 +324,8 @@ body {
     cursor: pointer;
     font-size: 14px;
     transition: all 0.3s;
-    background: #3a3a3a;
-    color: #e0e0e0;
+    background: var(--bg-surface);
+    color: var(--text-1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -333,7 +333,7 @@ body {
 }
 
 .bgm-btn:hover {
-    background: #4a4a4a;
+    background: var(--bg-surface-2);
     transform: translateY(-1px);
 }
 
@@ -385,9 +385,9 @@ body {
     flex-direction: column;
     gap: 8px;
     padding: 12px 15px;
-    background: #3a3a3a;
+    background: var(--bg-surface);
     border-radius: 8px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .token-status-info {
@@ -423,12 +423,12 @@ body {
 
 #tokenStatus, #userIdStatus {
     font-weight: bold;
-    color: #ff6b6b;
+    color: var(--text-danger);
     font-size: 14px;
 }
 
 #tokenStatus.set, #userIdStatus.set {
-    color: #4ade80;
+    color: var(--text-success);
 }
 
 /* ========== 提示文本 ========== */
@@ -456,7 +456,7 @@ body {
 
 .form-row label {
     flex: 0 0 90px;
-    color: #b0b0b0;
+    color: var(--text-2);
     font-weight: 500;
     font-size: 13px;
 }
@@ -465,9 +465,9 @@ body {
     flex: 1;
     padding: 6px 10px;
     background: var(--bg-surface);
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-1);
     font-size: 13px;
     font-family: 'Maple Mono', monospace;
     transition: border-color 0.2s;
@@ -475,11 +475,11 @@ body {
 
 .form-row input:focus {
     outline: none;
-    border-color: #5789d9;
+    border-color: var(--accent-blue);
 }
 
 .form-row input::placeholder {
-    color: #666;
+    color: var(--text-3);
 }
 
 /* ========== .form-row 里的「整行 label」 ==========
@@ -540,9 +540,9 @@ body {
     gap: 4px;
     padding: 4px 8px;
     background: var(--bg-surface);
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
-    color: #b0b0b0;
+    color: var(--text-2);
     font-size: 12px;
     font-weight: 400;
     cursor: pointer;
@@ -562,7 +562,7 @@ body {
     width: auto;
     padding: 0;
     margin: 0;
-    accent-color: #5789d9;
+    accent-color: var(--accent-blue);
 }
 
 /* ========== .form-group 里的整行复选标签（.check-row） ==========
@@ -582,9 +582,9 @@ body {
     flex: 1;
     padding: 6px 10px;
     background: var(--bg-surface);
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-1);
     font-size: 13px;
     font-family: 'Maple Mono', monospace;
     cursor: pointer;
@@ -593,18 +593,18 @@ body {
 
 .form-row select:focus {
     outline: none;
-    border-color: #5789d9;
+    border-color: var(--accent-blue);
 }
 
 .form-row select option {
     background: var(--bg-surface);
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 .form-group label {
     display: block;
     margin-bottom: 6px;
-    color: #b0b0b0;
+    color: var(--text-2);
     font-weight: 500;
     font-size: 13px;
 }
@@ -622,12 +622,12 @@ body {
 .input {
     width: 100%;
     padding: 10px 14px;
-    border: 2px solid #444;
+    border: 2px solid var(--border-strong);
     border-radius: 8px;
     font-size: 14px;
     transition: all 0.3s;
     background: var(--bg-surface-2);
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 .input:focus {
@@ -639,7 +639,7 @@ body {
 select.input {
     cursor: pointer;
     background: var(--bg-surface-2);
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 /* ========== 预览区域 ========== */
@@ -648,13 +648,13 @@ select.input {
     border-radius: 10px;
     padding: 3px;
     margin-bottom: 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     max-width: 100%;
     overflow-x: auto;
 }
 
 .preview-box {
-    background: var(--bg-deep, #181825);
+    background: var(--bg-deep);
     border-radius: var(--radius-md, 8px);
     padding: 0;
     max-height: 280px;
@@ -687,8 +687,8 @@ select.input {
 }
 
 .preview-box th {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
     padding: 10px 8px;
     text-align: left;
     font-weight: 600;
@@ -708,9 +708,9 @@ select.input {
 
 .preview-box td {
     padding: 10px 8px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border-strong);
     vertical-align: middle;
-    color: #e0e0e0;
+    color: var(--text-2);
     white-space: nowrap;
 }
 
@@ -719,7 +719,7 @@ select.input {
 }
 
 .preview-box tr:hover {
-    background: var(--bg-hover, #45475a);
+    background: var(--bg-hover);
 }
 
 .preview-box tr:last-child td {
@@ -747,22 +747,22 @@ select.input {
     text-align: center;
     font-size: 13px;
     background: var(--bg-surface-2);
-    color: #cdd6f4;
+    color: var(--text-2);
 }
 
 .status.success {
     background: rgba(74, 222, 128, 0.2);
-    color: #4ade80;
+    color: var(--text-success);
 }
 
 .status.error {
     background: rgba(255, 107, 107, 0.2);
-    color: #ff6b6b;
+    color: var(--text-danger);
 }
 
 .status.warning {
     background: rgba(255, 193, 7, 0.2);
-    color: #ffc107;
+    color: var(--text-warn);
 }
 
 .lock-status {
@@ -770,7 +770,7 @@ select.input {
     padding: 4px 8px;
     border-radius: 4px;
     background: rgba(255, 193, 7, 0.2);
-    color: #ffc107;
+    color: var(--text-warn);
 }
 
 /* ========== 步骤引导 ========== */
@@ -793,8 +793,8 @@ select.input {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -812,7 +812,7 @@ select.input {
 .format-table td {
     padding: 10px 12px;
     text-align: left;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
 }
 
 .format-table th {
@@ -826,10 +826,12 @@ select.input {
 }
 
 .format-table .required {
-    color: #4ade80;
+    color: var(--text-success);
 }
 
 /* ========== 调试区域 ========== */
+/* 调试面板刻意固定终端配色（深底 + 绿字）：它是排障工具，不参与深浅主题；
+   若跟随主题变成白底绿字，日志反而看不清。U-01 评审记为「有意保留」。 */
 .debug-section {
     background: #1a1a1a;
     border: 1px dashed #666;
@@ -867,7 +869,7 @@ select.input {
 }
 
 .radio-label:hover {
-    background: #3a3a3a;
+    background: var(--bg-surface);
 }
 
 .radio-label input:checked + .radio-text {
@@ -885,7 +887,7 @@ select.input {
 
 .radio-text {
     font-weight: 600;
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 .radio-desc {
@@ -933,16 +935,16 @@ select.input {
 }
 
 .toast.success {
-    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
+    background: var(--grad-success);
 }
 
 .toast.error {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    background: var(--grad-danger);
 }
 
 .toast.warning {
-    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-    color: var(--bg-surface-2);
+    background: var(--grad-warn);
+    color: var(--on-solid-light);
 }
 
 @keyframes toastIn {
@@ -971,7 +973,7 @@ select.input {
 }
 
 .detail-modal-content {
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     width: 90%;
     max-width: 700px;
@@ -986,11 +988,11 @@ select.input {
     justify-content: space-between;
     align-items: center;
     padding: 18px 20px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
 }
 
 .detail-modal-header h3 {
-    color: #fff;
+    color: var(--text-1);
     font-size: 18px;
     margin: 0;
     border: none;
@@ -999,7 +1001,7 @@ select.input {
 
 .detail-modal-toolbar {
     padding: 12px 20px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
@@ -1026,7 +1028,7 @@ select.input {
 }
 
 .preview-modal-content {
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     width: 95%;
     max-width: 900px;
@@ -1041,7 +1043,7 @@ select.input {
     justify-content: space-between;
     align-items: center;
     padding: 18px 20px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
 }
 
 .preview-modal-body {
@@ -1061,7 +1063,7 @@ select.input {
 .detail-table td {
     padding: 10px 12px;
     text-align: left;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
 }
 
 .detail-table th {
@@ -1081,15 +1083,15 @@ select.input {
 }
 
 .detail-table .status-pending {
-    color: #ffc107;
+    color: var(--text-warn);
 }
 
 .detail-table .status-success {
-    color: #4ade80;
+    color: var(--text-success);
 }
 
 .detail-table .status-failed {
-    color: #ff6b6b;
+    color: var(--text-danger);
 }
 
 .detail-table .status-skipped {
@@ -1168,7 +1170,7 @@ select.input {
 }
 
 .bgm-modal-content {
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 14px;
     padding: 24px;
     min-width: 340px;
@@ -1237,34 +1239,34 @@ select.input {
 }
 
 .bgm-icon-info {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
 }
 
 .bgm-icon-question {
-    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    background: var(--grad-warn);
     color: var(--bg-surface-2);
 }
 
 .bgm-icon-error {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-    color: white;
+    background: var(--grad-danger);
+    color: var(--on-solid-light);
 }
 
 .bgm-icon-warning {
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-    color: white;
+    background: var(--grad-amber);
+    color: var(--on-solid-light);
 }
 
 .bgm-icon-success {
-    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
-    color: white;
+    background: var(--grad-success);
+    color: var(--on-solid-light);
 }
 
 .bgm-dialog-title {
     font-size: 18px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-1);
 }
 
 .bgm-dialog-body {
@@ -1301,7 +1303,7 @@ select.input {
 
 .bgm-mapping-handle {
     cursor: grab;
-    color: var(--text-3, #8a8a8a);
+    color: var(--text-3);
     user-select: none;
     flex: 0 0 auto;
 }
@@ -1309,14 +1311,14 @@ select.input {
 .bgm-mapping-field {
     flex: 0 0 96px;
     font-size: 13px;
-    color: var(--text-1, #f2f2f2);
+    color: var(--text-1);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .bgm-mapping-arrow {
-    color: var(--text-3, #8a8a8a);
+    color: var(--text-3);
     flex: 0 0 auto;
 }
 
@@ -1324,8 +1326,8 @@ select.input {
   flex: 1 1 auto;
   min-width: 0;
   font-size: 13px;
-  background: var(--bg-surface, #2a2a2a);
-  color: var(--text-1, #f2f2f2);
+  background: var(--bg-surface);
+  color: var(--text-1);
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
   border-radius: 4px;
   padding: 2px 4px;
@@ -1336,22 +1338,23 @@ select.input {
    数据排一排，整行像被按钮压住（momo：离数据太近、做大一点小一点）。 */
 .bgm-mapping-move-btn {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  /* 24×24：WCAG 2.2 AA 的最小指针目标（原先 22px，见 文档/待办-UX评审与整改.md U-02） */
+  width: 24px;
+  height: 24px;
   margin-left: 10px;
   padding: 0;
-  font-size: 10px;
+  font-size: 11.5px;
   line-height: 1;
-  color: var(--text-3, #8a8a8a);
-  background: var(--bg-surface, #2a2a2a);
+  color: var(--text-3);
+  background: var(--bg-surface);
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
   border-radius: 4px;
   cursor: pointer;
 }
 
 .bgm-mapping-move-btn:hover:not(:disabled) {
-  color: var(--text-1, #f2f2f2);
-  background: var(--bg-surface-2, #333);
+  color: var(--text-1);
+  background: var(--bg-surface-2);
 }
 
 .bgm-mapping-move-btn:disabled {
@@ -1380,7 +1383,7 @@ select.input {
   flex-direction: column;
   width: min(560px, 100%);
   max-height: calc(100vh - 40px);
-  background: var(--bg-base, #2d2d2d);
+  background: var(--bg-base);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
@@ -1396,7 +1399,7 @@ select.input {
 .shard-list-modal-header h3 {
   margin: 0;
   font-size: 16px;
-  color: var(--text-1, #f2f2f2);
+  color: var(--text-1);
 }
 
 .shard-list-modal-body {
@@ -1415,12 +1418,12 @@ select.input {
 .shard-list-item h4 {
   margin: 0 0 4px;
   font-size: 14px;
-  color: var(--text-1, #f2f2f2);
+  color: var(--text-1);
 }
 
 /* 必选片（base）用强调色标题，和复选框里的 is-required 呼应 */
 .shard-list-item.is-required h4 {
-  color: var(--accent, #4f8cff);
+  color: var(--accent);
 }
 
 /* pre-line：detail 里的 \n 分段渲染，保持「一行一个要点」 */
@@ -1428,7 +1431,7 @@ select.input {
   margin: 0;
   font-size: 13px;
   line-height: 1.7;
-  color: var(--text-3, #b0b0b0);
+  color: var(--text-3);
   white-space: pre-line;
 }
 
@@ -1438,7 +1441,7 @@ select.input {
   padding: 8px 12px;
   font-size: 12px;
   line-height: 1.6;
-  color: var(--text-2, #c0c0c0);
+  color: var(--text-2);
   background: var(--bg-surface-2, rgba(255, 255, 255, 0.04));
   border-radius: var(--r-sm, 4px);
 }
@@ -1456,13 +1459,13 @@ select.input {
   padding: 4px 8px;
   text-align: left;
   font-weight: 600;
-  color: var(--text-3, #8a8a8a);
+  color: var(--text-3);
   border-bottom: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
 }
 
 .shard-list-table td {
   padding: 4px 8px;
-  color: var(--text-2, #c0c0c0);
+  color: var(--text-2);
   border-bottom: 1px solid var(--border-faint, rgba(255, 255, 255, 0.06));
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -1478,7 +1481,7 @@ select.input {
 .shard-list-table th:nth-child(2),
 .shard-list-table td:nth-child(2) {
   width: 10%;
-  color: var(--text-3, #8a8a8a);
+  color: var(--text-3);
 }
 
 .shard-list-table th:nth-child(4),
@@ -1494,7 +1497,7 @@ select.input {
 .bgm-dialog-message {
     font-size: 14px;
     line-height: 1.6;
-    color: #b0b0b0;
+    color: var(--text-2);
     white-space: pre-wrap;
     word-break: break-word;
 }
@@ -1539,49 +1542,49 @@ select.input {
 }
 
 .bgm-dialog-btn-primary {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
 }
 
 .bgm-dialog-btn-primary:hover {
-    background: linear-gradient(135deg, var(--accent-blue-strong) 0%, #2a7ed8 100%);
+    background: linear-gradient(135deg, var(--accent-blue-strong) 0%, var(--accent-blue-deeper) 100%);
     transform: translateY(-1px);
 }
 
 .bgm-dialog-btn-default {
-    background: #3a3a3a;
-    color: #e0e0e0;
+    background: var(--bg-surface);
+    color: var(--text-1);
 }
 
 .bgm-dialog-btn-default:hover {
-    background: #4a4a4a;
+    background: var(--bg-surface-2);
 }
 
 .bgm-dialog-btn-danger {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-    color: white;
+    background: var(--grad-danger);
+    color: var(--on-solid-light);
 }
 
 .bgm-dialog-btn-danger:hover {
-    background: linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
+    background: var(--grad-danger-hover);
 }
 
 .bgm-dialog-btn-warning {
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-    color: white;
+    background: var(--grad-amber);
+    color: var(--on-solid-light);
 }
 
 .bgm-dialog-btn-warning:hover {
-    background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+    background: var(--grad-amber-hover);
 }
 
 .bgm-dialog-btn-success {
-    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
-    color: white;
+    background: var(--grad-success);
+    color: var(--on-solid-light);
 }
 
 .bgm-dialog-btn-success:hover {
-    background: linear-gradient(135deg, #3ace70 0%, #2abe60 100%);
+    background: var(--grad-success-hover);
 }
 
 /* 输入对话框 */
@@ -1592,11 +1595,11 @@ select.input {
 .bgm-input-field {
     width: 100%;
     padding: 12px 14px;
-    border: 2px solid #444;
+    border: 2px solid var(--border-strong);
     border-radius: 8px;
     font-size: 14px;
     background: var(--bg-surface-2);
-    color: #e0e0e0;
+    color: var(--text-1);
     margin-top: 12px;
     transition: all 0.2s;
 }
@@ -1631,24 +1634,28 @@ select.input {
     transform: translateX(-50%) translateY(0);
 }
 
+/* toast 是浮在内容之上的短命浮层，配色语义恒定（绿=成功 / 红=错误 / 琥珀=警告），
+   刻意不跟主题翻转：浅色主题下换成深底反而会和白色卡片糊在一起。
+   因此这三组渐变有意硬编码，字色用恒定的 --on-solid-light（亮彩底上的深字），
+   不能用 --text-on-accent —— 那个会随主题翻成白字，压琥珀只剩 1.6:1。 */
 .bgm-toast-success {
-    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
-    color: white;
+    background: var(--grad-success);
+    color: var(--on-solid-light);
 }
 
 .bgm-toast-error {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-    color: white;
+    background: var(--grad-danger);
+    color: var(--on-solid-light);
 }
 
 .bgm-toast-warning {
-    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-    color: var(--bg-surface-2);
+    background: var(--grad-warn);
+    color: var(--on-solid-light);
 }
 
 .bgm-toast-info {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--accent-blue-deep) 0%, var(--accent-blue-deeper) 100%);
+    color: var(--on-solid-dark);
 }
 
 /* 预览表格（面板；enrich 页的 .preview-table 是外层容器，规则不共用） */
@@ -1842,7 +1849,7 @@ select.input {
 
 .export-source-label {
     flex: 1;
-    color: var(--text-2, #c8c8c8);
+    color: var(--text-2);
     font-size: var(--fs-sm, 12.5px);
 }
 
@@ -1861,23 +1868,23 @@ select.input {
     font-size: 12px;
     font-weight: 600;
     background: var(--bg-surface-2);
-    color: #aaa;
-    border: 1px solid #444;
+    color: var(--text-2);
+    border: 1px solid var(--border-strong);
 }
 
 .status-badge.type-1 { background: rgba(74,158,255,0.15); color: var(--text-link); border-color: rgba(74,158,255,0.3); }
-.status-badge.type-2 { background: rgba(74,222,128,0.12); color: #4ade80; border-color: rgba(74,222,128,0.25); }
-.status-badge.type-3 { background: rgba(168,85,247,0.15); color: #a855f7; border-color: rgba(168,85,247,0.3); }
-.status-badge.type-4 { background: rgba(255,193,7,0.15); color: #ffc107; border-color: rgba(255,193,7,0.3); }
-.status-badge.type-5 { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: rgba(255,107,107,0.3); }
+.status-badge.type-2 { background: rgba(74,222,128,0.12); color: var(--text-success); border-color: rgba(74,222,128,0.25); }
+.status-badge.type-3 { background: rgba(168,85,247,0.15); color: var(--purple); border-color: rgba(168,85,247,0.3); }
+.status-badge.type-4 { background: rgba(255,193,7,0.15); color: var(--text-warn); border-color: rgba(255,193,7,0.3); }
+.status-badge.type-5 { background: rgba(255,107,107,0.15); color: var(--text-danger); border-color: rgba(255,107,107,0.3); }
 
 /* ========== 富预览 - 过滤按钮 ========== */
 .filter-btn {
     padding: 6px 14px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     border-radius: 16px;
     background: transparent;
-    color: #aaa;
+    color: var(--text-2);
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
@@ -1885,25 +1892,27 @@ select.input {
 }
 
 .filter-btn:hover {
-    background: #3a3a3a;
-    color: #e0e0e0;
+    background: var(--bg-surface);
+    color: var(--text-1);
 }
 
 .filter-btn.active {
     background: var(--accent-blue);
-    color: #fff;
+    color: var(--text-on-accent);
     border-color: var(--accent-blue);
 }
 
+/* 实心底一律配 --text-on-accent：它对两套主题都正确 ——
+   深色主题给深字（压亮彩底），浅色主题给白字（压压深后的同色相底）。 */
 .filter-btn.type-1.active { background: var(--accent-blue); border-color: var(--accent-blue); }
-.filter-btn.type-2.active { background: #4ade80; color: #1a1a1a; border-color: #4ade80; }
-.filter-btn.type-3.active { background: #a855f7; border-color: #a855f7; }
-.filter-btn.type-4.active { background: #ffc107; color: #1a1a1a; border-color: #ffc107; }
-.filter-btn.type-5.active { background: #ff6b6b; border-color: #ff6b6b; }
+.filter-btn.type-2.active { background: var(--green); color: var(--text-on-accent); border-color: var(--green); }
+.filter-btn.type-3.active { background: var(--purple); border-color: var(--purple); }
+.filter-btn.type-4.active { background: var(--amber); color: var(--text-on-accent); border-color: var(--amber); }
+.filter-btn.type-5.active { background: var(--red); border-color: var(--red); }
 
 /* ========== 富预览 - 详情条目 ========== */
 .detail-item {
-    background: linear-gradient(180deg, #252530 0%, #1f1f28 100%);
+    background: var(--bg-mantle);
     border: 1px solid var(--border-subtle);
     border-radius: 8px;
     margin-bottom: 6px;
@@ -1917,11 +1926,11 @@ select.input {
 }
 
 .detail-item.uploaded {
-    border-left: 3px solid #4ade80;
+    border-left: 3px solid var(--success);
 }
 
 .detail-item.pending {
-    border-left: 3px solid #ffc107;
+    border-left: 3px solid var(--warning);
 }
 
 .detail-item-header {
@@ -1948,7 +1957,7 @@ select.input {
     border-radius: 4px;
     background: rgba(74,158,255,0.15);
     color: var(--text-link);
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -1966,27 +1975,27 @@ select.input {
 .upload-single-btn {
     padding: 3px 10px;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-strong));
-    color: #fff;
+    color: var(--text-on-accent);
     flex-shrink: 0;
 }
 
 .upload-single-btn:hover {
-    background: linear-gradient(135deg, var(--accent-blue-strong), #2a7ed8);
+    background: linear-gradient(135deg, var(--accent-blue-strong), var(--accent-blue-deeper));
     transform: translateY(-1px);
 }
 
 .upload-single-btn.reupload {
-    background: linear-gradient(135deg, #ff9800, #f57c00);
+    background: var(--grad-amber);
 }
 
 .upload-single-btn.reupload:hover {
-    background: linear-gradient(135deg, #f57c00, #e65100);
+    background: var(--grad-amber-hover);
 }
 
 .upload-single-btn.uploading {
@@ -1995,17 +2004,17 @@ select.input {
 }
 
 .upload-single-btn.error {
-    background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+    background: var(--grad-danger);
 }
 
 .uploaded-badge {
     display: inline-block;
     padding: 2px 8px;
     border-radius: 8px;
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     background: rgba(74,222,128,0.15);
-    color: #4ade80;
+    color: var(--text-success);
     flex-shrink: 0;
 }
 
@@ -2031,7 +2040,7 @@ select.input {
     display: inline-block;
     min-width: 70px;
     font-size: 11px;
-    color: #6a6a7a;
+    color: var(--text-3);
     font-weight: 500;
     flex-shrink: 0;
 }
@@ -2049,17 +2058,17 @@ select.input {
 }
 
 .detail-value.subjectId {
-    color: #ffc107;
+    color: var(--text-warn);
     font-weight: 600;
 }
 
 .detail-value.json {
-    background: #1a1a1a;
+    background: var(--bg-mantle);
     padding: 6px 8px;
-    border-radius: 5px;
+    border-radius: var(--r-sm);
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 11px;
-    color: #4ade80;
+    color: var(--text-success);
     white-space: pre-wrap;
     word-break: break-all;
     border: 1px solid var(--bg-surface-2);
@@ -2078,7 +2087,7 @@ select.input {
     display: inline-block;
     padding: 1px 6px;
     border-radius: 6px;
-    font-size: 10px;
+    font-size: 11.5px;
     background: rgba(74,158,255,0.1);
     color: var(--text-link);
     border: 1px solid rgba(74,158,255,0.2);
@@ -2099,9 +2108,12 @@ select.input {
     border-radius: 3px;
 }
 
-/* ========== Catppuccin Mocha 调色板 ==========
-   项目历史代码已使用 var(--bg-deep)、var(--bg-hover)、var(--radius-md) 但未在 :root 定义，
-   此处补全完整 Catppuccin Mocha 调色板，供全局复用。
+/* ========== Catppuccin Mocha 调色板（历史遗留的第二套色板） ==========
+   进度卡 / 详情表 / 统计芯片等组件用的是 var(--base) / var(--surface0) / var(--crust)
+   这一套命名，与 tokens.css 的 --bg-* 并行。2026-11-08 已收敛掉撞名与当文字用的部分
+   （--text / --subtext0 / --overlay1 / --blue 都改成 tokens 别名，并删掉 9 个从未
+   被引用的色名）；**剩下的 6 个背景档仍是独立值**（紫灰 #1e1e2e vs 中性 #1f1f1f），
+   统一它们会改变深色主题的色温，需要真机目视后再动 —— 记为待办 U-14。
 */
 :root {
     /* 背景层（由深到浅） */
@@ -2112,28 +2124,19 @@ select.input {
     --surface1:  #45475a;
     --surface2:  #585b70;
 
-    /* 文本 */
-    --text:      #cdd6f4;
-    --subtext1:  #bac2de;
-    --subtext0:  #a6adc8;
-    --overlay2:  #9399b2;
-    --overlay1:  #7f849c;
-    --overlay0:  #6c7086;
+    /* 文本：别名到 tokens.css 的正文三档。
+       原先这里各存一份十六进制（#cdd6f4 / #a6adc8 / #7f849c），两个后果：
+       ① 深色主题下 --overlay1 在 --bg-surface-2 上只有 3.42:1、--subtext0 只有
+       4.46:1，不达 AA；② 同名 token 隔一层又定义一遍，改一处要翻两处。
+       改成别名后深浅两套自动跟随。 */
+    --text:      var(--text-1);
+    --subtext0:  var(--text-2);
+    --overlay1:  var(--text-3);
+    --overlay0:  #6c7086;   /* 只当描边/填充用，不当文字 */
 
     /* 强调色 */
-    --rosewater: #f5e0dc;
-    --flamingo:  #f2cdcd;
-    --pink:      #f5c2e7;
-    --mauve:     #cba6f7;
-    --red:       #f38ba8;
-    --maroon:    #eba0ac;
     --peach:     #fab387;
-    --yellow:    #f9e2af;
-    --green:     #a6e3a1;
-    --teal:      #94e2d5;
-    --sky:       #89dceb;
-    --sapphire:  #74c7ec;
-    --blue:      #89b4fa;
+    --blue:      var(--info);   /* 深色与 --info 同值；浅色换成压深档 */
     --lavender:  #b4befe;
 
     /* 项目历史别名（保持向后兼容） */
@@ -2142,11 +2145,10 @@ select.input {
     --radius-md: 8px;
 }
 
-/* ========== Catppuccin Latte（浅色主题下的对应调色板） ==========
-   2026-10-19：上方 Mocha 调色板是**深色专用**的第二套 token 体系，被进度卡、
-   详情表、统计芯片等大量 `var(--text)/var(--surface0)` 使用。原先没有浅色映射，
-   导致浅色主题下这些组件仍是深色孤岛、文字与背景撞色。此处按 Catppuccin
-   官方 Latte 主题补齐映射（与 Mocha 一一对应），浅色下整体成立。
+/* ========== Catppuccin Latte（同一套色板的浅色对应） ==========
+   2026-10-19 补的浅色映射：原先这套 token 没有浅色值，进度卡 / 详情表 / 统计芯片
+   在浅色主题下仍是深色孤岛。2026-11-08 又把当文字用却不达标的 --peach / --lavender /
+   --overlay0 压深（对比度写在行内注释里）。
 */
 [data-theme="light"] {
     --crust:     #dce0e8;
@@ -2156,27 +2158,12 @@ select.input {
     --surface1:  #bcc0cc;
     --surface2:  #acb0be;
 
-    --text:      #4c4f69;
-    --subtext1:  #5c5f77;
-    --subtext0:  #6c6f85;
-    --overlay2:  #7c7f93;
-    --overlay1:  #8c8fa1;
-    --overlay0:  #9ca0b0;
+    /* --text / --subtext0 / --overlay1 不在这里重复定义：它们已是 --text-1/2/3 的别名，
+       浅色值由 tokens.css 的 [data-theme="light"] 提供。 */
+    --overlay0:  #6f727e;   /* 只当描边/填充用（原 #9ca0b0 当文字仅 2.60:1） */
 
-    --rosewater: #dc8a78;
-    --flamingo:  #dd7878;
-    --pink:      #ea76cb;
-    --mauve:     #8839ef;
-    --red:       #d20f39;
-    --maroon:    #e64553;
-    --peach:     #fe640b;
-    --yellow:    #df8e1d;
-    --green:     #40a02b;
-    --teal:      #179299;
-    --sky:       #04a5e5;
-    --sapphire:  #209fb5;
-    --blue:      #1e66f5;
-    --lavender:  #7287fd;
+    --peach:     #a03a08;   /* 白底 6.27 / #e2e5ea 5.36（原 #fe640b 仅 2.97:1） */
+    --lavender:  #4457c9;   /* 白底 6.08:1（原 #7287fd 仅 3.18:1） */
 }
 
 /* ========== 通用进度组件（modal / inline / detach） ========== */
@@ -2188,7 +2175,7 @@ select.input {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
 }
 
 /* ---- 标题栏 ---- */
@@ -2227,7 +2214,7 @@ select.input {
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
     font-size: 13px;
     line-height: 1;
     cursor: pointer;
@@ -2235,7 +2222,7 @@ select.input {
 
 .bgm-progress__close:hover {
     background: var(--fill-5);
-    color: var(--text, #cdd6f4);
+    color: var(--text);
 }
 
 /* ---- 主体 ---- */
@@ -2287,7 +2274,7 @@ select.input {
 .bgm-progress--detach {
     border: 1px solid var(--border-medium);
     border-radius: 10px;
-    background: var(--base, #1e1e2e);
+    background: var(--base);
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
     overflow: hidden;
 }
@@ -2391,19 +2378,19 @@ select.input {
     flex-wrap: wrap;
     gap: 6px;
     padding: 8px 10px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 6px;
     font-size: 12px;
     line-height: 1.6;
 }
 
 .bgm-progress__config .config-item {
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     white-space: nowrap;
 }
 
 .bgm-progress__config .config-item.warn {
-    color: var(--yellow, #f9e2af);
+    color: var(--yellow);
     font-weight: 600;
 }
 
@@ -2412,24 +2399,24 @@ select.input {
     justify-content: space-between;
     margin-bottom: 6px;
     font-size: 12px;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
 }
 
 .bgm-progress__eta {
     font-size: 12px;
-    color: var(--yellow, #f9e2af);
+    color: var(--yellow);
     font-weight: 500;
 }
 
 .bgm-progress__global-eta {
     font-size: 12px;
-    color: var(--green, #a6e3a1);
+    color: var(--green);
     font-weight: 500;
     margin-left: 8px;
 }
 
 .bgm-progress__track {
-    background: var(--surface1, #313244);
+    background: var(--surface1);
     border-radius: 4px;
     height: 20px;
     overflow: hidden;
@@ -2438,10 +2425,10 @@ select.input {
 .bgm-progress__bar {
     width: 0%;
     height: 100%;
-    background: var(--green, #a6e3a1);
+    background: var(--green);
     text-align: center;
     line-height: 20px;
-    color: var(--base, #1e1e2e);
+    color: var(--base);
     font-size: 12px;
     font-weight: 600;
     transition: width 0.3s;
@@ -2450,7 +2437,7 @@ select.input {
 .bgm-progress__current {
     margin-top: 8px;
     font-size: 12px;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
     min-height: 18px;
 }
 
@@ -2470,8 +2457,8 @@ select.input {
     font-size: 11px;
     line-height: 1.5;
     font-family: monospace;
-    background: var(--crust, #11111b);
-    color: var(--text, #cdd6f4);
+    background: var(--crust);
+    color: var(--text);
     padding: 6px 8px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -2499,7 +2486,7 @@ select.input {
 
 .bgm-progress__summary {
     white-space: pre-line;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     padding: 10px;
     background: var(--fill-2);
     border-radius: 8px;
@@ -2521,7 +2508,7 @@ select.input {
 .bgm-stats-title {
     font-size: 14px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--text-1);
 }
 
 .bgm-stats-meta {
@@ -2535,7 +2522,7 @@ select.input {
     padding: 3px 8px;
     border-radius: 12px;
     background: var(--fill-4);
-    color: #94a3b8;
+    color: var(--text-2);
     white-space: nowrap;
 }
 
@@ -2560,7 +2547,7 @@ select.input {
     line-height: 1.6;
     white-space: pre;
     font-family: monospace;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
 }
 
 /* 表格模式：覆盖 pre 换行并启用横向滚动 */
@@ -2581,7 +2568,7 @@ select.input {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    background: var(--crust, #11111b);
+    background: var(--crust);
 }
 
 .bgm-detail-table th,
@@ -2595,8 +2582,8 @@ select.input {
 .bgm-detail-table th {
     position: sticky;
     top: 0;
-    background: var(--surface0, #313244);
-    color: var(--text, #cdd6f4);
+    background: var(--surface0);
+    color: var(--text);
     font-weight: 600;
     z-index: 1;
 }
@@ -2629,29 +2616,29 @@ select.input {
 
 .bgm-detail-kind--add {
     background: rgba(166, 227, 161, 0.15);
-    color: var(--green, #a6e3a1);
+    color: var(--green);
 }
 
 .bgm-detail-kind--update {
     background: rgba(137, 180, 250, 0.15);
-    color: var(--blue, #89b4fa);
+    color: var(--blue);
 }
 
 .bgm-detail-kind--delete {
     background: rgba(180, 190, 254, 0.15);
-    color: var(--lavender, #b4befe);
+    color: var(--lavender);
 }
 
 .bgm-detail-kind--fail {
     background: rgba(243, 139, 168, 0.15);
-    color: var(--red, #f38ba8);
+    color: var(--red);
 }
 
 .bgm-detail-table-footer {
     padding: 6px 8px;
     text-align: right;
     font-size: 11px;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
     background: var(--fill-1);
     border-top: 1px solid var(--border-subtle);
 }
@@ -2659,22 +2646,22 @@ select.input {
 /* ========== 系统日志面板 ========== */
 .log-entry {
     padding: 6px 10px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border-strong);
     font-family: 'Maple Mono', monospace;
     font-size: 12px;
-    color: #e0e0e0;
+    color: var(--text-1);
     word-break: break-all;
 }
 .log-entry.log-error {
-    color: #ff6b6b;
+    color: var(--text-danger);
     background: rgba(255, 107, 107, 0.05);
 }
 .log-entry.log-warn {
-    color: #ffd93d;
+    color: var(--text-warn);
     background: rgba(255, 217, 61, 0.05);
 }
 .log-entry.log-info {
-    color: #6bcfff;
+    color: var(--text-link);
 }
 .log-entry.log-debug {
     color: var(--text-3);
@@ -2687,7 +2674,7 @@ select.input {
 
 .conflict-modal-content {
     background: var(--bg-surface);
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
     border-radius: 8px;
     padding: 16px;
     width: 90%;
@@ -2703,7 +2690,7 @@ select.input {
 
 .conflict-modal-header h3 {
     margin: 0;
-    color: #ffffff;
+    color: var(--text-1);
     font-size: 16px;
 }
 
@@ -2716,7 +2703,7 @@ select.input {
 }
 
 .conflict-count {
-    color: #ffd93d;
+    color: var(--text-warn);
     font-size: 13px;
     font-weight: 600;
     margin-right: 4px;
@@ -2757,12 +2744,12 @@ select.input {
 }
 
 .conflict-column-local {
-    color: #6bcfff;
+    color: var(--text-link);
     word-break: break-all;
 }
 
 .conflict-column-remote {
-    color: #ffd93d;
+    color: var(--text-warn);
     word-break: break-all;
 }
 
@@ -2783,7 +2770,7 @@ select.input {
 .conflict-column-select label {
     margin: 0 4px;
     font-size: 12px;
-    color: #c0c0c0;
+    color: var(--text-2);
     cursor: pointer;
     vertical-align: middle;
 }
@@ -2826,7 +2813,7 @@ select.input {
 
 .time-filter-label {
     flex: 0 0 80px !important;
-    color: #d0d0d0 !important;
+    color: var(--text-2) !important;
     font-weight: 600 !important;
     font-size: 14px !important;
     padding: 10px 0;
@@ -2845,20 +2832,20 @@ select.input {
 }
 
 .time-filter-select:hover {
-    border-color: #5789d9 !important;
-    background: #383838 !important;
+    border-color: var(--accent-blue) !important;
+    background: var(--bg-surface-2) !important;
 }
 
 .time-filter-select:focus {
     outline: none;
     border-color: var(--accent-blue) !important;
     box-shadow: 0 0 0 4px rgba(74, 158, 255, 0.25) !important;
-    background: #383838 !important;
+    background: var(--bg-surface-2) !important;
 }
 
 .time-filter-select option {
     background: var(--bg-surface);
-    color: #e0e0e0;
+    color: var(--text-1);
     padding: 8px;
     font-size: 14px;
 }
@@ -2886,10 +2873,10 @@ select.input {
 .bgm-result-section-title {
     font-size: 15px;
     font-weight: 700;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     margin-bottom: 10px;
     padding-bottom: 6px;
-    border-bottom: 2px solid var(--blue, #89b4fa);
+    border-bottom: 2px solid var(--blue);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2902,9 +2889,9 @@ select.input {
     gap: 12px;
     margin-bottom: 12px;
     font-size: 13px;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
     padding: 8px 12px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 8px;
 }
 
@@ -2923,11 +2910,11 @@ select.input {
 
 /* 统计卡片（保留兼容） */
 .bgm-result-stat-card {
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 10px;
     padding: 14px 10px;
     text-align: center;
-    border-top: 3px solid var(--overlay0, #6c7086);
+    border-top: 3px solid var(--overlay0);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -2939,7 +2926,7 @@ select.input {
 .bgm-result-stat-value {
     font-size: 26px;
     font-weight: 800;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     line-height: 1.2;
     margin-bottom: 2px;
     font-variant-numeric: tabular-nums;
@@ -2947,27 +2934,27 @@ select.input {
 
 .bgm-result-stat-label {
     font-size: 12px;
-    color: var(--subtext0, #a6adc8);
+    color: var(--subtext0);
     font-weight: 500;
 }
 
-.bgm-result-stat-add { border-top-color: var(--green, #a6e3a1); }
-.bgm-result-stat-add .bgm-result-stat-value { color: var(--green, #a6e3a1); }
-.bgm-result-stat-update { border-top-color: var(--blue, #89b4fa); }
-.bgm-result-stat-update .bgm-result-stat-value { color: var(--blue, #89b4fa); }
-.bgm-result-stat-delete { border-top-color: var(--red, #f38ba8); }
-.bgm-result-stat-delete .bgm-result-stat-value { color: var(--red, #f38ba8); }
-.bgm-result-stat-fail { border-top-color: var(--peach, #fab387); }
-.bgm-result-stat-fail .bgm-result-stat-value { color: var(--peach, #fab387); }
+.bgm-result-stat-add { border-top-color: var(--green); }
+.bgm-result-stat-add .bgm-result-stat-value { color: var(--green); }
+.bgm-result-stat-update { border-top-color: var(--blue); }
+.bgm-result-stat-update .bgm-result-stat-value { color: var(--blue); }
+.bgm-result-stat-delete { border-top-color: var(--red); }
+.bgm-result-stat-delete .bgm-result-stat-value { color: var(--red); }
+.bgm-result-stat-fail { border-top-color: var(--peach); }
+.bgm-result-stat-fail .bgm-result-stat-value { color: var(--peach); }
 
 /* ========== 概览条（Dashboard Top Bar） ========== */
 .bgm-overview-bar {
     display: flex;
     gap: 16px;
     padding: 12px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 12px;
-    border: 1px solid var(--surface1, #45475a);
+    border: 1px solid var(--surface1);
     margin-bottom: 12px;
 }
 
@@ -2979,28 +2966,28 @@ select.input {
 
 .bgm-overview-card {
     flex: 1;
-    background: var(--surface1, #45475a);
+    background: var(--surface1);
     border-radius: 10px;
     padding: 10px 12px;
-    border-left: 3px solid var(--overlay0, #6c7086);
+    border-left: 3px solid var(--overlay0);
     min-width: 0;
 }
 
 .bgm-overview-card-primary {
-    border-left-color: var(--blue, #89b4fa);
+    border-left-color: var(--blue);
 }
 
 .bgm-overview-card-success {
-    border-left-color: var(--green, #a6e3a1);
+    border-left-color: var(--green);
 }
 
 .bgm-overview-card-warning {
-    border-left-color: var(--peach, #fab387);
+    border-left-color: var(--peach);
     background: rgba(250, 179, 135, 0.08);
 }
 
 .bgm-overview-card-muted {
-    border-left-color: var(--overlay0, #6c7086);
+    border-left-color: var(--overlay0);
 }
 
 .bgm-overview-card-header {
@@ -3016,7 +3003,7 @@ select.input {
 
 .bgm-overview-label {
     font-size: 11px;
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     font-weight: 500;
     letter-spacing: 0.3px;
 }
@@ -3024,14 +3011,14 @@ select.input {
 .bgm-overview-value {
     font-size: 22px;
     font-weight: 800;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
 }
 
 .bgm-overview-sub {
-    font-size: 10px;
-    color: var(--overlay1, #7f849c);
+    font-size: 11.5px;
+    color: var(--overlay1);
     margin-top: 2px;
 }
 
@@ -3063,13 +3050,13 @@ select.input {
 .bgm-progress-value {
     font-size: 20px;
     font-weight: 800;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 
 .bgm-progress-label {
-    font-size: 10px;
-    color: var(--overlay1, #7f849c);
+    font-size: 11.5px;
+    color: var(--overlay1);
     margin-top: 2px;
 }
 
@@ -3082,7 +3069,7 @@ select.input {
 
 /* 日期统计项 */
 .bgm-result-date-item {
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 8px;
     padding: 10px 12px;
     display: flex;
@@ -3092,7 +3079,7 @@ select.input {
 
 .bgm-result-date-label {
     font-size: 11px;
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -3100,7 +3087,7 @@ select.input {
 
 .bgm-result-date-value {
     font-size: 14px;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -3128,12 +3115,12 @@ select.input {
 }
 
 .bgm-dialog-body::-webkit-scrollbar-thumb {
-    background: var(--surface2, #585b70);
+    background: var(--surface2);
     border-radius: 3px;
 }
 
 .bgm-dialog-body::-webkit-scrollbar-thumb:hover {
-    background: var(--overlay0, #6c7086);
+    background: var(--overlay0);
 }
 
 /* ========== 用户头像显示 ========== */
@@ -3191,7 +3178,7 @@ select.input {
 .user-name {
     font-size: 14px;
     font-weight: 600;
-    color: #e0e0e0;
+    color: var(--text-1);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3240,7 +3227,7 @@ select.input {
 }
 
 .connection-test-details .detail-value {
-    color: #e0e0e0;
+    color: var(--text-1);
     word-break: break-all;
 }
 
@@ -3253,7 +3240,7 @@ select.input {
 }
 
 .connection-test-details .error-msg {
-    color: #ff6b6b;
+    color: var(--text-danger);
 }
 
 /* ========== 设置页专属样式 ========== */
@@ -3291,7 +3278,7 @@ body {
 
 .theme-mode-btn.active {
     border-color: var(--primary);
-    background: var(--primary-soft, rgba(18, 150, 219, 0.14));
+    background: color-mix(in srgb, var(--accent-blue) 14%, transparent);
     color: var(--primary);
     font-weight: 500;
 }
@@ -3604,7 +3591,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-preview-notice.notice-warning {
     background: rgba(255, 193, 7, 0.1);
     border: 1px solid rgba(255, 193, 7, 0.3);
-    color: #ffc107;
+    color: var(--text-warn);
 }
 
 .bgm-preview-notice.notice-info {
@@ -3626,40 +3613,40 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 }
 
 .bgm-preview-stat-card {
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 8px;
     padding: 10px 8px;
     text-align: center;
-    border-left: 3px solid var(--blue, #89b4fa);
+    border-left: 3px solid var(--blue);
 }
 
 .bgm-preview-stat-card.bgm-preview-stat-add {
-    border-left-color: var(--green, #a6e3a1);
+    border-left-color: var(--green);
 }
 
 .bgm-preview-stat-card.bgm-preview-stat-update {
-    border-left-color: var(--yellow, #f9e2af);
+    border-left-color: var(--yellow);
 }
 
 .bgm-preview-stat-card.bgm-preview-stat-delete {
-    border-left-color: var(--red, #f38ba8);
+    border-left-color: var(--red);
 }
 
 .bgm-preview-stat-card.bgm-preview-stat-fail {
-    border-left-color: var(--peach, #fab387);
+    border-left-color: var(--peach);
     background: rgba(243, 139, 168, 0.1);
 }
 
 .bgm-preview-stat-value {
     font-size: 20px;
     font-weight: 700;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     line-height: 1.2;
 }
 
 .bgm-preview-stat-label {
     font-size: 11px;
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     margin-top: 4px;
 }
 
@@ -3675,18 +3662,18 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 6px;
     font-size: 13px;
 }
 
 .bgm-preview-detail-label {
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     font-weight: 500;
 }
 
 .bgm-preview-detail-value {
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -3717,7 +3704,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-preview-detail-table-title {
     font-size: 12px;
     font-weight: 600;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     margin-bottom: 6px;
 }
 
@@ -3773,14 +3760,14 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-donut-center-value {
     font-size: 24px;
     font-weight: 800;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     line-height: 1;
     font-variant-numeric: tabular-nums;
 }
 
 .bgm-donut-center-label {
     font-size: 11px;
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     margin-top: 4px;
 }
 
@@ -3831,7 +3818,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 
 .bgm-bar-track {
     height: 18px;
-    background: #1f2937;
+    background: var(--bg-surface-2);
     border-radius: 4px;
     overflow: hidden;
     position: relative;
@@ -3848,27 +3835,27 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 }
 
 .bgm-bar-add {
-    background: linear-gradient(90deg, #4ade80, #22c55e);
+    background: var(--bar-add);
     box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
 }
 
 .bgm-bar-update {
-    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    background: var(--bar-update);
     box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
 }
 
 .bgm-bar-delete {
-    background: linear-gradient(90deg, #f87171, #ef4444);
+    background: var(--bar-delete);
     box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
 }
 
 .bgm-bar-unchanged {
-    background: linear-gradient(90deg, #6b7280, #4b5563);
+    background: var(--bar-unchanged);
     opacity: 0.7;
 }
 
 .bgm-bar-fail {
-    background: linear-gradient(90deg, #fb923c, #f97316);
+    background: var(--bar-fail);
     box-shadow: 0 0 8px rgba(251, 146, 60, 0.6);
     animation: bar-pulse 1.5s ease-in-out infinite;
 }
@@ -3897,13 +3884,13 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 
 .bgm-bar-value {
     text-align: right;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
 
 .bgm-bar-pct {
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     font-weight: 400;
     font-size: 11px;
 }
@@ -3914,9 +3901,9 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 8px;
-    border: 1px solid var(--surface1, #45475a);
+    border: 1px solid var(--surface1);
 }
 
 .bgm-perf-item {
@@ -3941,7 +3928,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-perf-value {
     font-size: 15px;
     font-weight: 700;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -3950,15 +3937,15 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 }
 
 .bgm-perf-label {
-    font-size: 10px;
-    color: var(--overlay1, #7f849c);
+    font-size: 11.5px;
+    color: var(--overlay1);
     margin-top: 2px;
 }
 
 .bgm-perf-divider {
     width: 1px;
     height: 28px;
-    background: var(--overlay0, #585b70);
+    background: var(--overlay0);
     flex-shrink: 0;
 }
 
@@ -3967,7 +3954,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     flex-wrap: wrap;
     gap: 8px 14px;
     font-size: 11px;
-    color: var(--overlay1, #7f849c);
+    color: var(--overlay1);
     padding: 8px 12px;
     background: rgba(74, 158, 255, 0.06);
     border-radius: 6px;
@@ -3980,9 +3967,9 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     gap: 12px;
     margin-top: 16px;
     padding: 12px;
-    background: var(--surface0, #313244);
+    background: var(--surface0);
     border-radius: 10px;
-    border: 1px solid var(--surface1, #45475a);
+    border: 1px solid var(--surface1);
 }
 
 .bgm-perg-item {
@@ -4026,7 +4013,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 .bgm-perg-value {
     font-size: 14px;
     font-weight: 700;
-    color: var(--text, #cdd6f4);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     overflow: hidden;
@@ -4034,8 +4021,8 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 }
 
 .bgm-perg-label {
-    font-size: 10px;
-    color: var(--overlay1, #7f849c);
+    font-size: 11.5px;
+    color: var(--overlay1);
     margin-top: 2px;
 }
 
@@ -4057,7 +4044,7 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
     align-items: center;
     gap: 4px;
     padding: 3px 10px;
-    background: var(--surface1, #45475a);
+    background: var(--surface1);
     border-radius: 12px;
     color: var(--text-2);
     white-space: nowrap;
@@ -4065,13 +4052,13 @@ html[data-theme='dark'] .theme-toggle__container:hover .theme-toggle__sun {
 
 .bgm-meta-tag-warn {
     background: rgba(243, 139, 168, 0.15);
-    color: var(--red, #f38ba8);
+    color: var(--red);
     border: 1px solid rgba(243, 139, 168, 0.3);
 }
 
 /* ========== 跳过条（柱状图） ========== */
 .bgm-bar-skip {
-    background: linear-gradient(90deg, var(--lavender, #b4befe), var(--lavender, #b4befe)dd);
+    background: linear-gradient(90deg, var(--lavender), color-mix(in srgb, var(--lavender) 87%, transparent));
     box-shadow: 0 0 6px rgba(180, 190, 254, 0.4);
 }
 
@@ -4261,11 +4248,11 @@ body.solo-mode .main > .command-center:not([hidden]) {
 
 .solo-mode-bar-btn--exit {
     margin-left: 2px;
-    color: var(--danger, #f38ba8);
+    color: var(--danger);
 }
 
 .solo-mode-bar-btn--exit:hover {
-    border-color: var(--danger, #f38ba8);
+    border-color: var(--danger);
 }
 
 /* 主区模块被全部隐藏时的常驻占位块（toast 3 秒就消失，这里必须留得住） */
@@ -4312,6 +4299,8 @@ body.solo-mode .main > .command-center:not([hidden]) {
     gap: 12px;
 }
 
+/* 悬浮在预览内容上的滚动按钮：按「浮层控件」处理，两种主题都保持深底浅字
+   （跟随主题变浅会与背后的预览内容糊在一起）。U-01 评审记为「有意保留」。 */
 .scroll-btn {
     position: absolute;
     width: 36px;
@@ -4319,7 +4308,7 @@ body.solo-mode .main > .command-center:not([hidden]) {
     border-radius: 50%;
     border: 1px solid var(--border-strong);
     background: rgba(49, 50, 68, 0.9);
-    color: #cdd6f4;
+    color: var(--on-solid-dark);
     font-size: 18px;
     line-height: 1;
     display: flex;
@@ -4334,7 +4323,7 @@ body.solo-mode .main > .command-center:not([hidden]) {
 
 .scroll-btn:hover {
     background: rgba(137, 180, 250, 0.8);
-    color: #1e1e2e;
+    color: var(--on-solid-light);
     transform: scale(1.1);
 }
 

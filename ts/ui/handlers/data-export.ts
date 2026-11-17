@@ -214,7 +214,7 @@ export function exportData(key: string, format: ExportFormat, options?: ExportOp
 
   if (rows.length === 0) {
     showToast(
-      tOr('handlers.dataExport.empty', '暂无{label}可导出{note}', { label, note }),
+      tOr('handlers.dataExport.empty', '还没有可导出的{label}{note}，先同步一次', { label, note }),
       'warning',
     )
     return 0

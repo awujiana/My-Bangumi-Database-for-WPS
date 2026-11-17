@@ -280,7 +280,7 @@ function renderDetailItemHtml(
         </div>
         <div class="detail-row">
           <span class="detail-label">评分</span>
-          <span class="detail-value" style="color:#f39c12;font-weight:600;">${rowData.rate && rowData.rate !== 'true' && rowData.rate !== 'True' ? `⭐ ${rowData.rate}` : '(空)'}</span>
+          <span class="detail-value" style="color:var(--accent-amber);font-weight:600;">${rowData.rate && rowData.rate !== 'true' && rowData.rate !== 'True' ? `⭐ ${rowData.rate}` : '(空)'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">标签</span>

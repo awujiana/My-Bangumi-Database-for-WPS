@@ -60,10 +60,10 @@
   --yellow:       #ffd93d;   /* 字段名/重点强调 */
 
   /* ---- 语义文字色（只当文字用；已按最深/最浅实际底色验算 ≥ 4.5:1）----
-   * 与上面的 --danger / --success / --accent-blue 分开：那一组是**填充色**，
-   * 用来铺底、描边，或让白字压上去。直接拿来当文字色会在浅色主题失守
-   * （实测 --accent-blue #2f7fe0 在 #eef0f3 上 3.51:1，--red-strong #e74c3c 只有 3.35:1；
-   * 深色主题下 --red-strong 在 #2a2a2a 上也只有 3.76:1）。 */
+   * 与上面的 --danger / --success 分开：那一组在深色主题是**深底亮色**，
+   * 直接拿来当文字会在浅色主题失守（#a6e3a1 压白底只有 1.55:1）。
+   * 浅色主题已给那一组压深的同名值，所以两种写法都成立；但**新代码优先用
+   * 这一组**：语义单一，不管哪天改浅色映射都不会破。 */
   --text-link:     #89b4fa;   /* 链接 / 可点文字（深底 5.83~7.83:1） */
   --text-danger:   #ff8a80;   /* 错误文字（深底 5.37~7.22:1） */
   --text-success:  #a6e3a1;   /* 成功文字（深底 8.25~11.09:1） */
@@ -75,21 +75,52 @@
   --accent-blue-deep:   #1d6fd0;
   --accent-blue-deeper: #1857a8;
 
-  /* ---- 语义文字色（只当文字用；已按最深/最浅实际底色验算 ≥ 4.5:1）----
-   * 与上面的 --danger / --success / --accent-blue 分开：那一组是**填充色**，
-   * 用来铺底、描边，或让白字压上去。直接拿来当文字色会在浅色主题失守
-   * （实测 --accent-blue #2f7fe0 在 #eef0f3 上 3.51:1，--red-strong #e74c3c 只有 3.35:1；
-   * 深色主题下 --red-strong 在 #2a2a2a 上也只有 3.76:1）。 */
-  --text-link:     #89b4fa;   /* 链接 / 可点文字（深底 5.83~7.83:1） */
-  --text-danger:   #ff8a80;   /* 错误文字（深底 5.37~7.22:1） */
-  --text-success:  #a6e3a1;   /* 成功文字（深底 8.25~11.09:1） */
-  --text-warn:     #f9e2af;   /* 警告文字（深底 9.65~12.97:1） */
+  /* ---- 恒定彩色实心底上的字色（两套主题同值，浅色块不覆盖）----
+   * 上面的 --text-on-accent 会跟主题翻转（深色主题给深字、浅色主题给白字），
+   * 只适合「底色也跟着翻转」的场合。而 --accent-blue-deep 渐变、琥珀色 toast
+   * 这类底色**本身恒定**，字色就必须恒定，否则深色主题下白字压深蓝以外的
+   * 组合会失守（实测 var(--bg-surface-2) 压琥珀 = 浅色主题 1.6:1）。 */
+  --on-solid-dark:  #ffffff;   /* 恒定深底上：白字 */
+  --on-solid-light: #1a1a1a;   /* 恒定亮彩底上：深字 */
 
-  /* ---- 承载白字的蓝色底（.tip-num 序号徽标）----
-   * #4a9eff 上白字只有 2.75:1，往深走两档后 4.96 / 7.08。
-   * 深浅两套主题通用，故只在 :root 定义、浅色块不覆盖。 */
-  --accent-blue-deep:   #1d6fd0;
-  --accent-blue-deeper: #1857a8;
+  /* ---- 恒定的语义渐变（实心按钮 / toast 底）----
+   * 这一族**刻意不跟主题走**：它们在浅色主题下如果换成深底，会和白色卡片糊成一片。
+   * 底色恒定 ⇒ 字色也必须恒定，配 --on-solid-light（亮底深字）。
+   * 收成 token 前散着写了 20 多条线性渐变，改一个颜色要翻四个位置。 */
+  --grad-success:       linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
+  --grad-success-hover: linear-gradient(135deg, #3ace70 0%, #2abe60 100%);
+  --grad-danger:        linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+  --grad-danger-hover:  linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
+  --grad-warn:          linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+  --grad-amber:         linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  --grad-amber-hover:   linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+
+  /* ---- 结果柱状图分类色（纯填充、不上文字，两套主题同值）---- */
+  --bar-add:       linear-gradient(90deg, #4ade80, #22c55e);
+  --bar-update:    linear-gradient(90deg, #fbbf24, #f59e0b);
+  --bar-delete:    linear-gradient(90deg, #f87171, #ef4444);
+  --bar-unchanged: linear-gradient(90deg, #6b7280, #4b5563);
+  --bar-fail:      linear-gradient(90deg, #fb923c, #f97316);
+
+  /* ---- 徽标 12 色相阶（TAGS / 首播 / 平台 按内容稳定配色）----
+   * 只当「文字色 + 12% 透明底」用，浅色主题换同色相深色版本。
+   * 不复用上面的语义色：这里需要同一支里多个**彼此可区分**的邻近色
+   * （周四青柠 / 周五绿 / 周六青），语义色只有一档绿、一档黄，会撞车。
+   * 消费方：css/enrich.css 的 .weekday-chip / .ep-chip，以及
+   * ts/panel/enrich-preview-cell.ts 的 CHIP_HUES（内联 style 里写 var()）。 */
+  --chip-red:    #f87171;
+  --chip-orange: #fb923c;
+  --chip-yellow: #facc15;
+  --chip-lime:   #84cc16;
+  --chip-green:  #22c55e;
+  --chip-teal:   #2dd4bf;
+  --chip-sky:    #38bdf8;
+  --chip-blue:   #60a5fa;
+  --chip-violet: #a78bfa;
+  --chip-purple: #c084fc;
+  --chip-pink:   #f472b6;
+  --chip-rose:   #fb7185;
+
 
   /* ---- 间距（8px 基线；流体化以适配窗口缩放）---- */
   --sp-1: 4px;
@@ -191,8 +222,8 @@
   --primary-strong: #000000;   /* 主色 hover */
   --accent:         #4a4f57;   /* 次级高亮 */
   --accent-2:       #8a9099;   /* 第三强调 */
-  --accent-blue:    #2f7fe0;   /* 蓝强调（Bangumi 品牌色） */
-  --accent-blue-strong: #2569c0;
+  --accent-blue:    #1a63bc;   /* 蓝强调（浅底压深：白字 5.91:1；当文字压最深底色仍 4.68:1） */
+  --accent-blue-strong: #1857a8;
   --primary-grad:   linear-gradient(135deg, #2c2f33 0%, #4a4f57 100%);
   --accent-grad:    linear-gradient(135deg, #e2e5ea 0%, #cfd3da 100%);
 
@@ -216,16 +247,43 @@
   --border-emphasis: rgba(0, 0, 0, 0.26);
   --focus-ring:      rgba(0, 0, 0, 0.12);
   --purple:          #7c3aed;
-  --warn:            #b45309;
+  --warn:            #8a4b00;   /* 当文字用时 #b45309 在 #e2e5ea 上只有 3.98:1，压深到 5.39 */
   /* 重点列：浅底上 #ff9f43 对比度不足，换成深琥珀 */
-  --accent-amber:    #a15c00;
+  --accent-amber:    #8a4b00;   /* 当文字用：#e2e5ea 上 5.39:1（原 #a15c00 仅 4.11:1） */
 
-  /* ---- 语义文字色（浅底版本）----
-   * 底色取最深的 #e2e5ea 验算，四档全部 ≥ 4.5:1。 */
-  --text-link:     #1a5fb4;   /* 链接 / 可点文字（浅底 4.98~6.29:1） */
-  --text-danger:   #b3261e;   /* 错误文字（浅底 5.18~6.54:1） */
-  --text-success:  #1b6b21;   /* 成功文字（浅底 5.24~6.62:1） */
-  --text-warn:     #8a4b00;   /* 警告文字（浅底 5.39~6.80:1） */
+  /* ---- 语义强调色「当文字用」的浅底版本 ----
+   * :root 里的 --success / --warning / --danger / --info / --red / --green /
+   * --yellow / --amber / --teal 是**深底用的亮色**（#a6e3a1 / #f9e2af / #f38ba8 …
+   * 在 #ffffff 上只有 1.5~2.5:1），一旦被 `color:` 直接引用，浅色主题就读不出来。
+   * 这里整体压深到同色相深色档；因为底色也跟着翻转，`--text-on-accent`
+   * （深色主题给深字、浅色主题给白字）继续成立。
+   * 实测五档底色（#ffffff / #f5f6f8 / #eef0f3 / #e2e5ea / #eceef1）全 ≥ 4.5:1，
+   * 最紧的是 --purple 4.51、--info 4.98。 */
+  --success:         #1b6b21;
+  --warning:         #8a4b00;
+  --danger:          #b3261e;
+  --info:            #1a5fb4;
+  --red:             #b3261e;
+  --red-strong:      #b3261e;
+  --green:           #1b6b21;
+  --yellow:          #8a4b00;
+  --teal:            #0b5f59;
+  --amber:           #8a4b00;
+
+  /* ---- 徽标 12 色相阶（浅底版本）：同色相压深 ----
+   * 下限按最深底色 #e2e5ea 验算，逐条 ≥ 4.5:1（白底更高）。 */
+  --chip-red:    #b91c1c;   /* 白底 6.47 / #e2e5ea 5.12 */
+  --chip-orange: #9a3412;   /* 白底 5.79 / #e2e5ea 5.79 */
+  --chip-yellow: #854d0e;   /* 白底 6.85 / #e2e5ea 5.42 */
+  --chip-lime:   #3f6212;   /* 白底 6.55 / #e2e5ea 5.60 */
+  --chip-green:  #166534;   /* 白底 7.13 / #e2e5ea 5.65 */
+  --chip-teal:   #115e59;   /* 白底 6.66 / #e2e5ea 6.01 */
+  --chip-sky:    #0369a1;   /* 白底 5.93 / #e2e5ea 4.70 */
+  --chip-blue:   #1d4ed8;   /* 白底 6.70 / #e2e5ea 5.31 */
+  --chip-violet: #6d28d9;   /* 白底 7.11 / #e2e5ea 5.62 */
+  --chip-purple: #7e22ce;   /* 白底 6.98 / #e2e5ea 5.53 */
+  --chip-pink:   #be185d;   /* 白底 6.03 / #e2e5ea 4.78 */
+  --chip-rose:   #be123c;   /* 白底 6.28 / #e2e5ea 4.97 */
 
   /* ---- 语义文字色（浅底版本）----
    * 底色取最深的 #e2e5ea 验算，四档全部 ≥ 4.5:1。 */

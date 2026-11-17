@@ -184,7 +184,7 @@ export function mountDataContextNotice(page: string): void {
   // grid-column 兼容 panel 的 main-grid 布局（块布局下该属性无效果）
   bar.style.cssText =
     'display:flex;align-items:center;gap:8px;grid-column:1/-1;margin:0 0 8px;padding:6px 10px;' +
-    'font-size:12px;color:var(--text-2,#bac2de);background:var(--bg-surface-2,#313244);' +
+    'font-size:12px;color:var(--text-2);background:var(--bg-surface-2);' +
     'border-radius:6px;'
   const text = document.createElement('span')
   text.textContent = tOr(

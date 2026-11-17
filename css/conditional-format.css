@@ -153,8 +153,8 @@
 }
 
 .conditional-format-group-action {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   font-size: 11px;
   line-height: 1;
@@ -220,7 +220,7 @@
 }
 
 .conditional-format-group-remove:hover {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
 }
 
 /* 组级操作推右：名称 + 计数靠左，✎/✕ 靠右（不挤占组名） */
@@ -241,7 +241,7 @@
   width: 100%;
   min-width: 0;
   padding: 2px 6px;
-  border: 1px solid var(--accent, #4f8cff);
+  border: 1px solid var(--accent);
   border-radius: var(--r-sm);
   background: var(--bg-surface);
   color: var(--text-1);
@@ -298,7 +298,7 @@
     var(--table-col-1, 20px)
     var(--table-col-2, 14px)
     var(--table-col-3, minmax(0, 1fr))
-    var(--table-col-4, 22px)
+    var(--table-col-4, 24px)
     var(--table-col-5, 84px);
   align-items: center;
   gap: var(--sp-3);
@@ -532,7 +532,7 @@
 
 /* 表头行不参与 hover 高亮：吸顶时它盖在数据行上，半透明底色会让下面的行透上来 */
 .conditional-format-import-row:not(.conditional-format-import-row--head):hover {
-  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+  background: var(--fill-2);
 }
 
 .conditional-format-import-row.is-disabled {
@@ -845,7 +845,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md, 6px);
   overflow: hidden;
-  background: var(--bg-1, transparent);
+  background: var(--fill-1);
 }
 
 /* 行：8 列网格（勾选 / 序号 / 类型 / 格式 / 应用于 / 公式 / 为真则停 / 操作）。
@@ -879,7 +879,7 @@
 }
 
 .conditional-format-table .conditional-format-row:hover {
-  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+  background: var(--fill-2);
 }
 
 /* 四张表的表头行共用一套观感（列名灰、加粗、浅底）。
@@ -894,7 +894,7 @@
 .conditional-format-table-head {
   color: var(--text-3);
   font-weight: 600;
-  background: var(--bg-2, rgba(255, 255, 255, 0.03));
+  background: var(--fill-2);
 }
 
 .conditional-format-table-head > span {
@@ -904,7 +904,7 @@
 /* 插件无法重建的类型：整行降透明度 + 左侧警示条，扫一眼就知道哪些不能导 */
 .conditional-format-row-foreign {
   opacity: 0.72;
-  box-shadow: inset 2px 0 0 var(--warn, #d97706);
+  box-shadow: inset 2px 0 0 var(--warn);
 }
 
 .conditional-format-col-index {
@@ -925,9 +925,9 @@
   flex: 0 0 auto;
   padding: 0 4px;
   border-radius: 3px;
-  background: var(--warn-bg, rgba(217, 119, 6, 0.18));
-  color: var(--warn, #d97706);
-  font-size: 10px;
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warn);
+  font-size: 11.5px;
   font-style: normal;
 }
 
@@ -962,8 +962,8 @@
 }
 
 .conditional-format-col-actions button {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: 3px;
@@ -975,12 +975,12 @@
 }
 
 .conditional-format-col-actions button:hover {
-  background: var(--bg-3, rgba(255, 255, 255, 0.1));
+  background: var(--fill-5);
   color: var(--text-1);
 }
 
 .conditional-format-col-actions button[data-action='delete']:hover {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
 }
 
 /* 格式预览：填充块 + 右下角字体色小条（WPS 只显示填充） */
@@ -1034,11 +1034,11 @@
 }
 
 .conditional-format-row.is-selected {
-  background: color-mix(in srgb, var(--accent, #4f8cff) 14%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 14%, transparent);
 }
 
 .conditional-format-row.is-selected:hover {
-  background: color-mix(in srgb, var(--accent, #4f8cff) 22%, transparent);
+  background: color-mix(in srgb, var(--accent-blue) 22%, transparent);
 }
 
 .conditional-format-batch-bar {
@@ -1049,7 +1049,7 @@
   padding: var(--sp-2, 6px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md, 6px);
-  background: var(--bg-2, rgba(255, 255, 255, 0.04));
+  background: var(--fill-2);
 }
 
 .conditional-format-batch-bar[hidden] {
@@ -1064,13 +1064,15 @@
 }
 
 .bgm-btn.small.danger {
-  border-color: var(--danger, #ef4444);
-  color: var(--danger, #ef4444);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
+/* --danger 在两套主题里都是「亮粉」，字色必须跟着底色走：
+   深色主题给深字、浅色主题给白字 —— 用 --text-on-accent，别写死白。 */
 .bgm-btn.small.danger:hover {
-  background: var(--danger, #ef4444);
-  color: #fff;
+  background: var(--danger);
+  color: var(--text-on-accent);
 }
 
 .bgm-btn.small:disabled {
@@ -1133,7 +1135,7 @@
 /* 工具条在窗口页是常显的（任务窗格里只在拖出后挂进标题栏，故默认 hidden） */
 .conditional-format-dialog .conditional-format-float-toolbar {
   border: 0.5px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--r-sm);
 }
 
 .conditional-format-dialog #conditionalFormatExistingPanel {
@@ -1159,8 +1161,8 @@
 .conditional-format-modal-collapse,
 .conditional-format-modal-max {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   font-size: 12px;
   line-height: 1;
@@ -1196,7 +1198,7 @@
 .conditional-format-modal--buttons-outside .conditional-format-modal-actions {
   position: absolute;
   top: 8px;
-  /* 让出右上角两个 22px 窗口按钮（⛶ + ▾）与间距 */
+  /* 让出右上角两个 24px 窗口按钮（⛶ + ▾）与间距 */
   right: 58px;
   z-index: 2;
   margin: 0;
@@ -1284,7 +1286,7 @@
 }
 
 .conditional-format-group-delete:hover {
-  color: var(--danger, #ef4444);
+  color: var(--danger);
 }
 
 /* ===================== 规则体检弹窗 ===================== */
@@ -1321,13 +1323,13 @@
   padding: 1px 6px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--danger, #ef4444);
+  color: var(--danger);
   border: 1px solid currentColor;
   border-radius: var(--r-pill, 999px);
 }
 
 .conditional-format-doctor-flag--warn {
-  color: var(--warning, #f59e0b);
+  color: var(--warning);
 }
 
 .conditional-format-doctor-issues {
