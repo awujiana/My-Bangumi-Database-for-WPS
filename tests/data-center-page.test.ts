@@ -15,6 +15,8 @@ const m = vi.hoisted(() => ({
   getLastRow: vi.fn(),
   httpRequest: vi.fn(),
   showToast: vi.fn(),
+  searchResultsToRows: vi.fn(),
+  writeRowsToResultSheet: vi.fn(),
 }))
 
 vi.mock('../ts/i18n/locale-store.js', () => ({ tOr: m.tOr }))
@@ -25,12 +27,15 @@ vi.mock('../ts/tools/util/sheet.js', () => ({
 }))
 vi.mock('../ts/tools/http.js', () => ({ httpRequest: m.httpRequest }))
 vi.mock('../ts/ui/dialog.js', () => ({ showToast: m.showToast }))
+vi.mock('../ts/services/data-center-export.js', () => ({ searchResultsToRows: m.searchResultsToRows }))
+vi.mock('../ts/panel/data-center-sheet-writer.js', () => ({ writeRowsToResultSheet: m.writeRowsToResultSheet }))
 
 const BODY = `
   <button id="dcRefreshButton"></button>
   <button id="dcCheckUpdateButton"></button>
   <button id="dcExportButton"></button>
   <button id="dcSearchButton"></button>
+  <button id="dcWriteSheetButton"></button>
   <button id="dcLogClearButton"></button>
   <p id="dcUpdateStatus"></p>
   <div id="dcUpdateDiff"></div>
@@ -79,6 +84,8 @@ describe('data-center-page', () => {
     m.readRangeValues.mockReturnValue(ROWS)
     m.getLastRow.mockReturnValue(ROWS.length)
     m.httpRequest.mockResolvedValue({ isFail: () => false, isOk: () => true, data: null })
+    m.searchResultsToRows.mockReturnValue([['名称'], ['某番']])
+    m.writeRowsToResultSheet.mockReturnValue({ ok: true, written: 1, error: '' })
     vi.resetModules()
   })
 
@@ -109,6 +116,29 @@ describe('data-center-page', () => {
     const beforeCalls = m.readRangeValues.mock.calls.length
     click('dcRefreshButton')
     expect(m.readRangeValues.mock.calls.length).toBe(beforeCalls + 1)
+  })
+
+  it('没有搜索结果时点写入按钮，提示先搜索', async () => {
+    const { initializeDataCenterPage } = await import('../ts/panel/data-center-page.js')
+    initializeDataCenterPage()
+    click('dcWriteSheetButton')
+    expect(m.writeRowsToResultSheet).not.toHaveBeenCalled()
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('请先搜索'), 'warn')
+  })
+
+  it('搜索出结果后点写入按钮，调用写表并提示条数', async () => {
+    const { initializeDataCenterPage } = await import('../ts/panel/data-center-page.js')
+    initializeDataCenterPage()
+    ;(document.getElementById('dcSearchKeyword') as HTMLInputElement).value = '科幻'
+    ;(document.getElementById('dcSearchScope') as HTMLSelectElement).value = 'local'
+    click('dcSearchButton')
+    await vi.waitFor(() => {
+      expect(document.querySelector('#dcSearchResults .dc-result-item')).not.toBeNull()
+    })
+    click('dcWriteSheetButton')
+    expect(m.searchResultsToRows).toHaveBeenCalledTimes(1)
+    expect(m.writeRowsToResultSheet).toHaveBeenCalledTimes(1)
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('1 条'), 'success')
   })
 
   it('无活动工作表时记录日志且不崩', async () => {

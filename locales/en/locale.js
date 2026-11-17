@@ -16,7 +16,7 @@ export default {
   "name": "English",
   "nativeName": "English",
   "version": "2.5.1",
-  "updatedAt": "2026-11-17T08:15",
+  "updatedAt": "2026-11-17T17:40",
   "messages": {
     "ribbon.pluginGroup": "Plugins",
     "ribbon.buttonOpenPluginMarket": "Plugin market",
@@ -2115,6 +2115,12 @@ export default {
     "dc.log.clear": "Clear",
     "dc.log.ready": "Data Center ready",
     "dc.log.loaded": "Loaded {count} records",
-    "dc.log.noSheet": "No active worksheet found"
+    "dc.log.noSheet": "No active worksheet found",
+    "dc.write.button": "Write to Excel",
+    "dc.write.title": "Write current search results to the \"Search Results\" sheet (overwrites old data)",
+    "dc.write.empty": "Search for results before writing to Excel",
+    "dc.write.done": "Wrote {count} rows to the \"Search Results\" sheet",
+    "dc.write.failed": "Write failed: {reason}",
+    "dc.write.logDone": "Wrote {count} search results to sheet"
   }
 };

@@ -11,7 +11,7 @@ export default {
   "name": "Simplified Chinese",
   "nativeName": "简体中文",
   "version": "2.5.1",
-  "updatedAt": "2026-11-17T08:15",
+  "updatedAt": "2026-11-17T17:40",
   "messages": {
     "ribbon.pluginGroup": "插件",
     "ribbon.buttonOpenPluginMarket": "插件市场",
@@ -2081,6 +2081,12 @@ export default {
     "dc.log.clear": "清空",
     "dc.log.ready": "数据中心已就绪",
     "dc.log.loaded": "已读取 {count} 条记录",
-    "dc.log.noSheet": "未找到活动工作表"
+    "dc.log.noSheet": "未找到活动工作表",
+    "dc.write.button": "写入 Excel",
+    "dc.write.title": "把当前搜索结果写入工作簿的「搜索结果」表（覆盖旧数据）",
+    "dc.write.empty": "请先搜索出结果，再写入 Excel",
+    "dc.write.done": "已写入「搜索结果」工作表：{count} 条",
+    "dc.write.failed": "写入失败：{reason}",
+    "dc.write.logDone": "写入搜索结果 {count} 条到工作表"
   }
 };

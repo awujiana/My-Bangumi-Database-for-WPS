@@ -38,9 +38,13 @@ import {
 import type {OnlineEntry, SearchKind, SearchQuery, SearchResult, SearchScope} from '../services/data-center-search.js';
 import { renderComparison, renderMonthlyBars, renderStatusPie } from '../ui/data-center-charts.js'
 import { loadRecordsWith } from './data-center-loader.js'
+import { searchResultsToRows } from '../services/data-center-export.js'
+import { writeRowsToResultSheet } from './data-center-sheet-writer.js'
 
 /** 读取成功后缓存的记录，供统计 / 推荐 / 搜索 / 导出共用 */
 let cachedRecords: StatisticsRecord[] = []
+/** 最近一次搜索的结果，供「写入 Excel」使用 */
+let cachedResults: SearchResult[] = []
 
 function byId(id: string): HTMLElement | null {
   return document.getElementById(id)
@@ -286,6 +290,7 @@ async function performSearch(): Promise<void> {
 function renderSearchResults(results: SearchResult[]): void {
   const host = byId('dcSearchResults')
   if (host === null) return
+  cachedResults = results
   if (results.length === 0) {
     host.innerHTML = `<p class="dc-empty">${escapeHtml(tOr('dc.search.noResult', '没有找到匹配结果'))}</p>`
     return
@@ -297,6 +302,27 @@ function renderSearchResults(results: SearchResult[]): void {
       return `<details class="dc-result-item"><summary>${escapeHtml(result.name)} <span class="dc-result-meta">${escapeHtml(meta)}</span></summary>${detail}</details>`
     })
     .join('')
+}
+
+/** 把最近一次搜索结果写入当前工作簿的「搜索结果」表（覆盖同名表数据区） */
+function writeSearchResultsToSheet(): void {
+  if (cachedResults.length === 0) {
+    showToast(tOr('dc.write.empty', '请先搜索出结果，再写入 Excel'), 'warn')
+    return
+  }
+  const rows = searchResultsToRows(cachedResults)
+  const outcome = writeRowsToResultSheet(rows)
+  if (outcome.ok) {
+    showToast(tOr('dc.write.done', '已写入「搜索结果」工作表：{count} 条', {
+      count: String(outcome.written),
+    }), 'success')
+    appendLog(tOr('dc.write.logDone', '写入搜索结果 {count} 条到工作表', {
+      count: String(outcome.written),
+    }))
+  } else {
+    showToast(tOr('dc.write.failed', '写入失败：{reason}', { reason: outcome.error }), 'error')
+    appendLog(`[write] ${outcome.error}`)
+  }
 }
 
 /** 读取当前表并刷新统计与推荐（首屏自动跑一次，按钮也可手动触发） */
@@ -323,6 +349,10 @@ export function initializeDataCenterPage(): void {
   const searchButton = byId('dcSearchButton')
   searchButton?.addEventListener('click', () => {
     void performSearch()
+  })
+  const writeSheetButton = byId('dcWriteSheetButton')
+  writeSheetButton?.addEventListener('click', () => {
+    writeSearchResultsToSheet()
   })
   const clearLog = byId('dcLogClearButton')
   clearLog?.addEventListener('click', () => {

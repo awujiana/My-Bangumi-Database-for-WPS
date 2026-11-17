@@ -11,7 +11,7 @@ export default {
   "name": "Traditional Chinese",
   "nativeName": "繁體中文",
   "version": "2.5.1",
-  "updatedAt": "2026-11-17T08:15",
+  "updatedAt": "2026-11-17T17:40",
   "messages": {
     "ribbon.pluginGroup": "外掛",
     "ribbon.buttonOpenPluginMarket": "外掛市集",
@@ -2081,6 +2081,12 @@ export default {
     "dc.log.clear": "清空",
     "dc.log.ready": "資料中心已就緒",
     "dc.log.loaded": "已讀取 {count} 筆記錄",
-    "dc.log.noSheet": "找不到使用中工作表"
+    "dc.log.noSheet": "找不到使用中工作表",
+    "dc.write.button": "寫入 Excel",
+    "dc.write.title": "把目前搜尋結果寫入活頁簿的「搜尋結果」表（覆蓋舊資料）",
+    "dc.write.empty": "請先搜尋出結果，再寫入 Excel",
+    "dc.write.done": "已寫入「搜尋結果」工作表：{count} 筆",
+    "dc.write.failed": "寫入失敗：{reason}",
+    "dc.write.logDone": "寫入搜尋結果 {count} 筆到工作表"
   }
 };
