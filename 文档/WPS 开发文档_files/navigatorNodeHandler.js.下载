@@ -1,0 +1,461 @@
+/*
+@ 用于导航栏页面的脚本,处理导航栏节点信息以及点击响应
+*/
+
+
+/*
+@ 根据url获取模板文件连接地址,对于普通文件直接用nav.json中的href，对于api文件，解析成html+锚点的形式
+*/
+function GetTempleUrl(url, title, fileType) {
+    // 普通文章， 直接使用文章链接，不用模板文件
+    if (fileType === "essay") {
+        if (url.endsWith("对象.htm") || url.endsWith("对象成员.htm") || url.endsWith("属性.htm") || url.endsWith("方法.htm") || url.endsWith("index.htm") || url.endsWith("index.html")) {
+            return '"' + url + '"'
+        }
+    }
+
+    // 注意url“对象”，“对象成员”前面都有一个空格
+    if (url.endsWith("对象.htm")) { 
+        let urlObj = url.replace("对象.htm", ".htm") // 去掉"对象"
+        let objNameStart = urlObj.lastIndexOf("/");
+        let objName = urlObj.substring(objNameStart + 1, urlObj.length - 5);
+        let anchor = "#jsObject_" + objName
+        return '"apiObjectTemplate.htm?page=' + urlObj + anchor + '"'
+    } else if (url.endsWith("对象成员.htm")) {
+        let urlObj = url.replace("对象成员.htm", ".htm") // 去掉"对象成员"
+        let objNameStart = urlObj.lastIndexOf("/");
+        let objName = urlObj.substring(objNameStart + 1, urlObj.length - 5);
+        let anchor = "#jsMember_" + objName
+        return '"apiObjectTemplate.htm?page=' + urlObj + anchor + '"'
+    } else if (url.endsWith("属性.htm")) {
+        let objNameEnd = url.lastIndexOf("/属性");
+        let urlObj;
+        if (objNameEnd === -1) {
+            alert('invalid url');
+        } else {
+            let objNameStart = url.lastIndexOf("/", objNameEnd - 1)
+            let objName = url.substring(objNameStart, objNameEnd)
+            urlObj = url.substring(0, objNameEnd)
+            urlObj += objName + " .htm"
+        }
+        let anchor = title.split(" ")[0];
+        return '"apiObjectTemplate.htm?page=' + urlObj + "#" + anchor + '"';
+    } else if (url.endsWith("方法.htm")) {
+        let objNameEnd = url.lastIndexOf("/方法");
+        let urlObj;
+        if (objNameEnd === -1) {
+            alert('invalid url');
+        } else {
+            let objNameStart = url.lastIndexOf("/", objNameEnd - 1)
+            let objName = url.substring(objNameStart, objNameEnd)
+            urlObj = url.substring(0, objNameEnd)
+            urlObj += objName + " .htm"
+        }
+        let anchor = title.split(" ")[0];
+        return '"apiObjectTemplate.htm?page=' + urlObj + "#" + anchor + '"';
+    } else {
+        return '"' + url + '"'
+    }
+}
+
+/*
+* 导航栏中增加一项
+*/
+function AddChild(node, data) {
+    data.forEach(function(element) {
+        var ele = document.createElement("div");
+        ele.style.paddingLeft = "16px";
+        // 项目文件类型，如果显式指定了，那么就是该类型；否则按照普通类型来处理
+        let itemType = element.type;
+        if (itemType === undefined) {
+            itemType = element.fold ? "normaldir" : "essay"
+        }
+        
+        ele.fileType = itemType;
+        let navPath = node.getAttribute("navPath") + element.title + (isItemDir(itemType) ? "/" : "")
+        ele.setAttribute("navPath", navPath)
+        let href = (element.href === "#" ? "#" : node.getAttribute("navPath") + element.href);
+        if (itemType === "apiessay" || itemType === "essay") {
+            href = `topics/${href}`;
+        }
+
+        ele.innerHTML = '<jsbr><a href=' + GetTempleUrl(href, element.title, itemType) + '" onclick="return LinkClick(this, ' + 
+            element.fold + ')" target="content" title="' + element.title + '" onmousemove="window.status="' +
+            element.title + '"><img id="img3" src=' + (element.fold ? "icons/1.svg" : "icons/11.gif") +
+            ' class="p"><span id="l1" class="unselected">' + element.title + '</span></a></jsbr>';
+        
+        node.appendChild(ele);
+    });
+}
+
+function GetData(path, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", location.href.slice(0, location.href.length - 19) + "navjson/" + path + "nav.json");
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var data = JSON.parse(xhr.responseText);
+            callback(data);
+        }
+    }
+    xhr.send()
+}
+
+var curSelect;
+
+/*
+@  节点点击响应处理
+*/
+function LinkClick(cur, fold, callback) {
+    if (!String.prototype.endsWith) {
+        String.prototype.endsWith = function (suffix) {
+            return this.indexOf(suffix, this.length - suffix.length) !== -1;
+        };
+    }
+    if (curSelect) {
+        curSelect.style.color = "#000000"
+        curSelect.parentElement.style.backgroundColor = "#FFFFFF"
+    }
+    cur.style.color = "#409EFF";
+    cur.parentElement.style.backgroundColor = "#E9F1FE"
+    curSelect = cur;
+    if (!fold)
+        return true;
+
+    var bShow = true;
+    var img = cur.getElementsByTagName("img")[0];
+    if (img) {
+        if (img.src.endsWith("icons/1.svg")) {
+            img.src = "icons/2.svg";
+        } else {
+            img.src = "icons/1.svg";
+            bShow = false
+        }
+    }
+    var node = cur.parentElement.parentElement;
+    /*
+        关掉其他的同等级目录的导航栏 
+     */
+    if (bShow ) { 
+        let navEles = node.parentElement.children;
+        for(let i = 0;i < navEles.length;i++) {
+            let ele = navEles[i];
+            if(ele != node && ele.nodeName != "JSBR" && isFolderExpanded(ele)) {
+                ele.getElementsByTagName("img")[0].src = "icons/1.svg";
+                for (var j = ele.childElementCount - 1; j > 0; --j){
+                    ele.children[j].style.display = "none";
+                }
+            }
+        }
+    }
+    node.setAttribute("navPath", node.parentElement.getAttribute("navPath") + cur.title + "/")
+    if (bShow) {
+        if (node.childElementCount == 1) {
+            GetData(node.getAttribute("navPath"), function(data) {
+                AddChild(node, data);
+                if (callback) {
+                    callback();
+                }
+            });
+            return false;
+        } else {
+            for (var i = 1; i < node.childElementCount; ++i)
+                node.children[i].style.display = "block";
+        }
+    } else {
+        for (var i = 1; i < node.childElementCount; ++i)
+            node.children[i].style.display = "none";
+    }
+    return false;
+}
+
+
+
+
+/*
+@ 新建一个目录
+*/
+function newDir() {
+    hideContextMenu();
+    setTimeout(()=>{
+        let inputDirName = prompt("请输入新建目录名：");
+        if (inputDirName.length > 0) {
+            var parentDiv = elementOnEdit.parentElement.parentElement;
+            var newDiv = document.createElement("div");
+            newDiv.style.paddingLeft = "16px";
+            // 新建的目录是没有超链接的
+            newDiv.innerHTML = '<jsbr><a href="#"' + ' onclick="return LinkClick(this, true)" target="content" title="' + inputDirName + '" onmousemove="window.status="' +
+                inputDirName + '"><img id="img3" src=' + "icons/1.svg" +
+                    ' class="p"><span id="l1" class="unselected">' + inputDirName + '</span></a></jsbr>';
+            newDiv.setAttribute("navPath", parentDiv.getAttribute("navPath") + inputDirName + '/')
+            newDiv.fileType = "normaldir";
+            parentDiv.appendChild(newDiv);
+            NewCustomNode(false, parentDiv.getAttribute("navPath"), inputDirName);
+        }
+    }, 200);
+    
+}
+
+/*
+@ 新建一个文章
+*/
+function newFile() {
+   hideContextMenu();
+   setTimeout(()=>{
+        let inputFileName = prompt("请输入新建文件名：");
+        if (inputFileName.length > 0) {
+            var parentDiv = elementOnEdit.parentElement.parentElement;
+            var newDiv = document.createElement("div");
+            newDiv.style.paddingLeft = "16px";
+            newDiv.setAttribute("navPath", parentDiv.getAttribute("navPath") + inputFileName)
+            let newHref = 'topics/' + newDiv.getAttribute("navPath") + '.html';
+            // 新建的文章是是有超链接的
+            newDiv.innerHTML = '<jsbr><a href="' + newHref + '" onclick="return LinkClick(this, false)" target="content" title="' + 
+                inputFileName + '" onmousemove="window.status="' + inputFileName + '><img id="img3" src="icons/11.gif" class="p"><span id="l1" class="unselected">' +
+                     inputFileName + '</span></a></jsbr>';
+            
+            newDiv.fileType = "essay";
+            parentDiv.appendChild(newDiv);
+            NewCustomNode(true, parentDiv.getAttribute("navPath"), inputFileName);
+        }
+    }, 200);
+}
+
+/*
+@ 删除自定义节点，文章或者目录
+*/ 
+function delNode() {
+hideContextMenu();
+setTimeout(()=>{
+    if (!confirm("确认要删除当前节点？")) {
+        return;
+    }
+    var xmlReq = new XMLHttpRequest();
+    var serverHostIp = "http://10.13.76.111:9080/"
+    let url;
+    var parentDiv = elementOnEdit.parentElement.parentElement;
+    if (isItemDir(parentDiv.fileType)) {
+        if (parentDiv.fileType === "apidir") {
+            let para = {
+                navPath : parentDiv.getAttribute("navPath")
+            }
+            return CallServerApi("delApiDir", para, ()=>{
+                 // 删除页面节点元素
+                parentDiv.parentElement.removeChild(parentDiv);
+            })
+        } else {
+            url = serverHostIp + "delDir";
+        }
+        
+    } else {
+        url = serverHostIp + "delFile";
+    }
+    xmlReq.open('POST', url);
+    xmlReq.setRequestHeader('content-type', 'application/json');
+
+    xmlReq.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+        console.log("delnode success!")
+        }
+    }
+    
+    let nodeInfo = {
+        "nodeName" : parentDiv.getAttribute("navPath")
+    }
+    
+    xmlReq.send(JSON.stringify(nodeInfo));
+
+    // 删除节点元素
+    parentDiv.parentElement.removeChild(parentDiv);
+}, 200);
+}
+
+/*
+@ 隐藏右键菜单
+*/
+function hideContextMenu() {
+    let rm = document.getElementById("navRightMenu");
+    rm.style.display="none";
+}
+
+/*
+@ 通知后端创建目录和页面文件
+*/
+function NewCustomNode(bFile, dirName, nodeName) {
+    var xmlReq = new XMLHttpRequest();
+    var serverHostIp = "http://10.13.76.111:9080/"
+    let url;
+    if (bFile === true) {
+        url = serverHostIp + "newFile";
+    } else {
+        url = serverHostIp + "newDir";
+    }
+    xmlReq.open('POST', url);
+    xmlReq.setRequestHeader('content-type', 'application/json');
+
+    xmlReq.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var data = JSON.parse(xmlReq.responseText);
+        }
+    }
+
+    let nodeInfo = {
+        "dirName" : dirName,
+        "nodeName" : nodeName
+    }
+
+    xmlReq.send(JSON.stringify(nodeInfo));
+}
+
+
+/*
+@ 调用服务端接口
+*/
+function CallServerApi(apiName, para, callback) {
+    var xmlReq = new XMLHttpRequest();
+    var serverHostIp = "http://10.13.76.111:9080/"
+    let url = serverHostIp + apiName
+    xmlReq.open('POST', url);
+    xmlReq.setRequestHeader('content-type', 'application/json');
+
+    xmlReq.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var data = JSON.parse(xmlReq.responseText);
+            callback(data)
+        }
+    }
+
+    if (para === undefined) {
+        xmlReq.send();
+    } else {
+        xmlReq.send(JSON.stringify(para));
+    }
+}
+
+var elementOnEdit;
+function popupContextMenu(e, ele) {
+    let rm = document.getElementById("navRightMenu");
+    console.log(ele);
+    let xpos = e.pageX;
+    let ypos = e.pageY;
+    rm.style.left=xpos+"px";
+    rm.style.top = ypos+"px";
+
+    // 根据选择的是目录还是文件,要区别设置右键菜单
+    let parentDiv = ele.parentElement.parentElement;
+    let contextMenu = rm.children;
+
+    switch(parentDiv.fileType) {
+        case "normaldir" : // 普通目录，可进行所有操作
+            for (let i = 0; i < contextMenu.length; i++) {
+                contextMenu[i].style.display = "block";
+            }
+            rm.style.display = "block";
+            break;
+        case "apidir": // api目录，只能删除或者修改名字，下面不允许嵌套目录或者文件
+            for (let i = 0; i < contextMenu.length; i++) {
+                if (contextMenu[i].id == "idDelteNode" || contextMenu[i].id == "idRenameNode") {
+                    contextMenu[i].style.display = "block";
+                } else {
+                    contextMenu[i].style.display = "none";
+                }
+            }
+            rm.style.display = "block";
+            break;
+        case "apisubdir": // api子目录，不允许任何操作，在apidir上面进行操作
+            for (let i = 0; i < contextMenu.length; i++) {
+                contextMenu[i].style.display = "none";
+            }
+            rm.style.display = "none";
+            break;
+        case "apiessay": // api文章，不允许任何操作，在apidir上面进行操作
+            for (let i = 0; i < contextMenu.length; i++) {
+                contextMenu[i].style.display = "none";
+            }
+            rm.style.display = "none";
+            break;
+        case "essay": // 普通文章，只能删除或者修改名字
+            for (let i = 0; i < contextMenu.length; i++) {
+                if (contextMenu[i].id == "idDelteNode" || contextMenu[i].id == "idRenameNode") {
+                    contextMenu[i].style.display = "block";
+                } else {
+                    contextMenu[i].style.display = "none";
+                }
+            }
+            rm.style.display = "block";
+            break;
+        default:
+            break;
+    }
+
+    elementOnEdit = ele;
+    // 停止事件冒泡传播,这样其他的右键就不会生效了,比如body.oncontextmenu
+    e.stopPropagation();
+    return false;
+}
+
+/*
+@ 新建标准api文档
+*/
+function newStdApiFile() {
+    hideContextMenu();
+    setTimeout(()=>{
+         let inputFileName = prompt("请输入新建API对象名：");
+         if (inputFileName.length > 0) {
+            // 调用后端接口，创建api文档
+            var parentDiv = elementOnEdit.parentElement.parentElement;
+            let para = {
+                fileName : inputFileName,
+                navPath  : parentDiv.getAttribute("navPath")
+            }
+            CallServerApi("newApiFile", para, ()=>{
+                var newDiv = document.createElement("div");
+                newDiv.style.paddingLeft = "16px";
+                newDiv.setAttribute("navPath" , parentDiv.getAttribute("navPath") + inputFileName)
+                let newHref = 'topics/' + newDiv.getAttribute("navPath") + '.html';
+                // 新建的文章是是有超链接的
+                newDiv.innerHTML = '<jsbr><a href="#" onclick="return LinkClick(this, true)" target="content" title="' + 
+                    inputFileName + '" onmousemove="window.status="' + inputFileName + '><img id="img3" src="icons/1.svg" class="p"><span id="l1" class="unselected">' +
+                         inputFileName + '</span></a></jsbr>';
+                
+                newDiv.fileType = "apidir";
+                parentDiv.appendChild(newDiv);
+            })
+         }
+     }, 200);
+}
+
+function renameNode() {
+    alert("rename");
+}
+
+function isItemDir(type) {
+    if (type === "apidir" || type === "apisubdir" || type === "normaldir") {
+        return true;
+    }
+
+    return false;
+}
+
+/*
+@ 当前文件夹是否处于展开状态，（可能曾经就展开过，也有可能没有展开）
+*/
+function isFoldExpand(aNode) {
+    let img = aNode.getElementsByTagName("img")[0]
+    if (img) {
+        if (img.src.endsWith("icons/1.svg")) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*
+@ 当前文件夹是否已经展开过
+*/
+function isFolderExpanded(divNode) {
+    if (divNode && divNode.childElementCount === 1) {
+        return false;
+    }
+    return true;
+}
