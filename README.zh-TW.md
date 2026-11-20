@@ -473,24 +473,25 @@ npm run icon:merge                # images/ 裡的多個單尺寸 ico → 合成
 
 **外掛品牌圖示**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字樣），隨 `dist/`（或 `wpsjs build` 產物）一併封裝進外掛，同時作為 README 標題標識與 Releases 資源使用。
 
-### 維護者：兩棵工作樹 + 發佈流程
+### 維護者：分支模型與發佈流程
 
-本機維護時存在**兩棵內容一致、職責不同**的樹（不要在兩棵樹裡各改一半）：
+倉庫只有**一棵工作樹**（`Excel加载项/BGM/My-Bangumi-Database-for-WPS`），靠兩條分支區分職責：
 
-| 樹                               | 位置（本機）                                  | 職責                                                                                              |
-| -------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **開發樹**                       | `Excel加载项/BGM/restore-src`                 | 含 `tests/`、`scripts/`、`package.json` / `tsconfig*` / `vite.config`，跑 `npm run gate` 全量門禁 |
-| **發佈樹**（= 本 GitHub 儲存庫） | `Excel加载项/BGM/My-Bangumi-Database-for-WPS` | 只放發佈檔案 + `ts/` 原始碼 + `dist-ts/`；遠端 `origin` 指向 GitHub                               |
+| 分支 | 內容 | 誰讀它 |
+| --- | --- | --- |
+| `main` | **完整開發樹**：發佈檔案 + `ts/` 原始碼 + `tests/` + `scripts/` + 工具鏈 | 開發者（clone 後 `npm install` 就能跑 `gate`） |
+| `release` | **只含發佈檔案** + `download/` 更新包 + `locales/` 語言包 | 插件自己（`version.json` / 更新包 / 語言包都從這拉） |
 
 標準流程：
 
-1. 在**開發樹**改程式碼 → `npm run gate` 全綠（lint / 型別 / 門禁指令碼 / 全量單元測試）；
-2. 把改動的檔案同步到**發佈樹**（`ts/`、`ui/`、`css/`、`images/` 等；`tests/` 不進發佈樹）；
-3. 在發佈樹 `npm run build:ts` 重新產生 `dist-ts/`；
-4. 提交後執行 `node ../publish.mjs`（或雙擊 `publish.cmd`）—— 指令碼會重建只含發佈檔案的 `publish` 分支並強推 `origin/main`，本機 `main` 保留工具鏈。
+1. 在 `main` 改程式碼 → `npm run gate` 全綠（lint / 型別 / 門禁指令碼 / 全量單元測試）；
+2. `npm run build` 重新產生 `dist-ts/` 與 `dist/`；
+3. 打 zip 進 `download/`；
+4. 執行 `node scripts/release/publish.mjs`（或雙擊上級目錄的 `publish.cmd` 轉發殼）—— 指令碼從 `main` 重建 `publish` 分支、剔除工具鏈，強推 `origin/release`，末尾再把 `main` 快進推到 `origin/main`。完整步驟見 [`文档/发布流程.md`](文档/发布流程.md)。
 
-> ⚠️ 新增的 `dist-ts/**` 檔案被 `.gitignore` 擋住，`publish.mjs` 的 `git add -A` 收不到，必須明確 `git add -f dist-ts/...`，否則發佈包缺模組會直接白屏。
-> ⚠️ 開發樹缺 `node_modules` 時，用目錄聯結重用發佈樹的相依（`New-Item -ItemType Junction`），不必重新 `npm install`。
+> ℹ️ `download/` 會同時出現在兩條分支上，這是刻意留的相容路徑：≤2.5.1 的舊客戶端硬編碼讀 `main/download/version.json`，等這批使用者升到 ≥2.5.2 之後才能停更 `main/download/`。
+> ⚠️ **永遠不要把發佈樹推到 `main`，也不要 force push `main`** —— GitHub 上已開分支保護。2026-11-08 曾因遠端 `main` 是裸發佈樹，一次 `git pull --rebase origin main` 把本機工具鏈連同提交一起刪掉（另有 52 份從未入庫的文檔整批消失）。
+> ⚠️ 新增的 `dist-ts/**` 檔案被 `.gitignore` 擋住；`publish.mjs` 會 `git add -f` 整個目錄，手動補時必須 `git add -f dist-ts/...`，否則發佈包缺模組會直接白屏。
 
 ---
 

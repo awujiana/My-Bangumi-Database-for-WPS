@@ -486,8 +486,8 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
 1. 在 `main` 改代码 → `npm run gate` 全绿（lint / 类型 / 门禁脚本 / 全量单测）；
 2. `npm run build` 重新生成 `dist-ts/` 与 `dist/`；
 3. 打 zip 进 `download/`；
-4. 运行 `node ../publish.mjs`（或双击 `publish.cmd`）—— 脚本从 `main` 重建 `publish` 分支、剔除工具链，
-   强推 `origin/release`，末尾再把 `main` 快进推到 `origin/main`。
+4. 运行 `node scripts/release/publish.mjs`（或双击上级目录的 `publish.cmd` 转发壳）—— 脚本从 `main` 重建 `publish` 分支、剔除工具链，
+   强推 `origin/release`，末尾再把 `main` 快进推到 `origin/main`。完整步骤见 [`文档/发布流程.md`](文档/发布流程.md)。
 
 > ℹ️ **`download/` 会同时出现在两条分支上**，这是刻意留的兼容路径：≤2.5.1 的旧客户端硬编码读
 > `main/download/version.json`，`main` 上断更它们就永远收不到升级。等这批用户升到 ≥2.5.2 之后

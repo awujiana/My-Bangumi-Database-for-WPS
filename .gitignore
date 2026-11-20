@@ -1,0 +1,105 @@
+# ===== 操作系统临时文件 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ===== 编辑器/IDE 个人配置 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.\#*
+\#*\#
+
+# ===== Office 临时文件 =====
+~$*
+*.tmp
+
+# ===== Excel 文件（本地使用，不上传到 GitHub）=====
+*.xlsx
+*.xlsx.bak
+*.xls
+
+# ===== 备份文件 =====
+*.bak
+
+# ===== 发布流程临时产物（参见 项目操作指南.md 第五章）=====
+# 打包产物，每次发布重新生成
+data.zip
+*.zip
+# jq filter 临时文件
+filter.jq
+# 本地测试下载的 zip
+test.zip
+
+# ===== 日志 =====
+*.log
+npm-debug.log*
+
+# ===== Python 缓存 =====
+__pycache__/
+*.pyc
+*.pyo
+clean/
+# ===== Node.js 依赖（本地使用）=====
+node_modules/
+
+# ===== 不排除以下内容（显式说明，避免误判）=====
+# data/、differences/ 目录及其数据文件需要入库
+# *.jsonl、*.jsonlines、*.json、*.html、*.md 需要入库
+
+# ===== 测试覆盖率报告（本地生成，不入库）=====
+coverage/
+
+dist/
+
+# ===== TypeScript 编译产物（每次构建重新生成，不入库）=====
+# ts/ 源码是唯一真相；dist-ts 为 tsc 产物，误入库会与源码冲突
+dist-ts/
+dist.bak/
+
+# ===== 构建/规格生成物（不入库）=====
+dist.json
+
+# ===== 架构/文档生成工具产物（archify 等，不入库）=====
+archify-errors.json
+bgm-runtime-architecture*
+.archify-*
+
+# ===== Lint / 校验临时输出（不入库）=====
+lint-full.txt
+lint-output.txt
+lint-stderr.txt
+lint-stdout.txt
+validate-err.json
+
+# ===== 一次性/实验性临时文件（不入库）=====
+_skills_run*.txt
+# 会话调试输出（门禁 / lint / tsc / 测试日志与 vitest json 报告，不入库；.workbuddy/memory 仍入库）
+.workbuddy/*.txt
+.workbuddy/*.log
+.workbuddy/*.json
+.workbuddy/*.tar.gz
+.workbuddy/eejson/
+# ESLint 严格化迁移期的临时产物与物理备份（不入库）
+.fix_out/
+.backup_before_recovery/
+.stats.tmp.json
+.scan.json
+.dry.json
+
+# ===== 发布打包产物（release/ 为打包输出，wps-addon-build/ 为旧发布构建）=====
+# 必须带前导 `/`：不带会匹配任意层级的同名目录，把 scripts/release/ 一起吃掉
+/release/
+/wps-addon-build/
+
+# ===== Lint 审计快照（体积大、每次重生成，不入库）=====
+.lint-shadow.json
+.lint-raw.json
+.lint-*.json
+
+# ===== AI 助手工作目录（本地记忆 / 临时产物，不入库）=====
+.workbuddy-ai/

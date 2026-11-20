@@ -467,24 +467,25 @@ Multi-size icons: if you already have **a multi-size ico**, just overwrite `imag
 
 **Brand icon**: `images/mbd-logo.svg` (#1296db palette, contains "MBD"), packaged with `dist/` (or the `wpsjs build` output) into the add-in, and also used as the README title mark and a Releases asset.
 
-### Maintainers: two working trees + release flow
+### Maintainers: branch model and release flow
 
-On the maintainer's machine there are **two trees with identical content but different responsibilities** (never change half in each):
+This repo keeps **one working tree** (`Excel加载项/BGM/My-Bangumi-Database-for-WPS`); two branches split the responsibilities:
 
-| Tree                                  | Location (local)                              | Responsibility                                                                                       |
-| ------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Dev tree**                          | `Excel加载项/BGM/restore-src`                 | Has `tests/`, `scripts/`, `package.json` / `tsconfig*` / `vite.config`; runs the full `npm run gate` |
-| **Release tree** (= this GitHub repo) | `Excel加载项/BGM/My-Bangumi-Database-for-WPS` | Only release files + `ts/` sources + `dist-ts/`; `origin` points at GitHub                           |
+| Branch | Contents | Who reads it |
+| --- | --- | --- |
+| `main` | **Full dev tree**: release files + `ts/` sources + `tests/` + `scripts/` + toolchain | Developers (`npm install` then `npm run gate`) |
+| `release` | **Release files only** + `download/` packages + `locales/` | The add-in itself (`version.json` / update zip / language packs) |
 
 Standard flow:
 
-1. Change code in the **dev tree** → `npm run gate` fully green (lint / types / gate scripts / full unit tests);
-2. Copy the changed files into the **release tree** (`ts/`, `ui/`, `css/`, `images/`, …; `tests/` does not go there);
-3. Run `npm run build:ts` in the release tree to regenerate `dist-ts/`;
-4. Commit, then run `node ../publish.mjs` (or double-click `publish.cmd`) — the script rebuilds the `publish` branch containing only release files and force-pushes it to `origin/main`, while local `main` keeps the toolchain.
+1. Change code on `main` → `npm run gate` fully green (lint / types / gate scripts / full unit tests);
+2. `npm run build` to regenerate `dist-ts/` and `dist/`;
+3. Build the update zip into `download/`;
+4. Run `node scripts/release/publish.mjs` (or double-click `publish.cmd` in the parent folder) — it rebuilds `publish` from `main`, strips the toolchain, force-pushes `origin/release`, then fast-forwards `main` to `origin/main`. Full steps: [`文档/发布流程.md`](文档/发布流程.md) (Chinese).
 
-> ⚠️ Newly added `dist-ts/**` files are blocked by `.gitignore`, so `publish.mjs`'s `git add -A` misses them; you must `git add -f dist-ts/...` explicitly, otherwise the release package is missing modules and shows a blank page.
-> ⚠️ If the dev tree has no `node_modules`, junction it to the release tree's dependencies (`New-Item -ItemType Junction`) instead of reinstalling.
+> ℹ️ `download/` intentionally exists on both branches: clients ≤ 2.5.1 hard-code `main/download/version.json`, so `main` must keep receiving new packages until those users upgrade.
+> ⚠️ **Never push the release tree to `main`, and never force-push `main`** — branch protection is enabled on GitHub. In November 2026 a `git pull --rebase origin main` against a release-only `main` wiped the local toolchain and 52 never-committed docs.
+> ⚠️ Newly added `dist-ts/**` files are blocked by `.gitignore`; `publish.mjs` force-adds the whole directory, and manual adds must use `git add -f dist-ts/...`, otherwise the release package silently misses modules and shows a blank page.
 
 ---
 

@@ -303,20 +303,19 @@ npm run test:coverage
 
 ## 发布流程
 
-1. 更新 `package.json` 的 `version`。
-2. 确认 `npm run gate` 全绿。
-3. 构建发布包：
+完整步骤见 **[`文档/发布流程.md`](文档/发布流程.md)**（分支模型、构建打包、脚本行为、验证 URL、常见坑、回滚）。要点：
 
-   ```bash
-   npm run build
-   VERSION=$(node -p "require('./package.json').version")
-   zip -r "My-Bangumi-Database-for-WPS-v${VERSION}.zip" dist
-   ```
+1. 改 `package.json` 的 `version`，同时同步 `ts/tools/update-check.ts` 的 `CURRENT_VERSION`；
+2. `npm run gate` 全绿 → `npm run build` → 打 zip 进 `download/`；
+3. `node scripts/release/publish.mjs`（或双击上级目录 `publish.cmd`）：
+   从 `main` 重建 `publish` → 强推 `origin/release` → 把 `main` 快进推到 `origin/main`；
+4. `git tag -f v<ver> publish` + `gh release create`（Release 资产与更新包同一份 zip）。
 
-4. 在 GitHub 创建 `vX.Y.Z` Release，上传 zip，并填写更新说明。
-5. 插件「检查更新」读取 `releases/latest`，资产名需与 `My-Bangumi-Database-for-WPS-vX.Y.Z.zip` 约定一致。
+> **两条护栏**：`main` 恒为完整开发树，**发布树只进 `release`**；`main` **永不 force push**
+> （GitHub 上已开分支保护）。2026-11-08 因远端 `main` 曾是裸发布树，一次 `git pull --rebase`
+> 删掉了本地工具链和 52 份未入库文档。
 
-> GitHub API 对未认证请求按 IP 限流（60 次/小时）。插件已内置 `raw.githubusercontent.com` 的版本兜底，但发布时仍建议确保 Release 资产命名规范。
+> GitHub API 对未认证请求按 IP 限流（60 次/小时）。插件已内置 `raw.githubusercontent.com` 的版本兜底，但发布时仍建议确保更新包命名规范。
 
 ---
 
