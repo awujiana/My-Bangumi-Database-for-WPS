@@ -487,7 +487,7 @@ npm run icon:merge                # images/ 裡的多個單尺寸 ico → 合成
 1. 在 `main` 改程式碼 → `npm run gate` 全綠（lint / 型別 / 門禁指令碼 / 全量單元測試）；
 2. `npm run build` 重新產生 `dist-ts/` 與 `dist/`；
 3. 打 zip 進 `download/`；
-4. 執行 `node scripts/release/publish.mjs`（或雙擊上級目錄的 `publish.cmd` 轉發殼）—— 指令碼從 `main` 重建 `publish` 分支、剔除工具鏈，強推 `origin/release`，末尾再把 `main` 快進推到 `origin/main`。完整步驟見 [`文档/发布流程.md`](文档/发布流程.md)。
+4. 執行 `scripts/release/publish.cmd`（或 `node scripts/release/publish.mjs`；雙擊上級目錄的 `publish.cmd` 轉發殼等價）—— 指令碼從 `main` 重建 `publish` 分支、剔除工具鏈，強推 `origin/release`，末尾再把 `main` 快進推到 `origin/main`。完整步驟見 [`文档/发布流程.md`](文档/发布流程.md)。
 
 > ℹ️ `download/` 會同時出現在兩條分支上，這是刻意留的相容路徑：≤2.5.1 的舊客戶端硬編碼讀 `main/download/version.json`，等這批使用者升到 ≥2.5.2 之後才能停更 `main/download/`。
 > ⚠️ **永遠不要把發佈樹推到 `main`，也不要 force push `main`** —— GitHub 上已開分支保護。2026-11-08 曾因遠端 `main` 是裸發佈樹，一次 `git pull --rebase origin main` 把本機工具鏈連同提交一起刪掉（另有 52 份從未入庫的文檔整批消失）。

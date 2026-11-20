@@ -25,12 +25,12 @@
 | `download/`                                                        | 各版本发布 zip 与 `version.json`（更新链路数据源）                                                              | ✅                        |
 | `wps-addon-build/`                                                 | `wpsjs build --exe` 产物（exe）                                                                                 | ❌ 由发布流程上传 Release |
 | `tests/`                                                           | Vitest 单元测试                                                                                                 | ✅                        |
-| `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）；`release/publish.mjs` 为发布脚本 | ✅                        |
+| `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）；`release/` 下为发布入口（`publish.mjs` + `publish.cmd`） | ✅                        |
 | `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（2026-11-21 起**已纳入版本库**，随 `main` 分发；不进 `release` 发布树） | ✅                        |
 | `node_modules/`、`release/`、`.workbuddy-ai/`                      | 依赖、发布暂存、内部工作数据                                                                                    | ❌                        |
 
-> 上级目录 `Excel加载项/BGM/` 只剩两样东西：`publish.cmd` / `publish.mjs`（**转发壳**，逻辑在仓库内 `scripts/release/publish.mjs`）与 `release-notes-v*.md`（每版发布说明，`gh release create` 直接引用）。
-> 发布脚本与《[发布流程](文档/发布流程.md)》已于 2026-11-21 收进仓库，别再往上级目录写逻辑。
+> 上级目录 `Excel加载项/BGM/` 只剩两样东西：`publish.cmd` / `publish.mjs`（**转发壳**，各 4～5 行）与 `release-notes-v*.md`（每版发布说明，`gh release create` 直接引用）。
+> 发布入口与《[发布流程](文档/发布流程.md)》已于 2026-11-21 收进仓库（`scripts/release/` + `文档/发布流程.md`），别再往上级目录写逻辑。
 >
 > **分支模型（2026-11-21 起）**：`origin/main` = 完整开发树（工具链常驻，`npm run gate` 直接可跑）；
 > `origin/release` = 只含发布文件 + `download/` 更新包，插件运行期从这条分支读 `version.json` / zip / 语言包。

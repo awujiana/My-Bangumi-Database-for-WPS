@@ -34,8 +34,8 @@ rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.
   `文档/待办-多语言支持.md`（下载源改为 `release`）。
 - **`文档/` 首次纳入版本控制**（52 份，见 `docs:` 提交）：此前它们是未跟踪的散文件，
   不随仓库走，任何重建都会整批消失。
-- **发布脚本入库**：`publish.mjs` → `scripts/release/publish.mjs`（此前只在上级目录裸放，
-  没有任何版本控制兜底）；上级 `publish.mjs` / `publish.cmd` 退化为转发壳，逻辑只维护一份。
+- **发布脚本入库**：`publish.mjs` + `publish.cmd` → `scripts/release/`（此前只在上级目录裸放，
+  没有任何版本控制兜底）；上级 `publish.mjs` / `publish.cmd` 退化为 4～5 行转发壳，逻辑只维护一份。
   《发布流程》同步入库为 `文档/发布流程.md`，上级那份改为指针文件。
 - **GitHub 侧加锁**：`main` 启用 ruleset `protect-main` —— *Block force pushes* + *Restrict deletions*，
   **无 bypass actor**（连仓库 owner 也不能绕过，改规则需先到网页调整）。仓库默认分支由

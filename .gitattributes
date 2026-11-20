@@ -1,0 +1,6 @@
+# 换行符策略（只声明必要的，不动其它文件的现有行为）
+#
+# Windows 批处理用 LF 时 cmd.exe 解析 goto/label 会出问题，必须固定 CRLF：
+# `text eol=crlf` 表示入库归一化为 LF、检出时转 CRLF —— 任何平台 clone 都一样。
+*.cmd text eol=crlf
+*.bat text eol=crlf

@@ -481,7 +481,7 @@ Standard flow:
 1. Change code on `main` → `npm run gate` fully green (lint / types / gate scripts / full unit tests);
 2. `npm run build` to regenerate `dist-ts/` and `dist/`;
 3. Build the update zip into `download/`;
-4. Run `node scripts/release/publish.mjs` (or double-click `publish.cmd` in the parent folder) — it rebuilds `publish` from `main`, strips the toolchain, force-pushes `origin/release`, then fast-forwards `main` to `origin/main`. Full steps: [`文档/发布流程.md`](文档/发布流程.md) (Chinese).
+4. Run `scripts/release/publish.cmd` (or `node scripts/release/publish.mjs`; double-clicking the forwarded `publish.cmd` in the parent folder is equivalent) — it rebuilds `publish` from `main`, strips the toolchain, force-pushes `origin/release`, then fast-forwards `main` to `origin/main`. Full steps: [`文档/发布流程.md`](文档/发布流程.md) (Chinese).
 
 > ℹ️ `download/` intentionally exists on both branches: clients ≤ 2.5.1 hard-code `main/download/version.json`, so `main` must keep receiving new packages until those users upgrade.
 > ⚠️ **Never push the release tree to `main`, and never force-push `main`** — branch protection is enabled on GitHub. In November 2026 a `git pull --rebase origin main` against a release-only `main` wiped the local toolchain and 52 never-committed docs.
