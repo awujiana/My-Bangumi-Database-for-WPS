@@ -22,7 +22,19 @@ export declare const CURRENT_VERSION = "2.5.1";
 /** 更新来源仓库 */
 export declare const UPDATE_OWNER = "awujiana";
 export declare const UPDATE_REPO = "My-Bangumi-Database-for-WPS";
-/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../main/download/<repo>-v2.2.1.zip`） */
+/**
+ * 发布分支名 —— 插件运行期**只读这条分支**。
+ *
+ * 仓库有两棵树（2026-11-21 起）：
+ * - `main`    = 完整开发树（`package.json` / `tests` / `scripts` / `tsconfig*` 全在）
+ * - `release` = 只含发布文件（工具链已剔除）+ `download/` 更新包 + `locales/` 语言包
+ *
+ * 为什么必须读 `release` 而不是 `main`：发版只重建 release，`main` 上的
+ * `download/version.json` 从此不再更新 —— 读它会一直拿到**旧版本号**，
+ * 于是「检查更新」永远显示已是最新。
+ */
+export declare const UPDATE_BRANCH = "release";
+/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../release/download/<repo>-v2.2.1.zip`） */
 export declare function repoAssetUrl(version: string): string;
 /**
  * 归一化发布端声明的 SHA-256

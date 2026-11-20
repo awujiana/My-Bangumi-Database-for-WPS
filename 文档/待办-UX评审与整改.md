@@ -4,8 +4,9 @@
 > 评审依据：[`awujiana-readme-style/references/ux-design-spec.md`](../../awujiana-readme-style/references/ux-design-spec.md)（尼尔森十大原则 + Refactoring UI + 五讲卡片）
 > 评审对象：本插件 8 个页面（`sync-panel` / `settings` / `conditional-format` / `enrich` / `clean` / `highlight` / `plugin-market` / `donate`）+ 共享样式层（`tokens.css` / `panel-theme.css` / `styles.css`）
 > 方法：**代码走查**（`code-only`，未跑真机截图）。据此得出的结论一律标注 `code-only`，需真机复验的另标「待复验」。
-> 最近更新：**2026-11-08 第三轮** —— 跑通全量门禁（补回工具链 → `npm run gate` → 清理，流程记在 §5.1）；
-> 顺带修掉 `--sapphire` 幽灵引用，全仓 `var(--x, #hex)` 回退值清零。
+> 最近更新：**2026-11-21 第四轮** —— 分支模型调整：`main` 改为**完整开发树**，发布产物改推
+> `release` 分支。§5.1 的「临时恢复工具链跑门禁」流程随之作废（现在常驻，直接 `npm run gate`）。
+> 上一轮（11-08）跑通全量门禁，顺带修掉 `--sapphire` 幽灵引用，全仓 `var(--x, #hex)` 回退值清零。
 
 ---
 
@@ -178,7 +179,7 @@
 | 第三批 | U-06 间距归一 | ⏸ 待真机截图（每改一屏截一次，逐屏比对） |
 | 第四批 | U-08 阴影分档、U-09 动词表、U-10 术语、U-11 减边框 | ⏸ 待排期 |
 | 第五批 | U-14 删掉第二套 Catppuccin 底色档 | ⏸ 待真机对比色温后再改 |
-| **收口 · 门禁** | `npm run gate` | ✅ 已通过（2026-11-08，跑法见 §5.1；6 个红灯全是测试断言跟不上新文案，已修） |
+| **收口 · 门禁** | `npm run gate` | ✅ 已通过（2026-11-08 首跑；2026-11-21 分支模型调整后复跑，见 §5.1） |
 | **收口 · 目视** | 浅色主题真机逐屏目视 | ⏸ 待做（静态复算全绿 ≠ 观感可接受，见验收口径第 6 条） |
 
 ### 验收口径
@@ -190,33 +191,24 @@
 5. 全量 `npm run gate`。✅ **已通过**（2026-11-08）：14 项门禁全过 —— `lint:check` 0 问题、12 项 `check:*` 全绿、`typecheck:tests` 无回归、**192 个测试文件 / 5789 个用例全部通过**。跑法与注意事项见 §5.1。
 6. 真机打开浅色主题逐屏目视。⏸ **未完成** —— 静态复算全绿不等于好看，12 色徽标阶与压深后的 `--accent-blue`（`#2f7fe0` → `#1a63bc`）需要实机确认观感。
 
-### 5.1 怎么在「只含发布文件」的 main 上跑 gate
+### 5.1 跑全量门禁
 
-这棵树的 `main` 是**发布树**（`publish.mjs` 会把工具链全部剔除后强推远端），所以 `package.json` / `tests/` / `scripts/` / `tsconfig*` 平时不存在。跑一次全量门禁的做法：
+2026-11-21 分支模型调整后，`main` 就是**完整开发树**，`package.json` / `tests/` / `scripts/` / `tsconfig*` 常驻。直接跑：
 
 ```bash
-# 1) 从「发布前最后一次提交」取回工具链（只写工作区，不动 ts/ 改动）
-#    676cab0 = 2.5.1 发布提交，是 1d09351（publish: 仅发布文件）的父提交
-git checkout 676cab0 -- .npmrc .prettierignore .prettierrc \
-  eslint.config.mjs eslint.shadow.config.mjs lint-staged.config.js \
-  package-lock.json package.json patches scripts tests \
-  tsconfig.build.json tsconfig.json vite.config.mjs vitest.config.ts vitest.cov.config.ts
-
-# 2) 跑门禁。CODEBUDDY_SAFE_DELETE_ENABLED=0 是必需的：
-#    WorkBuddy 的删除保护会拦住 vitest 清理 node_modules/.vitest-cache（515 个文件 > 阈值 50），
-#    表现为「Startup Error: SAFE_DELETE_BULK_CONFIRM_REQUIRED」，不是测试失败。
+# CODEBUDDY_SAFE_DELETE_ENABLED=0 是必需的：WorkBuddy 的删除保护会拦住 vitest
+# 清理 node_modules/.vitest-cache（515 个文件 > 阈值 50），报
+# 「Startup Error: SAFE_DELETE_BULK_CONFIRM_REQUIRED」—— 看着像测试崩溃，其实是环境限制。
 CODEBUDDY_SAFE_DELETE_ENABLED=0 npm run gate
-
-# 3) 清理，恢复发布树
-git reset -q
-CODEBUDDY_SAFE_DELETE_ENABLED=0 rm -f .npmrc .prettierignore .prettierrc \
-  eslint.config.mjs eslint.shadow.config.mjs lint-staged.config.js \
-  package-lock.json package.json tsconfig.build.json tsconfig.json \
-  vite.config.mjs vitest.config.ts vitest.cov.config.ts
-CODEBUDDY_SAFE_DELETE_ENABLED=0 rm -rf patches scripts tests
 ```
 
-**本轮跑出来的 6 个红灯，全部是测试断言跟不上实现，不是代码 bug**（都是本轮有意改的：空态补「原因 + 下一步」、剥掉 `var()` 回退值、徽标改 token）。修正后的补丁存于
+> **旧流程已作废**：2026-11-08 之前 `main` 是「只含发布文件」的发布树，跑门禁要先用
+> `git checkout 676cab0 -- ...` 临时取回工具链、跑完再删。那次清理漏了 4 个文件
+> （`.npmrc` / `.prettierrc` / `lint-staged.config.js` / `patches/`），后来又因
+> `git pull --rebase origin main` 把整批工具链删掉。发布产物改推 `release` 分支后
+> **不要再照着旧步骤 checkout 工具链** —— 会把现有的删掉。
+
+**2026-11-08 那次门禁跑出来的 6 个红灯，全部是测试断言跟不上实现，不是代码 bug**（都是本轮有意改的：空态补「原因 + 下一步」、剥掉 `var()` 回退值、徽标改 token）。修正后的补丁存于
 `D:/编程/awujiana/.workbuddy/patches/2026-11-08-gate-test-fixes.patch`（11 增 9 删 / 5 个文件）：
 
 | 文件 | 旧断言 | 新断言 |

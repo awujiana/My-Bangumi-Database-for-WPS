@@ -220,7 +220,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
     └── highlight.html          # 番劇醒目提示
 ```
 
-> 上述結構是 **`publish` 分支 / 發佈 zip** 的內容。預設分支 **`main`** 是完整原始碼工作區，在上面之外還含 `tests/`、`scripts/`、`package.json` 與 `tsconfig*` / `vite.config`，`git clone` 後 `npm install` 即可跑 `npm run gate` / `npm run build`。
+> 上述結構是 **`release` 分支 / 發佈 zip** 的內容。預設分支 **`main`** 是完整原始碼工作區，在上面之外還含 `tests/`、`scripts/`、`package.json` 與 `tsconfig*` / `vite.config`，`git clone` 後 `npm install` 即可跑 `npm run gate` / `npm run build`。
 
 <details>
 <summary>📂 ts/ 原始碼結構（供查閱）</summary>
@@ -258,7 +258,7 @@ ts/
 
 ## 📥 開發者環境建置（僅開發需要）
 
-> 這是**開發外掛本身**的步驟，需在預設分支 `main` 上執行（`publish` 分支只有發佈檔案，缺 `package.json` 與建置設定，在那裡 `npm install` 會失敗）。一般使用者安裝外掛請看下一節 [安裝到 WPS 使用環境](#sec-5b)，無需 Node / 建置。
+> 這是**開發外掛本身**的步驟，需在預設分支 `main` 上執行（`release` 分支只有發佈檔案，缺 `package.json` 與建置設定，在那裡 `npm install` 會失敗）。一般使用者安裝外掛請看下一節 [安裝到 WPS 使用環境](#sec-5b)，無需 Node / 建置。
 
 ```bash
 # 1. 複製儲存庫

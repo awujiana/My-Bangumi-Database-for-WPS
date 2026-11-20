@@ -44,8 +44,8 @@ import type { LocaleCode } from '../ts/i18n/translate.js'
 const ADDIN_BASE_URL = 'file:///C:/jsaddons/p'
 /** `joinPath` 统一成正斜杠后的同一路径 */
 const ADDIN_ROOT = 'C:/jsaddons/p'
-/** raw CDN 上的仓库基址（与生产代码同一份拼接规则） */
-const RAW_BASE = 'https://raw.githubusercontent.com/awujiana/My-Bangumi-Database-for-WPS/main'
+/** raw CDN 上的仓库基址（与生产代码同一份拼接规则：发布分支 = release） */
+const RAW_BASE = 'https://raw.githubusercontent.com/awujiana/My-Bangumi-Database-for-WPS/release'
 
 /**
  * 判断文本是否纯 ASCII

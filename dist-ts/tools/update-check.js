@@ -22,6 +22,18 @@ export const CURRENT_VERSION = '2.5.1';
 /** 更新来源仓库 */
 export const UPDATE_OWNER = 'awujiana';
 export const UPDATE_REPO = 'My-Bangumi-Database-for-WPS';
+/**
+ * 发布分支名 —— 插件运行期**只读这条分支**。
+ *
+ * 仓库有两棵树（2026-11-21 起）：
+ * - `main`    = 完整开发树（`package.json` / `tests` / `scripts` / `tsconfig*` 全在）
+ * - `release` = 只含发布文件（工具链已剔除）+ `download/` 更新包 + `locales/` 语言包
+ *
+ * 为什么必须读 `release` 而不是 `main`：发版只重建 release，`main` 上的
+ * `download/version.json` 从此不再更新 —— 读它会一直拿到**旧版本号**，
+ * 于是「检查更新」永远显示已是最新。
+ */
+export const UPDATE_BRANCH = 'release';
 /** GitHub 最新 Release 接口 */
 const RELEASE_API = `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}/releases/latest`;
 /**
@@ -34,18 +46,19 @@ const RELEASE_API = `https://api.github.com/repos/${UPDATE_OWNER}/${UPDATE_REPO}
  * 也走它 —— 把 zip 提交进仓库的 `download/` 目录即可稳定下载。
  */
 const REPO_ASSET_DIRECTORY = 'download';
-/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../main/download/<repo>-v2.2.1.zip`） */
+/** 按版本号拼出仓库内托管更新包的 raw 地址（如 `.../release/download/<repo>-v2.2.1.zip`） */
 export function repoAssetUrl(version) {
     const tag = version.startsWith('v') ? version : `v${version}`;
-    return `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/${REPO_ASSET_DIRECTORY}/${UPDATE_REPO}-${tag}.zip`;
+    return `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/${UPDATE_BRANCH}/${REPO_ASSET_DIRECTORY}/${UPDATE_REPO}-${tag}.zip`;
 }
 /**
  * API 不可用时的兜底版本来源：仓库内 `download/version.json`（发布脚本自动生成）。
  *
- * 不用 `main/package.json`：发布分支刻意不含 package.json（本地工具链不入库）。
- * raw.githubusercontent.com 允许跨域且不限流。
+ * 不用 `package.json`：`main/package.json` 是开发用的（含 devDependencies、scripts），
+ * 版本号与「已发布的那一版」不保证同步；`release` 分支刻意不含 package.json，
+ * 只认发布脚本写出的 version.json。raw.githubusercontent.com 允许跨域且不限流。
  */
-const RAW_VERSION_JSON = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main/${REPO_ASSET_DIRECTORY}/version.json`;
+const RAW_VERSION_JSON = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/${UPDATE_BRANCH}/${REPO_ASSET_DIRECTORY}/version.json`;
 /**
  * 归一化发布端声明的 SHA-256
  *

@@ -472,24 +472,28 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
 
 **插件品牌图标**：`images/mbd-logo.svg`（#1296db 配色、含 MBD 字样），随 `dist/`（或 `wpsjs build` 产物）一并打包进加载项，同时作为 README 标题标识与 Releases 资源使用。
 
-### 维护者：两棵工作树 + 发布流程
+### 维护者：分支模型与发布流程
 
-本机维护时存在**两棵内容一致、职责不同**的树（不要在两棵树里各改一半）：
+仓库只有**一棵工作树**（`Excel加载项/BGM/My-Bangumi-Database-for-WPS`），靠两条分支区分职责：
 
-| 树                             | 位置（本机）                                  | 职责                                                                                              |
-| ------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **开发树**                     | `Excel加载项/BGM/restore-src`                 | 含 `tests/`、`scripts/`、`package.json` / `tsconfig*` / `vite.config`，跑 `npm run gate` 全量门禁 |
-| **发布树**（= 本 GitHub 仓库） | `Excel加载项/BGM/My-Bangumi-Database-for-WPS` | 只放发布文件 + `ts/` 源码 + `dist-ts/`；远端 `origin` 指向 GitHub                                 |
+| 分支              | 内容                                                                   | 谁读它                                             |
+| ----------------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
+| `main`            | **完整开发树**：发布文件 + `ts/` 源码 + `tests/` + `scripts/` + 工具链 | 开发者（clone 下来 `npm install` 就能跑 `gate`）   |
+| `release`         | **只含发布文件** + `download/` 更新包 + `locales/` 语言包              | 插件自己（`version.json` / 更新包 / 语言包都从这拉） |
 
 标准流程：
 
-1. 在**开发树**改代码 → `npm run gate` 全绿（lint / 类型 / 门禁脚本 / 全量单测）；
-2. 把改动的文件同步到**发布树**（`ts/`、`ui/`、`css/`、`images/` 等；`tests/` 不进发布树）；
-3. 在发布树 `npm run build:ts` 重新生成 `dist-ts/`；
-4. 提交后运行 `node ../publish.mjs`（或双击 `publish.cmd`）—— 脚本会重建只含发布文件的 `publish` 分支并强推 `origin/main`，本地 `main` 保留工具链。
+1. 在 `main` 改代码 → `npm run gate` 全绿（lint / 类型 / 门禁脚本 / 全量单测）；
+2. `npm run build` 重新生成 `dist-ts/` 与 `dist/`；
+3. 打 zip 进 `download/`；
+4. 运行 `node ../publish.mjs`（或双击 `publish.cmd`）—— 脚本从 `main` 重建 `publish` 分支、剔除工具链，
+   强推 `origin/release`，末尾再把 `main` 快进推到 `origin/main`。
 
+> ⚠️ **永远不要把发布树推到 `main`，也不要 force push `main`。** 远端 `main` 是开发树：
+> 2026-11-08 曾因远端 `main` 是「仅发布文件」的裸树，一次 `git pull --rebase origin main`
+> 把本地工具链连同提交一起删掉（丢了 4 个工具链文件，另有 52 份从未入库的文档整批消失）。
+> 发布产物只进 `release` 后，`pull` / `merge` / `rebase` 都不会再删文件。
 > ⚠️ 新增的 `dist-ts/**` 文件被 `.gitignore` 挡住，`publish.mjs` 的 `git add -A` 收不到，必须显式 `git add -f dist-ts/...`，否则发布包缺模块会直接白屏。
-> ⚠️ 开发树缺 `node_modules` 时，用目录联接复用发布树的依赖（`New-Item -ItemType Junction`），不必重新 `npm install`。
 
 ---
 
@@ -680,7 +684,7 @@ headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局
 | [`CHANGELOG.md`](CHANGELOG.md)       | 按版本累积的变更记录（含每处修复的成因与实测数据）                 |
 
 > 测试与质量：运行 `npm run gate`（详见「测试」一节）；测试文件位于 `tests/`，不逐条索引。
-> 架构说明与逐按钮的用户手册**不随仓库分发**，相关内容分散在本 README 的「目录结构」「使用示例」「配置备份与更新安全」三节。
+> 架构说明与逐按钮的用户手册放在 [`文档/`](文档/) 目录（`ARCHITECTURE.md` / `USER_OPERATIONS.md`，随 `main` 分发但**不进发布包**）；本 README 的「目录结构」「使用示例」「配置备份与更新安全」三节是精简版。
 
 ---
 

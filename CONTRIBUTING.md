@@ -292,8 +292,8 @@ npm run test:coverage
   - `README.md`（用户可见能力、安装与网络说明）—— **随仓库分发**
   - `AGENTS.md`（AI 协作约定与核心不变量）—— **随仓库分发**
   - `CHANGELOG.md`（每处修复的成因与实测数据）—— **随仓库分发**
-  - `文档/USER_OPERATIONS.md`、`文档/ARCHITECTURE.md` —— 只在**维护者本地工作区**，
-    不随仓库分发（README 因此不链它们）；改这两个文件不必进发布分支。
+  - `文档/USER_OPERATIONS.md`、`文档/ARCHITECTURE.md` —— 2026-11-21 起已纳入版本库，
+    随 `main` 分发；**不进 `release` 发布树**，所以不影响用户下载体积（README 暂未链它们）。
 - README 截图存放于 `images/`，使用 `screenshot-*.png` 命名；新增截图请同时更新「界面预览」小节。
 - 文档中的相对链接必须能在 GitHub 上直接打开。
 

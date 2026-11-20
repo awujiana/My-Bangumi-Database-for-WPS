@@ -26,10 +26,15 @@
 | `wps-addon-build/`                                                 | `wpsjs build --exe` 产物（exe）                                                                                 | ❌ 由发布流程上传 Release |
 | `tests/`                                                           | Vitest 单元测试                                                                                                 | ✅                        |
 | `scripts/`                                                         | 校验与构建脚本（`check-*.mjs` / `audit-layout.mjs` / `replace-icon.mjs`）                                       | ✅                        |
-| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（**只在维护者本地工作区，未跟踪、不分发**）                                | ❌                        |
+| `文档/`                                                            | 架构、用户操作手册、审计与覆盖率文档（2026-11-21 起**已纳入版本库**，随 `main` 分发；不进 `release` 发布树） | ✅                        |
 | `node_modules/`、`release/`、`.workbuddy-ai/`                      | 依赖、发布暂存、内部工作数据                                                                                    | ❌                        |
 
 > 上级目录 `Excel加载项/BGM/` 还放着 `publish.mjs`、`release-notes-v*.md`、`发布流程.md`，**不属于本仓库**。
+>
+> **分支模型（2026-11-21 起）**：`origin/main` = 完整开发树（工具链常驻，`npm run gate` 直接可跑）；
+> `origin/release` = 只含发布文件 + `download/` 更新包，插件运行期从这条分支读 `version.json` / zip / 语言包。
+> `publish.mjs` 只推 `publish:release`，末尾把 `main` 快进推到 `origin/main`。
+> **绝不把发布树推到 `main`，绝不 force push `main`** —— 2026-11-08 曾因此丢掉整批工具链与 52 份未跟踪文档。
 
 ## 必须遵守的约定
 

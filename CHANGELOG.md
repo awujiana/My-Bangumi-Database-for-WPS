@@ -6,6 +6,38 @@
 
 ---
 
+## [未发布] - 2026-11-21
+
+### 分支模型调整：发布产物改推 `release`，`main` 恢复为完整开发树
+
+仓库原先只有一套分支：**远端 `main` 本身就是发布树**（由 `publish.mjs` 把只含发布文件的
+`publish` 分支强推覆盖）。后果是 `main` 和本地开发树是两棵内容不同的树 —— 任何
+`git pull --rebase origin main` 都会把本地工具链连同提交一起删掉。2026-11-08 就因此在一次
+rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.config.js` / `patches/`），
+另有 52 份从未纳入版本控制的文档整批消失（后来从 `restore-src` 抢救回来）。
+
+改成两条分支各司其职：
+
+| 分支 | 内容 | 谁读它 |
+| --- | --- | --- |
+| `main` | 完整开发树（工具链 / `tests` / `scripts` / `文档` 全在） | 开发者；`clone` + `npm install` 即可跑 gate |
+| `release` | 只含发布文件 + `download/` 更新包 + `locales/` | 插件运行期拉 `version.json` / 更新包 / 语言包 |
+
+- **`publish.mjs` 推送目标改为 `origin/release`**；末尾会把 `main` 以普通（非 force）
+  push 推到 `origin/main`。`main` 一旦被覆盖成发布树就会立刻报错，不再静默。
+- **新增 `UPDATE_BRANCH` 常量**（`ts/tools/update-check.ts`），`repoAssetUrl()`、
+  兜底的 `RAW_VERSION_JSON`、以及语言包的 `RAW_BASE`（`ts/i18n/locale-manifest.ts`）
+  全部改读 `release`。此前三处各自硬编码 `/main`，改分支要翻三个文件、漏一个就静默半失效。
+- **文档同步**：`README.md` / `README.en.md` / `README.zh-TW.md`（分支表与开发指引）、
+  `AGENTS.md`、`CONTRIBUTING.md`、`发布流程.md`（分支模型、验证 URL、常见坑、回滚）、
+  `文档/待办-UX评审与整改.md` §5.1（临时恢复工具链的流程作废）、
+  `文档/待办-多语言支持.md`（下载源改为 `release`）。
+- **`文档/` 首次纳入版本控制**（52 份，见 `docs:` 提交）：此前它们是未跟踪的散文件，
+  不随仓库走，任何重建都会整批消失。
+
+> 迁移期间的一次性操作：`git push origin main:main`（快进，4 个提交）、
+> `git push --force-with-lease origin publish:release`（首次创建 `release`）。
+
 ## [未发布] - 2026-11-08
 
 ### UX 评审整改：浅色主题从「读不出字」到两套主题全达标（2026-11-08）

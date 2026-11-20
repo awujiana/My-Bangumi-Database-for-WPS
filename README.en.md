@@ -220,7 +220,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
     └── highlight.html          # Anime highlight
 ```
 
-> The tree above is what the **`publish` branch / release zip** contains. The default branch **`main`** is the full source workspace: on top of the above it also has `tests/`, `scripts/`, `package.json` and `tsconfig*` / `vite.config`, so after `git clone` + `npm install` you can run `npm run gate` / `npm run build`.
+> The tree above is what the **`release` branch / release zip** contains. The default branch **`main`** is the full source workspace: on top of the above it also has `tests/`, `scripts/`, `package.json` and `tsconfig*` / `vite.config`, so after `git clone` + `npm install` you can run `npm run gate` / `npm run build`.
 
 <details>
 <summary>📂 ts/ source layout (for reference)</summary>
@@ -258,7 +258,7 @@ ts/
 
 ## 📥 Developer setup (development only)
 
-> These steps are for **developing the add-in itself** and must be run on the default branch `main` (the `publish` branch only holds release files and has no `package.json` or build config, so `npm install` fails there). If you just want to install the add-in, see [Installing into WPS](#sec-5b) — no Node or build required.
+> These steps are for **developing the add-in itself** and must be run on the default branch `main` (the `release` branch only holds release files and has no `package.json` or build config, so `npm install` fails there). If you just want to install the add-in, see [Installing into WPS](#sec-5b) — no Node or build required.
 
 ```bash
 # 1. Clone the repository

@@ -23,13 +23,19 @@
  *   - 「要不要更新」看清单里的 `version` / `updatedAt`，不看哈希。
  */
 import { LOG_LEVELS } from '../core/constants.js';
-import { UPDATE_OWNER, UPDATE_REPO } from '../tools/update-check.js';
+import { UPDATE_BRANCH, UPDATE_OWNER, UPDATE_REPO } from '../tools/update-check.js';
 import { bgmLog } from '../tools/util/index.js';
 import { SOURCE_LOCALE, isLocaleCode } from './translate.js';
 /** 清单结构版本（与 `scripts/gen-locale-index.mjs` 的 `INDEX_SCHEMA_VERSION` 保持一致） */
 export const MANIFEST_SCHEMA_VERSION = 1;
-/** raw CDN 上的仓库基址（与更新包、数据同步同一个仓库 / 同一条分支） */
-const RAW_BASE = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/main`;
+/**
+ * raw CDN 上的仓库基址（与更新包同一个仓库、同一条**发布分支**）
+ *
+ * 必须用 `release` 而不是 `main`：语言包版本要和用户装上的那一版配套。
+ * `main` 是开发树，里面的 `locales/*` 可能已经改名 / 加键，而插件的
+ * `tOr()` 兜底文案还是旧的 —— 从 main 拉会拿到对不上的语言包。
+ */
+const RAW_BASE = `https://raw.githubusercontent.com/${UPDATE_OWNER}/${UPDATE_REPO}/${UPDATE_BRANCH}`;
 /** 合法的 SHA-256（64 位小写十六进制） */
 const SHA256_PATTERN = /^[\da-f]{64}$/u;
 /**
