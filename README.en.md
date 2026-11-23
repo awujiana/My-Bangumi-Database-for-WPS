@@ -161,10 +161,10 @@ The UI follows [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/) plus the "10 usabili
 
 ## 📂 Repository layout
 
-Below is the layout of the release package **`My-Bangumi-Database-for-WPS-v2.5.1.zip`** after extraction (i.e. the files actually loaded by WPS after installation — no sources, tests or docs):
+Below is the layout of the release package **`My-Bangumi-Database-for-WPS-v2.6.0.zip`** after extraction (i.e. the files actually loaded by WPS after installation — no sources, tests or docs):
 
 ```
-My-Bangumi-Database-for-WPS-v2.5.1/
+My-Bangumi-Database-for-WPS-v2.6.0/
 ├── index.html                  # Add-in entry point (loaded when WPS starts)
 ├── main.js                     # Dynamic module loader (early ribbon placeholder, real implementation swapped in later)
 ├── manifest.xml                # Add-in manifest (ApiVersion / Name)
@@ -181,6 +181,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── clean.css
 │   ├── conditional-format.css
 │   ├── context-menu.css
+│   ├── data-center.css
 │   ├── detachable-panel.css
 │   ├── diff.css
 │   ├── donate.css
@@ -193,12 +194,12 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── ribbon.js
 │   ├── core/                   # Constants, error handling, results, progress, types
 │   ├── entry/                  # ribbon / panel / settings entry points
-│   ├── panel/                  # Main panel, settings, cleanup, enrich, highlight, conditional format, donate
+│   ├── panel/                  # Main panel, settings, cleanup, enrich, highlight, conditional format, donate, data center
 │   ├── schemas/                # zod validation schemas
-│   ├── services/               # Config / ribbon services
+│   ├── services/               # Config / ribbon / data-center services
 │   ├── sync/                   # Sync engine (github / gitlab / gitee / gist / local file / Archive)
 │   ├── tools/                  # Utilities (http / wps / logger / sanitize / clipboard ...)
-│   └── ui/                     # Panel UI and handlers/
+│   └── ui/                     # Panel UI and handlers/ (incl. data-center-charts, pure SVG)
 ├── images/                     # Ribbon and panel icons (SVG), donation QR code
 ├── locales/                    # Language packs (Simplified / Traditional / English)
 │   ├── index.js                # Manifest (code / version / updatedAt / sha256 / coverage)
@@ -211,6 +212,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── purify.min.js.map
 │   └── wps-sdk-loader.js
 └── ui/                         # Panel HTML
+    ├── data-center.html        # Data center
     ├── sync-panel.html         # Sync panel
     ├── settings.html           # Settings panel
     ├── clean.html              # Data cleanup
@@ -306,13 +308,13 @@ npm run debug
    > On Windows the quickest route: `Win + R` → type `%appdata%` → Enter, then go into `kingsoft\wps\jsaddons`.
    > Example: `C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
    - **(Recommended) Installer / publish.html**: use the `publish.html` produced by WPS's official `wpsjs` toolchain (offline mode), or the installer produced by `wpsjs build --exe`. Open it in a browser and click "Install"; it writes the `publish.xml` above for you.
-   - **Manual registration**: put the extracted add-in directory at `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.5.1\`, then edit `publish.xml` in the same directory (create it if missing) and add one entry:
+   - **Manual registration**: put the extracted add-in directory at `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.6.0\`, then edit `publish.xml` in the same directory (create it if missing) and add one entry:
 
      ```xml
      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      <jsplugins>
        <jsplugin name="My Bangumi Database for WPS"
-                 url="file:///C:/Users/you/jsaddons/My Bangumi Database for WPS_2.5.1/"
+                 url="file:///C:/Users/you/jsaddons/My Bangumi Database for WPS_2.6.0/"
                  enable="true"/>
      </jsplugins>
      ```
@@ -324,7 +326,7 @@ npm run debug
    **Close WPS completely first** (including the WPS cloud process in the tray), otherwise the files are locked and cannot be deleted:
 
    1. Go to the add-in directory from the table above (Windows: `%APPDATA%\kingsoft\wps\jsaddons`);
-   2. Find this add-in's folder — named `My-Bangumi-Database-for-WPS_2.5.1` (or `my-bangumi-database-for-wps_2.5.1`, or similar with a version suffix) — and **delete the whole directory**;
+   2. Find this add-in's folder — named `My-Bangumi-Database-for-WPS_2.6.0` (or `my-bangumi-database-for-wps_2.6.0`, or similar with a version suffix) — and **delete the whole directory**;
    3. Optional: edit `publish.xml` in the same directory and remove the `<jsplugin .../>` line pointing at it (that line only).
 
    > ⚠️ Do not delete the whole `jsaddons` folder, and do not delete `publish.xml` itself — it may contain registrations for other add-ins, and deleting it breaks them too.
@@ -385,9 +387,9 @@ Automatic install relies on PowerShell and is **Windows only**. Otherwise:
 
 ```bash
 # Windows PowerShell
-Get-FileHash .\My-Bangumi-Database-for-WPS-v2.5.1.zip -Algorithm SHA256
+Get-FileHash .\My-Bangumi-Database-for-WPS-v2.6.0.zip -Algorithm SHA256
 # macOS / Linux
-shasum -a 256 My-Bangumi-Database-for-WPS-v2.5.1.zip
+shasum -a 256 My-Bangumi-Database-for-WPS-v2.6.0.zip
 ```
 
 Both values must match for the package to be unmodified.
@@ -471,10 +473,10 @@ Multi-size icons: if you already have **a multi-size ico**, just overwrite `imag
 
 This repo keeps **one working tree** (`Excel加载项/BGM/My-Bangumi-Database-for-WPS`); two branches split the responsibilities:
 
-| Branch | Contents | Who reads it |
-| --- | --- | --- |
-| `main` | **Full dev tree**: release files + `ts/` sources + `tests/` + `scripts/` + toolchain | Developers (`npm install` then `npm run gate`) |
-| `release` | **Release files only** + `download/` packages + `locales/` | The add-in itself (`version.json` / update zip / language packs) |
+| Branch    | Contents                                                                             | Who reads it                                                     |
+| --------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `main`    | **Full dev tree**: release files + `ts/` sources + `tests/` + `scripts/` + toolchain | Developers (`npm install` then `npm run gate`)                   |
+| `release` | **Release files only** + `download/` packages + `locales/`                           | The add-in itself (`version.json` / update zip / language packs) |
 
 Standard flow:
 

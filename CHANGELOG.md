@@ -6,7 +6,7 @@
 
 ---
 
-## [未发布] - 2026-11-21
+## [2.6.0] - 2026-11-23
 
 ### 分支模型调整：发布产物改推 `release`，`main` 恢复为完整开发树
 
@@ -18,10 +18,10 @@ rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.
 
 改成两条分支各司其职：
 
-| 分支 | 内容 | 谁读它 |
-| --- | --- | --- |
-| `main` | 完整开发树（工具链 / `tests` / `scripts` / `文档` 全在） | 开发者；`clone` + `npm install` 即可跑 gate |
-| `release` | 只含发布文件 + `download/` 更新包 + `locales/` | 插件运行期拉 `version.json` / 更新包 / 语言包 |
+| 分支      | 内容                                                     | 谁读它                                        |
+| --------- | -------------------------------------------------------- | --------------------------------------------- |
+| `main`    | 完整开发树（工具链 / `tests` / `scripts` / `文档` 全在） | 开发者；`clone` + `npm install` 即可跑 gate   |
+| `release` | 只含发布文件 + `download/` 更新包 + `locales/`           | 插件运行期拉 `version.json` / 更新包 / 语言包 |
 
 - **`publish.mjs` 推送目标改为 `origin/release`**；末尾会把 `main` 以普通（非 force）
   push 推到 `origin/main`。`main` 一旦被覆盖成发布树就会立刻报错，不再静默。
@@ -37,14 +37,12 @@ rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.
 - **发布脚本入库**：`publish.mjs` + `publish.cmd` → `scripts/release/`（此前只在上级目录裸放，
   没有任何版本控制兜底）；上级 `publish.mjs` / `publish.cmd` 退化为 4～5 行转发壳，逻辑只维护一份。
   《发布流程》同步入库为 `文档/发布流程.md`，上级那份改为指针文件。
-- **GitHub 侧加锁**：`main` 启用 ruleset `protect-main` —— *Block force pushes* + *Restrict deletions*，
+- **GitHub 侧加锁**：`main` 启用 ruleset `protect-main` —— _Block force pushes_ + _Restrict deletions_，
   **无 bypass actor**（连仓库 owner 也不能绕过，改规则需先到网页调整）。仓库默认分支由
   `release` 改回 `main`，避免新访客 / CI 默认 clone 到发布树。
 
 > 迁移期间的一次性操作：`git push origin main:main`（快进，4 个提交）、
 > `git push --force-with-lease origin publish:release`（首次创建 `release`）。
-
-## [未发布] - 2026-11-08
 
 ### UX 评审整改：浅色主题从「读不出字」到两套主题全达标（2026-11-08）
 
@@ -103,7 +101,7 @@ rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.
   修正补丁存 `D:/编程/awujiana/.workbuddy/patches/2026-11-08-gate-test-fixes.patch`。
 - **未完成**：浅色主题真机逐屏目视 —— 静态复算全绿不等于观感可接受。
 
-### 数据中心页面：更新对比 / 打卡统计 / 喜好推荐 / 在线搜索（未发布）
+### 数据中心页面：更新对比 / 打卡统计 / 喜好推荐 / 在线搜索
 
 新增独立任务窗格「数据中心」（Ribbon「数据中心」组），把四件事集中在一个页面：
 
@@ -154,7 +152,7 @@ rebase 里丢了 4 个工具链文件（`.npmrc` / `.prettierrc` / `lint-staged.
   入口文件，不一致直接拒装。
 - **清单签名（ECDSA P-256 + SHA-256，IEEE P1363 的 raw r||s）**：宿主内置可信公钥表
   `TRUSTED_PLUGIN_KEYS`，验签结论为 `verified | unsigned | untrusted-key | invalid |
-  unsupported` 五态。签名只覆盖身份、版本、入口、权限、域名白名单与文件哈希，
+unsupported` 五态。签名只覆盖身份、版本、入口、权限、域名白名单与文件哈希，
   展示性字段（名称 / 描述 / features）不签。签名未通过的安装一律拒绝，只有界面二次确认
   「无视风险安装」才传入 `allowUntrusted: true`；自动更新时信任状态**不得从 `verified`
   降级**，状态变化或老记录缺 `signatureStatus` 就暂停更新并返回 `needs-trust`。

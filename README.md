@@ -160,10 +160,10 @@
 
 ## 📂 目录结构
 
-以下为发布包 **`My-Bangumi-Database-for-WPS-v2.5.1.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
+以下为发布包 **`My-Bangumi-Database-for-WPS-v2.6.0.zip`** 解压后的目录结构（即使用者安装到 WPS 后实际加载的文件，不含源码 / 测试 / 文档）：
 
 ```
-My-Bangumi-Database-for-WPS-v2.5.1/
+My-Bangumi-Database-for-WPS-v2.6.0/
 ├── index.html                  # 加载项入口（WPS 启动时加载）
 ├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
 ├── manifest.xml                # 加载项清单（ApiVersion / Name）
@@ -180,6 +180,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── clean.css
 │   ├── conditional-format.css
 │   ├── context-menu.css
+│   ├── data-center.css
 │   ├── detachable-panel.css
 │   ├── diff.css
 │   ├── donate.css
@@ -192,12 +193,12 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── ribbon.js
 │   ├── core/                   # 常量、错误处理、结果、进度、类型
 │   ├── entry/                  # ribbon / panel / settings 入口
-│   ├── panel/                  # 主面板、设置、清洗、富化、高亮、条件格式、赞赏页逻辑
+│   ├── panel/                  # 主面板、设置、清洗、富化、高亮、条件格式、赞赏页、数据中心逻辑
 │   ├── schemas/                # zod 校验 schema
-│   ├── services/               # 配置 / Ribbon 服务
+│   ├── services/               # 配置 / Ribbon / 数据中心服务
 │   ├── sync/                   # 同步引擎（github / gitlab / gitee / gist / 本地文件 / Archive）
 │   ├── tools/                  # 工具函数（http / wps / logger / sanitize / clipboard ...）
-│   └── ui/                     # 面板 UI 与 handlers/
+│   └── ui/                     # 面板 UI 与 handlers/（含 data-center-charts 纯 SVG 图表）
 ├── images/                     # 功能区与面板图标（SVG）、赞赏二维码
 ├── locales/                    # 语言包（简体 / 繁体 / 英语）
 │   ├── index.js                # 语言包清单（code / version / updatedAt / sha256 / 覆盖率）
@@ -210,6 +211,7 @@ My-Bangumi-Database-for-WPS-v2.5.1/
 │   ├── purify.min.js.map
 │   └── wps-sdk-loader.js
 └── ui/                         # 面板 HTML
+    ├── data-center.html        # 数据中心
     ├── sync-panel.html         # 同步面板
     ├── settings.html           # 设置面板
     ├── clean.html              # 数据清洗
@@ -305,13 +307,13 @@ npm run debug
    > Windows 上最快的到达方式：`Win + R` → 输入 `%appdata%` → 回车，再依次进入 `kingsoft\wps\jsaddons`。
    > 例：`C:\Users\Administrator\AppData\Roaming\kingsoft\wps\jsaddons`
    - **(推荐) 安装器 / publish.html**：用 WPS 官方 `wpsjs` 工具链生成的 `publish.html`（离线模式）或 `wpsjs build --exe` 生成的安装器，浏览器打开后点「安装」，会自动写入上面的 `publish.xml`。
-   - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.5.1\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
+   - **手动注册**：把解压后的加载项目录放到 `%appdata%\kingsoft\wps\jsaddons\My Bangumi Database for WPS_2.6.0\`，并编辑同目录的 `publish.xml`（不存在则新建），加入一条加载项：
 
      ```xml
      <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
      <jsplugins>
        <jsplugin name="My Bangumi Database for WPS"
-                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.5.1/"
+                 url="file:///C:/Users/你/jsaddons/My Bangumi Database for WPS_2.6.0/"
                  enable="true"/>
      </jsplugins>
      ```
@@ -323,7 +325,7 @@ npm run debug
    **操作前请务必先完全关闭 WPS**（含托盘里的 WPS 云服务进程），否则文件被占用会删不掉：
 
    1. 进入上表的加载项目录（Windows：`%APPDATA%\kingsoft\wps\jsaddons`）；
-   2. 找到本插件的文件夹 —— 名为 `My-Bangumi-Database-for-WPS_2.5.1`（或 `my-bangumi-database-for-wps_2.5.1`、以及带版本号后缀的类似名称），**整目录删除**；
+   2. 找到本插件的文件夹 —— 名为 `My-Bangumi-Database-for-WPS_2.6.0`（或 `my-bangumi-database-for-wps_2.6.0`、以及带版本号后缀的类似名称），**整目录删除**；
    3. 可选：编辑同目录的 `publish.xml`，删掉指向该目录的 `<jsplugin .../>` 那一行（只删这一行）。
 
    > ⚠️ 不要删除整个 `jsaddons` 文件夹，也不要删掉 `publish.xml` 本身 —— 里面可能还有其它加载项的注册信息，删了会一起失效。
@@ -390,9 +392,9 @@ npm run debug
 
 ```bash
 # Windows PowerShell
-Get-FileHash .\My-Bangumi-Database-for-WPS-v2.5.1.zip -Algorithm SHA256
+Get-FileHash .\My-Bangumi-Database-for-WPS-v2.6.0.zip -Algorithm SHA256
 # macOS / Linux
-shasum -a 256 My-Bangumi-Database-for-WPS-v2.5.1.zip
+shasum -a 256 My-Bangumi-Database-for-WPS-v2.6.0.zip
 ```
 
 两个值一致才说明这份包没被改过。
@@ -476,10 +478,10 @@ npm run icon:merge                # images/ 里的多个单尺寸 ico → 合成
 
 仓库只有**一棵工作树**（`Excel加载项/BGM/My-Bangumi-Database-for-WPS`），靠两条分支区分职责：
 
-| 分支              | 内容                                                                   | 谁读它                                             |
-| ----------------- | ---------------------------------------------------------------------- | -------------------------------------------------- |
-| `main`            | **完整开发树**：发布文件 + `ts/` 源码 + `tests/` + `scripts/` + 工具链 | 开发者（clone 下来 `npm install` 就能跑 `gate`）   |
-| `release`         | **只含发布文件** + `download/` 更新包 + `locales/` 语言包              | 插件自己（`version.json` / 更新包 / 语言包都从这拉） |
+| 分支      | 内容                                                                   | 谁读它                                               |
+| --------- | ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| `main`    | **完整开发树**：发布文件 + `ts/` 源码 + `tests/` + `scripts/` + 工具链 | 开发者（clone 下来 `npm install` 就能跑 `gate`）     |
+| `release` | **只含发布文件** + `download/` 更新包 + `locales/` 语言包              | 插件自己（`version.json` / 更新包 / 语言包都从这拉） |
 
 标准流程：
 
