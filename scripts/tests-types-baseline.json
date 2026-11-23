@@ -1,5 +1,0 @@
-{
-  "_comment": "tests/ 类型错误基线（P1-2）。只允许下降：修完后跑 `node scripts/check-tests-types.mjs --update` 下调。",
-  "total": 0,
-  "byFile": {}
-}

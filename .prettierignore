@@ -1,9 +1,0 @@
-dist/
-dist-ts/
-wps-addon-build/
-node_modules/
-*.min.js
-wpsjsrpcsdk.js
-# 语言包与清单都是生成物：内容是 `export default` 后面跟纯 JSON，门禁按 JSON 解析。
-# prettier 会按 JS 习惯去掉键的引号（quoteProps: as-needed），一跑就把包写坏。
-locales/**/*.js
