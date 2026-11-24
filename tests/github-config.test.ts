@@ -64,7 +64,7 @@ describe('getGithubConfig', () => {
     vi.mocked(getApp).mockReturnValue(createMockApp({}))
     const config = getGithubConfig()
     expect(config.owner).toBe('awujiana')
-    expect(config.repo).toBe('Bangumi-Archive-Anime-Excel')
+    expect(config.repo).toBe('Bangumi-Archive-Excel')
     expect(config.branch).toBe('main')
   })
 

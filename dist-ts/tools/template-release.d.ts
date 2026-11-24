@@ -19,7 +19,7 @@
 /** 数据仓库拥有者 */
 export declare const TEMPLATE_OWNER = "awujiana";
 /** 数据仓库名（模板与分片数据源同一个仓库，见 `sync/github-config.ts` 默认配置） */
-export declare const TEMPLATE_REPO = "Bangumi-Archive-Anime-Excel";
+export declare const TEMPLATE_REPO = "Bangumi-Archive-Excel";
 /** 一个模板的下载信息 */
 export interface TemplateReleaseInfo {
     /** Release tag（如 `2026.10.27`）；兜底时为空串 */

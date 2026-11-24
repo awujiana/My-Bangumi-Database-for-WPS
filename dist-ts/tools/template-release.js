@@ -19,7 +19,7 @@
 /** 数据仓库拥有者 */
 export const TEMPLATE_OWNER = 'awujiana';
 /** 数据仓库名（模板与分片数据源同一个仓库，见 `sync/github-config.ts` 默认配置） */
-export const TEMPLATE_REPO = 'Bangumi-Archive-Anime-Excel';
+export const TEMPLATE_REPO = 'Bangumi-Archive-Excel';
 /** Release 页面基础路径 */
 const RELEASES_BASE = `https://github.com/${TEMPLATE_OWNER}/${TEMPLATE_REPO}/releases`;
 /** 查最新 Release 的接口（返回跨域头，任务窗格可直接 GET） */

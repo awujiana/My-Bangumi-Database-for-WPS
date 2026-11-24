@@ -130,7 +130,7 @@ async function checkDataUpdate() {
     if (statusHost === null || diffHost === null)
         return;
     statusHost.textContent = tOr('dc.update.checking', '正在检查线上数据源…');
-    const result = await httpRequest('https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/anime.manifest.json');
+    const result = await httpRequest('https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/anime/anime.manifest.json');
     const payload = result.isOk() ? result.data?.data : null;
     if (payload === null || payload === undefined) {
         statusHost.textContent = tOr('dc.update.failed', '检查失败，请稍后重试');

@@ -168,7 +168,7 @@ async function checkDataUpdate(): Promise<void> {
   statusHost.textContent = tOr('dc.update.checking', '正在检查线上数据源…')
 
   const result = await httpRequest<{ recordCount?: number; updatedAt?: string }>(
-    'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/anime.manifest.json',
+    'https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Excel/main/data/anime/anime.manifest.json',
   )
   const payload = result.isOk() ? result.data?.data : null
   if (payload === null || payload === undefined) {
